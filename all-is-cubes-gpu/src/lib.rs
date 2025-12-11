@@ -1,6 +1,14 @@
 //! Algorithms for rendering [All is Cubes] content using a GPU, via
 //! the [`wgpu`] graphics library.
 //!
+//! ## Package features
+//!
+//! This package defines the following feature flags:
+//!
+//! * `"auto-threads"`:
+//!   Enable use of threads for parallel and background processing, including via
+//!   [`rayon`]’s global thread pool.
+//!
 //! [All is Cubes]: all_is_cubes
 
 // wgpu is not no_std but is working towards it, so we shall too, for a better wasm target someday.

@@ -22,6 +22,17 @@
 //! To support a new API/format, you will need to create suitable implementations of the
 //! [`Vertex`] and [`texture::Allocator`] traits, then implement [`MeshTypes`] to bundle them
 //! together.
+//!
+//! ## Package features
+//!
+//! This package defines the following feature flags:
+//!
+//! * `"auto-threads"`:
+//!   Enables implicit use of threads for parallel and background processing, including via
+//!   [`rayon`]’s global thread pool.
+//! * `"dynamic"`:
+//!   Enable the `dynamic` module.
+//!   Incompatible with `no_std` platforms.
 
 #![no_std]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)

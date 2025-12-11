@@ -2,15 +2,31 @@
 //!
 //! Currently supported formats:
 //!
-//! | Format              | Extension         | Import  | Export  | Caveats |
-//! |---------------------|-------------------|:-------:|:-------:|---------|
-//! | All is Cubes native | `.alliscubesjson` | **Yes** | **Yes** | Version compatibility not yet guaranteed. |
-//! | MagicaVoxel `.vox`  | `.vox`            | **Yes** | **Yes** | Materials, scenes, and layers are ignored. |
-//! | [glTF 2.0]          | `.gltf`           | —       | **Yes** | Textures are not yet implemented. Output is suitable for rendering but not necessarily editing due to combined meshes. |
-//! | [STL]               | `.stl`            | —       | **Yes** | Meshes are not necessarily “manifold”/“watertight”. |
+//! | Format              | Extension          | Feature     | Import  | Export  | Caveats |
+//! |---------------------|--------------------|-------------|:-------:|:-------:|---------|
+//! | All is Cubes native | `.alliscubesjson`  | `"native"`  | **Yes** | **Yes** | Version compatibility not yet guaranteed. |
+//! | MagicaVoxel `.vox`  | `.vox`             | `"dot-vox"` | **Yes** | **Yes** | Scene import is buggy. Materials are not exported at all. |
+//! | [glTF 2.0]          | `.gltf`            | `"gltf"`    | No      | **Yes** | Textures are not yet implemented. Output is suitable for rendering but not necessarily editing due to combined meshes. |
+//! | [STL]               | `.stl`             | `"stl"`     | No      | **Yes** | Meshes are not necessarily “manifold”/“watertight”. |
 //!
 //! [glTF 2.0]: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
 //! [STL]: <https://en.wikipedia.org/wiki/STL_(file_format)>
+//!
+//! ## Package features
+//!
+//! This package defines the following feature flags:
+//!
+//! * `"import"`: importing/loading.
+//! * `"export"`: exporting/saving.
+//! * `"all-formats"`: Enables all format features.
+//! * Features for each supported format as listed in the above table.
+//! * `"auto-threads"`:
+//!   Enables implicit use of threads for parallel processing,
+//!   including via [`rayon`]’s global thread pool.
+//!
+//! In order to perform any actual operation, the feature for the desired format, and
+//! the appropriate one of `"export"` or `"import"`, must both be enabled.
+//!
 
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]

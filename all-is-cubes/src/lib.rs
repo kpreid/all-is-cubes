@@ -2,11 +2,12 @@
 //! are themselves made of “smaller” blocks (voxels) that define their appearance and
 //! behavior.
 //!
-//! This crate defines the world model, simulation rules, and basic non-GPU-accelerated
-//! rendering.
-//! (User interface components, platform glue, and game content are kept in other crates.)
+//! This crate, `all_is_cubes`, defines the data model and simulation rules.
+//! (User interface components, rendering, platform glue, and game content are kept in other
+//! crates.)
 //! This crate is designed to be a reusable library for simulating and rendering voxel
-//! world/scenes, but is not yet mature.
+//! world/scenes, but is not yet mature; many pieces of functionality are only sketched out
+//! or missing entirely.
 //!
 //! ## Capabilities
 //!
@@ -34,14 +35,14 @@
 //!   * In addition to their [`Block`] contents, `Space`s have global physical
 //!     properties such as gravity and illumination. They also can have [`Behavior`]s
 //!     attached for miscellaneous “scripting” purposes, though this feature is
-//!     incomplete.
+//!     to be redesigned.
 //!   * There can be arbitrarily many spaces per [`Universe`]. Eventually there will
 //!     be ways to teleport between spaces; for now, this mainly assists [`Block`]s.
 //! * A [`Block`] is a cubical object which can be placed in a [`Space`] or carried in
 //!   a [`Character`]'s inventory.
 //!   * Blocks' shape and appearance (their [`Primitive`]) is either a cube of a single
 //!     color, or recursively defined by a [`Space`] of smaller blocks (at a reduced
-//!     size between 1/2 to 1/255 of a full cube).
+//!     size of [between 1/2 and 1/128][block::Resolution] of a full cube).
 //!     Each of these voxels can be transparent.
 //!     * The player will be able to enter these [`Space`]s and interactively edit
 //!       blocks. This is not currently implemented but that is a lack in the user
@@ -52,8 +53,9 @@
 //!   * Blocks can have [`Modifier`]s applied to them which change the basic shape and
 //!     behavior in a particular instance, such as being rotated into different
 //!     orientations.
-//!   * Blocks will have various forms of active behavior and responses to their
-//!     environment but that has not been designed yet.
+//!   * Blocks have various forms of active behavior and responses to their environment,
+//!     such as [periodically taking an action][block::BlockAttributes::tick_action]
+//!     and [playing sound][block::BlockAttributes::ambient_sound].
 //! * A [`Character`] can move around a [`Space`], acting as the player's viewpoint, and
 //!   carry [`Tool`]s (items) with which to affect the space.
 //!     * There can be multiple characters, but not yet any multiplayer, NPC AI, or even
@@ -102,6 +104,8 @@
 //! * Compatible with web `wasm32-unknown-unknown`, whether or not the `std` feature is active.
 //!   That is, the parts of `std` it uses are the thread-safety and floating-point parts,
 //!   not IO (and not creating threads, unless requested).
+//!   However, you must enable the `"web"` feature of [`bevy_platform`].
+//!
 //! * `usize` must be at least 32 bits (that is, not 16).
 //!
 //! ## Dependencies and global state
@@ -115,7 +119,7 @@
 //!
 //! * [`arcstr`] for string data (as `all_is_cubes::arcstr`).
 //! * [`euclid`] for vector math (as `all_is_cubes::euclid`).
-//! * [`ordered_float`] (as `all_is_cubes::math::NotNan`).
+//! * [`ordered_float`] (only the type [`all_is_cubes::math::NotNan`][crate::math::NotNan]).
 //! * [`embedded_graphics`] (as `all_is_cubes::drawing::embedded_graphics`).
 //!
 //! [`Behavior`]: crate::behavior::Behavior

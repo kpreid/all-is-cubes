@@ -17,6 +17,14 @@
 //! [`Session::input_processor`]: crate::apps::Session::input_processor
 //! [`Space`]: all_is_cubes::space::Space
 //! [`Universe`]: all_is_cubes::universe::Universe
+//!
+//! ## Package features
+//!
+//! This package defines the following feature flags:
+//!
+//! * `"session"`:
+//!   Enables [`apps::Session`] and other items related to user input, menu screens, etc.
+//!   Not compatible with `no_std` platforms.
 
 #![no_std]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
