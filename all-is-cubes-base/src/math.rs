@@ -162,7 +162,7 @@ pub fn sort_two<T: PartialOrd>(a: &mut T, b: &mut T) {
 /// If any element is NaN (more precisely, if [`PartialOrd`] returns [`None`]),
 /// the result will be the absolute value of an arbitrary one of the inputs.
 ///
-/// [Chebyshev distance]: <https://en.wikipedia.org/w/index.php?title=Chebyshev_distance&oldid=1314633868>.
+/// [Chebyshev distance]: https://en.wikipedia.org/w/index.php?title=Chebyshev_distance&oldid=1314633868
 ///
 /// # Examples
 ///
