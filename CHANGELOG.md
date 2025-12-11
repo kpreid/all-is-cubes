@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 (Unreleased)
 
 ### Major change: ECS architecture
 

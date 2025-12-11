@@ -10,7 +10,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "all-is-cubes"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "all-is-cubes-base",
  "arbitrary",
@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-base"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "arbitrary",
  "bevy_platform",
@@ -93,7 +93,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-gpu"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-mesh",
@@ -124,7 +124,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-mesh"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-render",
@@ -150,7 +150,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-port"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-mesh",
@@ -176,7 +176,7 @@ dependencies = [
 
 [[package]]
 name = "all-is-cubes-render"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "all-is-cubes",
  "bitflags",

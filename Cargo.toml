@@ -58,16 +58,16 @@ repository = "https://github.com/kpreid/all-is-cubes"
 # See <https://github.com/rust-lang/cargo/issues/12162> for more information; we may be able to
 # revisit this policy after the 2024 Edition is released.
 #
-all-is-cubes = { path = "all-is-cubes", version = "0.9.0", default-features = false }
-all-is-cubes-base = { path = "all-is-cubes-base", version = "0.9.0", default-features = false }
-all-is-cubes-content = { path = "all-is-cubes-content", version = "0.9.0", default-features = false }
-all-is-cubes-desktop = { path = "all-is-cubes-desktop", version = "0.9.0", default-features = false }
-all-is-cubes-gpu = { path = "all-is-cubes-gpu", version = "0.9.0", default-features = false }
-all-is-cubes-mesh = { path = "all-is-cubes-mesh", version = "0.9.0", default-features = false }
-all-is-cubes-port = { path = "all-is-cubes-port", version = "0.9.0", default-features = false }
-all-is-cubes-render = { path = "all-is-cubes-render", version = "0.9.0", default-features = false }
-all-is-cubes-server = { path = "all-is-cubes-server", version = "0.9.0", default-features = false }
-all-is-cubes-ui = { path = "all-is-cubes-ui", version = "0.9.0", default-features = false }
+all-is-cubes = { path = "all-is-cubes", version = "0.10.0", default-features = false }
+all-is-cubes-base = { path = "all-is-cubes-base", version = "0.10.0", default-features = false }
+all-is-cubes-content = { path = "all-is-cubes-content", version = "0.10.0", default-features = false }
+all-is-cubes-desktop = { path = "all-is-cubes-desktop", version = "0.10.0", default-features = false }
+all-is-cubes-gpu = { path = "all-is-cubes-gpu", version = "0.10.0", default-features = false }
+all-is-cubes-mesh = { path = "all-is-cubes-mesh", version = "0.10.0", default-features = false }
+all-is-cubes-port = { path = "all-is-cubes-port", version = "0.10.0", default-features = false }
+all-is-cubes-render = { path = "all-is-cubes-render", version = "0.10.0", default-features = false }
+all-is-cubes-server = { path = "all-is-cubes-server", version = "0.10.0", default-features = false }
+all-is-cubes-ui = { path = "all-is-cubes-ui", version = "0.10.0", default-features = false }
 allocation-counter = { version = "0.8.1", default-features = false }
 # Only used in std-using packages, so default features enabled
 anyhow = "1.0.70"
