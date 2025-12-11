@@ -1,0 +1,33 @@
+[package]
+name = "test-mesh"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Tests for all-is-cubes-mesh, in a separate package for dependency cycle avoidance."
+publish = false
+
+[[bench]]
+name = "mesh"
+harness = false
+
+[[example]]
+# This is an `example` rather than a `bin` so that its dependencies can be only dev-dependencies.
+name = "visualize-block-mesh"
+required-features = ["rerun"]
+
+[features]
+dynamic = ["all-is-cubes-mesh/dynamic"]
+rerun = ["all-is-cubes-mesh/rerun", "all-is-cubes-mesh/_special_testing"]
+
+[dev-dependencies]
+all-is-cubes = { workspace = true }
+# This is the dependency that would contribute to a cycle if it were in all-is-cubes-mesh itself.
+# We use the demo content so that our tests/benches are realistic.
+all-is-cubes-content = { workspace = true }
+all-is-cubes-mesh = { workspace = true, features = ["dynamic"] }
+all-is-cubes-render = { workspace = true }
+criterion = { workspace = true }
+pollster = { workspace = true }
+
+[lints]
+workspace = true

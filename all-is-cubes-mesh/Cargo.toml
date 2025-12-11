@@ -20,14 +20,6 @@ bench = false
 # Disable doctest running (we have none) to reduce total noise in `cargo test` output.
 doctest = false
 
-[[bench]]
-name = "mesh"
-harness = false
-
-[[example]]
-name = "visualize-block-mesh"
-required-features = ["rerun", "_special_testing"]
-
 [features]
 default = []
 # Updating meshes as their data sources change. Requires std.
@@ -80,10 +72,6 @@ smallvec = { workspace = true }
 visibility = { workspace = true, optional = true }
 
 [dev-dependencies]
-# used for visualize-block-mesh example
-all-is-cubes-content = { workspace = true }
-criterion = { workspace = true }
-pollster = { workspace = true }
 pretty_assertions = { workspace = true }
 rstest = { workspace = true }
 

@@ -247,13 +247,11 @@ name = "all-is-cubes-mesh"
 version = "0.9.0"
 dependencies = [
  "all-is-cubes",
- "all-is-cubes-content",
  "all-is-cubes-render",
  "arbitrary",
  "bitvec",
  "bytemuck",
  "cfg-if",
- "criterion",
  "either",
  "exhaust",
  "flume",
@@ -266,7 +264,6 @@ dependencies = [
  "mutants",
  "num-traits",
  "ordered-float",
- "pollster",
  "pretty_assertions",
  "rayon",
  "rstest",
@@ -6114,6 +6111,18 @@ checksum = "60b8cb979cb11c32ce1603f8137b22262a9d131aaa5c37b5678025f22b8becd0"
 dependencies = [
  "rustix 1.1.2",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "test-mesh"
+version = "0.0.0"
+dependencies = [
+ "all-is-cubes",
+ "all-is-cubes-content",
+ "all-is-cubes-mesh",
+ "all-is-cubes-render",
+ "criterion",
+ "pollster",
 ]
 
 [[package]]
