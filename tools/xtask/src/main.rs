@@ -316,15 +316,22 @@ fn main() -> Result<(), ActionError> {
             exhaustive_test(&config, TestOrCheck::Test, &mut time_log)?;
 
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
-            for package in ALL_NONTEST_PACKAGES {
-                if package == "all-is-cubes-wasm" {
-                    // Not published to crates.io; built and packaged as a part of all-is-cubes-server.
-                    continue;
-                }
 
-                let _pushd = sh.push_dir(package);
-                config.cargo().arg("publish").args(maybe_dry.iter().copied()).run()?;
-            }
+            let package_args = ALL_NONTEST_PACKAGES
+                .into_iter()
+                .filter(|&p| {
+                    // Not published to crates.io; intended to work only with its accompanying
+                    // HTML+JS.
+                    p != "all-is-cubes-wasm"
+                })
+                .map(|p| format!("--package={p}"));
+
+            config
+                .cargo()
+                .arg("publish")
+                .args(maybe_dry.iter().copied())
+                .args(package_args)
+                .run()?;
         }
     }
 
