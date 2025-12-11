@@ -478,7 +478,7 @@ impl SpaceRenderer {
                 draw_opaque_blocks_time: Duration::ZERO,
                 draw_transparent_time: Duration::ZERO,
                 finalize_time: Duration::ZERO,
-                squares_drawn: 0,
+                triangles_drawn: 0,
                 chunk_meshes_drawn: 0,
                 chunks_with_instances_drawn: 0,
                 blocks_drawn: 0,
@@ -525,7 +525,7 @@ impl SpaceRenderer {
             buffers: &'pass ChunkBuffers,
             instance_buffer_writer: &mut MapVec<'_, WgpuInstanceData>,
             chunk_pos: ChunkPos<CHUNK_SIZE>,
-            squares_drawn: &mut usize,
+            triangles_drawn: &mut usize,
             flaws: &mut Flaws,
             in_world_debug_label: &'static str,
         ) {
@@ -552,7 +552,7 @@ impl SpaceRenderer {
                 }
 
                 render_pass.draw_indexed(to_wgpu_index_range(index_range.clone()), 0, id..(id + 1));
-                *squares_drawn += index_range.len() / 6;
+                *triangles_drawn += index_range.len() / 3;
             }
         }
 
@@ -621,7 +621,7 @@ impl SpaceRenderer {
         let mut chunk_meshes_drawn = 0;
         let mut chunks_with_instances_drawn = 0;
         let mut blocks_drawn = 0;
-        let mut squares_drawn = 0;
+        let mut triangles_drawn = 0;
         let mut block_instances: dynamic::InstanceCollector = self
             .instance_collector
             .lock()
@@ -645,7 +645,7 @@ impl SpaceRenderer {
                         buffers,
                         &mut instance_buffer_writer,
                         chunk.position(),
-                        &mut squares_drawn,
+                        &mut triangles_drawn,
                         &mut flaws,
                         "O",
                     );
@@ -702,7 +702,7 @@ impl SpaceRenderer {
             // Record draw command for all instances using this mesh
             let instance_range = first_instance_index..(first_instance_index + count);
             blocks_drawn += instance_range.len();
-            squares_drawn += (meta.opaque_range().len() / 6) * instance_range.len();
+            triangles_drawn += (meta.opaque_range().len() / 3) * instance_range.len();
             render_pass.draw_indexed(to_wgpu_index_range(meta.opaque_range()), 0, instance_range);
 
             // If we are doing overdraw visualization, run the depthless overdraw visualization.
@@ -750,7 +750,7 @@ impl SpaceRenderer {
                             buffers,
                             &mut instance_buffer_writer,
                             chunk.position(),
-                            &mut squares_drawn,
+                            &mut triangles_drawn,
                             &mut flaws,
                             "T",
                         );
@@ -772,7 +772,7 @@ impl SpaceRenderer {
                 .saturating_duration_since(start_opaque_instance_draw_time),
             draw_transparent_time: end_time.saturating_duration_since(start_draw_transparent_time),
             finalize_time: Duration::ZERO, // would be after draw_transparent_time if there was anything
-            squares_drawn,
+            triangles_drawn,
             chunk_meshes_drawn,
             chunks_with_instances_drawn,
             blocks_drawn,

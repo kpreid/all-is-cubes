@@ -265,9 +265,8 @@ pub struct SpaceDrawInfo {
     pub(crate) chunks_with_instances_drawn: usize,
     /// Number of instanced block meshes drawn.
     pub(crate) blocks_drawn: usize,
-    /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
-    /// to draw this frame.
-    pub(crate) squares_drawn: usize,
+    /// How many triangles were used to draw this frame.
+    pub(crate) triangles_drawn: usize,
 
     pub(crate) flaws: Flaws,
 }
@@ -283,7 +282,7 @@ impl Fmt<StatusText> for SpaceDrawInfo {
             chunk_meshes_drawn,
             chunks_with_instances_drawn,
             blocks_drawn,
-            squares_drawn,
+            triangles_drawn,
             flaws: _, // TODO: include or exclude?
         } = self;
 
@@ -305,7 +304,7 @@ impl Fmt<StatusText> for SpaceDrawInfo {
             fmt,
             "Chunk meshes drawn: {chunk_meshes_drawn:3}  \
             Block insts drawn: {blocks_drawn:3} in {chunks_with_instances_drawn:3} chunks  \
-            Quads drawn: {squares_drawn:7}",
+            Triangles drawn: {triangles_drawn:7}",
         )?;
         Ok(())
     }
