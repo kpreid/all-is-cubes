@@ -205,14 +205,22 @@ fn walk_scene_graph<'data>(
             let rotation = if let Some(frame) = frames.first()
                 && let Some(r_string) = frame.attributes.get("_r")
             {
-                // TODO: Rotation::from_byte() may panic on invalid data. Send a patch to fix that.
-                dot_vox::Rotation::from_byte(r_string.parse().map_err(|_| {
+                let rotation_byte = r_string.parse().map_err(|_| {
                     mv::DotVoxConversionError::SceneAttributeParse {
                         scene_index,
                         attribute: "_r",
                         // TODO: include the value
                     }
-                })?)
+                })?;
+                std::panic::catch_unwind(move || {
+                    // TODO: Rotation::from_byte() may panic on invalid data. Send a patch to fix that.
+                    dot_vox::Rotation::from_byte(rotation_byte)
+                })
+                .map_err(|_| mv::DotVoxConversionError::SceneAttributeParse {
+                    scene_index,
+                    attribute: "_r",
+                    // TODO: include the value
+                })?
             } else {
                 dot_vox::Rotation::IDENTITY
             };
