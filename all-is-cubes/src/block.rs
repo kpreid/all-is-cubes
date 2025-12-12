@@ -58,7 +58,9 @@ pub use modifier::*;
 /// * Multi-block structures can be defined using [`Modifier::Zoom`]; their total size
 ///   is limited by the resolution limit.
 pub use all_is_cubes_base::resolution::Resolution;
-pub use all_is_cubes_base::resolution::*;
+
+// Note: can't use a glob re-export due to <https://github.com/rust-lang/rust/issues/149895>
+pub use all_is_cubes_base::resolution::IntoResolutionError;
 
 pub mod text;
 
