@@ -43,6 +43,14 @@ pub(crate) async fn scene_to_space(
     let scale_to_blocks = Resolution::R16;
     let scene_block_bounding_box = scene_voxel_bounding_box.divide(scale_to_blocks.into());
 
+    // TODO: This is an arbitrary limit to avoid consuming unbounded memory.
+    // It should be configurable / check in with the user ("Loading will require XXX MB. Continue?")
+    if scene_block_bounding_box.volume_f64() > 16_000_000.0 {
+        return Err(mv::DotVoxConversionError::SceneTooLarge(
+            scene_block_bounding_box,
+        ));
+    }
+
     let mut space = Space::builder(scene_block_bounding_box)
         .spawn({
             let mut spawn = Spawn::looking_at_space(scene_block_bounding_box, vec3(-1., 1., 1.));

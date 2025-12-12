@@ -1,4 +1,5 @@
 use all_is_cubes::linking::InGenError;
+use all_is_cubes::math::GridAab;
 use all_is_cubes::space::SetCubeError;
 
 /// Errors that may occur while importing `.vox` data.
@@ -20,6 +21,10 @@ pub(crate) enum DotVoxConversionError {
     #[error("scene graph is too complex")]
     SceneGraphRecursion,
 
+    // TODO: better error, include size
+    #[error("scene size would allocate too much space")]
+    SceneTooLarge(GridAab),
+
     #[error("attribute “{attribute}” of scene node with ID {scene_index} is invalid")]
     SceneAttributeParse {
         scene_index: u32,
@@ -28,6 +33,10 @@ pub(crate) enum DotVoxConversionError {
 
     #[error("file refers to model with ID {0} but does not define it")]
     MissingModel(u32),
+
+    // TODO: don't use Debug formatting
+    #[error("model’s size is impossibly large: {0:?}")]
+    ModelSizeInvalid(dot_vox::Size),
 
     #[error("palette of {len} colors too short to contain index {index}")]
     PaletteTooShort { len: usize, index: u8 },

@@ -19,6 +19,11 @@ use crate::{ExportError, Format};
 
 // -------------------------------------------------------------------------------------------------
 
+/// Convert a [`dot_vox::Model`] to a [`Space`].
+///
+/// If `import_as_block` is true, configures the space using
+/// [`space::SpacePhysics::DEFAULT_FOR_BLOCK`].
+///
 /// TODO: Document and allow control over the metadata choices like spawn and physics,
 /// and the choice of coordinate transform.
 #[cfg(feature = "import")]
@@ -27,11 +32,17 @@ pub(crate) fn to_space(
     model: &dot_vox::Model,
     import_as_block: bool,
 ) -> Result<Space, mv::DotVoxConversionError> {
+    // Voxels have u8 coordinates, so a larger size is erroneous and would cause us to allocate
+    // excessive memory.
+    if model.size.x.max(model.size.y).max(model.size.z) > 256 {
+        return Err(mv::DotVoxConversionError::ModelSizeInvalid(model.size));
+    }
+
     let transform = mv_to_aic_coordinate_transform(model.size)?;
     let bounds =
         GridAab::from_lower_size([0, 0, 0], vec3(model.size.x, model.size.y, model.size.z))
             .transform(transform)
-            .expect("TODO: return error");
+            .unwrap(); // overflow should be impossible
 
     let mut space = Space::builder(bounds)
         .physics(if import_as_block {
