@@ -129,7 +129,7 @@ where
                     format!("{name} opaque index"),
                 ),
                 (
-                    mesh.transparent_range(all_is_cubes_mesh::DepthOrdering::ANY),
+                    mesh.transparent_range(all_is_cubes_mesh::DepthOrdering::ALL_UNSORTED),
                     writer.materials.transparent_vertex_colored,
                     format!("{name} transparent index"),
                 ),

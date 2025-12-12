@@ -22,18 +22,17 @@ use crate::{MeshMeta, SpaceMesh};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Identifies a back-to-front order in which to draw transparent triangles (of a [`SpaceMesh`]),
-/// based on the direction from which they are being viewed.
+/// Sorting and culling of transparent triangles of a [`SpaceMesh`].
 ///
-/// Create this using [`DepthOrdering::from_view_of_aabb()`], then use it in
-/// [`MeshMeta::transparent_range()`].
+/// Each value of this type identifies an ordering for depth sorting, and a filter for culling,
+/// based on the direction from which the mesh is being viewed.
+///
+/// Create this using [`DepthOrdering::from_view_of_aabb()`],
+/// then use it in [`MeshMeta::transparent_range()`].
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct DepthOrdering(
     /// Specifies the relationship which the viewpoint has to the viewed mesh’s bounding box,
     /// per axis.
-    ///
-    /// `Ordering::Equal` means that the viewpoint is within the bounding box’s projection
-    /// onto that axis.
     Vector3D<Rel, ()>,
 );
 
@@ -51,19 +50,23 @@ pub enum Rel {
 }
 
 impl DepthOrdering {
-    /// An arbitrary choice of ordering.
+    /// An arbitrary choice of ordering, with no culling.
     ///
-    /// Use this when querying the mesh’s indices without regard for ordering.
+    /// Use this to read the mesh’s indices without regard for view direction,
+    /// such as to prepare an unsorted, unculled export.
     //---
     // Note: The use of `WITHIN` is because we omit known back-faces from the other options,
     // whereas `WITHIN` always has to be complete — well, except that it could omit faces that are
     // _on_ the bounding box which cannot be seen from within, but that is not currently
-    // implemented.
-    pub const ANY: Self = Self::WITHIN;
+    // implemented. If we did implement that culling, we would need to define a separate value for
+    // this purpose.
+    //
+    // The superfluous `const` block nudges rustdoc into not showing the value.
+    pub const ALL_UNSORTED: Self = const { Self::WITHIN };
 
     /// The viewpoint is within the volume; therefore dynamic rather than precomputed
     /// sorting must be used.
-    pub const WITHIN: Self = Self(vec3(Rel::Within, Rel::Within, Rel::Within));
+    pub(crate) const WITHIN: Self = Self(vec3(Rel::Within, Rel::Within, Rel::Within));
 
     /// Number of distinct [`Self`] values; one plus the maximum of [`Self::to_index()`].
     pub(crate) const COUNT: usize = 3_usize.pow(3);
@@ -106,18 +109,6 @@ impl DepthOrdering {
             camera_position.to_untyped(),
             geometry_bounds.into().to_untyped(),
         )
-    }
-
-    /// Returns the ordering which is opposite this one.
-    ///
-    /// When called with [`DepthOrdering::WITHIN`], returns the same value.
-    #[must_use]
-    pub fn reverse(self) -> Self {
-        Self(self.0.map(|ord| match ord {
-            Rel::Lower => Rel::Higher,
-            Rel::Within => Rel::Within,
-            Rel::Higher => Rel::Lower,
-        }))
     }
 
     /// Counts how many axes have the viewpoint within the bounding box when projected on that axis.
