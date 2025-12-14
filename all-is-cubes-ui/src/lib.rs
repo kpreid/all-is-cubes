@@ -37,15 +37,20 @@ extern crate alloc;
 #[macro_use]
 extern crate std;
 
+// -------------------------------------------------------------------------------------------------
+
+#[cfg(feature = "session")]
+pub mod apps;
+
 #[cfg(feature = "session")]
 mod editor;
 #[cfg(feature = "session")]
 mod inv_watch;
 
-#[cfg(feature = "session")]
-pub mod apps;
-
 pub mod logo;
+
+#[cfg(feature = "session")]
+pub mod settings;
 
 #[cfg(feature = "session")]
 mod ui_content;

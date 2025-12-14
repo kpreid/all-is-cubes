@@ -19,7 +19,8 @@ use all_is_cubes::universe::{Universe, UniverseStepInfo};
 use all_is_cubes_gpu as gpu;
 use all_is_cubes_port::file::NonDiskFile;
 use all_is_cubes_render::camera::{StandardCameras, Viewport};
-use all_is_cubes_ui::apps::{CursorIcon, Key, Settings};
+use all_is_cubes_ui::apps::{CursorIcon, Key};
+use all_is_cubes_ui::settings::Settings;
 
 use crate::js_bindings::GuiHelpers;
 

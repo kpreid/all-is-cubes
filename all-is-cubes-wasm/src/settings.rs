@@ -4,7 +4,7 @@ use send_wrapper::SendWrapper;
 use web_sys::window;
 
 use all_is_cubes_render::camera::GraphicsOptions;
-use all_is_cubes_ui::apps::Settings;
+use all_is_cubes_ui::settings::Settings;
 
 /// `localStorage` key we stash the graphics options in.
 ///

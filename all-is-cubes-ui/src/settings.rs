@@ -1,3 +1,7 @@
+//! User-facing interactively editable and persisted settings for All is Cubes sessions.
+//!
+//! [`Settings`] is the primary type of this module.
+
 use alloc::sync::Arc;
 use core::fmt;
 
@@ -14,8 +18,8 @@ type Data = Arc<GraphicsOptions>;
 /// Settings are user-visible configuration that is not specific to a particular session
 /// or universe; for example, graphics options and key bindings.
 ///
-/// This is separate from [`Session`](super::Session) so that it can be shared among
-/// multiple sessions without conflict.
+/// This is separate from [`Session`][super::apps::Session] so that it can be shared among
+/// multiple sessions without conflict (and to allow its use separately if desired).
 /// All such sessions can edit the same settings.
 ///
 /// Having `&` access to a [`Settings`] grants permission to read the settings, follow

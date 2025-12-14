@@ -14,7 +14,7 @@ use all_is_cubes_render::camera::{
     FogOption, LightingOption, NdcPoint2, NominalPixel, RenderMethod, TransparencyOption, Viewport,
 };
 
-use crate::apps::{ControlMessage, Settings};
+use crate::{apps::ControlMessage, settings::Settings};
 
 type MousePoint = Point2D<f64, NominalPixel>;
 

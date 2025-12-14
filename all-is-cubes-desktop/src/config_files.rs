@@ -9,7 +9,7 @@ use directories_next::ProjectDirs;
 use serde::{Serialize, de::DeserializeOwned};
 
 use all_is_cubes_render::camera::GraphicsOptions;
-use all_is_cubes_ui::apps::Settings;
+use all_is_cubes_ui::settings::Settings;
 
 // -------------------------------------------------------------------------------------------------
 
