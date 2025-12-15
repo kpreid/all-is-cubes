@@ -296,6 +296,24 @@ where
 }
 
 impl<C, O> Vol<C, O> {
+    /// Constructs a [`Vol`] whose bounds are [`GridAab::ORIGIN_EMPTY`]
+    /// and which, accordingly, contains no elements.
+    ///
+    /// This depends on `C`’s [`Default`] implementation returning an empty collection,
+    /// (which is true for all Rust standard library collections).
+    /// If it does not, the result will be inconsistent.
+    #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
+    pub fn origin_empty() -> Self
+    where
+        C: Default,
+        O: Default,
+    {
+        Vol {
+            bounds: GridAab::ORIGIN_EMPTY,
+            ordering: O::default(),
+            contents: C::default(),
+        }
+    }
     /// Returns the [`GridAab`] specifying the bounds of this volume data.
     #[inline]
     pub fn bounds(&self) -> GridAab {
@@ -1095,6 +1113,24 @@ mod tests {
         assert_eq!(
             Vol::from_element_mut(&mut Foo),
             Vol::from_elements(GridAab::ORIGIN_CUBE, [Foo].as_mut_slice()).unwrap(),
+        );
+    }
+
+    #[test]
+    fn origin_empty() {
+        const OE: GridAab = GridAab::ORIGIN_EMPTY;
+        assert_eq!(Vol::<()>::origin_empty(), OE.to_vol().unwrap());
+        assert_eq!(
+            Vol::<Box<[i32]>>::origin_empty(),
+            Vol::from_elements(OE, []).unwrap(),
+        );
+        assert_eq!(
+            Vol::<&[i32]>::origin_empty(),
+            Vol::from_elements(OE, [].as_slice()).unwrap(),
+        );
+        assert_eq!(
+            Vol::<&mut [i32]>::origin_empty(),
+            Vol::from_elements(OE, [].as_mut_slice()).unwrap(),
         );
     }
 

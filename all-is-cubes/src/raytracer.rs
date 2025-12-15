@@ -31,8 +31,8 @@ use crate::camera::{FogOption, NdcPoint2};
 )]
 use crate::math::Euclid as _;
 use crate::math::{
-    Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, GridMatrix, Intensity, Rgb,
-    Rgba, Vol, ZeroOne, rgb_const, smoothstep,
+    Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridMatrix, Intensity, Rgb, Rgba,
+    Vol, ZeroOne, rgb_const, smoothstep,
 };
 use crate::raycast::{self, Ray, RayIsh};
 use crate::space::{self, BlockIndex, BlockSky, PackedLight, Sky, SpaceBlockData};
@@ -109,7 +109,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         };
         SpaceRaytracer {
             blocks: Vec::new(),
-            cubes: Vol::from_elements(GridAab::ORIGIN_EMPTY, []).unwrap(),
+            cubes: Vol::origin_empty(),
             block_sky: sky.for_blocks(),
             sky,
             sky_data: D::exception(Exception::Sky, options),

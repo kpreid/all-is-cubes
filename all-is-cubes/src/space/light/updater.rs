@@ -638,10 +638,7 @@ impl LightPhysics {
         opacity: OpacityCategory,
     ) -> Result<Vol<Box<[PackedLight]>>, crate::space::builder::Error> {
         let (storage_bounds, value) = match self {
-            LightPhysics::None => (
-                GridAab::ORIGIN_EMPTY.to_vol().unwrap(),
-                PackedLight::UNINITIALIZED_AND_BLACK,
-            ),
+            LightPhysics::None => (Vol::origin_empty(), PackedLight::UNINITIALIZED_AND_BLACK),
             LightPhysics::Rays { .. } => (
                 space_bounds,
                 match opacity {

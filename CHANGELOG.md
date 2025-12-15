@@ -5,6 +5,7 @@
 ### Added
 
 * `all-is-cubes` library:
+    * `math::Vol::origin_empty()`, infallible construction of empty volume.
     * `time::Tick::{delta_t_f64, delta_t_ps64}()`, convenience for common conversions.
 
 ### Changed

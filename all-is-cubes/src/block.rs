@@ -5,7 +5,6 @@
 //! [`BlockAttributes`], and [`Modifier`].
 
 use alloc::borrow::Cow;
-use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -730,8 +729,7 @@ impl Block {
                         // If there is no intersection, then return an empty voxel array,
                         // with an arbitrary position.
                         // Also applies when skip_eval is true
-                        Vol::from_elements(GridAab::ORIGIN_EMPTY, Box::<[Evoxel]>::default())
-                            .unwrap()
+                        Vol::origin_empty()
                     }
                 };
 
