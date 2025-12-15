@@ -91,7 +91,9 @@ where
     O: UniverseMember + Transactional,
     <O as Transactional>::Transaction: TransactionOnEcs,
 {
-    let entity: ecs::Entity = target.as_entity(universe.universe_id()).unwrap();
+    let entity: ecs::Entity = target
+        .as_entity(universe.universe_id())
+        .expect("transaction target belongs to wrong universe");
     let query_state = O::member_mutation_query_state(&mut universe.queries.write_members);
     let target_query_data = query_state
         .get_mut(&mut universe.world, entity)
@@ -231,7 +233,7 @@ pub(in crate::universe) fn anytxn_merge_helper<O>(
     O: Transactional,
     TransactionInUniverse<O>: Transaction,
 {
-    t1.commit_merge(t2, *check.downcast().unwrap())
+    t1.commit_merge(t2, *check.downcast().expect("invalid merge check"))
 }
 
 /// Called from `impl Transaction for AnyTransaction`

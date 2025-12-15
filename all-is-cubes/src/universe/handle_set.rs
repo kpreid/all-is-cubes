@@ -40,7 +40,7 @@ impl HandleSet {
     pub fn extract_type<T: universe::UniverseMember>(&mut self) -> Vec<Handle<T>> {
         self.handles
             .extract_if(.., |_, handle| handle.downcast_ref::<T>().is_some())
-            .map(|(_, handle)| handle.downcast::<T>().unwrap())
+            .map(|(_, handle)| handle.downcast::<T>().unwrap_or_else(|_| unreachable!()))
             .collect()
     }
 }

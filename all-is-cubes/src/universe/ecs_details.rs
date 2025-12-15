@@ -57,8 +57,18 @@ impl Membership {
     /// Returns this member’s handle.
     ///
     /// Panics if `T` is not the correct handle type.
+    #[track_caller]
     pub fn handle<T: UniverseMember>(&self) -> Handle<T> {
-        self.handle.clone().downcast().unwrap()
+        #[expect(clippy::match_wild_err_arm)]
+        match self.handle.clone().downcast() {
+            Ok(handle) => handle,
+            Err(_) => panic!(
+                "type mismatch: Membership::handle() called on member with type {actual} \
+                    while expecting type {expected}",
+                expected = core::any::type_name::<T>(),
+                actual = self.handle.member_type_name()
+            ),
+        }
     }
 }
 

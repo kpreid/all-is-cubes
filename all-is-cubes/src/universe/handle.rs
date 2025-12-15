@@ -186,7 +186,12 @@ impl<T: 'static> Handle<T> {
                 entity: entity_mut.id(),
             },
         );
-        handle.inner.universe_id.set(universe_id).unwrap();
+        if let Err(already_set) = handle.inner.universe_id.set(universe_id) {
+            panic!(
+                "universe ID already set to {already_set:?} \
+                while deserializing handle to {universe_id:?}"
+            );
+        }
         // Point back to the handle.
         entity_mut.insert(Membership {
             name,

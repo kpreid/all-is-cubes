@@ -82,7 +82,9 @@ fn gc_system(
                     // belongs to a different universe.
                     return;
                 };
-                let r_state = gc_state_query.get(referenced_entity).unwrap();
+                let Ok(r_state) = gc_state_query.get(referenced_entity) else {
+                    panic!("GcState component missing for entity {referenced_entity}")
+                };
                 if !r_state.marked.swap(true, Ordering::Relaxed) {
                     to_visit.insert(referenced_entity);
                 }
