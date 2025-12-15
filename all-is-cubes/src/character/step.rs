@@ -143,7 +143,7 @@ impl Input {
         body: &Body,
         tick: &time::Tick,
     ) -> Vector3D<NotNan<f64>, physics::Velocity> {
-        let dt = tick.delta_t().as_secs_f64();
+        let dt = tick.delta_t_f64();
         let flying = body.flying;
 
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)

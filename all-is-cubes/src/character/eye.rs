@@ -91,7 +91,7 @@ fn step_eye_position(
     characters: ecs::Query<'_, '_, (&Body, &PreviousBodyVelocity, &mut CharacterEye)>,
 ) -> ecs::Result {
     let tick = current_step.get()?.tick;
-    let dt = tick.delta_t().as_secs_f64();
+    let dt = tick.delta_t_f64();
     for (body, &PreviousBodyVelocity(previous_body_velocity), mut eye) in characters {
         let eye = &mut *eye;
 
@@ -123,7 +123,7 @@ fn step_exposure(
     spaces: universe::HandleReadQuery<space::Space>,
 ) -> ecs::Result {
     let tick = current_step.get()?.tick;
-    let dt = tick.delta_t().as_secs_f64();
+    let dt = tick.delta_t_f64();
 
     // TODO(ecs): This'll be a good candidate for parallel execution *if* we have many characters.
     // In any case, maybe hold off until we have reconciled Bevy and Rayon’s thread pools, or
@@ -157,7 +157,7 @@ fn step_ambient_sound(
     spaces: universe::HandleReadQuery<space::Space>,
 ) -> ecs::Result {
     let tick = current_step.get()?.tick;
-    let dt = tick.delta_t().as_secs_f64();
+    let dt = tick.delta_t_f64();
 
     // TODO: Skip characters that are not actually using ambient sound for anything.
     // The simplest way to do this would be to omit the `ambient_sound::State` component,

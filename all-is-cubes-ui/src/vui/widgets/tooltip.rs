@@ -122,7 +122,7 @@ impl TooltipState {
 
     fn step(&mut self, tick: Tick) {
         if let Some(ref mut age) = self.age {
-            *age += tick.delta_t();
+            *age += tick.delta_t_duration();
             if *age > Duration::from_secs(1) {
                 self.set_contents(TooltipContents::Blanked);
                 self.age = None;

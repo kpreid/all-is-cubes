@@ -241,7 +241,7 @@ impl Body {
         let _ = rerun_destination;
 
         let velocity_before_gravity_and_collision = self.velocity;
-        let dt = NotNan::new(tick.delta_t().as_secs_f64()).unwrap();
+        let dt = tick.delta_t_ps64();
         let mut move_segments = [MoveSegment::default(); 3];
         let mut move_segment_index = 0;
         let mut already_colliding = None;
@@ -279,7 +279,7 @@ impl Body {
             && !tick.paused()
             && let Some(space) = colliding_space
         {
-            self.velocity += space.physics().gravity.cast_unit() * dt;
+            self.velocity += space.physics().gravity.cast_unit() * NotNan::from(dt);
         }
 
         // TODO: attempt to expand `occupying` to fit `collision_box`.

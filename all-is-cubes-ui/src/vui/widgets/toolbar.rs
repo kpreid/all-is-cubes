@@ -298,7 +298,7 @@ impl WidgetController for ToolbarController {
                     // include a final goes-to-zero update
                     should_update_pointers = true;
                 }
-                *t = t.saturating_sub(context.tick().delta_t());
+                *t = t.saturating_sub(context.tick().delta_t_duration());
                 pressed_buttons[i] = *t != Duration::ZERO;
             }
         }

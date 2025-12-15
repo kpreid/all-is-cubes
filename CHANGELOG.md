@@ -4,10 +4,15 @@
 
 ### Added
 
+* `all-is-cubes` library:
+    * `time::Tick::{delta_t_f64, delta_t_ps64}()`, convenience for common conversions.
+
 ### Changed
 
 * `all-is-cubes` library:
     * `chunking::point_to_chunk()` now returns `None` in case of out-of-range input instead of panicking.
+
+    * Renamed `time::Tick::delta_t()` to `delta_t_duration()`, to make room for other variations.
 
 ### Removed
 

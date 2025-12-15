@@ -5,6 +5,8 @@ use core::num::NonZeroU16;
 
 use bevy_ecs::prelude as ecs;
 
+use crate::math::PositiveSign;
+
 #[cfg(doc)]
 use crate::universe::Universe;
 
@@ -65,9 +67,22 @@ impl Tick {
         }
     }
 
-    /// Return the amount of time passed as a [`Duration`].
-    pub fn delta_t(self) -> Duration {
+    /// Returns the amount of time passed, as a [`Duration`].
+    pub fn delta_t_duration(self) -> Duration {
         self.schedule.delta_t()
+    }
+
+    /// Returns the amount of time passed, as a restricted floating-point number of seconds.
+    pub fn delta_t_ps64(self) -> PositiveSign<f64> {
+        // We could probably avoid the clamping and do an unchecked construction,
+        // but [`Duration::as_secs_f64()`] doesn’t specifically promise it won’t return
+        // negative zero.
+        PositiveSign::<f64>::new_clamped(self.delta_t_duration().as_secs_f64())
+    }
+
+    /// Returns the amount of time passed, as a floating-point number of seconds.
+    pub fn delta_t_f64(self) -> f64 {
+        self.delta_t_ps64().into_inner()
     }
 
     /// Returns the phase of the originating clock *before* this tick happens.

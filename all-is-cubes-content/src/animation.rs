@@ -133,7 +133,7 @@ impl Fire {
 
     fn tick_state(&mut self, tick: Tick) -> bool {
         const PERIOD: Duration = Duration::from_nanos(1_000_000_000 / 32);
-        self.accumulator += tick.delta_t();
+        self.accumulator += tick.delta_t_duration();
         if self.accumulator >= PERIOD {
             self.accumulator -= PERIOD;
         } else {

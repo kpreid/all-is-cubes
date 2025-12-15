@@ -268,7 +268,7 @@ impl InputProcessor {
     pub(crate) fn step(&mut self, tick: Tick) {
         let mut to_drop = Vec::new();
         for (key, duration) in self.momentary_timeout.iter_mut() {
-            if let Some(reduced) = duration.checked_sub(tick.delta_t()) {
+            if let Some(reduced) = duration.checked_sub(tick.delta_t_duration()) {
                 *duration = reduced;
             } else {
                 to_drop.push(*key);
@@ -303,7 +303,7 @@ impl InputProcessor {
         // TODO: universe input is not yet used but it will be, as we start having inputs that trigger transactions
         let _ = universe;
 
-        let dt = tick.delta_t().as_secs_f64();
+        let dt = tick.delta_t_f64();
         let key_turning_step = 80.0 * dt;
 
         // Effects of UI on input processing.
@@ -647,8 +647,12 @@ mod tests {
     fn slot_selection() {
         let u = &mut Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let character =
-            u.insert("c".into(), Character::spawn_default(u.read_ticket(), space).unwrap()).unwrap();
+        let character = u
+            .insert(
+                "c".into(),
+                Character::spawn_default(u.read_ticket(), space).unwrap(),
+            )
+            .unwrap();
         let mut input = InputProcessor::new();
 
         input.key_down(Key::Character('5'));

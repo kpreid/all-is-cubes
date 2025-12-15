@@ -382,7 +382,7 @@ impl Session {
                 // TODO(time-budget): give UI a time that reflects how much time it needs, rather
                 // than arbitrarily partitioning the delta_t
                 let step_start_time = time::Instant::now();
-                let dt = game_tick.delta_t();
+                let dt = game_tick.delta_t_duration();
                 let deadlines = Layers {
                     world: time::Deadline::At(step_start_time + dt / 2),
                     ui: time::Deadline::At(step_start_time + dt / 2 + dt / 4),
