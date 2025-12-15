@@ -194,7 +194,9 @@ where
     // TODO(instancing): wgpu needs this, but do we really want to offer this canned?
     // Can we have a better API?
     pub fn count_block_instances(&self, camera: &Camera) -> usize {
-        let view_chunk = point_to_chunk(camera.view_position());
+        let Some(view_chunk) = point_to_chunk(camera.view_position()) else {
+            return 0;
+        };
 
         self.chunk_chart
             .chunks(view_chunk, camera.view_direction_mask())
@@ -279,7 +281,16 @@ where
         let graphics_options = camera.options();
         let view_point = camera.view_position();
 
-        let view_chunk = point_to_chunk(view_point);
+        let Some(view_chunk) = point_to_chunk(view_point) else {
+            // TODO: report error
+            return (
+                CsmUpdateInfo {
+                    prep_time: time::Instant::now().saturating_duration_since(update_start_time),
+                    ..CsmUpdateInfo::default()
+                },
+                false,
+            );
+        };
         let view_chunk_is_different = self.view_chunk != view_chunk;
         self.view_chunk = view_chunk;
 

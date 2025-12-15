@@ -112,12 +112,14 @@ pub fn cube_to_chunk<const CHUNK_SIZE: GridCoordinate>(
 }
 
 /// Scale an arbitrary point to obtain the containing chunk.
-pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(point: FreePoint) -> ChunkPos<CHUNK_SIZE> {
-    ChunkPos(
-        Cube::containing(
+///
+/// Returns [`None`] if the floating-point input overflows the integer range of the output.
+pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(
+    point: FreePoint,
+) -> Option<ChunkPos<CHUNK_SIZE>> {
+    Some(ChunkPos(Cube::containing(
         point.map(|c| c.div_euclid(FreeCoordinate::from(CHUNK_SIZE))),
-    ).unwrap(/* TODO */),
-    )
+    )?))
 }
 
 /// A distance between two chunks, taking into consideration their entire volume.

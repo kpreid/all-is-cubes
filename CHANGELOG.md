@@ -6,6 +6,9 @@
 
 ### Changed
 
+* `all-is-cubes` library:
+    * `chunking::point_to_chunk()` now returns `None` in case of out-of-range input instead of panicking.
+
 ### Removed
 
 ## 0.10.0 (2025-12-11)
