@@ -96,7 +96,7 @@ impl Inventory {
         let original_slot = self.get(slot_index);
         match original_slot {
             None | Some(Slot::Empty) => Err(ToolError::NoTool),
-            Some(Slot::Stack(count, original_tool)) => {
+            Some(original_slot @ Slot::Stack(count, original_tool)) => {
                 let input = ToolInput {
                     read_ticket,
                     cursor: cursor.cloned(),
@@ -110,7 +110,7 @@ impl Inventory {
                         // Tool deletes itself.
                         Some(InventoryTransaction::replace(
                             slot_index,
-                            original_slot.unwrap().clone(),
+                            original_slot.clone(),
                             Slot::stack(count.get() - 1, original_tool.clone()),
                         ))
                     }
@@ -122,7 +122,7 @@ impl Inventory {
                         // Tool modifies itself and is not stacked.
                         Some(InventoryTransaction::replace(
                             slot_index,
-                            original_slot.unwrap().clone(),
+                            original_slot.clone(),
                             new_tool.into(),
                         ))
                     }
@@ -132,7 +132,7 @@ impl Inventory {
                         Some(
                             InventoryTransaction::replace(
                                 slot_index,
-                                original_slot.unwrap().clone(),
+                                original_slot.clone(),
                                 Slot::stack(
                                     count_greater_than_one.get() - 1,
                                     original_tool.clone(),
