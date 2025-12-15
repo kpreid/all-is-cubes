@@ -157,14 +157,13 @@ impl Builder<'_, Vol<()>> {
     /// Panics if any of the given coordinates is infinite or NaN.
     #[track_caller]
     pub fn spawn_position(mut self, position: FreePoint) -> Self {
-        assert!(
-            position.to_vector().square_length().is_finite(),
-            "spawn_position must be finite"
-        );
+        let Some(position) = crate::math::try_into_finite_point(position) else {
+            panic!("spawn_position must be finite")
+        };
 
         let mut spawn =
             self.spawn.unwrap_or_else(|| Spawn::default_for_new_space(self.bounds.bounds()));
-        spawn.set_eye_position(position);
+        spawn.set_eye_position(position.map(crate::math::NotNan::into_inner));
         self.spawn = Some(spawn);
         self
     }

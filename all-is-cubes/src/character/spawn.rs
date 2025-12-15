@@ -73,7 +73,11 @@ impl Spawn {
     /// Sets the position at which the character will appear, in terms of its viewpoint.
     pub fn set_eye_position(&mut self, position: impl Into<FreePoint>) {
         // TODO: accept None for clearing
-        // TODO: If we're going to suppress NaN, then it makes sense to suppress infinities too; come up with a general theory of how we want all-is-cubes to handle unreasonable positions.
+        //
+        // TODO: If we're going to suppress NaN, then it makes sense to suppress infinities too;
+        // come up with a general theory of how we want all-is-cubes to handle unreasonable
+        // positions. Currently, there is a mix of panicking and ignoring.
+
         self.eye_position = Some(position.into().map(notnan_or_zero));
     }
 

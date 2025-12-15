@@ -29,6 +29,7 @@ use crate::fluff::Fluff;
 use crate::math::Euclid as _;
 use crate::math::{
     Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign, notnan,
+    try_into_finite_point, try_into_finite_vector,
 };
 use crate::physics::step::PhysicsOutputs;
 use crate::physics::{POSITION_EPSILON, StopAt, Velocity};
@@ -178,9 +179,9 @@ impl Body {
     /// Panics if any component of `position` is NaN or infinite.
     #[track_caller]
     pub fn new_minimal(position: impl Into<FreePoint>, collision_box: impl Into<Aab>) -> Self {
-        let position = position.into();
-        assert!(position.is_finite(), "body’s position must be finite");
-        let position = position.map(|c| NotNan::new(c).unwrap()); // NotNan is a weaker condition
+        let Some(position) = try_into_finite_point(position.into()) else {
+            panic!("body’s position must be finite");
+        };
 
         let collision_box = collision_box.into();
         Self {
@@ -265,7 +266,9 @@ impl Body {
         };
 
         if !self.position.to_vector().square_length().is_finite() {
-            // If position is NaN or infinite, can't do anything, but don't panic
+            // If position is NaN or infinite, can't do anything, but don't panic.
+            // TODO: Instead of this condition, self.position should be statically typed to not
+            // contain any infinity.
             return BodyStepDetails {
                 quiescent: false,
                 already_colliding,
@@ -676,11 +679,11 @@ impl Body {
     /// If `position` contains any component which is infinite or NaN, this function does nothing.
     /// This behavior may change in the future.
     pub fn set_position(&mut self, position: FreePoint) {
-        if !position.is_finite() {
+        let Some(position) = try_into_finite_point(position) else {
             return;
-        }
+        };
 
-        self.position = position.map(|c| NotNan::new(c).unwrap());
+        self.position = position;
 
         // This new box might collide with the `Space`, but (TODO: not implemented yet)
         // stepping will recover from that if possible.
@@ -699,11 +702,10 @@ impl Body {
     /// This behavior may change in the future.
     #[allow(non_snake_case)]
     pub fn add_velocity(&mut self, Δv: Vector3D<f64, Velocity>) {
-        if !Δv.is_finite() {
+        let Some(Δv) = try_into_finite_vector(Δv) else {
             return;
-        }
-
-        self.velocity += Δv.map(|c| NotNan::new(c).unwrap());
+        };
+        self.velocity += Δv;
     }
 
     /// Replaces the body’s velocity with the given value.
@@ -711,11 +713,10 @@ impl Body {
     /// If `Δv` contains any component which is infinite or NaN, this function does nothing.
     /// This behavior may change in the future.
     pub fn set_velocity(&mut self, v: Vector3D<f64, Velocity>) {
-        if !v.is_finite() {
+        let Some(v) = try_into_finite_vector(v) else {
             return;
-        }
-
-        self.velocity = v.map(|c| NotNan::new(c).unwrap());
+        };
+        self.velocity = v;
     }
 
     /// Returns the body's configured collision box in coordinates relative to [`Self::position()`].

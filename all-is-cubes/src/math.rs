@@ -5,6 +5,8 @@
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
+// -------------------------------------------------------------------------------------------------
+
 // Most of the content of this module is implemented in `all_is_cubes_base::math`.
 #[doc(inline)]
 pub use all_is_cubes_base::math::*;
@@ -27,6 +29,8 @@ pub use all_is_cubes_base::{notnan, rgb_const, rgb01, rgba_const};
 ///
 #[doc = include_str!("save/serde-warning.md")]
 pub use all_is_cubes_base::math::GridAab;
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(not(any(feature = "std", test)))]
 #[allow(dead_code, reason = "unclear why this warns even though it is needed")]
@@ -54,6 +58,47 @@ pub(crate) fn smoothstep(x: f64) -> f64 {
     let x = x.clamp(0.0, 1.0);
     3. * x.powi(2) - 2. * x.powi(3)
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Converts a vector with float components into a vector with finite [`NotNan`] components.
+///
+/// Note that this is stricter than [`NotNan::new()`] in that it rejects infinities.
+#[inline]
+pub(crate) fn try_into_finite_vector<T: ordered_float::FloatCore, U>(
+    input: euclid::Vector3D<T, U>,
+) -> Option<euclid::Vector3D<NotNan<T>, U>> {
+    Some(euclid::Vector3D::new(
+        try_into_finite(input.x)?,
+        try_into_finite(input.y)?,
+        try_into_finite(input.z)?,
+    ))
+}
+
+/// Converts a point with float components into a pointwith finite [`NotNan`] components.
+///
+/// Note that this is stricter than [`NotNan::new()`] in that it rejects infinities.
+#[inline]
+pub(crate) fn try_into_finite_point<T: ordered_float::FloatCore, U>(
+    input: euclid::Point3D<T, U>,
+) -> Option<euclid::Point3D<NotNan<T>, U>> {
+    Some(euclid::Point3D::new(
+        try_into_finite(input.x)?,
+        try_into_finite(input.y)?,
+        try_into_finite(input.z)?,
+    ))
+}
+
+#[inline]
+pub(crate) fn try_into_finite<T: ordered_float::FloatCore>(value: T) -> Option<NotNan<T>> {
+    if !value.is_finite() {
+        None
+    } else {
+        NotNan::new(value).ok()
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
