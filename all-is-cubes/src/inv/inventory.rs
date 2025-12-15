@@ -287,8 +287,8 @@ impl Slot {
                         return false;
                     } else if count_to_move < s_count.get() {
                         // The source stack is not completely transferred; update counts.
-                        *s_count = NonZeroU16::new(s_count.get() - count_to_move).unwrap();
-                        *d_count = NonZeroU16::new(d_count.get() + count_to_move).unwrap();
+                        *s_count = strict_sub_nz(*s_count, count_to_move);
+                        *d_count = strict_add_nz(*d_count, count_to_move);
                         return true;
                     } else {
                         // The source stack is completely transferred; exit this match so that we
@@ -304,7 +304,7 @@ impl Slot {
         debug_assert_eq!(count_to_move, self.count());
         if let Slot::Stack(d_count, _) = destination {
             *self = Slot::Empty;
-            *d_count = NonZeroU16::new(d_count.get() + count_to_move).unwrap();
+            *d_count = strict_add_nz(*d_count, count_to_move);
         } else {
             unreachable!();
         }
@@ -573,6 +573,31 @@ pub struct InventoryChange {
     /// Which slots of the inventory have been changed.
     pub slots: Arc<[Ix]>,
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Adds to a [`NonZeroU16`] and panics on overflow.
+///
+/// This is largely equivalent to [`NonZeroU16::checked_add()`] but has a sibling for subtraction.
+#[track_caller]
+fn strict_add_nz(left: NonZeroU16, right: u16) -> NonZeroU16 {
+    left.checked_add(right).unwrap_or_else(strict_panic)
+}
+
+/// Subtracts from a [`NonZeroU16`] and panics on overflow or reaching 0.
+#[track_caller]
+fn strict_sub_nz(left: NonZeroU16, right: u16) -> NonZeroU16 {
+    // Unfortunately, there is no `NonZeroU16::checked_sub()`.
+    NonZeroU16::new(left.get().checked_sub(right).unwrap_or_else(strict_panic))
+        .unwrap_or_else(strict_panic)
+}
+
+#[track_caller]
+fn strict_panic<T>() -> T {
+    panic!("can’t happen: stack count arithmetic overflow")
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
