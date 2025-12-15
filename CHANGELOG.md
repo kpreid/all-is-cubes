@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.10.0 (Unreleased)
+## Unreleased
+
+### Added
+
+### Changed
+
+### Removed
+
+## 0.10.0 (2025-12-11)
 
 ### Major change: ECS architecture
 
