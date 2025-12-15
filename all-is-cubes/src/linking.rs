@@ -234,9 +234,10 @@ impl<E: BlockModule> Provider<E, Block> {
             });
         }
         Ok(Provider {
-            map: E::exhaust()
-                .map(|key| {
-                    let block = Block::from(found.remove(&key).unwrap());
+            map: found
+                .into_iter()
+                .map(|(key, handle)| {
+                    let block = Block::from(handle);
                     (key, block)
                 })
                 .collect(),
