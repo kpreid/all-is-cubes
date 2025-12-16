@@ -185,7 +185,7 @@ impl UniverseTemplate {
                     Some(crate::islands::islands(&mut universe, p.take().unwrap(), params).await)
                 }
                 Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
-                CornellBox => Some(cornell_box(params.size.unwrap_or(GridSize::splat(57)))),
+                CornellBox => Some(cornell_box(params.size.unwrap_or(GridSize::splat(30)))),
                 MengerSponge => Some(
                     menger_sponge_from_size(
                         &mut universe,
