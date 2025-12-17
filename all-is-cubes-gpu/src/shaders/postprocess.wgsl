@@ -26,7 +26,7 @@ struct PostprocessUniforms {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
-    @location(0) tc: vec4<f32>,
+    @location(0) tc: vec2<f32>,
 }
 
 @vertex
@@ -40,7 +40,11 @@ fn postprocess_vertex(
         0.0,
         1.0
     );
-    return VertexOutput(position, position);
+
+    // Y-downward texcoords
+    let tc: vec2f = position.xy * vec2f(0.5, -0.5) + 0.5;
+
+    return VertexOutput(position, tc);
 }
 
 // --- Fragment shader; doing the actual postprocessing work -------------------
@@ -117,10 +121,7 @@ fn text_shadow_alpha(texcoord: vec2<f32>) -> f32 {
 
 @fragment
 fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    // scale clip coordinates to 0-1 coordinates and flip Y
-    let texcoord: vec2<f32> = in.tc.xy * vec2<f32>(0.5, -0.5) + 0.5;
-
-    let scene_color = scene_pixel(texcoord);
+    let scene_color = scene_pixel(in.tc);
 
     // apply tone mapping, respecting premultiplied alpha
     let tone_mapped_scene = vec4<f32>(
@@ -128,8 +129,8 @@ fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         scene_color.a,
     );
 
-    let shadowing = text_shadow_alpha(texcoord);
-    let foreground_texel = textureSampleLevel(text_texture, text_sampler, texcoord, 0.0).r;
+    let shadowing = text_shadow_alpha(in.tc);
+    let foreground_texel = textureSampleLevel(text_texture, text_sampler, in.tc, 0.0).r;
 
     // Final compositing:
     // 1. Shadow layer on scene
