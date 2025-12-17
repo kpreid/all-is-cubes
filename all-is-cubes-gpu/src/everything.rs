@@ -6,14 +6,12 @@ use core::mem;
 
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
-use all_is_cubes::drawing::embedded_graphics::{Drawable as _, pixelcolor::Gray8};
-use all_is_cubes::euclid::Size2D;
-use all_is_cubes::math::VectorOps as _;
+use all_is_cubes::drawing::embedded_graphics::pixelcolor::Gray8;
+use all_is_cubes::euclid::{Size2D, Vector2D};
 use all_is_cubes::time;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::Executor;
-use all_is_cubes_render::camera::{ImagePixel, Layers, RenderMethod, StandardCameras};
-use all_is_cubes_render::info_text_drawable;
+use all_is_cubes_render::camera::{Layers, RenderMethod, StandardCameras, Viewport};
 use all_is_cubes_render::{Flaws, RenderError};
 
 #[cfg(feature = "rerun")]
@@ -82,6 +80,7 @@ pub(super) struct EverythingRenderer {
     /// Debug overlay text is uploaded via this texture
     info_text_texture: InfoTextTexture,
     info_text_sampler: wgpu::Sampler,
+    info_text_coordinate_scale: Vector2D<f32, ()>,
 
     /// If active, then we read the scene out of `self.fb` and include it in the rerun log.
     #[cfg(feature = "rerun")]
@@ -108,6 +107,7 @@ impl fmt::Debug for EverythingRenderer {
             previous_postprocess_time,
             info_text_texture: _,
             info_text_sampler: _,
+            info_text_coordinate_scale,
             #[cfg(feature = "rerun")]
                 rerun_image: _,
         } = self;
@@ -120,6 +120,7 @@ impl fmt::Debug for EverythingRenderer {
             .field("space_renderers", &space_renderers)
             .field("lines_vertex_count", &lines_vertex_count)
             .field("previous_postprocess_time", &previous_postprocess_time)
+            .field("info_text_coordinate_scale", &info_text_coordinate_scale)
             .finish_non_exhaustive()
     }
 }
@@ -222,7 +223,7 @@ impl EverythingRenderer {
             postprocess: postprocess::PostprocessResources::new(&device),
             previous_postprocess_time: time::Duration::ZERO,
 
-            info_text_texture: DrawableTexture::new(wgpu::TextureFormat::R8Unorm),
+            info_text_texture: DrawableTexture::new(wgpu::TextureFormat::R8Uint),
             info_text_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
                 label: Some("EverythingRenderer::info_text_sampler"),
                 address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -233,6 +234,7 @@ impl EverythingRenderer {
                 mipmap_filter: wgpu::MipmapFilterMode::Nearest,
                 ..Default::default()
             }),
+            info_text_coordinate_scale: Vector2D::zero(),
 
             #[cfg(feature = "rerun")]
             rerun_image: rerun_image::RerunImageExport::new(device.clone()),
@@ -244,18 +246,21 @@ impl EverythingRenderer {
             shaders,
             pipelines,
         };
-        // Ensure that we *always* have a postprocess pipeline ready.
+
+        // Ensure that we *always* have a postprocess pipeline and info text texture ready,
+        // rather than needing to deal with absence.
         new_self.update_postprocess_pipeline();
-        // create initial texture
-        new_self.info_text_texture.resize(
-            &new_self.device,
-            Some("info_text_texture"),
-            viewport
-                .nominal_size
-                .map(|component| (component as u32).max(1))
-                .cast_unit::<ImagePixel>(), // info text texture is deliberately sized in nominal pixels to control the font size
-        );
+        new_self.update_info_text_size(viewport);
+
         new_self
+    }
+
+    fn update_info_text_size(&mut self, viewport: Viewport) {
+        let (texture_size, scale) =
+            crate::text::character_texture_size(viewport, &self.pipelines.info_text_font_metrics);
+        self.info_text_texture
+            .resize(&self.device, Some("info_text_texture"), texture_size);
+        self.info_text_coordinate_scale = scale;
     }
 
     /// Read current scene content, compute meshes, and send updated resources
@@ -287,12 +292,7 @@ impl EverythingRenderer {
             if size != previous_size && size.width != 0 && size.height != 0 {
                 self.config.width = size.width;
                 self.config.height = size.height;
-
-                self.info_text_texture.resize(
-                    &self.device,
-                    Some("info_text_texture"),
-                    viewport.nominal_size.map(|component| (component as u32).max(1)).cast_unit(),
-                );
+                self.update_info_text_size(viewport);
             }
 
             cfg_if::cfg_if! {
@@ -612,6 +612,8 @@ impl EverythingRenderer {
             self.cameras.graphics_options(),
             self.cameras.viewport(),
             self.fb.config().maximum_intensity,
+            self.info_text_coordinate_scale,
+            &self.pipelines.info_text_font_metrics,
         )));
 
         // If we're copying the scene image to Rerun, then start that copy now.
@@ -672,10 +674,7 @@ impl EverythingRenderer {
         let info_text_texture = &mut self.info_text_texture;
         // Update info text texture if there is text to draw or if there *was* text that we need to clear.
         if !text.is_empty() || info_text_texture.is_nonzero() {
-            info_text_texture.draw_target().clear_transparent();
-            info_text_drawable(text, Gray8::new(255))
-                .draw(info_text_texture.draw_target())
-                .unwrap(); // TODO: use .into_ok() when stable
+            crate::text::render_text_to_character_texture(text, info_text_texture);
             info_text_texture.upload(queue);
         }
 
@@ -684,6 +683,7 @@ impl EverythingRenderer {
             &mut self.fb,
             &self.info_text_texture,
             &self.info_text_sampler,
+            &self.pipelines.info_text_font,
             output,
         );
 

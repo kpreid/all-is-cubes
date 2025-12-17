@@ -3,15 +3,17 @@
 //! * screen-space effects such as bloom
 //! * tone mapping
 
+use all_is_cubes::euclid::{Vector2D, vec2};
 use all_is_cubes::math::PositiveSign;
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{GraphicsOptions, ToneMappingOperator, Viewport};
 
-use crate::common::{Id, Memo};
+use crate::common::{Id, Identified, Memo};
 use crate::everything::InfoTextTexture;
 use crate::frame_texture;
 use crate::glue::buffer_size_of;
 use crate::shaders::Shaders;
+use crate::text::GpuFontMetrics;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -20,7 +22,7 @@ use crate::shaders::Shaders;
 pub(super) struct PostprocessResources {
     /// Pipeline for the color postprocessing + info text layer drawing.
     pub(super) render_pipeline: Memo<Id<wgpu::ShaderModule>, wgpu::RenderPipeline>,
-    bind_group: Memo<(Id<wgpu::TextureView>, frame_texture::FbtId), wgpu::BindGroup>,
+    bind_group: Memo<([Id<wgpu::TextureView>; 2], frame_texture::FbtId), wgpu::BindGroup>,
     pub(super) bind_group_layout: wgpu::BindGroupLayout,
     pub(super) camera_buffer: wgpu::Buffer,
 }
@@ -32,7 +34,7 @@ impl PostprocessResources {
                 wgpu::BindGroupLayoutEntry {
                     // var<uniform> camera: PostprocessUniforms;
                     binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    visibility: wgpu::ShaderStages::FRAGMENT | wgpu::ShaderStages::VERTEX,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -65,7 +67,7 @@ impl PostprocessResources {
                     ty: wgpu::BindingType::Texture {
                         multisampled: false,
                         view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        sample_type: wgpu::TextureSampleType::Uint, // character codes, not image
                     },
                     count: None,
                 },
@@ -94,6 +96,17 @@ impl PostprocessResources {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    // var font_texture: texture_2d<f32>;
+                    binding: 7,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
             ],
             label: Some("postprocess_bind_group_layout"),
         });
@@ -118,6 +131,7 @@ impl PostprocessResources {
         fb: &mut frame_texture::FramebufferTextures,
         info_text_texture: &InfoTextTexture,
         info_text_sampler: &wgpu::Sampler,
+        font_texture_view: &Identified<wgpu::TextureView>,
         output: &wgpu::TextureView,
     ) -> (wgpu::CommandBuffer, Flaws) {
         const INFO_TEXT_ERROR: &str =
@@ -153,7 +167,10 @@ impl PostprocessResources {
                 0,
                 &*self.bind_group.get_or_insert(
                     (
-                        info_text_texture.view().expect(INFO_TEXT_ERROR).global_id(),
+                        [
+                            info_text_texture.view().expect(INFO_TEXT_ERROR).global_id(),
+                            font_texture_view.global_id(),
+                        ],
                         fb.global_id(),
                     ),
                     || {
@@ -209,6 +226,10 @@ impl PostprocessResources {
                                 wgpu::BindGroupEntry {
                                     binding: 6,
                                     resource: wgpu::BindingResource::Sampler(bloom_sampler),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 7,
+                                    resource: wgpu::BindingResource::TextureView(font_texture_view),
                                 },
                             ],
                             label: Some("PostprocessResources::bind_group"),
@@ -277,21 +298,35 @@ pub(crate) fn create_postprocess_pipeline(
 
 // -------------------------------------------------------------------------------------------------
 
-/// Information corresponding to [`Camera`] (or, for the moment, just [`GraphicsOptions`])
-/// but in a form suitable for passing in a uniform buffer to the `postprocess.wgsl`
-/// shader.
+/// Contents of the uniform buffer updated every frame and read by `postprocess.wgsl`.
 #[repr(C, align(16))] // align triggers bytemuck error if the size doesn't turn out to be a multiple
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct PostprocessUniforms {
+    /// Scale factors transforming from the viewport extent in 0.0..1.0 coordinates
+    /// to `info_text_texture` sampling coordinates.
+    ///
+    /// These factors are not simple because `info_text_texture`’s size is in character cells,
+    /// which are to be some exact multiple of framebuffer pixels.
+    info_text_coordinate_scale: [f32; 2],
+
+    /// Position of the top-left corner of the info text’s top-left character cell,
+    /// in 0.0..1.0 coordinates.
+    info_text_origin: [f32; 2],
+
+    /// Size of a single character cell in `font_texture`.
+    font_cell_size: [u32; 2],
+
+    // --- 16-byte aligned point ---
+    font_cell_margin: u32,
+
     tone_mapping_id: i32,
 
     maximum_intensity: f32,
 
     bloom_intensity: f32,
 
-    /// Scale factor from framebuffer texels to nominal screen coordinates.
-    /// Used for producing “1 pixel” outlines.
-    nominal_pixel_scale: u32,
+    // Adjust this as needed to make a multiple of 16 bytes
+    _padding: [u32; 2],
 }
 
 impl PostprocessUniforms {
@@ -299,8 +334,19 @@ impl PostprocessUniforms {
         options: &GraphicsOptions,
         viewport: Viewport,
         surface_maximum_intensity: PositiveSign<f32>,
+        info_text_coordinate_scale: Vector2D<f32, ()>,
+        info_text_font_metrics: &GpuFontMetrics,
     ) -> Self {
         Self {
+            info_text_coordinate_scale: info_text_coordinate_scale.into(),
+            info_text_origin: vec2(5., 5.)
+                .component_div(viewport.nominal_size.to_vector())
+                .to_f32()
+                .into(),
+
+            font_cell_size: info_text_font_metrics.atlas_cell_size.into(),
+            font_cell_margin: info_text_font_metrics.cell_margin,
+
             tone_mapping_id: if options.maximum_intensity.is_finite() {
                 match options.tone_mapping {
                     ToneMappingOperator::Clamp => 0,
@@ -328,8 +374,7 @@ impl PostprocessUniforms {
 
             bloom_intensity: options.bloom_intensity.into_inner(),
 
-            // non-square pixels not properly supported here for now
-            nominal_pixel_scale: viewport.scale().x.ceil() as u32,
+            _padding: Default::default(),
         }
     }
 }

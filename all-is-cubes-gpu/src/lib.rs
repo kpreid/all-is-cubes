@@ -50,6 +50,7 @@ mod skybox;
 mod space;
 use space::SpaceRenderer;
 mod surface;
+mod text;
 mod vertex;
 
 // -------------------------------------------------------------------------------------------------

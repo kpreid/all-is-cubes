@@ -2,15 +2,18 @@
 
 use alloc::sync::Arc;
 use core::mem;
+
 use wgpu::util::DeviceExt;
 
 use all_is_cubes::content::load_image::include_image;
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
+use crate::common::Identified;
 use crate::frame_texture::FramebufferTextures;
 use crate::glue::size2d_to_extent;
 use crate::shaders::Shaders;
+use crate::text::GpuFontMetrics;
 use crate::vertex;
 
 /// Resources needed for rendering that aren't actually specific to any content and so
@@ -87,6 +90,9 @@ pub(crate) struct Pipelines {
 
     /// Bind group created once and used by the blocks-and-lines shader.
     pub(crate) blocks_static_bind_group: wgpu::BindGroup,
+
+    pub(crate) info_text_font: Identified<wgpu::TextureView>,
+    pub(crate) info_text_font_metrics: GpuFontMetrics,
 }
 
 impl Pipelines {
@@ -750,6 +756,12 @@ impl Pipelines {
             )
         };
 
+        let (info_text_font, info_text_font_metrics) = crate::text::generate_texture_atlas(
+            device,
+            queue,
+            &all_is_cubes::drawing::embedded_graphics::mono_font::iso_8859_1::FONT_7X13_BOLD,
+        );
+
         let block_linear_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Pipelines::block_linear_sampler"),
             mag_filter: wgpu::FilterMode::Linear,
@@ -801,6 +813,8 @@ impl Pipelines {
             linear_sampler,
             skybox_sampler,
             blocks_static_bind_group,
+            info_text_font,
+            info_text_font_metrics,
         }
     }
 
