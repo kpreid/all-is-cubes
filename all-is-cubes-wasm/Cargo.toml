@@ -55,7 +55,7 @@ wasm-bindgen-futures = "0.4.50"
 web-time = { version = "1.1.0" }
 # Must be the same version as in the main workspace, i.e. as in all-is-cubes-gpu.
 # This dep is present for initialization and to enable the features we need.
-wgpu = { version = "27.0.0", default-features = false, features = ["webgpu", "webgl"] }
+wgpu = { version = "28.0.0", default-features = false, features = ["webgpu", "webgl"] }
 # Feature enabling
 yield-progress = { version = "0.2.0", features = ["log_hiccups"] }
 

@@ -166,7 +166,7 @@ visibility = { version = "0.1.1", default-features = false }
 # explicitly enabling "std" needed for <https://github.com/rustwasm/wasm-bindgen/issues/4303>
 wasm-bindgen-futures = { version = "0.4.50", default-features = false, features = ["std"] }
 web-time = { version = "1.1.0", default-features = false }
-wgpu = { version = "27.0.0", default-features = false, features = ["std", "wgsl"] }
+wgpu = { version = "28.0.0", default-features = false, features = ["std", "wgsl"] }
 yield-progress = { version = "0.2.0", default-features = false }
 yoke = { version = "0.8.0", default-features = false, features = ["alloc"] }
 
