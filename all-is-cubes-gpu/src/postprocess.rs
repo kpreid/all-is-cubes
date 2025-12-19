@@ -329,7 +329,7 @@ impl PostprocessUniforms {
             bloom_intensity: options.bloom_intensity.into_inner(),
 
             // non-square pixels not properly supported here for now
-            nominal_pixel_scale: viewport.scale().x as u32,
+            nominal_pixel_scale: viewport.scale().x.ceil() as u32,
         }
     }
 }
