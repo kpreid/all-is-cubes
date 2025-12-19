@@ -567,16 +567,19 @@ mod trace_image {
 
 mod eg {
     use super::*;
-    use crate::info_text_drawable;
     use embedded_graphics::Drawable;
     use embedded_graphics::Pixel;
     use embedded_graphics::draw_target::DrawTarget;
+    use embedded_graphics::mono_font::{MonoTextStyle, iso_8859_1::FONT_7X13_BOLD};
     use embedded_graphics::pixelcolor::BinaryColor;
-    use embedded_graphics::prelude::{DrawTargetExt as _, OriginDimensions, Point, Size};
+    use embedded_graphics::prelude::{
+        DrawTargetExt as _, OriginDimensions, PixelColor, Point, Size,
+    };
     use embedded_graphics::primitives::Rectangle;
+    use embedded_graphics::text::{Baseline, Text};
     use itertools::iproduct;
 
-    pub fn draw_info_text<T: Clone>(
+    pub(crate) fn draw_info_text<T: Clone>(
         output: &mut [T],
         viewport: Viewport,
         paint: [T; 2],
@@ -601,6 +604,18 @@ mod eg {
         }
 
         info_text_drawable(info_text, BinaryColor::On).draw(target).unwrap();
+    }
+
+    fn info_text_drawable<C: PixelColor + 'static>(
+        text: &str,
+        color_value: C,
+    ) -> impl Drawable<Color = C> + '_ {
+        Text::with_baseline(
+            text,
+            Point::new(5, 5),
+            MonoTextStyle::new(&FONT_7X13_BOLD, color_value),
+            Baseline::Top,
+        )
     }
 
     /// Just enough [`DrawTarget`] to implement info text drawing.

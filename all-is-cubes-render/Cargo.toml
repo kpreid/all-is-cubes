@@ -35,14 +35,14 @@ std = [
 # If enabled, threads may be created and the active `rayon` thread pool may be used.
 auto-threads = ["std", "dep:rayon"]
 # Adds the `raytracer` module.
-raytracer = []
+raytracer = ["dep:embedded-graphics"]
 
 [dependencies]
 all-is-cubes = { workspace = true }
 bitflags = { workspace = true }
 displaydoc = { workspace = true }
 # Used to render overlay info text.
-embedded-graphics = { workspace = true }
+embedded-graphics = { workspace = true, optional = true }
 futures-core = { workspace = true }
 imgref = { workspace = true }
 indoc = { workspace = true }

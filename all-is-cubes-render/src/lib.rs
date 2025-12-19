@@ -34,8 +34,6 @@ mod flaws;
 pub use flaws::Flaws;
 
 mod headless;
-#[doc(hidden)]
-pub use headless::info_text_drawable;
 pub use headless::{HeadlessRenderer, Rendering};
 
 #[cfg(feature = "raytracer")]
