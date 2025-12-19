@@ -317,6 +317,7 @@ dependencies = [
  "futures-core",
  "imgref",
  "indoc",
+ "itertools 0.14.0",
  "rayon",
 ]
 

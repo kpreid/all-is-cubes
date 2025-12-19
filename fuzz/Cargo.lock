@@ -185,6 +185,7 @@ dependencies = [
  "futures-core",
  "imgref",
  "indoc",
+ "itertools",
 ]
 
 [[package]]

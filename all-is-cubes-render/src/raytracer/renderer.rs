@@ -571,10 +571,10 @@ mod eg {
     use embedded_graphics::Drawable;
     use embedded_graphics::Pixel;
     use embedded_graphics::draw_target::DrawTarget;
-    use embedded_graphics::draw_target::DrawTargetExt;
     use embedded_graphics::pixelcolor::BinaryColor;
-    use embedded_graphics::prelude::{OriginDimensions, Point, Size};
+    use embedded_graphics::prelude::{DrawTargetExt as _, OriginDimensions, Point, Size};
     use embedded_graphics::primitives::Rectangle;
+    use itertools::iproduct;
 
     pub fn draw_info_text<T: Clone>(
         output: &mut [T],
@@ -590,12 +590,16 @@ mod eg {
                 height: viewport.framebuffer_size.height,
             },
         };
-        let shadow = info_text_drawable(info_text, BinaryColor::Off);
-        // TODO: use .into_ok() when stable for infallible drawing
-        shadow.draw(&mut target.translated(Point::new(0, -1))).unwrap();
-        shadow.draw(&mut target.translated(Point::new(0, 1))).unwrap();
-        shadow.draw(&mut target.translated(Point::new(-1, 0))).unwrap();
-        shadow.draw(&mut target.translated(Point::new(1, 0))).unwrap();
+
+        // Draw outline around the text using copies of the text
+        let outline = info_text_drawable(info_text, BinaryColor::Off);
+        for translation in iproduct!(-1..=1, -1..=1)
+            .map(Point::from)
+            .filter(|&point| point != Point::zero())
+        {
+            let Ok(_) = outline.draw(&mut target.translated(translation));
+        }
+
         info_text_drawable(info_text, BinaryColor::On).draw(target).unwrap();
     }
 

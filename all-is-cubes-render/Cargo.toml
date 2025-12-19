@@ -46,6 +46,7 @@ embedded-graphics = { workspace = true }
 futures-core = { workspace = true }
 imgref = { workspace = true }
 indoc = { workspace = true }
+itertools = { workspace = true }
 rayon = { workspace = true, optional = true }
 
 [dev-dependencies]
