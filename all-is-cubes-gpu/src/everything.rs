@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
+use core::mem;
 
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
@@ -75,6 +76,9 @@ pub(super) struct EverythingRenderer {
 
     postprocess: postprocess::PostprocessResources,
 
+    /// Time spent on the most recent [`Self::add_info_text_and_postprocess()`].
+    previous_postprocess_time: time::Duration,
+
     /// Debug overlay text is uploaded via this texture
     info_text_texture: InfoTextTexture,
     info_text_sampler: wgpu::Sampler,
@@ -101,6 +105,7 @@ impl fmt::Debug for EverythingRenderer {
             lines_buffer: _,
             lines_vertex_count,
             postprocess: _,
+            previous_postprocess_time,
             info_text_texture: _,
             info_text_sampler: _,
             #[cfg(feature = "rerun")]
@@ -114,6 +119,7 @@ impl fmt::Debug for EverythingRenderer {
             .field("config", &config)
             .field("space_renderers", &space_renderers)
             .field("lines_vertex_count", &lines_vertex_count)
+            .field("previous_postprocess_time", &previous_postprocess_time)
             .finish_non_exhaustive()
     }
 }
@@ -214,6 +220,7 @@ impl EverythingRenderer {
             lines_vertex_count: 0,
 
             postprocess: postprocess::PostprocessResources::new(&device),
+            previous_postprocess_time: time::Duration::ZERO,
 
             info_text_texture: DrawableTexture::new(wgpu::TextureFormat::R8Unorm),
             info_text_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
@@ -644,6 +651,7 @@ impl EverythingRenderer {
             },
             // TODO: count bloom (call it postprocess) time separately from submit
             submit_time: Some(end_time.saturating_duration_since(ui_to_postprocess_time)),
+            previous_postprocess_time: mem::take(&mut self.previous_postprocess_time),
         }
     }
 
@@ -654,6 +662,8 @@ impl EverythingRenderer {
         output: &wgpu::TextureView,
         mut text: &str,
     ) -> (wgpu::CommandBuffer, Flaws) {
+        let start_time = time::Instant::now();
+
         // Apply info text option
         if !self.cameras.cameras().world.options().debug_info_text {
             text = "";
@@ -679,6 +689,10 @@ impl EverythingRenderer {
 
         #[cfg(feature = "rerun")]
         self.rerun_image.finish_frame();
+
+        // We can't incorporate the current time into rendering *this* frame’s info text,
+        // so save it for reporting 1 frame later.
+        self.previous_postprocess_time = start_time.elapsed();
 
         (postprocess_cmd, flaws)
     }

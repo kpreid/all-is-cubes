@@ -62,6 +62,12 @@ pub(crate) struct DrawInfo {
     /// Time taken on submitting accumulated information to the GPU.
     /// `None` if the graphics API does not expose this as a step.
     pub(crate) submit_time: Option<Duration>,
+
+    /// CPU time taken on screen-space postprocessing and info text rendering.
+    ///
+    /// This information is stored and reported delayed by 1 frame because otherwise it would not be
+    /// available while drawing the text that incorporates itself.
+    pub(crate) previous_postprocess_time: Duration,
 }
 impl DrawInfo {
     pub(crate) fn flaws(&self) -> Flaws {
@@ -87,6 +93,7 @@ impl Fmt<StatusText> for RenderInfo {
                     times: draw_time,
                     space_info: ref draw_spaces,
                     submit_time,
+                    previous_postprocess_time,
                 },
             flaws,
         } = self;
@@ -110,7 +117,11 @@ impl Fmt<StatusText> for RenderInfo {
         if let Some(t) = submit_time {
             write!(fmt, ", submit {}", t.refmt(fopt))?;
         }
-        writeln!(fmt, ")")?;
+        writeln!(
+            fmt,
+            ", prev post {})",
+            previous_postprocess_time.refmt(fopt)
+        )?;
 
         // UpdateInfo details
         write!(
