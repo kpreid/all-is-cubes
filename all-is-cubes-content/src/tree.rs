@@ -1,7 +1,6 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use itertools::Itertools as _;
 use petgraph::visit::EdgeRef as _;
 use rand::RngExt as _;
 use rand::seq::{IndexedRandom as _, SliceRandom as _};
@@ -193,7 +192,7 @@ pub(crate) fn make_tree(
                 (distance.x.abs() + distance.y.abs() + distance.z.abs()) * MIN_STEP_COST
             },
         ) {
-            for (rootward, leafward) in path.into_iter().tuple_windows() {
+            for &[rootward, leafward] in path.array_windows() {
                 let face = Face6::try_from(leafward - rootward).unwrap();
                 // TODO: cleverer algorithm (at least don't overwrite)
                 *graph.edge_mut(rootward, face).unwrap() = Some(TreeGrowth::Sapling);
