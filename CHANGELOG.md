@@ -8,6 +8,9 @@
     * `math::Vol::origin_empty()`, infallible construction of empty volume.
     * `time::Tick::{delta_t_f64, delta_t_ps64}()`, convenience for common conversions.
 
+* `all-is-cubes-render` library:
+    * `camera::Viewport::scale()`
+
 ### Changed
 
 * `all-is-cubes` library:

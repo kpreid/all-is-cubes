@@ -631,9 +631,7 @@ async fn info_text(mut context: RenderTestContext) {
         ),
     };
 
-    context
-        .render_comparison_test(TEXT_MAX_DIFF, context.default_cameras(), overlays)
-        .await;
+    context.render_comparison_test(0, context.default_cameras(), overlays).await;
 }
 
 /// Display some of the [`Icons`] and [`UiBlocks`].
@@ -836,7 +834,7 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
 
     context
         .render_comparison_test(
-            TEXT_MAX_DIFF,
+            0,
             cameras,
             Overlays {
                 cursor: None,
@@ -856,7 +854,7 @@ async fn layers_hidden_ui(context: RenderTestContext) {
 async fn layers_none_but_text(mut context: RenderTestContext) {
     context
         .render_comparison_test(
-            TEXT_MAX_DIFF,
+            0,
             context.default_cameras(),
             Overlays {
                 cursor: None,
@@ -882,7 +880,7 @@ async fn layers_ui_only(mut context: RenderTestContext) {
 
     context
         .render_comparison_test(
-            TEXT_MAX_DIFF,
+            0,
             cameras,
             Overlays {
                 cursor: None,
@@ -1079,7 +1077,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
     let zero = Viewport::with_scale(1.00, [0, 0]);
     let viewport_cell = listen::Cell::new(zero);
     let cameras: StandardCameras = StandardCameras::new(
-        listen::constant(Arc::new(GraphicsOptions::default())),
+        listen::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
         viewport_cell.as_source(),
         listen::constant(context.universe().get_default_character().map(StrongHandle::from)),
         listen::constant(Arc::new(UiViewState::default())),
@@ -1100,7 +1098,11 @@ async fn viewport_zero(mut context: RenderTestContext) {
     // Now confirm the renderer can produce an okay image afterward
     viewport_cell.set(COMMON_VIEWPORT);
     context
-        .render_comparison_test_with_renderer(TEXT_MAX_DIFF, &mut renderer, overlays.clone())
+        .render_comparison_test_with_renderer(
+            COLOR_ROUNDING_MAX_DIFF,
+            &mut renderer,
+            overlays.clone(),
+        )
         .await;
 
     // Now try *resizing to* zero and back
@@ -1112,7 +1114,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
     }
     viewport_cell.set(COMMON_VIEWPORT);
     context
-        .render_comparison_test_with_renderer(TEXT_MAX_DIFF, &mut renderer, overlays)
+        .render_comparison_test_with_renderer(COLOR_ROUNDING_MAX_DIFF, &mut renderer, overlays)
         .await;
 }
 
@@ -1123,7 +1125,7 @@ async fn viewport_prime(mut context: RenderTestContext) {
 
     context
         .render_comparison_test(
-            1,
+            COLOR_ROUNDING_MAX_DIFF,
             StandardCameras::from_constant_for_test(
                 GraphicsOptions::UNALTERED_COLORS,
                 Viewport::with_scale(1.0, [101, 37]),
@@ -1135,9 +1137,6 @@ async fn viewport_prime(mut context: RenderTestContext) {
 }
 
 // --- Test helpers -------------------------------------------------------------------------------
-
-/// Maximum expected color difference for tests that have text shadows.
-const TEXT_MAX_DIFF: u8 = 20;
 
 /// Maximum expected color difference for tests that should at most have rounding errors
 ///

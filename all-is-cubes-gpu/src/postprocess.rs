@@ -5,7 +5,7 @@
 
 use all_is_cubes::math::PositiveSign;
 use all_is_cubes_render::Flaws;
-use all_is_cubes_render::camera::{GraphicsOptions, ToneMappingOperator};
+use all_is_cubes_render::camera::{GraphicsOptions, ToneMappingOperator, Viewport};
 
 use crate::common::{Id, Memo};
 use crate::everything::InfoTextTexture;
@@ -289,12 +289,15 @@ pub(crate) struct PostprocessUniforms {
 
     bloom_intensity: f32,
 
-    _padding: i32,
+    /// Scale factor from framebuffer texels to nominal screen coordinates.
+    /// Used for producing “1 pixel” outlines.
+    nominal_pixel_scale: u32,
 }
 
 impl PostprocessUniforms {
     pub(crate) fn new(
         options: &GraphicsOptions,
+        viewport: Viewport,
         surface_maximum_intensity: PositiveSign<f32>,
     ) -> Self {
         Self {
@@ -325,7 +328,8 @@ impl PostprocessUniforms {
 
             bloom_intensity: options.bloom_intensity.into_inner(),
 
-            _padding: 0,
+            // non-square pixels not properly supported here for now
+            nominal_pixel_scale: viewport.scale().x as u32,
         }
     }
 }

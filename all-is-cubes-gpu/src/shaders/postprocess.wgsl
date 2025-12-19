@@ -5,7 +5,7 @@ struct PostprocessUniforms {
     tone_mapping_id: i32,
     maximum_intensity: f32,
     bloom_intensity: f32,
-    bloom_debug_level: u32,
+    nominal_pixel_scale: u32,
 }
 
 
@@ -90,12 +90,11 @@ fn scene_pixel(texcoord: vec2<f32>) -> vec4<f32> {
 }
 
 // Given a point in the viewport using 0-1 coordinates, find the opacity the info text's
-// shadow should have.
-fn text_shadow_alpha(texcoord: vec2<f32>) -> f32 {
+// outline should have.
+fn text_outline_alpha(texcoord: vec2<f32>) -> f32 {
     let derivatives = vec2<f32>(dpdx(texcoord.x), dpdy(texcoord.y));
 
-    var accumulator: f32 = 0.0;
-    let radius: i32 = 2;
+    let radius: i32 = i32(camera.nominal_pixel_scale);
     let diameter = radius * 2 + 1;
     // Note: This roundabout method of computing the neighborhood coordinates using
     // a linear index is because the obvious nested for loop would stop early somehow.
@@ -113,10 +112,11 @@ fn text_shadow_alpha(texcoord: vec2<f32>) -> f32 {
             texcoord + offset * derivatives,
             0.0
         ).r;
-        let weight: f32 = 0.35 / max(0.001, length(offset));
-        accumulator = accumulator + offset_sample * weight;
+        if offset_sample > 0.5 {
+            return 1.0;
+        }
     }
-    return pow(clamp(accumulator, 0.0, 1.0), 0.7);
+    return 0.0;
 }
 
 @fragment
@@ -129,7 +129,7 @@ fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         scene_color.a,
     );
 
-    let shadowing = text_shadow_alpha(in.tc);
+    let shadowing = text_outline_alpha(in.tc);
     let foreground_texel = textureSampleLevel(text_texture, text_sampler, in.tc, 0.0).r;
 
     // Final compositing:

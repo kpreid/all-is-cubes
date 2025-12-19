@@ -603,6 +603,7 @@ impl EverythingRenderer {
         )
         .copy_from_slice(bytemuck::bytes_of(&postprocess::PostprocessUniforms::new(
             self.cameras.graphics_options(),
+            self.cameras.viewport(),
             self.fb.config().maximum_intensity,
         )));
 

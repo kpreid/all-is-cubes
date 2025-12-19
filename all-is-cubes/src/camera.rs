@@ -593,6 +593,19 @@ impl Viewport {
         w.checked_mul(h)
     }
 
+    /// Returns the horizontal and vertical scale factors of this viewport.
+    ///
+    /// The scale factor is `framebuffer_size` divided by `nominal_size`.
+    /// It may be understood as “how many physical image pixels are in a nominal pixel?”,
+    /// and is the same value that [`Viewport::with_scale()`] accepts.
+    pub fn scale(&self) -> euclid::Vector2D<f64, ()> {
+        self.framebuffer_size
+            .to_f64()
+            .cast_unit()
+            .to_vector()
+            .component_div(self.nominal_size.to_vector().cast_unit())
+    }
+
     // TODO: Maybe have a validate() that checks if the data is not fit for producing an
     // invertible transform.
 }
