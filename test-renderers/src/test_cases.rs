@@ -103,7 +103,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     );
     c.insert("no_update", None, no_update);
     c.insert_variants("sky", &None, sky, Face6::exhaust());
-    c.insert("info_text", None, info_text);
+    c.insert_variants("info_text", &None, info_text, [1.0, 1.5, 2.0]);
     c.insert_variants(
         "template",
         &None,
@@ -614,7 +614,7 @@ async fn furnace(mut context: RenderTestContext) {
     context.render_comparison_test(1, scene, Overlays::NONE).await;
 }
 
-async fn info_text(mut context: RenderTestContext) {
+async fn info_text(mut context: RenderTestContext, scale_factor: f64) {
     let space = Space::builder(GridAab::ORIGIN_CUBE)
         // This used to also be a test of setting sky
         .sky_color(rgb_const!(1.0, 0.5, 0.0))
@@ -624,14 +624,36 @@ async fn info_text(mut context: RenderTestContext) {
         cursor: None,
         info_text: Some(
             "\
-            +-------------+\n\
-            | Hello world |\n\
-            +-------------+\n\
+            /\\/\\/\\/\\/\\/\\/\\/\\\n\
+            | Hello world. |\n\
+            +--------------+--------\n\
+            |\n\
+            |\n\
+            |\n\
+            |\n\
+            |\n\
             ",
         ),
     };
 
-    context.render_comparison_test(0, context.default_cameras(), overlays).await;
+    context
+        .render_comparison_test(
+            COLOR_ROUNDING_MAX_DIFF,
+            StandardCameras::from_constant_for_test(
+                GraphicsOptions::UNALTERED_COLORS,
+                // this isn't Viewport::with_scale() because that scales the nominal size,
+                // not the framebuffer size.
+                Viewport {
+                    nominal_size: COMMON_VIEWPORT.nominal_size,
+                    framebuffer_size: (COMMON_VIEWPORT.nominal_size * scale_factor)
+                        .to_u32()
+                        .cast_unit(),
+                },
+                context.universe(),
+            ),
+            overlays,
+        )
+        .await;
 }
 
 /// Display some of the [`Icons`] and [`UiBlocks`].
