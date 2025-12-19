@@ -15,7 +15,7 @@ cargo_metadata = "0.23.0"
 clap = { workspace = true }
 itertools = { workspace = true }
 strum = { workspace = true }
-toml_edit = { version = "0.22.27" }
+toml_edit = { version = "0.24.0" }
 walkdir = "2.5.0"
 xshell = "0.2.7"
 
