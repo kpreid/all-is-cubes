@@ -10,9 +10,9 @@ use crate::math::{self, Axis, Rgb, Rgba, lines, rgba_const};
 // To support concise conditional debugging, this module re-exports many items from rerun.
 pub use re_log_types::{EntityPath, EntityPathPart, TimelineName, entity_path};
 pub use re_sdk::{RecordingStream, RecordingStreamBuilder, RecordingStreamResult};
-pub use re_types::datatypes;
-// pub use re_types::external::arrow::types::f16;
-pub use re_types::{archetypes, components, view_coordinates};
+pub use re_sdk_types::datatypes;
+// pub use re_sdk_types::external::arrow::types::f16;
+pub use re_sdk_types::{archetypes, components, view_coordinates};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -224,15 +224,12 @@ pub fn convert_aabs(
     aabs: impl IntoIterator<Item = math::Aab>,
     offset: math::FreeVector,
 ) -> archetypes::Boxes3D {
-    let (half_sizes, centers): (
-        Vec<components::HalfSize3D>,
-        Vec<components::PoseTranslation3D>,
-    ) = aabs
+    let (half_sizes, centers): (Vec<components::HalfSize3D>, Vec<components::Translation3D>) = aabs
         .into_iter()
         .map(|aab| {
             (
                 convert_half_sizes(aab.size()),
-                components::PoseTranslation3D::from(convert_vec(aab.center().to_vector() + offset)),
+                components::Translation3D::from(convert_vec(aab.center().to_vector() + offset)),
             )
         })
         .unzip();
@@ -288,10 +285,10 @@ pub fn convert_camera_to_pinhole(
     (
         archetypes::Pinhole::new(components::PinholeProjection(pinhole_matrix))
             .with_camera_xyz(OUR_VIEW_COORDINATES)
-            .with_image_plane_distance(2.0f32),
+            .with_image_plane_distance(2.0f32)
+            .with_resolution(<[f32; 2]>::from(size)),
         convert_transform(camera.view_transform())
-            .with_relation(components::TransformRelation::ParentFromChild)
-            .with_axis_length(1.0f32),
+            .with_relation(components::TransformRelation::ParentFromChild),
     )
 }
 

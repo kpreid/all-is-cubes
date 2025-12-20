@@ -1004,7 +1004,7 @@ mod eg {
 #[cfg(feature = "rerun")]
 mod rerun {
     use super::*;
-    use re_types::datatypes;
+    use re_sdk_types::datatypes;
 
     impl From<Rgb> for datatypes::Rgba32 {
         #[inline]

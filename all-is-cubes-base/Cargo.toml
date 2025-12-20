@@ -26,7 +26,7 @@ arbitrary = [
     "euclid/arbitrary",
     "ordered-float/arbitrary"
 ]
-rerun = ["dep:re_types"]
+rerun = ["dep:re_sdk_types"]
 serde = [
     "dep:serde",
     "ordered-float/serde",
@@ -52,7 +52,7 @@ mutants = { workspace = true }
 num-traits = { workspace = true }
 ordered-float = { workspace = true }
 rand = { workspace = true }
-re_types = { workspace = true, optional = true }
+re_sdk_types = { workspace = true, optional = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
 visibility = { workspace = true, optional = true }
 

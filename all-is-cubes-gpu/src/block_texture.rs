@@ -217,14 +217,14 @@ impl AtlasAllocator {
             reflectance_backing,
             reflectance_and_emission_backing,
         } = self;
-        reflectance_backing
-            .lock()
-            .unwrap()
-            .log_to_rerun(destination.child(&rg::entity_path!["reflectance"]));
-        reflectance_and_emission_backing
-            .lock()
-            .unwrap()
-            .log_to_rerun(destination.into_child(&rg::entity_path!["reflectance_and_emission"]));
+        reflectance_backing.lock().unwrap().log_to_rerun(
+            destination.child(&rg::entity_path!["reflectance"]),
+            &rg::archetypes::Transform3D::from_translation([0., 0., 0.]),
+        );
+        reflectance_and_emission_backing.lock().unwrap().log_to_rerun(
+            destination.into_child(&rg::entity_path!["reflectance_and_emission"]),
+            &rg::archetypes::Transform3D::from_translation([512., 0., 0.]),
+        );
     }
 }
 
@@ -632,15 +632,13 @@ impl AllocatorBacking {
     /// Activate logging of all texels to Rerun as a point cloud.
     /// Does not take effect until the next [`Self::flush()`].
     #[cfg(feature = "rerun")]
-    pub(crate) fn log_to_rerun(&mut self, destination: rg::Destination) {
-        // Logging an invalid transform signals this should be a disconnected coordinate system.
-        // We're supposed to use an explicit blueprint instead, but those aren't available from
-        // Rust yet.
-        // <https://rerun.io/docs/reference/migration/migration-0-21#disconnectedspace-archetypecomponent-deprecated>
-        destination.log_static(
-            &rg::entity_path![],
-            &rg::archetypes::Transform3D::from_scale(0.0),
-        );
+    pub(crate) fn log_to_rerun(
+        &mut self,
+        destination: rg::Destination,
+        transform: &rg::archetypes::Transform3D,
+    ) {
+        // establish separate coordinate frame
+        destination.log_static(&rg::entity_path![], transform);
         destination.log(&rg::entity_path![], &rg::archetypes::ViewCoordinates::RUF());
         self.rerun_destination = destination;
     }

@@ -463,7 +463,7 @@ fn convert_vertices(vertices: &[AnalysisVertex], box_half_size: f32) -> rg::arch
 
     rg::archetypes::Boxes3D::from_centers_and_half_sizes(
         which_boxes.clone().map(|(vertex, octant)| {
-            rg::components::PoseTranslation3D(rg::convert_vec(
+            rg::components::Translation3D(rg::convert_vec(
                 vertex.position.to_vector().to_f32() + octant.reflect(offset),
             ))
         }),
