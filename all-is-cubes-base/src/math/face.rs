@@ -739,10 +739,10 @@ impl TryFrom<GridVector> for Face7 {
 pub struct Faceless;
 
 #[cfg(feature = "rerun")]
-impl From<Face6> for re_types::view_coordinates::SignedAxis3 {
+impl From<Face6> for re_sdk_types::view_coordinates::SignedAxis3 {
     #[inline]
     fn from(face: Face6) -> Self {
-        use re_types::view_coordinates::{Axis3, Sign, SignedAxis3};
+        use re_sdk_types::view_coordinates::{Axis3, Sign, SignedAxis3};
         match face {
             Face6::NX => SignedAxis3 {
                 sign: Sign::Negative,

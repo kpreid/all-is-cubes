@@ -147,9 +147,7 @@ impl RerunMesher {
                 && let Some(dm) = &mesh.render_data
             {
                 let translations = cubes.into_iter().map(|cube| {
-                    rg::components::PoseTranslation3D(rg::convert_vec(
-                        cube.lower_bounds().to_vector(),
-                    ))
+                    rg::components::Translation3D(rg::convert_vec(cube.lower_bounds().to_vector()))
                 });
                 dm.destination.log(
                     &rg::entity_path![],

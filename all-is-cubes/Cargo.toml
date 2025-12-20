@@ -91,7 +91,7 @@ rerun = [
     "std",
     "dep:re_log_types",
     "dep:re_sdk",
-    "dep:re_types",
+    "dep:re_sdk_types",
     "all-is-cubes-base/rerun",
 ]
 # Adds automatic parallelism to some algorithms.
@@ -151,7 +151,7 @@ rayon = { workspace = true, optional = true }
 # development of All is Cubes itself.
 re_log_types = { workspace = true, optional = true }
 re_sdk = { workspace = true, optional = true }
-re_types = { workspace = true, optional = true }
+re_sdk_types = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 # rc feature needed because we are [de]serializing `Arc`s
 # alloc feature needed for #[serde(flatten)] — https://github.com/serde-rs/serde/issues/1935
