@@ -98,6 +98,9 @@ pub(crate) enum XtaskCommand {
         additional_args: Vec<String>,
     },
 
+    /// Perform audits of dependencies.
+    CheckDeps,
+
     /// Set the version number of all packages and their dependencies on each other.
     SetVersion {
         version: String,

@@ -50,22 +50,22 @@ impl Config<'_> {
     /// [`crate::do_for_all_packages`] doesn't use this because it has more specialized handling
     pub fn do_for_all_workspaces<F>(&self, mut f: F) -> Result<(), ActionError>
     where
-        F: FnMut() -> Result<(), ActionError>,
+        F: FnMut(Workspace) -> Result<(), ActionError>,
     {
         // main workspace
         if self.scope.includes_main_workspace() {
-            f()?;
+            f(Workspace::Main)?;
 
             // TODO: split out wasm as a Scope
             {
                 let _pushd = self.sh.push_dir("all-is-cubes-wasm");
-                f()?;
+                f(Workspace::Wasm)?;
             }
         }
 
         if self.scope.includes_fuzz_workspace() {
             let _pushd = self.sh.push_dir("fuzz");
-            f()?;
+            f(Workspace::Fuzz)?;
         }
         Ok(())
     }
@@ -131,4 +131,12 @@ pub(crate) enum Features {
 
     /// Each package with every possible combination of features.
     Powerset,
+}
+
+/// Which workspace within the repository this is.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Workspace {
+    Main,
+    Wasm,
+    Fuzz,
 }

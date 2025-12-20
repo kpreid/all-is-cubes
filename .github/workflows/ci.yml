@@ -469,6 +469,8 @@ jobs:
         path: |
           target/cargo-timings/cargo-timing-*.html
 
+  # Check dependencies for undesirable properties with cargo-deny.
+  # Note: When changing this job, also change the behavior of `xtask check-deps`.
   deny:
     runs-on: ubuntu-latest
     

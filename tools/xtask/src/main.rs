@@ -71,69 +71,83 @@ fn main() -> Result<(), ActionError> {
     // TODO: fold time_log into the Config to reduce number of pieces passed around
     let mut time_log: Vec<Timing> = Vec::new();
 
+    run_command(&config, command, &mut time_log)?;
+
+    for t in time_log {
+        eprintln!("{t}");
+    }
+
+    Ok(())
+}
+
+fn run_command(
+    config: &Config<'_>,
+    command: XtaskCommand,
+    time_log: &mut Vec<Timing>,
+) -> Result<(), ActionError> {
     match command {
         XtaskCommand::Init => {
-            write_development_files(&config)?;
+            write_development_files(config)?;
             if config.scope.includes_main_workspace() {
-                build_web(&config, &mut time_log, Profile::Dev)?; // includes installing wasm tools
+                build_web(config, time_log, Profile::Dev)?; // includes installing wasm tools
             }
         }
         XtaskCommand::Test { no_run } => {
             do_for_all_packages(
-                &config,
+                config,
                 if no_run {
                     TestOrCheck::BuildTests
                 } else {
                     TestOrCheck::Test
                 },
                 Features::Default,
-                &mut time_log,
+                time_log,
             )?;
         }
         XtaskCommand::TestMore { no_run } => {
             exhaustive_test(
-                &config,
+                config,
                 if no_run {
                     TestOrCheck::BuildTests
                 } else {
                     TestOrCheck::Test
                 },
-                &mut time_log,
+                time_log,
             )?;
         }
         XtaskCommand::Lint => {
-            do_for_all_packages(&config, TestOrCheck::Lint, Features::Default, &mut time_log)?;
+            do_for_all_packages(config, TestOrCheck::Lint, Features::Default, time_log)?;
 
             // Build docs to verify that there are no broken doc links.
             // This applies to the main workspace & target only, because there are no
             // libraries with docs elsewhere.
             if config.scope.includes_main_workspace() {
-                build_documentation(&config, &mut time_log)?;
+                build_documentation(config, time_log)?;
             }
         }
         XtaskCommand::CheckFeatures => {
             do_for_all_packages(
-                &config,
+                config,
                 // no Clippy for better throughput; pragmatically we care about "does it build"
                 // much more than the more pedantic lints, and this will still give us dead code
                 // and unused imports warnings
                 TestOrCheck::Check,
                 Features::Powerset,
-                &mut time_log,
+                time_log,
             )?;
         }
         XtaskCommand::Doc => {
             assert!(config.scope.includes_main_workspace());
-            build_documentation(&config, &mut time_log)?;
+            build_documentation(config, time_log)?;
         }
         XtaskCommand::Fmt => {
-            config.do_for_all_workspaces(|| {
+            config.do_for_all_workspaces(|_| {
                 config.cargo().arg("fmt").run()?;
                 Ok(())
             })?;
         }
         XtaskCommand::Clean => {
-            config.do_for_all_workspaces(|| {
+            config.do_for_all_workspaces(|_| {
                 config.cargo().arg("clean").run()?;
                 Ok(())
             })?;
@@ -178,10 +192,10 @@ fn main() -> Result<(), ActionError> {
             }
         }
         XtaskCommand::BinSize => {
-            measure_binary_sizes(&config)?;
+            measure_binary_sizes(config)?;
         }
         XtaskCommand::RunGameServer { server_args } => {
-            build_web(&config, &mut time_log, Profile::Dev)?;
+            build_web(config, time_log, Profile::Dev)?;
 
             let mut cmd = std::process::Command::new(config.cargo_path());
             cmd.arg("run")
@@ -205,9 +219,9 @@ fn main() -> Result<(), ActionError> {
         }
         XtaskCommand::BuildWebRelease => {
             // We only generate the license file in release builds, to save time.
-            generate_wasm_licenses_file(&config, &mut time_log)?;
+            generate_wasm_licenses_file(config, time_log)?;
 
-            build_web(&config, &mut time_log, Profile::Release)?;
+            build_web(config, time_log, Profile::Release)?;
         }
         XtaskCommand::Update {
             to,
@@ -225,7 +239,7 @@ fn main() -> Result<(), ActionError> {
                     eprintln!("Doing nothing because update type is {to:?}.");
                 }
                 UpdateTo::Latest => {
-                    config.do_for_all_workspaces(|| {
+                    config.do_for_all_workspaces(|_| {
                         // Note: The `fuzz` workspace lock file is ignored in version control.
                         // But we do want to occasionally update it anyway.
                         config.cargo().arg("update").args(&cargo_update_args).run()?;
@@ -233,7 +247,7 @@ fn main() -> Result<(), ActionError> {
                     })?;
                 }
                 UpdateTo::Minimal => {
-                    config.do_for_all_workspaces(|| {
+                    config.do_for_all_workspaces(|_| {
                         // can't use cargo() to invoke rustup
                         cmd!(config.sh, "cargo +nightly")
                             .args(["update", "-Zdirect-minimal-versions"])
@@ -243,6 +257,25 @@ fn main() -> Result<(), ActionError> {
                     })?;
                 }
             }
+        }
+        XtaskCommand::CheckDeps => {
+            // Note when changing this command set: .github/workflows/ci.yml performs the same
+            // operations but broken out into separate jobs.
+            config.do_for_all_workspaces(|ws| {
+                if ws != Workspace::Fuzz {
+                    config.cargo().args(["deny", "check"]).run()?;
+                }
+                Ok(())
+            })?;
+            run_command(
+                config,
+                XtaskCommand::Update {
+                    to: UpdateTo::Minimal,
+                    dry_run: true,
+                    additional_args: Vec::new(),
+                },
+                time_log,
+            )?;
         }
         XtaskCommand::SetVersion { version } => {
             /// Given a dependency table entry like `foo = "1.2.3"` or
@@ -313,7 +346,7 @@ fn main() -> Result<(), ActionError> {
         XtaskCommand::PublishAll { for_real } => {
             assert_eq!(config.scope, Scope::All);
 
-            exhaustive_test(&config, TestOrCheck::Test, &mut time_log)?;
+            exhaustive_test(config, TestOrCheck::Test, time_log)?;
 
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
 
@@ -333,10 +366,6 @@ fn main() -> Result<(), ActionError> {
                 .args(package_args)
                 .run()?;
         }
-    }
-
-    for t in time_log {
-        eprintln!("{t}");
     }
 
     Ok(())
