@@ -45,7 +45,6 @@ skip-tree = [
     { name = "hashbrown", version = "0.15", depth = 2 }, # waiting for bevy, ratatui, wgpu to catch up
     { name = "rand", version = "0.8" }, # via `noise`
     { name = "windows-sys", depth = 2 },
-    { name = "windows-targets", depth = 2 },
 ]
 
 [sources]
