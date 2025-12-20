@@ -164,9 +164,9 @@ fn render_character_cell(cell: vec2i, position_in_cell: vec2f) -> vec4f {
     // Position in cell scaled to be whole-texel coordinates for the box within the atlas cell
     // *not* including the outline.
     let float_texel_in_cell =
-        position_in_cell * vec2f(camera.font_cell_size - u32(camera.font_cell_margin) * 2)
+        position_in_cell * vec2f(camera.font_cell_size - camera.font_cell_margin * 2)
         // offset so 0,0 is the top-left of the nominal character cell *inside* the margin
-        + vec2f(camera.font_cell_margin);
+        + vec2f(f32(camera.font_cell_margin));
 
     if float_texel_in_cell.x < 0 
         || float_texel_in_cell.y < 0 
