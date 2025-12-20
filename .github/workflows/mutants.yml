@@ -40,7 +40,7 @@ jobs:
 
       - name: Save results
         if: ${{ always() }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: mutation-report
           path: "mutants.out"
