@@ -49,6 +49,7 @@ impl SurfaceRenderer {
         let request_device_future = adapter.request_device(&EverythingRenderer::device_descriptor(
             "SurfaceRenderer::device",
             adapter.limits(),
+            adapter.features(),
         ));
         let (device, queue) = request_device_future.await?;
 

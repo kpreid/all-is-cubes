@@ -118,6 +118,7 @@ dependencies = [
  "rand_xoshiro",
  "resource",
  "send_wrapper",
+ "strum",
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",

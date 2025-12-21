@@ -40,6 +40,7 @@ mod mip_ping;
 mod pipelines;
 mod poll;
 mod postprocess;
+mod queries;
 mod raytrace_to_texture;
 #[cfg(feature = "rerun")]
 mod rerun_image;
@@ -95,6 +96,7 @@ impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for WgpuMt {
 pub fn device_descriptor(
     label: &str,
     available_limits: wgpu::Limits,
+    available_features: wgpu::Features,
 ) -> wgpu::DeviceDescriptor<'_> {
-    EverythingRenderer::device_descriptor(label, available_limits)
+    EverythingRenderer::device_descriptor(label, available_limits, available_features)
 }

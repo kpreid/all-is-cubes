@@ -235,6 +235,7 @@ dependencies = [
  "scopeguard",
  "send_wrapper",
  "smol-macros",
+ "strum",
  "visibility",
  "wasm-bindgen-futures",
  "web-sys",

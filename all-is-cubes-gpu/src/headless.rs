@@ -39,6 +39,7 @@ impl Builder {
             .request_device(&crate::EverythingRenderer::device_descriptor(
                 label,
                 adapter.limits(),
+                adapter.features(),
             ))
             .await?;
         Ok(Self {

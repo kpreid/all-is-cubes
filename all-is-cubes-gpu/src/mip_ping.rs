@@ -10,6 +10,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use crate::Identified;
+use crate::queries::{Queries, Query};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -198,16 +199,32 @@ impl Pipelines {
 /// Texture and size-dependent resources for a [`mip_ping`](self) effect.
 #[derive(Debug)]
 pub(crate) struct Texture {
-    /// When executed, computes the effect on the previously provided texture and leaves the result
-    /// (blurred scene) in [`Self::output_texture_view`].
+    /// When the render bundles in this vector are executed, they compute the effect on the
+    /// previously provided texture and leaves the result in [`Self::output_texture_view`].
     ///
-    /// The `TextureView` in each element is the color attachment with which to execute
-    /// the bundle.
-    render_bundles: Vec<(String, wgpu::RenderBundle, wgpu::TextureView)>,
+    /// The `TextureView` in each element is
+    stages: Vec<Stage>,
 
     pub output_texture_view: wgpu::TextureView,
 
     shader_id: crate::Id<wgpu::ShaderModule>,
+}
+
+/// A [`wgpu::RenderBundle`] and ingredients for one render pass of those making up the whole.
+#[derive(Debug)]
+pub(crate) struct Stage {
+    /// Label for the render pass.
+    pass_label: String,
+
+    /// Render bundle to execute in the render pass.
+    render_bundle: wgpu::RenderBundle,
+
+    /// Texture view to use as the color attachment for the render pass.
+    color_attachment: wgpu::TextureView,
+
+    // Timestamp indices to put in [`wgpu::RenderPassTimestampWrites`].
+    begin_timestamp_query: Option<Query>,
+    end_timestamp_query: Option<Query>,
 }
 
 impl Texture {
@@ -220,6 +237,8 @@ impl Texture {
         scene_texture: &wgpu::TextureView,
         maximum_levels: u32,
         repetitions: u32,
+        begin_timestamp_query: Query,
+        end_timestamp_query: Query,
     ) -> Self {
         let label = &pipelines.label;
         let (intermediate_texture_size, mip_level_count) =
@@ -239,7 +258,7 @@ impl Texture {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         });
 
-        let mut render_bundles = Vec::with_capacity(mip_level_count as usize * 2 - 1);
+        let mut stages = Vec::with_capacity(mip_level_count as usize * 2 - 1);
 
         // Repeat the downsample-upsample several times.
         // This can give us a larger radius of effect in cases where downsampling further
@@ -276,14 +295,17 @@ impl Texture {
                 encoder.draw(0..3, output_mip..(output_mip + 1));
 
                 let pass_label = format!("{label} rep {repetition} downsample {output_mip}");
-                let bundle = encoder.finish(&wgpu::RenderBundleDescriptor {
+                let render_bundle = encoder.finish(&wgpu::RenderBundleDescriptor {
                     label: Some(&pass_label),
                 });
-                render_bundles.push((
+                stages.push(Stage {
                     pass_label,
-                    bundle,
-                    single_mip_view(label, output_mip, &intermediate_texture),
-                ));
+                    render_bundle,
+                    color_attachment: single_mip_view(label, output_mip, &intermediate_texture),
+                    begin_timestamp_query: (repetition == 0 && output_mip == 0)
+                        .then_some(begin_timestamp_query),
+                    end_timestamp_query: None,
+                });
             }
 
             // Generate upsampling stages.
@@ -310,32 +332,41 @@ impl Texture {
                 encoder.draw(0..3, output_mip..(output_mip + 1));
 
                 let pass_label = format!("{label} rep {repetition} upsample {output_mip}");
-                let bundle = encoder.finish(&wgpu::RenderBundleDescriptor {
+                let render_bundle = encoder.finish(&wgpu::RenderBundleDescriptor {
                     label: Some(&pass_label),
                 });
-                render_bundles.push((
+                stages.push(Stage {
                     pass_label,
-                    bundle,
-                    single_mip_view(label, output_mip, &intermediate_texture),
-                ));
+                    render_bundle,
+                    color_attachment: single_mip_view(label, output_mip, &intermediate_texture),
+                    begin_timestamp_query: None,
+                    end_timestamp_query: (repetition == repetitions - 1 && output_mip == 0)
+                        .then_some(end_timestamp_query),
+                });
             }
         }
 
         Self {
-            render_bundles,
+            stages,
 
             output_texture_view: single_mip_view(label, 0, &intermediate_texture),
             shader_id: pipelines.shader_id,
         }
     }
 
-    pub fn run(&self, encoder: &mut wgpu::CommandEncoder) {
-        for (label, bundle, color_texture_view) in &self.render_bundles {
-            // TODO: Is this a good use for a CommandBuffer instead of a CommandEncoder?
+    pub fn run(&self, encoder: &mut wgpu::CommandEncoder, queries: Option<&Queries>) {
+        for Stage {
+            pass_label,
+            render_bundle,
+            color_attachment,
+            begin_timestamp_query,
+            end_timestamp_query,
+        } in &self.stages
+        {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some(label),
+                label: Some(pass_label),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: color_texture_view,
+                    view: color_attachment,
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
@@ -343,9 +374,20 @@ impl Texture {
                         store: wgpu::StoreOp::Store,
                     },
                 })],
+                timestamp_writes: queries
+                    .map(|queries| wgpu::RenderPassTimestampWrites {
+                        query_set: &queries.query_set,
+                        beginning_of_pass_write_index: begin_timestamp_query.map(Query::index),
+                        end_of_pass_write_index: end_timestamp_query.map(Query::index),
+                    })
+                    .filter(|tw| {
+                        // obey wgpu API restriction that there must be at least one index
+                        tw.beginning_of_pass_write_index.is_some()
+                            || tw.end_of_pass_write_index.is_some()
+                    }),
                 ..Default::default()
             });
-            render_pass.execute_bundles([bundle]);
+            render_pass.execute_bundles([render_bundle]);
         }
     }
 

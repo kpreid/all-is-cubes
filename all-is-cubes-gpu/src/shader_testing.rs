@@ -46,6 +46,7 @@ where
         .request_device(&crate::EverythingRenderer::device_descriptor(
             device_label,
             adapter.limits(),
+            adapter.features(),
         ))
         .await
         .unwrap();

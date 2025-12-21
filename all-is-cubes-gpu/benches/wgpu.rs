@@ -132,6 +132,7 @@ fn light_benches(c: &mut Criterion, instance: &wgpu::Instance) {
                 .request_device(&all_is_cubes_gpu::device_descriptor(
                     "module_benches",
                     adapter.limits(),
+                    adapter.features(),
                 ))
                 .await
         })

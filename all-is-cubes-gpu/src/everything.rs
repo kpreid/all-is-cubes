@@ -26,6 +26,7 @@ use crate::frame_texture::{self, FbtFeatures};
 use crate::glue::{BeltWritingParts, ResizingBuffer, buffer_size_of, to_wgpu_color};
 use crate::pipelines::Pipelines;
 use crate::postprocess;
+use crate::queries::{Queries, Query};
 use crate::raytrace_to_texture::RaytraceToTexture;
 use crate::shaders::Shaders;
 use crate::vertex::WgpuLinesVertex;
@@ -77,6 +78,9 @@ pub(super) struct EverythingRenderer {
     /// Time spent on the most recent [`Self::add_info_text_and_postprocess()`].
     previous_postprocess_time: time::Duration,
 
+    /// Fetches GPU-side performance information, if supported.
+    queries: Option<Queries>,
+
     /// Debug overlay text is uploaded via this texture
     info_text_texture: InfoTextTexture,
     info_text_sampler: wgpu::Sampler,
@@ -105,6 +109,7 @@ impl fmt::Debug for EverythingRenderer {
             lines_vertex_count,
             postprocess: _,
             previous_postprocess_time,
+            queries,
             info_text_texture: _,
             info_text_sampler: _,
             info_text_coordinate_scale,
@@ -120,6 +125,7 @@ impl fmt::Debug for EverythingRenderer {
             .field("space_renderers", &space_renderers)
             .field("lines_vertex_count", &lines_vertex_count)
             .field("previous_postprocess_time", &previous_postprocess_time)
+            .field("queries", &queries)
             .field("info_text_coordinate_scale", &info_text_coordinate_scale)
             .finish_non_exhaustive()
     }
@@ -130,10 +136,17 @@ impl EverythingRenderer {
     pub fn device_descriptor(
         label: &str,
         available_limits: wgpu::Limits,
+        available_features: wgpu::Features,
     ) -> wgpu::DeviceDescriptor<'_> {
         wgpu::DeviceDescriptor {
             label: Some(label),
-            required_features: wgpu::Features::empty(),
+            required_features: available_features
+                & const {
+                    // features we will use if they are present
+                    wgpu::Features::TIMESTAMP_QUERY
+                        .union(wgpu::Features::TIMESTAMP_QUERY_INSIDE_ENCODERS)
+                        .union(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES)
+                },
             required_limits: wgpu::Limits {
                 max_inter_stage_shader_components: 37, // number used by blocks-and-lines shader
                 ..wgpu::Limits::downlevel_webgl2_defaults().using_resolution(available_limits)
@@ -189,6 +202,8 @@ impl EverythingRenderer {
         );
         let block_texture = AtlasAllocator::new("EverythingRenderer", &device.limits());
 
+        log::debug!("device features {:?}", device.features());
+
         let mut new_self = EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(
                 device.clone(),
@@ -222,6 +237,11 @@ impl EverythingRenderer {
 
             postprocess: postprocess::PostprocessResources::new(&device),
             previous_postprocess_time: time::Duration::ZERO,
+
+            queries: device.features().contains(wgpu::Features::TIMESTAMP_QUERY).then(|| {
+                log::debug!("TIMESTAMP_QUERY available");
+                Queries::new(&device, queue.get_timestamp_period())
+            }),
 
             info_text_texture: DrawableTexture::new(wgpu::TextureFormat::R8Uint),
             info_text_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
@@ -523,6 +543,13 @@ impl EverythingRenderer {
                 },
                 false,
             )),
+            timestamp_writes: self.queries.as_ref().map(|queries| {
+                wgpu::RenderPassTimestampWrites {
+                    query_set: &queries.query_set,
+                    beginning_of_pass_write_index: Some(Query::BeginWorldRenderPass.index()),
+                    end_of_pass_write_index: Some(Query::EndWorldRenderPass.index()),
+                }
+            }),
             ..Default::default()
         });
 
@@ -584,6 +611,13 @@ impl EverythingRenderer {
                 },
                 true,
             )),
+            timestamp_writes: self.queries.as_ref().map(|queries| {
+                wgpu::RenderPassTimestampWrites {
+                    query_set: &queries.query_set,
+                    beginning_of_pass_write_index: Some(Query::BeginUiRenderPass.index()),
+                    end_of_pass_write_index: Some(Query::EndUiRenderPass.index()),
+                }
+            }),
             ..Default::default()
         });
 
@@ -627,13 +661,23 @@ impl EverythingRenderer {
             );
         }
 
-        if !self.cameras.graphics_options().bloom_intensity.is_zero()
+        let bloom_present = if !self.cameras.graphics_options().bloom_intensity.is_zero()
             && let Some(bloom) = &self.fb.bloom
         {
-            bloom.run(&mut pass_encoder);
-        }
+            bloom.run(&mut pass_encoder, self.queries.as_ref());
+            true
+        } else {
+            false
+        };
 
         // let postprocess_to_submit_time = Instant::now();
+
+        let gpu_times = if let Some(queries) = &mut self.queries {
+            queries.resolve_and_fetch(&self.device, &mut pass_encoder);
+            queries.latest(crate::queries::TimestampInterpretation { bloom_present })
+        } else {
+            None
+        };
 
         // TODO(efficiency): allow this submit to happen externally and be combined with others
         // (postprocessing, in particular).
@@ -654,6 +698,7 @@ impl EverythingRenderer {
             // TODO: count bloom (call it postprocess) time separately from submit
             submit_time: Some(end_time.saturating_duration_since(ui_to_postprocess_time)),
             previous_postprocess_time: mem::take(&mut self.previous_postprocess_time),
+            gpu_times,
         }
     }
 
@@ -678,12 +723,14 @@ impl EverythingRenderer {
             info_text_texture.upload(queue);
         }
 
+        // TODO: hook up timestamp queries for postprocessing
         let (postprocess_cmd, flaws) = self.postprocess.run(
             &self.device,
             &mut self.fb,
             &self.info_text_texture,
             &self.info_text_sampler,
             &self.pipelines.info_text_font,
+            self.queries.as_ref(),
             output,
         );
 

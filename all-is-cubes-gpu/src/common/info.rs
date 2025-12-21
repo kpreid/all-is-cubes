@@ -68,6 +68,9 @@ pub(crate) struct DrawInfo {
     /// This information is stored and reported delayed by 1 frame because otherwise it would not be
     /// available while drawing the text that incorporates itself.
     pub(crate) previous_postprocess_time: Duration,
+
+    /// GPU time taken to draw some previous frame.
+    pub(crate) gpu_times: Option<crate::queries::GpuTimes>,
 }
 impl DrawInfo {
     pub(crate) fn flaws(&self) -> Flaws {
@@ -94,6 +97,7 @@ impl Fmt<StatusText> for RenderInfo {
                     space_info: ref draw_spaces,
                     submit_time,
                     previous_postprocess_time,
+                    gpu_times,
                 },
             flaws,
         } = self;
@@ -122,6 +126,9 @@ impl Fmt<StatusText> for RenderInfo {
             ", prev post {})",
             previous_postprocess_time.refmt(fopt)
         )?;
+        if let Some(g) = gpu_times {
+            writeln!(fmt, "GPU: {}", g.refmt(fopt))?;
+        }
 
         // UpdateInfo details
         write!(

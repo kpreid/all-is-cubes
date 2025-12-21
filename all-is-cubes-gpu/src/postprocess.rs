@@ -12,6 +12,7 @@ use crate::common::{Id, Identified, Memo};
 use crate::everything::InfoTextTexture;
 use crate::frame_texture;
 use crate::glue::buffer_size_of;
+use crate::queries::{Queries, Query};
 use crate::shaders::Shaders;
 use crate::text::GpuFontMetrics;
 
@@ -132,6 +133,7 @@ impl PostprocessResources {
         info_text_texture: &InfoTextTexture,
         info_text_sampler: &wgpu::Sampler,
         font_texture_view: &Identified<wgpu::TextureView>,
+        queries: Option<&Queries>,
         output: &wgpu::TextureView,
     ) -> (wgpu::CommandBuffer, Flaws) {
         const INFO_TEXT_ERROR: &str =
@@ -159,6 +161,11 @@ impl PostprocessResources {
                         store: wgpu::StoreOp::Store,
                     },
                 })],
+                timestamp_writes: queries.map(|queries| wgpu::RenderPassTimestampWrites {
+                    query_set: &queries.query_set,
+                    beginning_of_pass_write_index: Some(Query::BeginPostprocess.index()),
+                    end_of_pass_write_index: Some(Query::EndPostprocess.index()),
+                }),
                 ..Default::default()
             });
 

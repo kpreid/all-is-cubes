@@ -55,5 +55,7 @@ pub fn create_bloom_texture(
         // TODO: set levels and repetitions to control size relative to framebuffer size?
         6,
         3,
+        crate::queries::Query::BeginBloom,
+        crate::queries::Query::EndBloom,
     )
 }
