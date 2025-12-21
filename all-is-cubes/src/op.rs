@@ -10,6 +10,7 @@ use alloc::vec::Vec;
 use core::mem;
 
 use crate::block::{self, AIR, Block};
+use crate::fluff::Fluff;
 use crate::inv::{self, Inventory, InventoryTransaction};
 use crate::math::{Cube, Face6, GridAab, GridRotation, Gridgid};
 use crate::space::{self, CubeTransaction, SpaceTransaction};
@@ -131,6 +132,15 @@ pub enum Operation {
     // but that would currently interfere with `derive(Arbitrary)` because `euclid`'s
     // `Arbitrary` feature isn't properly functional at this time.
     Neighbors(Arc<[(Cube, Operation)]>),
+
+    /// Emit fluff located at the cube.
+    AndFluff {
+        /// Fluff to emit as part of the operation's transaction.
+        fluff: Fluff,
+
+        /// Operation to perform in addition to playing the sound.
+        and: Arc<Operation>,
+    },
 }
 
 impl Operation {
@@ -412,6 +422,12 @@ impl Operation {
                 }
                 Ok(txns)
             }
+
+            Operation::AndFluff { fluff, and } => {
+                let (mut space_txn, inventory_txn) = and.apply(space, inventory, transform)?;
+                space_txn.at(transform.transform_cube(Cube::ORIGIN)).add_fluff(fluff.clone());
+                Ok((space_txn, inventory_txn))
+            }
         }
     }
 
@@ -437,6 +453,7 @@ impl Operation {
                 destroy_if_empty: _,
             } => true,
             Operation::Neighbors(_) => false,
+            Operation::AndFluff { fluff: _, and } => and.rotationally_symmetric(),
         }
     }
 
@@ -492,6 +509,11 @@ impl Operation {
                 }
                 Operation::Neighbors(neighbors)
             }
+
+            Operation::AndFluff { fluff, and } => Operation::AndFluff {
+                fluff,
+                and: Arc::new(Arc::unwrap_or_clone(and).rotate(rotation)),
+            },
         }
     }
 }
@@ -522,6 +544,10 @@ impl VisitHandles for Operation {
                 for (_, op) in neighbors.iter() {
                     op.visit_handles(visitor);
                 }
+            }
+            Operation::AndFluff { fluff, and } => {
+                fluff.visit_handles(visitor);
+                and.visit_handles(visitor);
             }
         }
     }
@@ -805,6 +831,23 @@ mod tests {
                 InventoryTransaction::insert([stack])
             )
         );
+    }
+
+    #[test]
+    fn and_fluff() {
+        let [block] = make_some_blocks();
+        let space = Space::empty_positive(2, 2, 2);
+
+        let op = Operation::AndFluff {
+            fluff: Fluff::Beep,
+            and: Arc::new(Operation::Become(block.clone())),
+        };
+
+        assert_eq!(op.apply(&space.read(), None, Gridgid::IDENTITY).unwrap(), {
+            let mut cube_txn = CubeTransaction::replacing(Some(AIR), Some(block));
+            cube_txn.add_fluff(Fluff::Beep);
+            (cube_txn.at(Cube::ORIGIN), InventoryTransaction::default())
+        });
     }
 
     /// Test that `.rotate()` is consistent with passing a rotation `transform` to `apply()`.

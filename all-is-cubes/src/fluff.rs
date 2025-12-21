@@ -30,6 +30,7 @@ use crate::universe;
 // TODO: Should we possibly be distinguishing “fluff that can be in the game world” (serializable)
 // from that which is for UI purposes?
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Fluff {
     /// Placeholder value which occurs to replace a [`Fluff`] value that cannot be serialized.
@@ -71,6 +72,7 @@ pub enum Fluff {
 ///
 /// This is not intended for display to all players but as an editor's diagnostic tool.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum BlockFault {
     /// The block would have executed its [`BlockAttributes::tick_action`] operation,

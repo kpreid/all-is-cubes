@@ -22,6 +22,7 @@
 
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::num::NonZeroU16;
 
@@ -432,6 +433,10 @@ pub(crate) enum OperationSer<'a> {
     },
     NeighborsV1 {
         neighbors: Cow<'a, [([i32; 3], op::Operation)]>,
+    },
+    AndFluffV1 {
+        fluff: crate::fluff::Fluff,
+        and: Arc<op::Operation>,
     },
 }
 

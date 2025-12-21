@@ -841,6 +841,10 @@ mod op {
                             .collect(),
                     ),
                 },
+                op::Operation::AndFluff { fluff, and } => schema::OperationSer::AndFluffV1 {
+                    fluff: fluff.clone(),
+                    and: and.clone(),
+                },
             }
             .serialize(serializer)
         }
@@ -866,7 +870,6 @@ mod op {
                     conserved,
                     optional,
                 },
-
                 schema::OperationSer::AddModifiersV1 { modifiers } => op::Operation::AddModifiers(
                     cow_into_iter(modifiers).map(crate::block::Modifier::from).collect(),
                 ),
@@ -884,6 +887,9 @@ mod op {
                 schema::OperationSer::NeighborsV1 { neighbors } => op::Operation::Neighbors(
                     cow_into_iter(neighbors).map(|(offset, op)| (offset.into(), op)).collect(),
                 ),
+                schema::OperationSer::AndFluffV1 { fluff, and } => {
+                    op::Operation::AndFluff { fluff, and }
+                }
             })
         }
     }

@@ -32,6 +32,7 @@ pub use ambient::{Ambient, Band, SpatialAmbient, Spectrum};
 /// [`SoundDef`]s are used as members of [`Universe`s][crate::universe::Universe]
 /// and may be referenced by ... TODO document
 #[derive(Clone, Debug, Eq, Hash, PartialEq, bevy_ecs::component::Component)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[expect(clippy::module_name_repetitions)]
 #[non_exhaustive]
 pub struct SoundDef {
