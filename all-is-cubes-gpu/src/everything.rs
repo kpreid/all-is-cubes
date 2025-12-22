@@ -723,7 +723,6 @@ impl EverythingRenderer {
             info_text_texture.upload(queue);
         }
 
-        // TODO: hook up timestamp queries for postprocessing
         let (postprocess_cmd, flaws) = self.postprocess.run(
             &self.device,
             &mut self.fb,
