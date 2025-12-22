@@ -1,6 +1,10 @@
+use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::any::Any;
+use core::fmt::Debug;
 
 use all_is_cubes::character::Cursor;
+use all_is_cubes::util::{Fmt, StatusText};
 
 use crate::camera::{ImageSize, Layers};
 use crate::{Flaws, RenderError};
@@ -45,11 +49,18 @@ pub trait HeadlessRenderer {
 pub struct Rendering {
     /// Width and height of the image.
     pub size: ImageSize,
+
     /// Image data, RGBA, 8 bits per component, in the sRGB color space.
     pub data: Vec<[u8; 4]>,
+
     /// Deficiencies of the rendering; ways in which it fails to accurately represent the
     /// scene or apply the renderer’s configuration.
     pub flaws: Flaws,
+
+    /// Renderer-specific diagnostic information about the rendering process.
+    ///
+    /// May be formatted or downcast.
+    pub info: Arc<dyn Info>,
 }
 
 impl From<Rendering> for imgref::ImgVec<[u8; 4]> {
@@ -72,6 +83,24 @@ impl<'a> From<&'a Rendering> for imgref::ImgRef<'a, [u8; 4]> {
         )
     }
 }
+
+/// `dyn`-compatible trait for [`Rendering::info`]’s requirements.
+#[expect(private_interfaces)]
+pub trait Info: Debug + Fmt<StatusText> + Any + Send + Sync {
+    #[doc(hidden)]
+    fn _info_trait_is_sealed(&self) -> InfoTraitIsSealed;
+}
+
+#[expect(private_interfaces)]
+impl<T: Debug + Fmt<StatusText> + Any + Send + Sync> Info for T {
+    #[doc(hidden)]
+    fn _info_trait_is_sealed(&self) -> InfoTraitIsSealed {
+        InfoTraitIsSealed {}
+    }
+}
+
+#[non_exhaustive] // non-instantiable outside the crate
+struct InfoTraitIsSealed {}
 
 #[cfg(test)]
 mod tests {

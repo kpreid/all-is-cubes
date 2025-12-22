@@ -249,10 +249,7 @@ impl RtRenderer<()> {
     /// [`Camera::post_process_color()`] is applied to the pixels.
     ///
     ///  [`Camera::post_process_color()`]: crate::camera::Camera::post_process_color
-    pub fn draw_rgba(
-        &self,
-        info_text_fn: impl FnOnce(&RaytraceInfo) -> String,
-    ) -> (Rendering, RaytraceInfo) {
+    pub fn draw_rgba(&self, info_text_fn: impl FnOnce(&RaytraceInfo) -> String) -> Rendering {
         let camera = self.cameras.cameras().world.clone();
         let size = self.modified_viewport().framebuffer_size;
 
@@ -272,7 +269,12 @@ impl RtRenderer<()> {
             flaws |= Flaws::NO_CURSOR;
         }
 
-        (Rendering { size, data, flaws }, info)
+        Rendering {
+            size,
+            data,
+            flaws,
+            info: Arc::new(info),
+        }
     }
 }
 
@@ -319,11 +321,7 @@ impl HeadlessRenderer for RtRenderer<()> {
     ) -> futures_core::future::BoxFuture<'a, Result<Rendering, RenderError>> {
         use alloc::string::ToString as _;
 
-        Box::pin(async {
-            let (rendering, _rt_info) = self.draw_rgba(|_| info_text.to_string());
-
-            Ok(rendering)
-        })
+        Box::pin(async { Ok(self.draw_rgba(|_| info_text.to_string())) })
     }
 }
 

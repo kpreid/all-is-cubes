@@ -1,5 +1,7 @@
 //! Axis-aligned orthographic raytracing as a special case.
 
+use alloc::sync::Arc;
+
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
@@ -13,7 +15,7 @@ use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, ReadTicket};
 
 use crate::camera::{self, GraphicsOptions, ImagePixel};
-use crate::raytracer;
+use crate::raytracer::{self, RaytraceInfo};
 use crate::{Flaws, Rendering};
 
 /// Special-purpose renderer which uses a pixel-perfect orthographic projection and adapts to the
@@ -47,7 +49,7 @@ pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -
             (0..camera.image_size.width)
                 .into_par_iter()
                 .map_with(Cache::default(), move |cache: &mut Cache, x| {
-                    trace_one_pixel_with_cache(camera, rt, cache, x, y)
+                    trace_one_pixel_with_cache(camera, rt, cache, x, y).0
                 })
         })
         .collect();
@@ -58,14 +60,15 @@ pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -
             let mut cache = Cache::default();
 
             (0..camera.image_size.width)
-                .map(move |x| trace_one_pixel_with_cache(camera, rt, &mut cache, x, y))
+                .map(move |x| trace_one_pixel_with_cache(camera, rt, &mut cache, x, y).0)
         })
         .collect();
 
     Rendering {
         size: camera.image_size,
         data,
-        flaws: Flaws::empty(), // TODO: wrong
+        flaws: Flaws::empty(), // TODO: missing the actual flaws
+        info: Arc::new(RaytraceInfo::default()), // TODO: need to collect infos from the tracing operation
     }
 }
 
@@ -75,8 +78,8 @@ fn trace_one_pixel_with_cache(
     cache: &mut Cache,
     x: u32,
     y: u32,
-) -> [u8; 4] {
-    match camera.project_pixel_into_world(point2(x, y)) {
+) -> ([u8; 4], RaytraceInfo) {
+    let (color, info) = match camera.project_pixel_into_world(point2(x, y)) {
         Some(ray) => {
             // Note that this cache key may be nonsense (using the resolution from the wrong cube),
             // but in that case it will always not match the cube, so we’ll then create
@@ -87,10 +90,10 @@ fn trace_one_pixel_with_cache(
                 ray.zoom_in(ray.origin_cube(), cache.resolution).origin_cube(),
             );
             if let Some((_, v)) = cache.pixel.filter(|&(k, _)| k == cache_key) {
-                v
+                (v, RaytraceInfo::default())
             } else {
                 let mut pixel = OrthoBuf::default();
-                rt.trace_axis_aligned_ray(ray, &mut pixel, true);
+                let info = rt.trace_axis_aligned_ray(ray, &mut pixel, true);
 
                 let output = Rgba::from(pixel.color);
 
@@ -103,12 +106,12 @@ fn trace_one_pixel_with_cache(
                     resolution: pixel.max_resolution,
                     pixel: Some((new_cache_key, output)),
                 };
-                output
+                (output, info)
             }
         }
-        None => Rgba::TRANSPARENT,
-    }
-    .to_srgb8()
+        None => (Rgba::TRANSPARENT, RaytraceInfo::default()),
+    };
+    (color.to_srgb8(), info)
 }
 
 type CacheKey = (Cube, Resolution, Cube);

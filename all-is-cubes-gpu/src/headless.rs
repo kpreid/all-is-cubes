@@ -3,6 +3,7 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::time::Duration;
 
 use futures_core::future::BoxFuture;
 
@@ -87,7 +88,10 @@ impl Builder {
             everything,
             viewport_source,
             viewport_dirty,
-            flaws: Flaws::UNFINISHED, // unfinished because no update() yet
+            last_update_info: crate::UpdateInfo {
+                flaws: Flaws::UNFINISHED, // unfinished because no update() yet
+                ..Default::default()
+            },
         })
     }
 }
@@ -119,8 +123,7 @@ struct RendererImpl {
     viewport_source: listen::DynSource<Viewport>,
     viewport_dirty: listen::Flag,
 
-    /// Flaws from the last [`Self::update()`] call.
-    flaws: Flaws,
+    last_update_info: crate::UpdateInfo,
 }
 
 impl Renderer {
@@ -158,13 +161,12 @@ impl RendererImpl {
         read_tickets: Layers<ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
-        let info = self.everything.update(
+        self.last_update_info = self.everything.update(
             read_tickets,
             &self.queue,
             cursor,
             &FrameBudget::PRACTICALLY_INFINITE,
         )?;
-        self.flaws = info.flaws();
         Ok(())
     }
 
@@ -187,6 +189,7 @@ impl RendererImpl {
                 size: viewport.framebuffer_size,
                 data: Vec::new(),
                 flaws: Flaws::empty(),
+                info: Arc::new(crate::RenderInfo::default()),
             });
         }
 
@@ -201,14 +204,23 @@ impl RendererImpl {
             info_text,
         );
         self.queue.submit([post_cmd]);
+
+        let flaws = self.last_update_info.flaws | draw_info.flaws() | post_flaws | adapter_flaws;
         let image = init::get_image_from_gpu(
             &self.device,
             &self.queue,
             &self.color_texture,
-            self.flaws | draw_info.flaws() | post_flaws | adapter_flaws,
+            flaws,
+            Arc::new(crate::RenderInfo {
+                waiting_for_gpu: Duration::ZERO, // this refers to Surface::get_current_texture()
+                update: self.last_update_info.clone(),
+                draw: draw_info,
+                flaws: Flaws::default(),
+            }),
         )
         .await;
         debug_assert_eq!(viewport.framebuffer_size, image.size);
+
         Ok(image)
     }
 }

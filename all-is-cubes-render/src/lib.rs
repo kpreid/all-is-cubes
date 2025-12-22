@@ -34,7 +34,7 @@ mod flaws;
 pub use flaws::Flaws;
 
 mod headless;
-pub use headless::{HeadlessRenderer, Rendering};
+pub use headless::{HeadlessRenderer, Info, Rendering};
 
 #[cfg(feature = "raytracer")]
 pub mod raytracer;

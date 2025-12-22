@@ -5,6 +5,7 @@
 
 use alloc::format;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use std::io::Write as _;
 
@@ -162,6 +163,7 @@ pub fn get_image_from_gpu(
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     flaws: Flaws,
+    info: Arc<dyn all_is_cubes_render::Info>,
 ) -> impl Future<Output = Rendering> + 'static + use<> {
     // By making this an explicit `Future` return we avoid capturing the queue and texture
     // references.
@@ -180,6 +182,7 @@ pub fn get_image_from_gpu(
             size,
             data: data_future.await,
             flaws,
+            info,
         }
     }
 }
