@@ -26,23 +26,39 @@ use crate::universe;
 ///
 /// Currently, all `Fluff` is an item from a fixed list. In the future, it will be able
 /// to refer to audio and visual assets defined in a `Universe`.
+//---
+// TODO: Should we possibly be distinguishing “fluff that can be in the game world” (serializable)
+// from that which is for UI purposes?
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum Fluff {
+    /// Placeholder value which occurs to replace a [`Fluff`] value that cannot be serialized.
+    Gone,
+
     /// A standard beep/“bell” sound, as might be used for a notification or error.
+    ///
+    /// This variant cannot be serialized.
     Beep,
 
     /// A sound suitable for “something was activated or done”, e.g. a button was clicked.
+    ///
+    /// This variant cannot be serialized.
     Happened,
 
     /// Something went wrong with the operation of a block present as placed in a [`Space`].
+    ///
+    /// This variant cannot be serialized.
     BlockFault(BlockFault),
 
     /// Sound and visual effect from a block having been placed in the game world
     /// by player action, without any more specific overriding styling.
+    ///
+    /// This variant cannot be serialized.
     PlaceBlockGeneric,
 
     /// Collision between a block and a moving object.
+    ///
+    /// This variant cannot be serialized.
     #[non_exhaustive]
     BlockImpact {
         /// Closing velocity in m/s.
@@ -98,6 +114,7 @@ impl Fluff {
         };
 
         match self {
+            Fluff::Gone => None,
             Fluff::Beep => Some((&BEEP, 1.0)),
             Fluff::Happened | Fluff::PlaceBlockGeneric => Some((&HAPPENED, 1.0)),
             Fluff::BlockFault(_) => None,
@@ -117,6 +134,7 @@ impl Fluff {
 impl universe::VisitHandles for Fluff {
     fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
         match self {
+            Fluff::Gone => {}
             Fluff::Beep => {}
             Fluff::Happened => {}
             Fluff::BlockFault(_) => {}

@@ -321,6 +321,15 @@ pub(crate) enum SpawnSer {
 }
 
 //------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `fluff` module
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum FluffSer {
+    GoneV1,
+}
+
+//------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `inv` module
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -587,6 +587,40 @@ mod block {
 // `character::Character` and `character::Spawn` serialization are inside their module
 // for the sake of private fields.
 
+mod fluff {
+    use super::*;
+    use crate::fluff::Fluff;
+
+    impl Serialize for Fluff {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            match self {
+                // Currently, all of the available values in `Fluff` are placeholders.
+                Fluff::Gone
+                | Fluff::Beep
+                | Fluff::Happened
+                | Fluff::BlockFault { .. }
+                | Fluff::PlaceBlockGeneric
+                | Fluff::BlockImpact { .. } => schema::FluffSer::GoneV1,
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Fluff {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            Ok(match schema::FluffSer::deserialize(deserializer)? {
+                schema::FluffSer::GoneV1 => Fluff::Gone,
+            })
+        }
+    }
+}
+
 mod inv {
     use super::*;
     use crate::inv::{self, Inventory, Slot, Tool};
