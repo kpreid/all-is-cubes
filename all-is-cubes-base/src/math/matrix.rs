@@ -54,7 +54,6 @@ impl GridMatrix {
 
     /// Note: This takes the elements in a column-major ordering, so the argument order
     /// is transposed relative to a conventional textual display of a matrix.
-    #[expect(clippy::too_many_arguments)]
     #[inline]
     pub const fn new(
         x0: GridCoordinate,

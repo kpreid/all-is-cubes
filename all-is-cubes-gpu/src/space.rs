@@ -301,7 +301,6 @@ impl SpaceRenderer {
     /// Update renderer internal state from the given [`Camera`] and referenced [`Space`],
     /// so that the next rendered meshes will be up to date (or as far up to date as the
     /// given [`deadline`] permits).
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn update(
         &mut self,
         deadline: time::Deadline,
@@ -518,7 +517,6 @@ impl SpaceRenderer {
 
         // Helper for the common logic of opaque + transparent drawing of a single instance
         // that's a chunk mesh (i.e. instance range is length 1).
-        #[allow(clippy::too_many_arguments)]
         fn draw_chunk_instance<'pass>(
             index_range: Range<usize>,
             render_pass: &mut wgpu::RenderPass<'pass>,

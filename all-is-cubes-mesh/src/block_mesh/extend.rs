@@ -134,7 +134,6 @@ pub(crate) fn push_full_box<M: MeshTypes>(
 /// The caller should call [`Vec::reserve()`] so as to reserve space for at least the 4 vertices
 /// pushed.
 #[inline]
-#[expect(clippy::too_many_arguments)] // TODO: Figure out how to simplify
 pub(crate) fn push_quad<V, Tex>(
     vertices: &mut (Vec<V>, Vec<V::SecondaryData>),
     indices: &mut IndexVec,

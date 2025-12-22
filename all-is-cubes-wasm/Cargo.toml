@@ -129,6 +129,7 @@ collapsible_if = "allow"
 match_ref_pats = "allow"
 needless_update = "allow"
 single_match = "allow"
+too_many_arguments = "allow" # not usefully actionable for the internal functions it fires on
 
 # clippy::pedantic lints that are set to allow
 cast_possible_truncation = "allow" # we would need an alternative for intentional from-float saturation and to-float precision loss

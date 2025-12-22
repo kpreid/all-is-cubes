@@ -421,7 +421,6 @@ impl LightStorage {
     /// * `ray_state` describes TODO
     ///
     /// Returns the total weight that was added to `cube_buffer.total_ray_weight`
-    #[expect(clippy::too_many_arguments)]
     fn walk_ray_tree<D: LightComputeOutput>(
         &self,
         uc: UpdateCtx<'_>,
@@ -755,7 +754,6 @@ impl LightBuffer {
     /// Note: to avoid redundant lookups as a ray proceeds, `current_light` is used only to fill
     /// `light_ahead_cache` or `light_behind_cache`.
     #[inline]
-    #[expect(clippy::too_many_arguments)]
     fn traverse<D>(
         &mut self,
         ray_state: &mut LightRayState,

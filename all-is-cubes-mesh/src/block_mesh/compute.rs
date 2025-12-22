@@ -166,7 +166,6 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
 /// just starts slinging triangles.
 ///
 /// This function assumes that `output` has been cleared and writes to every part of it.
-#[allow(clippy::too_many_arguments)]
 fn compute_block_mesh_from_analysis<M: MeshTypes>(
     output: &mut BlockMesh<M>,
     voxels: &Evoxels,

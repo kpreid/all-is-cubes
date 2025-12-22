@@ -487,7 +487,6 @@ impl<M: MeshTypes> Clone for SpaceMesh<M> {
 /// * `neighbor_is_fully_opaque` is called to determine whether this block's faces are
 ///   obscured. It is a function so that lookups can be skipped if their answer would
 ///   make no difference.
-#[allow(clippy::too_many_arguments)]
 fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     block_mesh: &BlockMesh<M>,
     translation: Cube,

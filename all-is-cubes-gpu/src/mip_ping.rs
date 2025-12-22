@@ -37,7 +37,6 @@ impl Pipelines {
     ///   the format of the input texture provided later.
     /// * `module` is the shader module containing the downsampling and upsampling functions.
     /// * `sampler` is a sampler that will be provided to the shaders for their use.
-    #[allow(clippy::too_many_arguments)] // we could maybe switch to a struct...
     pub fn new(
         device: &wgpu::Device,
         label: String,
