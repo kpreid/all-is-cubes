@@ -14,6 +14,7 @@ use all_is_cubes::block::{
 };
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::Vector3D;
+use all_is_cubes::fluff::Fluff;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
     Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord, GridVector,
@@ -494,7 +495,12 @@ fn demo_blocks_generator(
                     block::AnimationChange::ColorSameCategory,
                 ))
                 .tick_action(Some(TickAction {
-                    operation: Operation::Become(provider[BecomeBlinker(!state)].clone()),
+                    operation: Operation::AndFluff {
+                        // TODO: This should be a custom sound and particle effect, but `Fluff`
+                        // doesn’t support those yet.
+                        fluff: Fluff::Happened,
+                        and: Arc::new(Operation::Become(provider[BecomeBlinker(!state)].clone())),
+                    },
                     schedule: time::Schedule::from_period(NonZeroU16::new(60).unwrap()),
                 }))
                 .build(),
