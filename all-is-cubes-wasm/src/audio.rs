@@ -9,38 +9,65 @@ use std::sync::atomic;
 
 use rand::{Rng as _, SeedableRng as _};
 use wasm_bindgen::JsValue;
-use web_sys::{AudioBuffer, AudioContext, GainNode};
+use web_sys::{AudioBuffer, AudioContext, AudioListener, GainNode};
 
+use all_is_cubes::euclid::vec3;
 use all_is_cubes::listen::{self, Listen as _, Listener as _};
 use all_is_cubes::sound::{self, SoundDef};
-use all_is_cubes_ui::apps::SessionFluff;
+use all_is_cubes_render::camera::Camera;
+use all_is_cubes_ui::apps::{SessionFluff, SessionFluffSource};
 
 use crate::web_session::Session;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Create the audio context and task.
-///
-/// Dropping the returned [`listen::Gate`] stops audio.
-/// TODO: Should it be stopped immediately or gracefully?
-pub(crate) fn initialize_audio(session: &Session) -> Result<listen::Gate, JsValue> {
-    // We do not currently need any options
-    let context = AudioContext::new()?;
+/// Allows setting audio playback parameters. Dropping this stops audio.
+pub struct AudioTask {
+    #[expect(dead_code, reason = "used for its drop effect")]
+    gate: listen::Gate,
+    // sender: flume::Sender<AudioCommand>,
+    listener: AudioListener,
+}
 
-    // Transfers audio events to the audio processing task.
-    let (sender, receiver) = flume::bounded(256);
+impl AudioTask {
+    pub fn new(session: &Session) -> Result<Self, JsValue> {
+        // We do not currently need any options
+        let context = AudioContext::new()?;
 
-    // Hook up ambient sound to channel
-    let ambient_source = session.ambient_sound();
-    ambient_source.listen(UpdateAmbientListener::new(sender.clone()));
-    sender.send(AudioCommand::UpdateAmbient).unwrap(); // ensure initial sync
+        // Transfers audio events to the audio processing task.
+        let (sender, receiver) = flume::bounded(256);
 
-    let (gate, listener) = FluffListener::new(sender).gate();
-    session.listen_fluff(listener);
+        // Hook up ambient sound to channel
+        let ambient_source = session.ambient_sound();
+        ambient_source.listen(UpdateAmbientListener::new(sender.clone()));
+        sender.send(AudioCommand::UpdateAmbient).unwrap(); // ensure initial sync
 
-    wasm_bindgen_futures::spawn_local(audio_command_task(receiver, context, ambient_source));
+        let (gate, listener) = FluffListener::new(sender).gate();
+        session.listen_fluff(listener);
 
-    Ok(gate)
+        let audio_task_handle = AudioTask {
+            // sender,
+            listener: context.listener(),
+            gate,
+        };
+
+        wasm_bindgen_futures::spawn_local(audio_command_task(receiver, context, ambient_source));
+
+        Ok(audio_task_handle)
+    }
+
+    pub fn set_listener(&self, camera: &Camera) {
+        let transform = camera.view_transform().to_transform();
+        let position = camera.view_position();
+        let forward = transform.transform_vector3d(vec3(0., 0., -1.));
+        let up = transform.transform_vector3d(vec3(0., 1., 0.));
+
+        // Note: https://www.w3.org/TR/webaudio-1.1/#AudioListener says these setters are
+        // deprecated, but `web-sys` does not seem to offer the alternative.
+        self.listener.set_position(position.x, position.y, position.z);
+        self.listener.set_orientation(forward.x, forward.y, forward.z, up.x, up.y, up.z);
+        // TODO: listener.set_velocity(velocity.x, velocity.y, velocity.z);
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -51,7 +78,7 @@ enum AudioCommand {
     UpdateAmbient,
 }
 
-/// Async task for receiving commands, synthesizing audio, and managing the [`AudioContext`].
+/// Async task which does most but not all of the [`AudioContext`] control.
 async fn audio_command_task(
     receiver: flume::Receiver<AudioCommand>,
     context: AudioContext,
@@ -73,7 +100,6 @@ async fn audio_command_task(
     while let Ok(message) = receiver.recv_async().await {
         match message {
             AudioCommand::Fluff(SessionFluff { fluff, source }) => {
-                let _ = source; // TODO: spatial audio
                 if let Some((sound_def, gain)) = fluff.sound() {
                     // TODO: Need a better solution than comparing sounds by value.
                     // When we have the sounds stored in Universes instead of as constants,
@@ -94,6 +120,9 @@ async fn audio_command_task(
                         },
                     };
 
+                    // Node chain we are constructing:
+                    // BufferSource → Gain → (Panner)? → Destination
+
                     let source_node = context.create_buffer_source().unwrap();
                     source_node.set_buffer(Some(&buffer));
 
@@ -103,15 +132,35 @@ async fn audio_command_task(
                     source_node
                         .connect_with_audio_node(&gain_node)
                         .expect("audio graph logic error");
-                    gain_node
-                        .connect_with_audio_node(&context.destination())
-                        .expect("audio graph logic error");
+
+                    match source {
+                        SessionFluffSource::World(position) => {
+                            let panner_node = context.create_panner().unwrap();
+                            panner_node.set_position(position.x, position.y, position.z);
+                            panner_node.set_panning_model(web_sys::PanningModelType::Hrtf);
+
+                            gain_node
+                                .connect_with_audio_node(&panner_node)
+                                .expect("audio graph logic error");
+                            panner_node
+                                .connect_with_audio_node(&context.destination())
+                                .expect("audio graph logic error");
+                        }
+                        SessionFluffSource::NonSpatial => {
+                            // Make direct connection without panner node
+                            gain_node
+                                .connect_with_audio_node(&context.destination())
+                                .expect("audio graph logic error");
+                        }
+                        _ => unimplemented!("unknown `SessionFluffSource` variant {source:?}"),
+                    }
 
                     source_node.start().expect("audio graph logic error");
 
                     // log::trace!("played {fluff:?}");
                 }
             }
+
             AudioCommand::UpdateAmbient => {
                 let new_ambient = ambient_source.get();
 

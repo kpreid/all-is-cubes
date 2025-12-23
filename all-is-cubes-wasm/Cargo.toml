@@ -69,10 +69,10 @@ features = [
   "AudioBufferOptions",
   "AudioBufferSourceNode",
   "AudioDestinationNode",
+  "AudioListener", # part of audio processing
   "AudioParam",
   "BiquadFilterNode", # part of audio processing
   "BiquadFilterType", # part of audio processing
-
   "ChannelMergerNode", # part of audio processing
   "CssStyleDeclaration", # HTMLElement.style for dynamic styling
   "DataTransfer", # file drag-and-drop
@@ -92,6 +92,8 @@ features = [
   "KeyboardEvent",
   "Location",
   "MouseEvent",
+  "PannerNode", # part of audio processing
+  "PanningModelType", # part of audio processing
   "Storage", # settings persistence
   "Text",
   "Window",

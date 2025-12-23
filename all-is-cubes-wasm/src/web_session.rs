@@ -22,6 +22,7 @@ use all_is_cubes_render::camera::{StandardCameras, Viewport};
 use all_is_cubes_ui::apps::{CursorIcon, Key};
 use all_is_cubes_ui::settings::Settings;
 
+use crate::audio::AudioTask;
 use crate::js_bindings::GuiHelpers;
 
 use crate::web_glue::{
@@ -44,8 +45,7 @@ pub(crate) struct WebSession {
     static_dom: StaticDom,
     viewport_cell: listen::Cell<Viewport>,
     fullscreen_cell: listen::Cell<Option<bool>>,
-    #[expect(dead_code, reason = "used for its drop effect")]
-    audio_task_gate: Option<listen::Gate>,
+    audio_task_control: Option<AudioTask>,
     raf_callback: Closure<dyn FnMut(f64)>,
     step_callback: Closure<dyn FnMut()>,
 
@@ -76,7 +76,7 @@ impl WebSession {
                 static_dom,
                 viewport_cell,
                 fullscreen_cell,
-                audio_task_gate: match crate::audio::initialize_audio(&session) {
+                audio_task_control: match AudioTask::new(&session) {
                     Ok(gate) => Some(gate),
                     Err(error) => {
                         log::warn!("failed to initialize web audio: {error:?}");
@@ -440,6 +440,11 @@ impl WebSession {
                     .set_data(&format!("{}", inner.session.info_text(render_info)));
             } else {
                 self.static_dom.scene_info_text_node.set_data("");
+            }
+
+            // TODO: do this whether or not `should_draw` (need camera ccess)
+            if let Some(a) = &self.audio_task_control {
+                a.set_listener(&cameras.cameras().world);
             }
         }
 
