@@ -7,15 +7,19 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, atomic, mpsc};
+use std::time::Duration;
 
-use kira::AudioManager;
-use kira::PlaySoundError;
+use kira::listener::ListenerHandle;
 use kira::sound::static_sound::{StaticSoundData, StaticSoundSettings};
+use kira::track::SpatialTrackBuilder;
+use kira::{AudioManager, PlaySoundError};
 use rand::{Rng as _, SeedableRng};
 
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::sound::{Band, SoundDef, SpatialAmbient};
-use all_is_cubes_ui::apps::SessionFluff;
+use all_is_cubes::universe::ReadTicket;
+use all_is_cubes_render::camera::{self, Camera, Layers, StandardCameras};
+use all_is_cubes_ui::apps::{SessionFluff, SessionFluffSource};
 
 use crate::Session;
 
@@ -28,11 +32,39 @@ pub(crate) struct AudioOut {
         reason = "eventually we're going to need this for volume control etc."
     )]
     sender: mpsc::SyncSender<AudioCommand>,
+    world_spatial_listener: ListenerHandle,
+
+    // TODO: having our own separate `StandardCameras` is overkill for audio, but because it
+    // needs to be updated exclusively, we don't have a good way to share it with the renderer
+    // straightforwardly. Find a better architecture.
+    cameras_for_audio: StandardCameras,
 }
 
 impl fmt::Debug for AudioOut {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AudioOut").finish_non_exhaustive()
+    }
+}
+
+impl AudioOut {
+    pub(crate) fn update_listener(&mut self, read_tickets: Layers<ReadTicket<'_>>) {
+        self.cameras_for_audio.update(read_tickets);
+        Self::set_listener_state(
+            &mut self.world_spatial_listener,
+            &self.cameras_for_audio.cameras().world,
+        );
+    }
+
+    fn set_listener_state(handle: &mut ListenerHandle, camera: &Camera) {
+        let (position, rotation) = convert_view_to_kira_listener(camera.view_transform());
+        let tween = kira::Tween {
+            start_time: kira::StartTime::Immediate,
+            duration: Duration::from_millis(16), // TODO: get from frame rate
+            easing: kira::Easing::Linear,
+        };
+
+        handle.set_position(kira::Value::Fixed(position), tween);
+        handle.set_orientation(kira::Value::Fixed(rotation), tween);
     }
 }
 
@@ -43,9 +75,17 @@ enum AudioCommand {
 }
 
 pub(crate) fn init_sound(session: &Session) -> Result<AudioOut, anyhow::Error> {
-    let manager = AudioManager::<kira::backend::cpal::CpalBackend>::new(
+    let mut manager = AudioManager::<kira::backend::cpal::CpalBackend>::new(
         kira::AudioManagerSettings::default(),
     )?;
+    let cameras_for_audio =
+        session.create_cameras(listen::constant(camera::Viewport::with_scale(1.0, [0, 0])));
+
+    // TODO: non-placeholder initial values
+    let (initial_position, initial_orientation) =
+        convert_view_to_kira_listener(cameras_for_audio.cameras().world.view_transform());
+    let world_spatial_listener = manager.add_listener(initial_position, initial_orientation)?;
+    let world_spatial_listener_id = world_spatial_listener.id();
 
     // Transfers audio events to the audio processing thread.
     // We never block on this channel, but drop things if full.
@@ -65,14 +105,21 @@ pub(crate) fn init_sound(session: &Session) -> Result<AudioOut, anyhow::Error> {
     // to perform operations, so I either need a dedicated thread (actor) or a mutex.
     // We also don’t want to find ourselves running synthesis inside the Listener.
     // Note that this is *not* a sample-by-sample realtime audio thread.
-    if let Err(e) = std::thread::Builder::new()
-        .name("all_is_cubes audio core".to_owned())
-        .spawn(move || audio_command_thread(receiver, manager, ambient_source))
+    if let Err(e) =
+        std::thread::Builder::new()
+            .name("all_is_cubes audio core".to_owned())
+            .spawn(move || {
+                audio_command_thread(receiver, manager, ambient_source, world_spatial_listener_id)
+            })
     {
         log::error!("failed to spawn audio command thread; audio disabled: {e}");
     }
 
-    Ok(AudioOut { sender })
+    Ok(AudioOut {
+        sender,
+        world_spatial_listener,
+        cameras_for_audio,
+    })
 }
 
 /// Thread function for receiving commands and executing them on `&mut AudioManager`.
@@ -82,6 +129,7 @@ fn audio_command_thread(
     receiver: mpsc::Receiver<AudioCommand>,
     mut manager: AudioManager,
     ambient_source: listen::DynSource<SpatialAmbient>,
+    spatial_listener_id: kira::listener::ListenerId,
 ) {
     let sample_rate = 44100;
     let mut sound_cache: HashMap<SoundDef, StaticSoundData> = HashMap::new();
@@ -121,8 +169,10 @@ fn audio_command_thread(
 
     while let Ok(message) = receiver.recv() {
         match message {
-            AudioCommand::Fluff(fluff) => {
-                if let Some((sound_def, amplitude)) = fluff.fluff.sound() {
+            AudioCommand::Fluff(SessionFluff { fluff, source }) => {
+                let _ = source; // TODO: spatial audio
+
+                if let Some((sound_def, amplitude)) = fluff.sound() {
                     // TODO: Need a better solution than comparing sounds by value.
                     // When we have the sounds stored in Universes instead of as constants,
                     // we can compare the Handles by name.
@@ -134,9 +184,31 @@ fn audio_command_thread(
                             new_sound
                         }
                     };
-
                     sound.settings.volume = amplitude_to_value(amplitude);
-                    play_fluff(&mut manager, sound)
+
+                    match source {
+                        SessionFluffSource::World(position) => {
+                            match manager.add_spatial_sub_track(
+                                spatial_listener_id,
+                                position.to_vector().to_f32(),
+                                SpatialTrackBuilder::new()
+                                    .persist_until_sounds_finish(true)
+                                    .sound_capacity(1),
+                            ) {
+                                Ok(mut track) => {
+                                    log_playback_result(track.play(sound));
+                                }
+                                Err(error) => log::error!(
+                                    "Playback error creating spatial_sub_track: {error}",
+                                    error = all_is_cubes::util::ErrorChain(&error)
+                                ),
+                            }
+                        }
+                        SessionFluffSource::NonSpatial => {
+                            log_playback_result(manager.play(sound));
+                        }
+                        _ => unimplemented!("unknown `SessionFluffSource` variant {source:?}"),
+                    }
                 }
             }
             AudioCommand::UpdateAmbient => {
@@ -164,12 +236,13 @@ fn amplitude_to_value(amplitude: f32) -> kira::Value<kira::Decibels> {
     kira::Decibels((amplitude.log10() * 20.0).max(-200.0)).into()
 }
 
-fn play_fluff(manager: &mut AudioManager, sound: StaticSoundData) {
-    match manager.play(sound) {
+fn log_playback_result(
+    result: Result<kira::sound::static_sound::StaticSoundHandle, PlaySoundError<()>>,
+) {
+    match result {
         Ok(_handle) => {}
         Err(PlaySoundError::SoundLimitReached) => {
             log::trace!("sound limit reached");
-            // Ignore this, since fluff is inconsequential
         }
         Err(error) => log::error!(
             "Playback error: {error}",
@@ -271,6 +344,22 @@ impl listen::Listener<()> for UpdateAmbientListener {
 }
 
 // -------------------------------------------------------------------------------------------------
+
+fn convert_view_to_kira_listener(
+    view_transform: camera::ViewTransform,
+) -> (mint::Vector3<f32>, mint::Quaternion<f32>) {
+    let position: mint::Vector3<f32> = mint::Vector3::from(view_transform.translation.to_f32());
+
+    // `euclid` quaternion has no scalar conversion operators, so we have to do it elementwise
+    // despite `mint`.
+    // On the positive side, `kira`'s coordinate system for listeners is identical to ours.
+    let rotation: mint::Quaternion<f32> = mint::Quaternion {
+        v: mint::Vector3::from(view_transform.rotation.vector_part().to_f32()),
+        s: view_transform.rotation.r as f32,
+    };
+
+    (position, rotation)
+}
 
 fn convert_sound_to_kira(sample_rate: u32, sound: &SoundDef) -> StaticSoundData {
     StaticSoundData {

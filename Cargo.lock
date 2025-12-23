@@ -185,6 +185,7 @@ dependencies = [
  "itertools 0.14.0",
  "kira",
  "log",
+ "mint",
  "png",
  "pretty_assertions",
  "rand 0.9.2",

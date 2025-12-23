@@ -138,6 +138,10 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         }
         let step_info = self.session.maybe_step_universe();
 
+        if let Some(audio) = &mut self.audio {
+            audio.update_listener(self.session.read_tickets());
+        }
+
         if self.session_info_altered.get_and_clear() {
             self.sync_title();
         }

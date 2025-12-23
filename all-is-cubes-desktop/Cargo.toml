@@ -82,7 +82,9 @@ anyhow = { workspace = true }
 cfg-if = { workspace = true }
 clap = { workspace = true }
 directories-next = "2.0.0"
-euclid = { workspace = true, optional = true, features = ["serde"] } # only exists to enable feature
+# "serde" feature for TODO: explain
+# "mint" feature for interop with kira
+euclid = { workspace = true, optional = true, features = ["serde", "mint"] }
 futures-channel = { workspace = true }
 futures-core = { workspace = true }
 gilrs = { workspace = true }
@@ -91,6 +93,8 @@ indicatif = { version = "0.18.0", default-features = false }
 itertools = { workspace = true }
 kira = { version = "0.11.0", optional = true, default-features = false, features = ["cpal"] }
 log = { workspace = true }
+# for `kira` data inputs
+mint = { workspace = true }
 png = { workspace = true, optional = true }
 rand = { workspace = true, features = ["thread_rng"] }
 # re_sdk is a data-logging and visualization tool; we are currently using it _only_ for
