@@ -11,9 +11,9 @@ use rand::{Rng as _, SeedableRng as _};
 use wasm_bindgen::JsValue;
 use web_sys::{AudioBuffer, AudioContext, GainNode};
 
-use all_is_cubes::fluff::Fluff;
 use all_is_cubes::listen::{self, Listen as _, Listener as _};
 use all_is_cubes::sound::{self, SoundDef};
+use all_is_cubes_ui::apps::SessionFluff;
 
 use crate::web_session::Session;
 
@@ -47,7 +47,7 @@ pub(crate) fn initialize_audio(session: &Session) -> Result<listen::Gate, JsValu
 
 #[derive(Debug)]
 enum AudioCommand {
-    Fluff(Fluff),
+    Fluff(SessionFluff),
     UpdateAmbient,
 }
 
@@ -72,7 +72,8 @@ async fn audio_command_task(
     // or the `Gate` is dropped.
     while let Ok(message) = receiver.recv_async().await {
         match message {
-            AudioCommand::Fluff(fluff) => {
+            AudioCommand::Fluff(SessionFluff { fluff, source }) => {
+                let _ = source; // TODO: spatial audio
                 if let Some((sound_def, gain)) = fluff.sound() {
                     // TODO: Need a better solution than comparing sounds by value.
                     // When we have the sounds stored in Universes instead of as constants,
@@ -209,8 +210,8 @@ impl fmt::Debug for FluffListener {
     }
 }
 
-impl listen::Listener<Fluff> for FluffListener {
-    fn receive(&self, fluffs: &[Fluff]) -> bool {
+impl listen::Listener<SessionFluff> for FluffListener {
+    fn receive(&self, fluffs: &[SessionFluff]) -> bool {
         if !self.alive.load(atomic::Ordering::Relaxed) {
             return false;
         }

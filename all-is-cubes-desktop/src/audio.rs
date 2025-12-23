@@ -13,9 +13,9 @@ use kira::PlaySoundError;
 use kira::sound::static_sound::{StaticSoundData, StaticSoundSettings};
 use rand::{Rng as _, SeedableRng};
 
-use all_is_cubes::fluff::Fluff;
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::sound::{Band, SoundDef, SpatialAmbient};
+use all_is_cubes_ui::apps::SessionFluff;
 
 use crate::Session;
 
@@ -38,7 +38,7 @@ impl fmt::Debug for AudioOut {
 
 #[derive(Debug)]
 enum AudioCommand {
-    Fluff(Fluff),
+    Fluff(SessionFluff),
     UpdateAmbient,
 }
 
@@ -122,7 +122,7 @@ fn audio_command_thread(
     while let Ok(message) = receiver.recv() {
         match message {
             AudioCommand::Fluff(fluff) => {
-                if let Some((sound_def, amplitude)) = fluff.sound() {
+                if let Some((sound_def, amplitude)) = fluff.fluff.sound() {
                     // TODO: Need a better solution than comparing sounds by value.
                     // When we have the sounds stored in Universes instead of as constants,
                     // we can compare the Handles by name.
@@ -204,8 +204,8 @@ impl fmt::Debug for FluffListener {
     }
 }
 
-impl listen::Listener<Fluff> for FluffListener {
-    fn receive(&self, fluffs: &[Fluff]) -> bool {
+impl listen::Listener<SessionFluff> for FluffListener {
+    fn receive(&self, fluffs: &[SessionFluff]) -> bool {
         if !self.alive.load(atomic::Ordering::Relaxed) {
             return false;
         }

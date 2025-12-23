@@ -16,6 +16,7 @@ use all_is_cubes::character::{self, Character, Cursor};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::ToolError;
 use all_is_cubes::listen::{self, Listen as _, Listener as _, Source as _};
+use all_is_cubes::math::FreePoint;
 use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::sound;
 use all_is_cubes::space::{self, Space};
@@ -124,9 +125,7 @@ struct Shuttle {
     cursor_result: Option<Cursor>,
 
     /// Outputs [`Fluff`] from the game character's viewpoint and also the session UI.
-    //---
-    // TODO: should include spatial information and source information
-    fluff_notifier: Arc<listen::Notifier<Fluff>>,
+    fluff_notifier: Arc<listen::Notifier<SessionFluff>>,
 
     ambient_sound_state: listen::CellWithLocal<sound::SpatialAmbient>,
 
@@ -323,7 +322,10 @@ impl Session {
 
     /// Listen for [`Fluff`] events from this session. Fluff constitutes short-duration
     /// sound or particle effects.
-    pub fn listen_fluff(&self, listener: impl listen::Listener<Fluff> + Send + Sync + 'static) {
+    pub fn listen_fluff(
+        &self,
+        listener: impl listen::Listener<SessionFluff> + Send + Sync + 'static,
+    ) {
         self.shuttle().fluff_notifier.listen(listener)
     }
 
@@ -625,7 +627,10 @@ impl Session {
         if let Err(error) = &result {
             let shuttle = self.shuttle();
             for fluff in error.fluff() {
-                shuttle.fluff_notifier.notify(&fluff);
+                shuttle.fluff_notifier.notify(&SessionFluff {
+                    fluff,
+                    source: SessionFluffSource::NonSpatial,
+                });
             }
         } else {
             // success effects should come from the tool's transaction
@@ -1037,23 +1042,23 @@ struct SpaceWatchState {
     /// Gates the message forwarding from the `space` to `Session::fluff_notifier`.
     #[expect(dead_code, reason = "acts upon being dropped")]
     fluff_gate: listen::Gate,
-    // /// Camera state copied from the character, for use by fluff forwarder.
-    // camera: Camera,
 }
 
 impl SpaceWatchState {
     fn new(
         read_ticket: ReadTicket<'_>,
         space: Option<Handle<Space>>,
-        fluff_notifier: &Arc<listen::Notifier<Fluff>>,
+        fluff_notifier: &Arc<listen::Notifier<SessionFluff>>,
     ) -> Result<Self, universe::HandleError> {
         if let Some(space) = space {
             let space_read = space.read(read_ticket)?;
             let (fluff_gate, fluff_forwarder) =
                 listen::Notifier::forwarder(Arc::downgrade(fluff_notifier))
-                    .filter(|sf: &space::SpaceFluff| {
-                        // TODO: do not discard spatial information; and add source information
-                        Some(sf.fluff.clone())
+                    .filter(move |sf: &space::SpaceFluff| {
+                        Some(SessionFluff {
+                            fluff: sf.fluff.clone(),
+                            source: SessionFluffSource::World(sf.position.center()),
+                        })
                     })
                     .with_stack_buffer::<10>() // TODO: non-arbitrary number
                     .gate();
@@ -1074,6 +1079,33 @@ impl SpaceWatchState {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// [`Fluff`] with additional information about its origin, produced by [`Session`].
+#[derive(Debug, Clone)]
+#[expect(clippy::exhaustive_structs)]
+pub struct SessionFluff {
+    #[allow(missing_docs)]
+    pub fluff: Fluff,
+    /// Origin of the fluff, to be used for spatial audio, independent volume control, etc.
+    pub source: SessionFluffSource,
+}
+
+/// Identifies the source of a [`SessionFluff`].
+///
+/// May be used to modify its rendering/playback according to spatial location or user settings.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum SessionFluffSource {
+    /// Fluff is from the game world (current character’s current [`Space`]).
+    World(FreePoint),
+    /// Fluff is from a non-spatial source.
+    /// TODO: Eventually this should be more specific, like "UI"
+    NonSpatial,
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Information about the [`Universe`] currently owned by a [`Session`].
 ///
@@ -1470,7 +1502,7 @@ mod tests {
         session.set_universe(u);
         session.set_character(Some(character.clone()));
         let log = listen::Log::<Fluff>::new();
-        session.listen_fluff(log.listener());
+        session.listen_fluff(log.listener().filter(|sf: &SessionFluff| Some(sf.fluff.clone())));
 
         // Try some fluff with the initial state (we haven't even stepped the session)
         session.universe_mut().execute_1(&space1, st.clone()).unwrap();
