@@ -62,7 +62,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
 
     if !headless {
         #[cfg(feature = "audio")]
-        match crate::audio::init_sound(&dsession.session) {
+        match crate::audio::AudioTask::new(&dsession.session) {
             Ok(audio_out) => dsession.audio = Some(audio_out),
             Err(e) => log::error!(
                 // note that `e` is an anyhow::Error and will benefit from its

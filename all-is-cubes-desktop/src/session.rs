@@ -45,7 +45,7 @@ pub struct DesktopSession<Ren, Win> {
     /// If present, connection to system audio output.
     /// If absent, sound is not produced
     #[cfg(feature = "audio")]
-    pub(crate) audio: Option<crate::audio::AudioOut>,
+    pub(crate) audio: Option<crate::audio::AudioTask>,
     #[cfg(not(feature = "audio"))]
     pub(crate) audio: Option<std::convert::Infallible>,
 

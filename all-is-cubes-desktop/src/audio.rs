@@ -26,7 +26,7 @@ use crate::Session;
 // -------------------------------------------------------------------------------------------------
 
 /// Fills the audio slot in a `DesktopSession` to actually produce audio.
-pub(crate) struct AudioOut {
+pub(crate) struct AudioTask {
     #[expect(
         dead_code,
         reason = "eventually we're going to need this for volume control etc."
@@ -40,13 +40,60 @@ pub(crate) struct AudioOut {
     cameras_for_audio: StandardCameras,
 }
 
-impl fmt::Debug for AudioOut {
+impl fmt::Debug for AudioTask {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("AudioOut").finish_non_exhaustive()
+        f.debug_struct("AudioTask").finish_non_exhaustive()
     }
 }
 
-impl AudioOut {
+impl AudioTask {
+    pub(crate) fn new(session: &Session) -> Result<AudioTask, anyhow::Error> {
+        let mut manager = AudioManager::<kira::backend::cpal::CpalBackend>::new(
+            kira::AudioManagerSettings::default(),
+        )?;
+        let cameras_for_audio =
+            session.create_cameras(listen::constant(camera::Viewport::with_scale(1.0, [0, 0])));
+
+        // TODO: non-placeholder initial values
+        let (initial_position, initial_orientation) =
+            convert_view_to_kira_listener(cameras_for_audio.cameras().world.view_transform());
+        let world_spatial_listener = manager.add_listener(initial_position, initial_orientation)?;
+        let world_spatial_listener_id = world_spatial_listener.id();
+
+        // Transfers audio events to the audio processing thread.
+        // We never block on this channel, but drop things if full.
+        let (sender, receiver) = mpsc::sync_channel(256);
+
+        // Hook up ambient sound to channel
+        let ambient_source = session.ambient_sound();
+        // TODO: this whole custom listener scheme should be replaced with something more async
+        // and less custom-code-per-use-case.
+        ambient_source.listen(UpdateAmbientListener::new(sender.clone()));
+        sender.send(AudioCommand::UpdateAmbient).unwrap(); // ensure initial sync
+
+        // Hook up fluff to channel
+        session.listen_fluff(FluffListener::new(sender.clone()));
+
+        // The audio processing is done on a thread because `AudioManager` wants `&mut self`
+        // to perform operations, so I either need a dedicated thread (actor) or a mutex.
+        // We also don’t want to find ourselves running synthesis inside the Listener.
+        // Note that this is *not* a sample-by-sample realtime audio thread.
+        if let Err(e) = std::thread::Builder::new()
+            .name("all_is_cubes audio core".to_owned())
+            .spawn(move || {
+                audio_command_thread(receiver, manager, ambient_source, world_spatial_listener_id)
+            })
+        {
+            log::error!("failed to spawn audio command thread; audio disabled: {e}");
+        }
+
+        Ok(AudioTask {
+            sender,
+            world_spatial_listener,
+            cameras_for_audio,
+        })
+    }
+
     pub(crate) fn update_listener(&mut self, read_tickets: Layers<ReadTicket<'_>>) {
         self.cameras_for_audio.update(read_tickets);
         Self::set_listener_state(
@@ -72,54 +119,6 @@ impl AudioOut {
 enum AudioCommand {
     Fluff(SessionFluff),
     UpdateAmbient,
-}
-
-pub(crate) fn init_sound(session: &Session) -> Result<AudioOut, anyhow::Error> {
-    let mut manager = AudioManager::<kira::backend::cpal::CpalBackend>::new(
-        kira::AudioManagerSettings::default(),
-    )?;
-    let cameras_for_audio =
-        session.create_cameras(listen::constant(camera::Viewport::with_scale(1.0, [0, 0])));
-
-    // TODO: non-placeholder initial values
-    let (initial_position, initial_orientation) =
-        convert_view_to_kira_listener(cameras_for_audio.cameras().world.view_transform());
-    let world_spatial_listener = manager.add_listener(initial_position, initial_orientation)?;
-    let world_spatial_listener_id = world_spatial_listener.id();
-
-    // Transfers audio events to the audio processing thread.
-    // We never block on this channel, but drop things if full.
-    let (sender, receiver) = mpsc::sync_channel(256);
-
-    // Hook up ambient sound to channel
-    let ambient_source = session.ambient_sound();
-    // TODO: this whole custom listener scheme should be replaced with something more async
-    // and less custom-code-per-use-case.
-    ambient_source.listen(UpdateAmbientListener::new(sender.clone()));
-    sender.send(AudioCommand::UpdateAmbient).unwrap(); // ensure initial sync
-
-    // Hook up fluff to channel
-    session.listen_fluff(FluffListener::new(sender.clone()));
-
-    // The audio processing is done on a thread because `AudioManager` wants `&mut self`
-    // to perform operations, so I either need a dedicated thread (actor) or a mutex.
-    // We also don’t want to find ourselves running synthesis inside the Listener.
-    // Note that this is *not* a sample-by-sample realtime audio thread.
-    if let Err(e) =
-        std::thread::Builder::new()
-            .name("all_is_cubes audio core".to_owned())
-            .spawn(move || {
-                audio_command_thread(receiver, manager, ambient_source, world_spatial_listener_id)
-            })
-    {
-        log::error!("failed to spawn audio command thread; audio disabled: {e}");
-    }
-
-    Ok(AudioOut {
-        sender,
-        world_spatial_listener,
-        cameras_for_audio,
-    })
 }
 
 /// Thread function for receiving commands and executing them on `&mut AudioManager`.
