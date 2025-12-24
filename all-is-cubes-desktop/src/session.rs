@@ -138,6 +138,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         }
         let step_info = self.session.maybe_step_universe();
 
+        #[cfg(feature = "audio")]
         if let Some(audio) = &mut self.audio {
             audio.update_listener(self.session.read_tickets());
         }
