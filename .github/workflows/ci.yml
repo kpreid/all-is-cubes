@@ -150,15 +150,16 @@ jobs:
       if: ${{ matrix.depversions == 'minimal' }}
       run: rustup toolchain install nightly --profile=minimal 
 
-    - name: Install native libraries
+    - name: Install Linux native dependencies
       if: ${{ runner.os == 'Linux' }}
       run: |
           sudo apt update
-          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev
+          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev mesa-vulkan-drivers
       # libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev: needed for windowing
       # Note that `libwayland-dev` provides the library called `wayland-client`
       # libasound2-dev: needed for audio via `kira`
       # libudev-dev: needed for gamepad input via `gilrs`
+      # mesa-vulkan-drivers: needed for rendering
 
     - run: df -h .
 
@@ -323,7 +324,7 @@ jobs:
       if: ${{ runner.os == 'Linux' }}
       run: |
           sudo apt update
-          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev
+          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev mesa-vulkan-drivers
 
     - run: df -h .
 
@@ -366,7 +367,7 @@ jobs:
       if: ${{ runner.os == 'Linux' }}
       run: |
           sudo apt update
-          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev
+          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev mesa-vulkan-drivers
 
     # Load cache before doing any Rust builds
     - uses: Swatinem/rust-cache@v2.8.2
@@ -428,7 +429,7 @@ jobs:
       if: ${{ runner.os == 'Linux' }}
       run: |
           sudo apt update
-          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev
+          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev mesa-vulkan-drivers
 
     # Load cache before doing any Rust builds
     - uses: Swatinem/rust-cache@v2.8.2

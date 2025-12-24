@@ -103,15 +103,16 @@ jobs:
     - name: Install Rust toolchain
       run: rustup show active-toolchain || rustup toolchain install
 
-    - name: Install native libraries
+    - name: Install Linux native dependencies
       if: ${{ runner.os == 'Linux' }}
       run: |
           sudo apt update
-          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev
+          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev mesa-vulkan-drivers
       # libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev: needed for windowing
       # Note that `libwayland-dev` provides the library called `wayland-client`
       # libasound2-dev: needed for audio via `kira`
       # libudev-dev: needed for gamepad input via `gilrs`
+      # mesa-vulkan-drivers: needed for rendering
 
     # break this out as a separate non-silenced build step
     - name: Compile xtask
@@ -197,7 +198,7 @@ jobs:
       if: ${{ runner.os == 'Linux' }}
       run: |
           sudo apt update
-          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev
+          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev mesa-vulkan-drivers
 
     # break this out as a separate non-silenced build step
     - name: Compile xtask
