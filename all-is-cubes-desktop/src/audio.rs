@@ -132,15 +132,13 @@ fn audio_command_thread(
 ) {
     let sample_rate = 44100;
     let mut sound_cache: HashMap<SoundDef, StaticSoundData> = HashMap::new();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(0);
 
     // TODO: maybe synthesize white noise continuously to avoid any chance of audible repetition?
     let white_noise = StaticSoundData {
         sample_rate: 44100,
-        frames: (0..44100 * 10)
-            .map({
-                let mut rng = rand::rngs::StdRng::seed_from_u64(0);
-                move |_| kira::Frame::from_mono(rng.random())
-            })
+        frames: std::iter::repeat_with(|| kira::Frame::from_mono(rng.random()))
+            .take(44100 * 10)
             .collect(),
         settings: StaticSoundSettings {
             loop_region: Some(kira::sound::Region::default()),
@@ -184,6 +182,11 @@ fn audio_command_thread(
                         }
                     };
                     sound.settings.volume = amplitude_to_value(amplitude);
+                    // Randomize start time to reduce constructive interference effects.
+                    // TODO: get size of time range from universe tick rate.
+                    sound.settings.start_time = kira::StartTime::Delayed(Duration::from_nanos(
+                        rng.random_range(0..16_000_000),
+                    ));
 
                     match source {
                         SessionFluffSource::World(position) => {

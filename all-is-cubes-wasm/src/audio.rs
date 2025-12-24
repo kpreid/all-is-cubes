@@ -155,7 +155,12 @@ async fn audio_command_task(
                         _ => unimplemented!("unknown `SessionFluffSource` variant {source:?}"),
                     }
 
-                    source_node.start().expect("audio graph logic error");
+                    // Randomize start time to reduce constructive interference effects.
+                    // TODO: get size of time range from universe tick rate.
+                    let when =
+                        js_sys::Math::random().mul_add(const { 1. / 60. }, context.current_time());
+
+                    source_node.start_with_when(when).expect("audio graph logic error");
 
                     // log::trace!("played {fluff:?}");
                 }
