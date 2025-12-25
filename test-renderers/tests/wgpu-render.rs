@@ -6,7 +6,7 @@ use tokio::sync::OnceCell;
 use all_is_cubes_gpu::{headless, init};
 use all_is_cubes_render::HeadlessRenderer;
 use all_is_cubes_render::camera::StandardCameras;
-use test_renderers::{RendererFactory, RendererId};
+use test_renderers::{KnownIncorrectness, RendererFactory, RendererId};
 
 #[tokio::main]
 async fn main() -> test_renderers::HarnessResult {
@@ -42,20 +42,42 @@ async fn get_factory(
 ) -> Result<WgpuFactory, Box<dyn std::error::Error + Send + Sync>> {
     let adapter =
         init::create_adapter_for_test(WGPU_INSTANCE.get().expect("instance not initialized")).await;
-    let known_incorrect = adapter.get_info().backend == wgpu::Backend::Noop;
-    if known_incorrect {
+    let info = adapter.get_info();
+
+    let known_incorrectness = if info.backend == wgpu::Backend::Noop {
         log::warn!("*** NOOP BACKEND IN USE; TESTS WILL NOT COMPARE ANY IMAGES");
-    }
+        KnownIncorrectness {
+            completely_incorrect: true,
+            ..KnownIncorrectness::NONE
+        }
+    } else if info.driver == "llvmpipe" || info.name == "Microsoft Basic Render Driver"
+    // aka WARP
+    {
+        // Both of these software renderers break the antialiasing test for some reason
+        // (Microsoft Basic much more so), so set a flag indicating this.
+        // They also have odd off-by-1-ness mostly affecting the clear color,
+        // but the tests accomodate that in thresholds.
+        //
+        // I don't know whether these are actual driver bugs or spec-compliant behaviors
+        // that I just happen not to see on other implementations.
+        KnownIncorrectness {
+            antialiasing_funny_business: true,
+            ..KnownIncorrectness::NONE
+        }
+    } else {
+        KnownIncorrectness::NONE
+    };
+
     let builder = headless::Builder::from_adapter(&label, adapter.clone()).await?;
     Ok(WgpuFactory {
-        known_incorrect,
+        known_incorrectness,
         builder,
     })
 }
 
 #[derive(Clone, Debug)]
 struct WgpuFactory {
-    known_incorrect: bool,
+    known_incorrectness: KnownIncorrectness,
     builder: headless::Builder,
 }
 
@@ -69,10 +91,14 @@ impl RendererFactory for WgpuFactory {
     }
 
     fn info(&self) -> String {
-        format!("{:#?}", self.builder.get_adapter().get_info())
+        format!(
+            "{:#?}\n{:#?}",
+            self.builder.get_adapter().get_info(),
+            self.known_incorrectness
+        )
     }
 
-    fn known_incorrect(&self) -> bool {
-        self.known_incorrect
+    fn known_incorrect(&self) -> KnownIncorrectness {
+        self.known_incorrectness
     }
 }

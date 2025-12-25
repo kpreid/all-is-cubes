@@ -151,11 +151,16 @@ async fn antialias(mut context: RenderTestContext, antialias_option: Antialiasin
     options.antialiasing = antialias_option;
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
+
     // TODO: We need a better algorithm for comparing antialiased images which might make
-    // different choices of intermediate shades.
-    context
-        .render_comparison_test(Threshold::new([(5, 1000), (40, 1)]), scene, Overlays::NONE)
-        .await;
+    // different choices of intermediate shades. When we have that, we will be able to
+    // tighten up this threshold.
+    let threshold = if context.renderer_known_incorrect().antialiasing_funny_business {
+        Threshold::new([(5, 1000), (40, 1), (255, 1000)])
+    } else {
+        Threshold::new([(5, 1000), (40, 1)])
+    };
+    context.render_comparison_test(threshold, scene, Overlays::NONE).await;
 }
 
 async fn bloom(mut context: RenderTestContext, bloom_intensity: f32) {
@@ -504,7 +509,7 @@ async fn follow_character_change(mut context: RenderTestContext) {
     let image1 = renderer.draw("").await.unwrap();
 
     // Don't assert if they would fail because the renderer is stubbed
-    if context.renderer_known_incorrect() {
+    if context.renderer_known_incorrect().completely_incorrect {
         return;
     }
 

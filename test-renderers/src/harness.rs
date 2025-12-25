@@ -19,8 +19,9 @@ use all_is_cubes_render::camera::{Layers, StandardCameras};
 use all_is_cubes_render::{Flaws, HeadlessRenderer, Rendering};
 
 use crate::{
-    ComparisonOutcome, ComparisonRecord, ImageId, Overlays, RendererFactory, RendererId, Scene,
-    SuiteId, TestCaseOutput, TestId, Threshold, results_json_path, write_report_file,
+    ComparisonOutcome, ComparisonRecord, ImageId, KnownIncorrectness, Overlays, RendererFactory,
+    RendererId, Scene, SuiteId, TestCaseOutput, TestId, Threshold, results_json_path,
+    write_report_file,
 };
 
 #[cfg(doc)]
@@ -222,7 +223,7 @@ impl RenderTestContext {
     ///
     /// This is part of a system which handles letting the test suite complete even when no GPU
     /// is available to run GPU rendering tests.
-    pub fn renderer_known_incorrect(&self) -> bool {
+    pub fn renderer_known_incorrect(&self) -> KnownIncorrectness {
         self.renderer_factory.known_incorrect()
     }
 }
