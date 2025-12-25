@@ -75,8 +75,33 @@ pub trait RendererFactory: Send + Sync + Debug {
     /// Returns whether all images from this renderer are known to be incorrect due to inability
     /// to obtain a GPU or other necessary resources. Those images should also report
     /// `Flaws::OTHER` (TODO: assign a dedicated flag bit?).
-    fn known_incorrect(&self) -> bool;
+    fn known_incorrect(&self) -> KnownIncorrectness {
+        KnownIncorrectness::NONE
+    }
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct KnownIncorrectness {
+    /// Renderer is [`wgpu::Backend::Noop`] or otherwise completely nonfunctional.
+    /// Disables image comparison tests, but still runs test code.
+    pub completely_incorrect: bool,
+
+    /// Partially incorrect results when rendering antialiased images.
+    ///
+    /// (TODO: Debug this further with access to the relevant platforms, and either
+    /// implement workarounds or make this flag more specific about what the underlying
+    /// problem is.)
+    pub antialiasing_funny_business: bool,
+}
+
+impl KnownIncorrectness {
+    pub const NONE: Self = Self {
+        completely_incorrect: false,
+        antialiasing_funny_business: false,
+    };
+}
+
+// ------------------------------------------------------------------------------------------------
 
 /// [`RendererFactory`] implementor which produces [`all_is_cubes_render::raytracer::RtRenderer`]s.
 #[derive(Clone, Debug)]
@@ -98,10 +123,6 @@ impl RendererFactory for RtFactory {
 
     fn info(&self) -> String {
         "all_is_cubes_render raytracer".into()
-    }
-
-    fn known_incorrect(&self) -> bool {
-        false
     }
 }
 

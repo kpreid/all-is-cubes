@@ -136,7 +136,7 @@ re_log_types = { version = "0.28.0", default-features = false }
 re_sdk = { version = "0.28.0", default-features = false }
 re_sdk_types = { version = "0.28.0", default-features = false }
 rectangle-pack = { version = "0.4.2" } # currently only used in all-is-cubes-port which is currently std only
-rendiff = { version = "0.2.0", default-features = false }
+rendiff = { version = "0.2.2", default-features = false }
 # We use rstest for parameterized tests where each case can fail or succeed independently.
 # If there are too many cases to write literally, use `all_is_cubes::util::MultiFailure` instead.
 rstest = { version = "0.26.1", default-features = false }
@@ -308,4 +308,5 @@ overflow-checks = true
 # Here are some patches we might want to apply for development:
 #
 # exhaust = { git = "https://github.com/kpreid/exhaust/", branch = "main" }
+# rendiff = { git = "https://github.com/kpreid/rendiff/", branch = "main" }
 # wgpu = { git = "https://github.com/gfx-rs/wgpu/", branch = "trunk" }

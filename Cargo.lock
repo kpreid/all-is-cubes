@@ -6264,9 +6264,9 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "rendiff"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "056710053ba8867cb47a1a3c2b67319eb47294325450ea5ad757ee799d73c924"
+checksum = "7b498ca597ed206af14673b3c8a730cec699bc43434d797f41742ebbd27a2f6b"
 dependencies = [
  "embed-doc-image",
  "imgref",

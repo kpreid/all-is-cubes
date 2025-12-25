@@ -5,6 +5,8 @@
 #![allow(
     missing_docs,
     clippy::module_name_repetitions,
+    clippy::exhaustive_enums,
+    clippy::exhaustive_structs,
     reason = "library for internal use only"
 )]
 #![forbid(unsafe_code)]
