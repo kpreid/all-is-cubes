@@ -856,7 +856,7 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
 
     context
         .render_comparison_test(
-            0,
+            COLOR_ROUNDING_MAX_DIFF,
             cameras,
             Overlays {
                 cursor: None,
@@ -1060,7 +1060,15 @@ async fn tone_map(
     // So, there are probably bugs lurking here.
     // (The thresholds here are *not* for those difference but other pixel differences.)
     context
-        .render_comparison_test(Threshold::new([(10, 100), (3, 500)]), scene, Overlays::NONE)
+        .render_comparison_test(
+            Threshold::new([
+                (10, 100),
+                (3, 500),
+                (1, usize::MAX), // allow rounding differences
+            ]),
+            scene,
+            Overlays::NONE,
+        )
         .await;
 }
 
