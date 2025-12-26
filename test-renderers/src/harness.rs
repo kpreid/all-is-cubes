@@ -557,7 +557,14 @@ where
     // (This doesn't create the directory, but that doesn't matter unless we ran zero tests.)
     fs::write(
         results_json_path(suite_id, renderer_id),
-        serde_json::to_string(&per_test_output).unwrap().as_bytes(),
+        serde_json::to_string(&crate::report::TestSuiteOutput {
+            renderer_id,
+            // TODO: ideally we wouldn't have to make a dummy call to factory_factory
+            renderer_info: factory_factory("_meta".into()).await.info(),
+            test_case_results: per_test_output,
+        })
+        .unwrap()
+        .as_bytes(),
     )
     .expect("failed to write results json file");
 

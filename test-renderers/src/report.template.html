@@ -7,12 +7,20 @@
 </head>
 <body>
   <table class="results-table">
-    <thead><tr>
-      <th>Test Case</th>
-      <th><code>raytracer</code></th>
-      <th><code>wgpu</code></th>
-      <th><code>gltf</code></th>
-    </tr></thead>
+    <thead>
+      <tr>
+        <th>Test Case</th>
+        {{ for renderer in renderers }}
+        <th><code>{renderer.id}</code></th>
+        {{ endfor }}
+      </tr>
+      <tr>
+        <td></td>
+        {{ for renderer in renderers }}
+        <td><pre>{renderer.info}</pre></td>
+        {{ endfor }}
+      </tr>
+    </thead>
     {{ for test_case in statuses }}
       <tr>
         <td class="test-case-name-cell">

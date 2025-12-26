@@ -57,6 +57,12 @@ impl Builder {
         self
     }
 
+    /// Returns the adapter that this builder was created with.
+    #[doc(hidden)] // not sure if good public API
+    pub fn get_adapter(&self) -> &wgpu::Adapter {
+        &self.adapter
+    }
+
     /// Create a [`Renderer`] from the GPU connection in this builder and the given cameras.
     pub fn build(&self, cameras: StandardCameras) -> Renderer {
         let viewport_source = cameras.viewport_source();

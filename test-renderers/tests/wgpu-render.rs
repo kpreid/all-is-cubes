@@ -68,6 +68,10 @@ impl RendererFactory for WgpuFactory {
         RendererId::Wgpu
     }
 
+    fn info(&self) -> String {
+        format!("{:#?}", self.builder.get_adapter().get_info())
+    }
+
     fn known_incorrect(&self) -> bool {
         self.known_incorrect
     }
