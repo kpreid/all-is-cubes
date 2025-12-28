@@ -736,14 +736,17 @@ fn block_tick_action_timing() {
     let [mut block1, mut block2, block3] = make_some_blocks();
 
     // Hook them up to turn into each other
-    fn connect(read_ticket: ReadTicket<'_>, from: &mut Block, to: &Block) {
-        from.freezing_get_attributes_mut(read_ticket).tick_action = Some(TickAction {
-            operation: Operation::Become(to.clone()),
-            schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
-        });
+    fn connect(from: &mut Block, to: &Block) {
+        from.modifiers_mut().push(
+            block::SetAttribute::TickAction(Some(TickAction {
+                operation: Operation::Become(to.clone()),
+                schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
+            }))
+            .into(),
+        );
     }
-    connect(universe.read_ticket(), &mut block2, &block3);
-    connect(universe.read_ticket(), &mut block1, &block2);
+    connect(&mut block2, &block3);
+    connect(&mut block1, &block2);
 
     let mut space = Space::empty_positive(1, 1, 1);
     space.mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block1)).unwrap();
@@ -789,18 +792,21 @@ fn block_tick_action_conflict() {
         output2,
     ] = make_some_blocks();
     fn connect(from: &mut Block, to: &Block, face: Face6) {
-        from.freezing_get_attributes_mut(ReadTicket::stub()).tick_action = Some(TickAction {
-            // TODO: replace this with a better-behaved neighbor-modifying operation,
-            // once we have one
-            operation: Operation::Neighbors(
-                [(
-                    Cube::from(face.normal_vector().to_point()),
-                    Operation::Become(to.clone()),
-                )]
-                .into(),
-            ),
-            schedule: time::Schedule::from_period(NonZeroU16::new(1).unwrap()),
-        });
+        from.modifiers_mut().push(
+            block::SetAttribute::TickAction(Some(TickAction {
+                // TODO: replace this with a better-behaved neighbor-modifying operation,
+                // once we have one
+                operation: Operation::Neighbors(
+                    [(
+                        Cube::from(face.normal_vector().to_point()),
+                        Operation::Become(to.clone()),
+                    )]
+                    .into(),
+                ),
+                schedule: time::Schedule::from_period(NonZeroU16::new(1).unwrap()),
+            }))
+            .into(),
+        );
     }
     connect(&mut modifies_px_neighbor, &output1, Face6::PX);
     connect(&mut modifies_nx_neighbor, &output2, Face6::NX);

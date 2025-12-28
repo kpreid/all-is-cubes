@@ -105,38 +105,6 @@ pub(crate) enum PrimitiveSer {
     },
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct BlockAttributesV1Ser {
-    #[serde(default, skip_serializing_if = "str::is_empty")]
-    pub display_name: ArcStr,
-    #[serde(default = "return_true", skip_serializing_if = "is_true")]
-    pub selectable: bool,
-    #[serde(default, skip_serializing_if = "is_default")]
-    pub inventory: InvInBlockSer,
-    #[serde(default, skip_serializing_if = "AmbientSoundSer::is_silent")]
-    pub ambient_sound: AmbientSoundSer,
-    #[serde(default, skip_serializing_if = "is_default")]
-    pub rotation_rule: RotationPlacementRuleSer,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub placement_action: Option<PlacementActionSer>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tick_action: Option<TickActionSer>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub activation_action: Option<op::Operation>,
-    #[serde(default, skip_serializing_if = "is_default")]
-    pub animation_hint: AnimationHintSer,
-}
-fn return_true() -> bool {
-    true
-}
-#[expect(clippy::trivially_copy_pass_by_ref)]
-fn is_true(value: &bool) -> bool {
-    *value
-}
-fn is_default<T: Default + PartialEq>(value: &T) -> bool {
-    *value == T::default()
-}
-
 #[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
 pub(crate) enum BlockCollisionSer {
     #[default]
@@ -156,7 +124,7 @@ pub(crate) enum RotationPlacementRuleSer {
 
 /// Unversioned because it's versioned by the parent struct
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct TickActionSer {
+pub(crate) struct TickActionSerV1 {
     pub operation: op::Operation,
     pub schedule: Schedule,
 }
@@ -167,16 +135,13 @@ pub(crate) struct PlacementActionSer {
     pub in_front: bool,
 }
 #[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
-#[serde(tag = "type")]
-pub(crate) enum AnimationHintSer {
-    AnimationHintV1 {
-        redefinition: AnimationChangeV1Ser,
-        replacement: AnimationChangeV1Ser,
-    },
+pub(crate) struct AnimationHintSerV1 {
+    pub redefinition: AnimationChangeV1Ser,
+    pub replacement: AnimationChangeV1Ser,
 }
-impl Default for AnimationHintSer {
+impl Default for AnimationHintSerV1 {
     fn default() -> Self {
-        Self::AnimationHintV1 {
+        Self {
             redefinition: AnimationChangeV1Ser::None,
             replacement: AnimationChangeV1Ser::None,
         }
@@ -193,10 +158,6 @@ pub(crate) enum AnimationChangeV1Ser {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub(crate) enum ModifierSer<'a> {
-    AttributesV1 {
-        #[serde(flatten)]
-        attributes: BlockAttributesV1Ser,
-    },
     TagV1 {
         tag: tag::Tag,
     },
@@ -222,19 +183,48 @@ pub(crate) enum ModifierSer<'a> {
     BlockInventoryV1 {
         inventory: Cow<'a, inv::Inventory>,
     },
-    #[serde(untagged)]
-    Move(MoveSer),
+    Move(MoveSerV1),
+    //
+    // ---
+    // The following variants are `SetAttribute` flattened in.
+    // They are flattened because we want to keep it simple to change whether some piece of a
+    // block configuration counts as an attribute or some other kind of modifier.
+    //
+    // Note: Serde assumes that values in tuple variants should be flattened into the enum.
+    // Therefore, each variant must either have named fields, refer to a struct (no tag),
+    // not an enum, or have identical tags inside, (which would defeat the point of it being
+    // a separate enum).
+    //
+    DisplayNameV1 {
+        display_name: ArcStr,
+    },
+    SelectableV1 {
+        selectable: bool,
+    },
+    InvInBlockV1(InvInBlockSerV1),
+    AmbientSoundV1(AmbientSoundSerV1),
+    RotationRuleV1 {
+        // using a named field makes serde not collapse the tag
+        rotation_rule: RotationPlacementRuleSer,
+    },
+    PlacementActionV1 {
+        placement_action: Option<PlacementActionSer>,
+    },
+    TickActionV1 {
+        tick_action: Option<TickActionSerV1>,
+    },
+    ActivationActionV1 {
+        activation_action: Option<op::Operation>,
+    },
+    AnimationHintV1(AnimationHintSerV1),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(tag = "type")]
-pub(crate) enum MoveSer {
-    MoveV1 {
-        direction: Face6,
-        distance: u16,
-        velocity: i16,
-        schedule: Schedule,
-    },
+pub(crate) struct MoveSerV1 {
+    pub direction: Face6,
+    pub distance: u16,
+    pub velocity: i16,
+    pub schedule: Schedule,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -357,16 +347,13 @@ pub(crate) enum ToolSer {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-#[serde(tag = "type")]
-pub(crate) enum InvInBlockSer {
-    InvInBlockV1 {
-        size: inv::Ix,
-        icon_scale: block::Resolution,
-        icon_resolution: block::Resolution,
-        icon_rows: Vec<IconRowSerV1>,
-    },
+pub(crate) struct InvInBlockSerV1 {
+    pub size: inv::Ix,
+    pub icon_scale: block::Resolution,
+    pub icon_resolution: block::Resolution,
+    pub icon_rows: Vec<IconRowSerV1>,
 }
-impl Default for InvInBlockSer {
+impl Default for InvInBlockSerV1 {
     fn default() -> Self {
         (&inv::InvInBlock::EMPTY).into()
     }
@@ -416,9 +403,7 @@ pub(crate) enum OperationSer<'a> {
     AddModifiersV1 {
         modifiers: Cow<'a, [ModifierSer<'a>]>,
     },
-    StartMoveV1 {
-        modifier: MoveSer,
-    },
+    StartMoveV1(MoveSerV1),
     MoveInventoryV1 {
         transfer_into_adjacent: Option<Face6>,
     },
@@ -469,25 +454,14 @@ pub(crate) enum SoundDefSer {
 // Schema corresponding to the `sound` module
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(tag = "type")]
-pub(crate) enum AmbientSoundSer {
-    AmbientSoundV1 {
-        noise_bands: [PositiveSign<f32>; 20],
-    },
+pub(crate) struct AmbientSoundSerV1 {
+    pub noise_bands: [PositiveSign<f32>; 20],
 }
 
-impl Default for AmbientSoundSer {
+impl Default for AmbientSoundSerV1 {
     fn default() -> Self {
-        Self::AmbientSoundV1 {
+        Self {
             noise_bands: [ps32(0.0); 20],
-        }
-    }
-}
-
-impl AmbientSoundSer {
-    fn is_silent(&self) -> bool {
-        match self {
-            AmbientSoundSer::AmbientSoundV1 { noise_bands } => noise_bands == &[ps32(0.0); _],
         }
     }
 }
@@ -650,4 +624,11 @@ pub(crate) enum HandleSer {
 pub(crate) enum NameSer {
     Specific(ArcStr),
     Anonym(usize),
+}
+
+// -------------------------------------------------------------------------------------------------
+// Helper functions
+
+fn is_default<T: Default + PartialEq>(value: &T) -> bool {
+    *value == T::default()
 }

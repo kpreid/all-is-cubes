@@ -1173,9 +1173,7 @@ mod tests {
                                     collision: Hard,
                                 },
                                 modifiers: [
-                                    BlockAttributes {
-                                        display_name: "0",
-                                    },
+                                    SetAttribute::DisplayName("0"),
                                 ],
                             },
                         ),

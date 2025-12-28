@@ -39,7 +39,8 @@ where
         "serialized json != expected json"
     );
     assert_eq!(
-        &from_value::<T>(json_value).expect("failed to deserialize"),
+        &from_value::<T>(json_value)
+            .expect("failed to deserialize (but serialized JSON was as expected)"),
         value,
         "roundtripped value not as expected"
     );
@@ -203,40 +204,43 @@ fn block_atom_with_all_attributes() {
                 "collision": "NoneV1",
             },
             "modifiers": [
+                {"type": "DisplayNameV1", "display_name": "foo"},
+                {"type": "SelectableV1", "selectable": false},
                 {
-                    "type": "AttributesV1",
-                    "display_name": "foo",
-                    "selectable": false,
-                    "inventory": {
-                        "type": "InvInBlockV1",
-                        "size": 1,
-                        "icon_scale": 4,
-                        "icon_resolution": 16,
-                        "icon_rows": [
-                            {
-                                "count": 3,
-                                "first_slot": 0,
-                                "origin": [1, 1, 1],
-                                "stride": [5, 0, 0],
-                            },
-                            {
-                                "count": 3,
-                                "first_slot": 3,
-                                "origin": [1, 1, 6],
-                                "stride": [5, 0, 0],
-                            },
-                            {
-                                "count": 3,
-                                "first_slot": 6,
-                                "origin": [1, 1, 11],
-                                "stride": [5, 0, 0],
-                            },
-                        ],
-                    },
+                    "type": "InvInBlockV1",
+                    "size": 1,
+                    "icon_scale": 4,
+                    "icon_resolution": 16,
+                    "icon_rows": [
+                        {
+                            "count": 3,
+                            "first_slot": 0,
+                            "origin": [1, 1, 1],
+                            "stride": [5, 0, 0],
+                        },
+                        {
+                            "count": 3,
+                            "first_slot": 3,
+                            "origin": [1, 1, 6],
+                            "stride": [5, 0, 0],
+                        },
+                        {
+                            "count": 3,
+                            "first_slot": 6,
+                            "origin": [1, 1, 11],
+                            "stride": [5, 0, 0],
+                        },
+                    ],
+                },
+                {
+                    "type": "RotationRuleV1",
                     "rotation_rule": {
                         "type": "AttachV1",
                         "by": "PX",
                     },
+                },
+                {
+                    "type": "TickActionV1",
                     "tick_action": {
                         "schedule": {
                             "type": "ScheduleV1",
@@ -249,13 +253,13 @@ fn block_atom_with_all_attributes() {
                                 "primitive": {"type": "AirV1"},
                             }
                         }
-                    },
-                    "animation_hint": {
-                        "type": "AnimationHintV1",
-                        "redefinition": "ColorSameCategory",
-                        "replacement": "Shape",
-                    },
-                }
+                    }
+                },
+                {
+                    "type": "AnimationHintV1",
+                    "redefinition": "ColorSameCategory",
+                    "replacement": "Shape",
+                },
             ]
         }),
     );
@@ -712,7 +716,7 @@ fn space_success() {
                     },
                     "modifiers": [
                         {
-                            "type": "AttributesV1",
+                            "type": "DisplayNameV1",
                             "display_name": "0"
                         }
                     ]
@@ -910,7 +914,7 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                     },
                     "modifiers": [
                         {
-                            "type": "AttributesV1",
+                            "type": "DisplayNameV1",
                             "display_name": "0",
                         },
                         {

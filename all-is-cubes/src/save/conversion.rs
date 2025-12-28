@@ -80,9 +80,8 @@ mod behavior {
 mod block {
     use super::*;
     use crate::block::{
-        AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision, Composite,
-        Modifier, Move, PlacementAction, Primitive, Quote, RotationPlacementRule, TickAction, Zoom,
-        text,
+        AnimationChange, AnimationHint, Atom, Block, BlockCollision, Composite, Modifier, Move,
+        PlacementAction, Primitive, Quote, RotationPlacementRule, TickAction, Zoom, text,
     };
     use crate::math::{Rgb, Rgba};
     use crate::tag;
@@ -174,94 +173,6 @@ mod block {
         }
     }
 
-    impl<'a> From<&'a BlockAttributes> for schema::BlockAttributesV1Ser {
-        fn from(value: &'a BlockAttributes) -> Self {
-            let &BlockAttributes {
-                ref display_name,
-                selectable,
-                ref inventory,
-                ref ambient_sound,
-                rotation_rule,
-                ref placement_action,
-                ref tick_action,
-                ref activation_action,
-                animation_hint,
-            } = value;
-            schema::BlockAttributesV1Ser {
-                display_name: display_name.clone(),
-                selectable,
-                inventory: inventory.into(),
-                ambient_sound: ambient_sound.into(),
-                rotation_rule: rotation_rule.into(),
-                placement_action: placement_action.as_ref().map(
-                    |&PlacementAction {
-                         ref operation,
-                         in_front,
-                     }| schema::PlacementActionSer {
-                        operation: operation.clone(),
-                        in_front,
-                    },
-                ),
-                tick_action: tick_action.as_ref().map(
-                    |&TickAction {
-                         ref operation,
-                         schedule,
-                     }| schema::TickActionSer {
-                        operation: operation.clone(),
-                        schedule,
-                    },
-                ),
-                activation_action: activation_action.clone(),
-                animation_hint: animation_hint.into(),
-            }
-        }
-    }
-
-    impl From<schema::BlockAttributesV1Ser> for BlockAttributes {
-        fn from(value: schema::BlockAttributesV1Ser) -> Self {
-            let schema::BlockAttributesV1Ser {
-                display_name,
-                selectable,
-                inventory,
-                ambient_sound,
-                rotation_rule,
-                placement_action,
-                tick_action,
-                activation_action,
-                animation_hint,
-            } = value;
-            Self {
-                display_name,
-                selectable,
-                inventory: inventory.into(),
-                ambient_sound: ambient_sound.into(),
-                rotation_rule: rotation_rule.into(),
-                placement_action: placement_action.map(
-                    |schema::PlacementActionSer {
-                         operation,
-                         in_front,
-                     }| PlacementAction {
-                        operation,
-                        in_front,
-                    },
-                ),
-                tick_action: tick_action.map(
-                    |schema::TickActionSer {
-                         operation,
-                         schedule,
-                     }| {
-                        TickAction {
-                            operation,
-                            schedule,
-                        }
-                    },
-                ),
-                activation_action,
-                animation_hint: animation_hint.into(),
-            }
-        }
-    }
-
     impl From<BlockCollision> for schema::BlockCollisionSer {
         fn from(value: BlockCollision) -> Self {
             use schema::BlockCollisionSer as S;
@@ -302,30 +213,28 @@ mod block {
         }
     }
 
-    impl From<AnimationHint> for schema::AnimationHintSer {
+    impl From<AnimationHint> for schema::AnimationHintSerV1 {
         fn from(value: AnimationHint) -> Self {
             let AnimationHint {
                 redefinition,
                 replacement,
             } = value;
-            schema::AnimationHintSer::AnimationHintV1 {
+            schema::AnimationHintSerV1 {
                 redefinition: redefinition.into(),
                 replacement: replacement.into(),
             }
         }
     }
 
-    impl From<schema::AnimationHintSer> for AnimationHint {
-        fn from(value: schema::AnimationHintSer) -> Self {
-            use schema::AnimationHintSer as S;
-            match value {
-                S::AnimationHintV1 {
-                    redefinition,
-                    replacement,
-                } => AnimationHint {
-                    redefinition: redefinition.into(),
-                    replacement: replacement.into(),
-                },
+    impl From<schema::AnimationHintSerV1> for AnimationHint {
+        fn from(value: schema::AnimationHintSerV1) -> Self {
+            let schema::AnimationHintSerV1 {
+                redefinition,
+                replacement,
+            } = value;
+            AnimationHint {
+                redefinition: redefinition.into(),
+                replacement: replacement.into(),
             }
         }
     }
@@ -354,9 +263,42 @@ mod block {
 
     impl<'a> From<&'a Modifier> for ModifierSer<'a> {
         fn from(value: &'a Modifier) -> Self {
+            use crate::block::SetAttribute as A;
+
             match *value {
-                Modifier::Attributes(ref attributes) => ModifierSer::AttributesV1 {
-                    attributes: (&**attributes).into(),
+                Modifier::SetAttribute(ref attribute) => match *attribute {
+                    A::DisplayName(ref attr_value) => ModifierSer::DisplayNameV1 {
+                        display_name: attr_value.clone(),
+                    },
+                    A::Selectable(selectable) => ModifierSer::SelectableV1 { selectable },
+                    A::Inventory(ref attr_value) => ModifierSer::InvInBlockV1(attr_value.into()),
+                    A::AmbientSound(ref attr_value) => {
+                        ModifierSer::AmbientSoundV1(attr_value.into())
+                    }
+                    A::RotationRule(attr_value) => ModifierSer::RotationRuleV1 {
+                        rotation_rule: attr_value.into(),
+                    },
+                    A::PlacementAction(ref attr_value) => ModifierSer::PlacementActionV1 {
+                        placement_action: attr_value.clone().map(
+                            |PlacementAction {
+                                 operation,
+                                 in_front,
+                             }| schema::PlacementActionSer {
+                                operation,
+                                in_front,
+                            },
+                        ),
+                    },
+                    A::TickAction(ref attr_value) => ModifierSer::TickActionV1 {
+                        tick_action: attr_value.clone().map(|ta| schema::TickActionSerV1 {
+                            operation: ta.operation,
+                            schedule: ta.schedule,
+                        }),
+                    },
+                    A::ActivationAction(ref attr_value) => ModifierSer::ActivationActionV1 {
+                        activation_action: attr_value.clone(),
+                    },
+                    A::AnimationHint(attr_value) => ModifierSer::AnimationHintV1(attr_value.into()),
                 },
                 Modifier::Tag(tag::Be(ref tag)) => ModifierSer::TagV1 { tag: tag.clone() },
                 Modifier::Quote(Quote { suppress_ambient }) => {
@@ -385,10 +327,10 @@ mod block {
 
     impl From<ModifierSer<'_>> for Modifier {
         fn from(value: ModifierSer<'_>) -> Self {
+            use crate::block::SetAttribute as A;
+            let ms = Modifier::SetAttribute;
+
             match value {
-                ModifierSer::AttributesV1 { attributes } => {
-                    Modifier::Attributes(Arc::new(attributes.into()))
-                }
                 ModifierSer::TagV1 { tag } => Modifier::Tag(tag::Be(tag)),
                 ModifierSer::QuoteV1 { suppress_ambient } => {
                     Modifier::Quote(Quote { suppress_ambient })
@@ -412,11 +354,46 @@ mod block {
                 ModifierSer::BlockInventoryV1 { inventory } => {
                     Modifier::Inventory(inventory.into_owned())
                 }
+
+                // Attributes
+                ModifierSer::DisplayNameV1 { display_name } => ms(A::DisplayName(display_name)),
+                ModifierSer::SelectableV1 { selectable } => ms(A::Selectable(selectable)),
+                ModifierSer::InvInBlockV1(attr_value) => ms(A::Inventory(attr_value.into())),
+                ModifierSer::AmbientSoundV1(attr_value) => ms(A::AmbientSound(attr_value.into())),
+                ModifierSer::RotationRuleV1 { rotation_rule } => {
+                    ms(A::RotationRule(rotation_rule.into()))
+                }
+                ModifierSer::PlacementActionV1 { placement_action } => {
+                    ms(A::PlacementAction(placement_action.map(
+                        |schema::PlacementActionSer {
+                             operation,
+                             in_front,
+                         }| {
+                            PlacementAction {
+                                operation,
+                                in_front,
+                            }
+                        },
+                    )))
+                }
+                ModifierSer::TickActionV1 { tick_action } => ms(A::TickAction(tick_action.map(
+                    |schema::TickActionSerV1 {
+                         operation,
+                         schedule,
+                     }| TickAction {
+                        operation,
+                        schedule,
+                    },
+                ))),
+                ModifierSer::ActivationActionV1 { activation_action } => {
+                    ms(A::ActivationAction(activation_action))
+                }
+                ModifierSer::AnimationHintV1(attr_value) => ms(A::AnimationHint(attr_value.into())),
             }
         }
     }
 
-    impl From<&Move> for schema::MoveSer {
+    impl From<&Move> for schema::MoveSerV1 {
         fn from(value: &Move) -> Self {
             let &Move {
                 direction,
@@ -425,7 +402,7 @@ mod block {
                 schedule,
             } = value;
 
-            schema::MoveSer::MoveV1 {
+            schema::MoveSerV1 {
                 direction,
                 distance,
                 velocity,
@@ -434,20 +411,20 @@ mod block {
         }
     }
 
-    impl From<schema::MoveSer> for Move {
-        fn from(value: schema::MoveSer) -> Self {
-            match value {
-                schema::MoveSer::MoveV1 {
-                    direction,
-                    distance,
-                    velocity,
-                    schedule,
-                } => Move {
-                    direction,
-                    distance,
-                    velocity,
-                    schedule,
-                },
+    impl From<schema::MoveSerV1> for Move {
+        fn from(value: schema::MoveSerV1) -> Self {
+            let schema::MoveSerV1 {
+                direction,
+                distance,
+                velocity,
+                schedule,
+            } = value;
+
+            Move {
+                direction,
+                distance,
+                velocity,
+                schedule,
             }
         }
     }
@@ -690,7 +667,7 @@ mod inv {
         }
     }
 
-    impl From<&inv::InvInBlock> for schema::InvInBlockSer {
+    impl From<&inv::InvInBlock> for schema::InvInBlockSerV1 {
         fn from(value: &inv::InvInBlock) -> Self {
             let inv::InvInBlock {
                 size,
@@ -698,7 +675,7 @@ mod inv {
                 icon_resolution,
                 ref icon_rows,
             } = *value;
-            schema::InvInBlockSer::InvInBlockV1 {
+            schema::InvInBlockSerV1 {
                 size,
                 icon_scale,
                 icon_resolution,
@@ -707,20 +684,19 @@ mod inv {
         }
     }
 
-    impl From<schema::InvInBlockSer> for inv::InvInBlock {
-        fn from(value: schema::InvInBlockSer) -> Self {
-            match value {
-                schema::InvInBlockSer::InvInBlockV1 {
-                    size,
-                    icon_scale,
-                    icon_resolution,
-                    icon_rows,
-                } => inv::InvInBlock {
-                    size,
-                    icon_scale,
-                    icon_resolution,
-                    icon_rows: icon_rows.into_iter().map(inv::IconRow::from).collect(),
-                },
+    impl From<schema::InvInBlockSerV1> for inv::InvInBlock {
+        fn from(value: schema::InvInBlockSerV1) -> Self {
+            let schema::InvInBlockSerV1 {
+                size,
+                icon_scale,
+                icon_resolution,
+                icon_rows,
+            } = value;
+            inv::InvInBlock {
+                size,
+                icon_scale,
+                icon_resolution,
+                icon_rows: icon_rows.into_iter().map(inv::IconRow::from).collect(),
             }
         }
     }
@@ -794,9 +770,7 @@ mod op {
                 op::Operation::AddModifiers(modifiers) => schema::OperationSer::AddModifiersV1 {
                     modifiers: modifiers.iter().map(schema::ModifierSer::from).collect(),
                 },
-                op::Operation::StartMove(m) => {
-                    schema::OperationSer::StartMoveV1 { modifier: m.into() }
-                }
+                op::Operation::StartMove(m) => schema::OperationSer::StartMoveV1(m.into()),
                 &op::Operation::MoveInventory {
                     transfer_into_adjacent,
                 } => schema::OperationSer::MoveInventoryV1 {
@@ -846,9 +820,7 @@ mod op {
                 schema::OperationSer::AddModifiersV1 { modifiers } => op::Operation::AddModifiers(
                     cow_into_iter(modifiers).map(crate::block::Modifier::from).collect(),
                 ),
-                schema::OperationSer::StartMoveV1 { modifier: m } => {
-                    op::Operation::StartMove(m.into())
-                }
+                schema::OperationSer::StartMoveV1(m) => op::Operation::StartMove(m.into()),
                 schema::OperationSer::MoveInventoryV1 {
                     transfer_into_adjacent,
                 } => op::Operation::MoveInventory {
@@ -905,21 +877,20 @@ mod sound {
         }
     }
 
-    impl From<&sound::Ambient> for schema::AmbientSoundSer {
+    impl From<&sound::Ambient> for schema::AmbientSoundSerV1 {
         fn from(value: &sound::Ambient) -> Self {
             let &sound::Ambient {
                 noise_bands: sound::Spectrum(noise_bands),
             } = value;
-            Self::AmbientSoundV1 { noise_bands }
+            schema::AmbientSoundSerV1 { noise_bands }
         }
     }
 
-    impl From<schema::AmbientSoundSer> for sound::Ambient {
-        fn from(value: schema::AmbientSoundSer) -> Self {
-            match value {
-                schema::AmbientSoundSer::AmbientSoundV1 { noise_bands } => Self {
-                    noise_bands: sound::Spectrum(noise_bands),
-                },
+    impl From<schema::AmbientSoundSerV1> for sound::Ambient {
+        fn from(value: schema::AmbientSoundSerV1) -> Self {
+            let schema::AmbientSoundSerV1 { noise_bands } = value;
+            Self {
+                noise_bands: sound::Spectrum(noise_bands),
             }
         }
     }

@@ -279,7 +279,7 @@ pub fn free_editing_starter_inventory(flying: bool) -> Vec<Slot> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Atom, BlockAttributes, BlockCollision};
+    use crate::block::{Atom, BlockCollision};
     use crate::math::Rgb;
 
     #[test]
@@ -297,10 +297,7 @@ mod tests {
                 emission: Rgb::ZERO,
                 collision: BlockCollision::Hard,
             })
-            .with_modifier(BlockAttributes {
-                display_name: "0".into(),
-                ..BlockAttributes::default()
-            })]
+            .with_modifier(block::SetAttribute::DisplayName(arcstr::literal!("0")))]
         );
     }
 
@@ -314,19 +311,13 @@ mod tests {
                     emission: Rgb::ZERO,
                     collision: BlockCollision::Hard,
                 })
-                .with_modifier(BlockAttributes {
-                    display_name: "0".into(),
-                    ..BlockAttributes::default()
-                }),
+                .with_modifier(block::SetAttribute::DisplayName(arcstr::literal!("0"))),
                 Block::from(Atom {
                     color: Rgba::new(1.0, 1.0, 1.0, 1.0),
                     emission: Rgb::ZERO,
                     collision: BlockCollision::Hard,
                 })
-                .with_modifier(BlockAttributes {
-                    display_name: "1".into(),
-                    ..BlockAttributes::default()
-                })
+                .with_modifier(block::SetAttribute::DisplayName(arcstr::literal!("1")))
             ]
         );
     }

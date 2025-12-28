@@ -4,14 +4,13 @@ use core::{fmt, ops};
 
 use arcstr::ArcStr;
 
+use crate::block::Modifier;
 use crate::inv::InvInBlock;
 use crate::math::{Face6, GridRotation};
 use crate::op::Operation;
-use crate::universe::{HandleVisitor, VisitHandles};
-
-use crate::block::Modifier;
 use crate::sound;
 use crate::time;
+use crate::universe::{HandleVisitor, VisitHandles};
 
 #[cfg(doc)]
 use crate::{
@@ -20,8 +19,12 @@ use crate::{
     time::TickSchedule,
 };
 
-/// This single-use macro takes the [`BlockAttributes`] struct declaration and derives various
-/// items so that fewer other things need to be updated when an attribute is added or changed.
+/// This single-use macro takes the [`BlockAttributes`] struct declaration and generates things that
+/// need to handle every attribute:
+///
+/// * Implementations on [`BlockAttributes`]
+/// * The [`SetAttribute`] enum which has variants where [`BlockAttributes`] has fields
+/// * Attribute methods on [`crate::block::Builder`]
 macro_rules! derive_attribute_helpers {
     ($(#[$_:meta])* pub struct BlockAttributes {
         $(
@@ -33,6 +36,52 @@ macro_rules! derive_attribute_helpers {
             pub $field_name:ident: $field_type:ty,
         )*
     }) => {
+        paste::paste! {
+            /// Part of [`Modifier::SetAttribute`] specifying an attribute to set.
+            #[derive(Clone, Eq, Hash, PartialEq)]
+            #[non_exhaustive]
+            pub enum SetAttribute {
+                $(
+                    #[doc = concat!(
+                        "Replaces the value of [`BlockAttributes::", stringify!($field_name), "`]."
+                    )]
+                    [< $field_name :camel >]($field_type),
+                )*
+            }
+        }
+
+        impl BlockAttributes {
+            /// For each field with a non-default value in `self`, produce a corresponding
+            /// [`SetAttribute`].
+            pub(crate) fn into_set_attributes(self) -> impl Iterator<Item = SetAttribute> {
+                paste::paste! {
+                    let Self { $( $field_name, )* } = self;
+                    itertools::chain!(
+                        $(
+                            if $field_name != Self::DEFAULT_REF.$field_name {
+                                Some(SetAttribute::[< $field_name :camel >]($field_name))
+                            } else {
+                                None
+                            }
+                        ),*
+                    )
+                }
+            }
+        }
+
+        impl SetAttribute {
+            pub(crate) fn apply(&self, attributes: &mut BlockAttributes) {
+                paste::paste! {
+                    match self {
+                        $(
+                            Self::[< $field_name :camel >](value) =>
+                                attributes.$field_name = <$field_type as Clone>::clone(value),
+                        )*
+                    }
+                }
+            }
+        }
+
         impl fmt::Debug for BlockAttributes {
             /// Only attributes which differ from the default are shown.
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -56,12 +105,46 @@ macro_rules! derive_attribute_helpers {
             }
         }
 
+        impl fmt::Debug for SetAttribute {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                paste::paste! {
+                    match self {
+                        $(
+                            Self::[< $field_name :camel >](value) => {
+                                // Differs from derive(Debug) in that:
+                                // * One line unless the value is multiline
+                                // * Includes the enum name
+                                write!(f, "SetAttribute::{}(",
+                                    stringify!([< $field_name :camel >]),
+                                )?;
+                                value.fmt(f)?;
+                                write!(f, ")")
+                            }
+                        )*
+                    }
+                }
+            }
+        }
+
         impl VisitHandles for BlockAttributes {
             fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
                 let Self { $( $field_name, )* } = self;
                 $(
                     <$field_type as VisitHandles>::visit_handles($field_name, visitor);
                 )*
+            }
+        }
+
+        paste::paste! {
+            impl VisitHandles for SetAttribute {
+                fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+                    match self {
+                        $(
+                            Self::[< $field_name :camel >]($field_name) =>
+                                VisitHandles::visit_handles($field_name, visitor),
+                        )*
+                    }
+                }
             }
         }
 
@@ -78,6 +161,30 @@ macro_rules! derive_attribute_helpers {
                     $(
                         $field_name: <$field_type as BlRotate>::rotate(self.$field_name, rotation),
                     )*
+                }
+            }
+        }
+
+        paste::paste! {
+            impl BlRotate for SetAttribute {
+                fn rotationally_symmetric(&self) -> bool {
+                    match self {
+                        $(
+                            Self::[< $field_name :camel >]($field_name) =>
+                                <$field_type as BlRotate>::rotationally_symmetric($field_name),
+                        )*
+                    }
+                }
+
+                fn rotate(self, rotation: GridRotation) -> Self {
+                    match self {
+                        $(
+                            Self::[< $field_name :camel >]($field_name) =>
+                                Self::[< $field_name :camel >](
+                                    <$field_type as BlRotate>::rotate($field_name, rotation)
+                                ),
+                        )*
+                    }
                 }
             }
         }
@@ -102,6 +209,30 @@ macro_rules! derive_attribute_helpers {
             ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
                 arbitrary::size_hint::try_recursion_guard(depth, |depth| {
                     Ok(arbitrary::size_hint::and_all(&[
+                        $(
+                            <$arbitrary_type as arbitrary::Arbitrary>::try_size_hint(depth)?,
+                        )*
+                    ]))
+                })
+            }
+        }
+
+        #[cfg(feature = "arbitrary")]
+        #[mutants::skip]
+        impl<'a> arbitrary::Arbitrary<'a> for SetAttribute {
+            fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+                _ = u;
+                todo!()
+            }
+
+            fn size_hint(depth: usize) -> (usize, Option<usize>) {
+                Self::try_size_hint(depth).unwrap_or_default()
+            }
+            fn try_size_hint(
+                depth: usize,
+            ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+                arbitrary::size_hint::try_recursion_guard(depth, |depth| {
+                    Ok(arbitrary::size_hint::or_all(&[
                         $(
                             <$arbitrary_type as arbitrary::Arbitrary>::try_size_hint(depth)?,
                         )*
@@ -163,14 +294,22 @@ macro_rules! attribute_builder_method {
     };
 }
 
-/// Miscellaneous properties of blocks that are not the block’s voxels.
+/// Properties of blocks that are not the block’s voxels.
 ///
-/// `BlockAttributes::default()` will produce a reasonable set of defaults for “ordinary”
-/// blocks.
+/// Attributes are set on blocks using [`Modifier::SetAttribute`].
+/// Some other modifiers also implicitly change attributes, such as the
+/// [animation hint][BlockAttributes::animation_hint].
+///
+/// `BlockAttributes::default()` returns the attributes which a block with no modifiers has.
 #[derive(Clone, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 #[macro_rules_attribute::derive(derive_attribute_helpers!)]
 pub struct BlockAttributes {
+    // CAUTION: The ordering of fields in this struct has effects beyond only documentation:
+    //
+    // * It is the ordering in which `block::Builder` creates `SetAttribute` modifiers.
+    //---
+    //
     /// The name that should be displayed to players.
     ///
     /// The default value is the empty string. The empty string should be considered a
@@ -284,16 +423,18 @@ impl BlockAttributes {
 
 impl Default for BlockAttributes {
     /// Block attributes suitable as default values for in-game use.
+    ///
+    /// These attributes are equal to the attributes of a block with no modifiers.
     fn default() -> BlockAttributes {
         // Delegate to the inherent impl `const fn`.
         BlockAttributes::default()
     }
 }
 
-impl From<BlockAttributes> for Modifier {
-    /// Converts [`BlockAttributes`] to a modifier that applies them to a block.
-    fn from(value: BlockAttributes) -> Self {
-        Modifier::Attributes(alloc::sync::Arc::new(value))
+impl From<SetAttribute> for Modifier {
+    /// Wraps [`SetAttribute`] in [`Modifier::SetAttribute`].
+    fn from(value: SetAttribute) -> Self {
+        Modifier::SetAttribute(value)
     }
 }
 

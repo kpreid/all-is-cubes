@@ -408,27 +408,6 @@ impl Block {
             && self.modifiers().iter().all(|m| m.does_not_introduce_asymmetry())
     }
 
-    /// Add a [`Modifier::Attributes`] if there isn't one already.
-    /// Evaluates the block if needed to get existing attributes.
-    ///
-    /// TODO: bad API, because it overwrites/freezes attributes; this was added in a hurry to tidy
-    /// up the attributes-is-a-modifer refactor. The proper API is more like `with_modifier()`
-    /// for a single attribute, but we don't have single attribute override modifiers yet.
-    #[cfg(test)]
-    pub(crate) fn freezing_get_attributes_mut(
-        &mut self,
-        read_ticket: ReadTicket<'_>,
-    ) -> &mut BlockAttributes {
-        if !matches!(self.modifiers().last(), Some(Modifier::Attributes(_))) {
-            let attr_modifier = self.evaluate(read_ticket).unwrap().attributes.into();
-            self.modifiers_mut().push(attr_modifier);
-        }
-        let Some(Modifier::Attributes(a)) = self.modifiers_mut().last_mut() else {
-            unreachable!();
-        };
-        Arc::make_mut(a)
-    }
-
     /// Rotates this block by the specified rotation.
     ///
     /// Compared to direct use of [`Modifier::Rotate`], this will:

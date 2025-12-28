@@ -551,10 +551,7 @@ fn place_one_exhibit(
                     bounds_for_info_voxels,
                     universe.insert_anonymous(exhibit_info_space).into(),
                     info_resolution,
-                    [block::Block::builder()
-                        .display_name(literal!("Exhibit Name"))
-                        .build_attributes()
-                        .into()],
+                    [block::SetAttribute::DisplayName(literal!("Exhibit Name")).into()],
                 ))),
             ],
         })

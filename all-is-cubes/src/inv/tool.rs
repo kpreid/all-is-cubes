@@ -933,10 +933,11 @@ mod tests {
 
         // Make a block with a rotation rule
         let [mut tool_block] = make_some_voxel_blocks(&mut tester.universe);
-        tool_block.modifiers_mut().push(block::Modifier::from(block::BlockAttributes {
-            rotation_rule: RotationPlacementRule::Attach { by: Face6::NZ },
-            ..block::BlockAttributes::default()
-        }));
+        tool_block
+            .modifiers_mut()
+            .push(block::Modifier::from(block::SetAttribute::RotationRule(
+                RotationPlacementRule::Attach { by: Face6::NZ },
+            )));
 
         // TODO: For more thorough testing, we need to be able to control ToolTester's choice of ray
         let transaction =
@@ -994,11 +995,8 @@ mod tests {
         #[values(false, true)] in_front: bool,
     ) {
         let [existing_target] = make_some_blocks();
-        let modifier_to_add: block::Modifier = block::BlockAttributes {
-            display_name: literal!("modifier_to_add"),
-            ..Default::default()
-        }
-        .into();
+        let modifier_to_add: block::Modifier =
+            block::SetAttribute::DisplayName(literal!("modifier_to_add")).into();
         let existing_affected_block = if in_front {
             AIR
         } else {

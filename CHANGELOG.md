@@ -5,6 +5,8 @@
 ### Added
 
 * `all-is-cubes` library:
+    * `block::SetAttribute` is a modifier which overrides a single attribute of a block, instead of all of them.
+      It replaces `Modifier::Attributes`.
     * `math::Vol::origin_empty()`, infallible construction of empty volume.
     * `time::Tick::{delta_t_f64, delta_t_ps64}()`, convenience for common conversions.
 
@@ -19,6 +21,10 @@
     * Renamed `time::Tick::delta_t()` to `delta_t_duration()`, to make room for other variations.
 
 ### Removed
+
+* `all-is-cubes` library:
+    * `block::Modifier::Attributes` has been replaced by `SetAttribute`.
+
 
 ## 0.10.0 (2025-12-11)
 

@@ -236,11 +236,7 @@ fn view_all_models_as_blocks(
                 for (rel_cube, block) in mv::scene::model_space_to_blocks(
                     model,
                     space,
-                    {
-                        let mut a = block::BlockAttributes::default();
-                        a.display_name = arcstr::format!("Model #{i}");
-                        a
-                    },
+                    &[block::SetAttribute::DisplayName(arcstr::format!("Model #{i}")).into()],
                     resolution,
                     GridVector::zero(),
                 ) {

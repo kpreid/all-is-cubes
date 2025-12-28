@@ -77,7 +77,7 @@ pub(crate) async fn scene_to_space(
                 for (rel_cube, block_for_this_model) in model_space_to_blocks(
                     leaf.model,
                     imported_model,
-                    block::BlockAttributes::default(),
+                    &[],
                     scale_to_blocks,
                     remainder_of_transform,
                 ) {
@@ -109,7 +109,7 @@ pub(crate) async fn scene_to_space(
 pub(crate) fn model_space_to_blocks(
     model: &dot_vox::Model,
     space: Handle<Space>,
-    attributes: block::BlockAttributes,
+    modifiers: &[block::Modifier],
     resolution: Resolution,
     voxel_offset: GridVector,
 ) -> impl Iterator<Item = (Cube, Block)> {
@@ -123,17 +123,15 @@ pub(crate) fn model_space_to_blocks(
             .divide(resolution.into());
 
     bounding_box_in_blocks.interior_iter().map(move |cube| {
-        (
-            cube,
-            Block::from_primitive(block::Primitive::Recur {
-                space: space.clone(),
-                offset: cube.lower_bounds() * GridCoordinate::from(resolution)
-                    - voxel_offset
-                    - model_origin_translation,
-                resolution,
-            })
-            .with_modifier(attributes.clone()),
-        )
+        let mut block = Block::from_primitive(block::Primitive::Recur {
+            space: space.clone(),
+            offset: cube.lower_bounds() * GridCoordinate::from(resolution)
+                - voxel_offset
+                - model_origin_translation,
+            resolution,
+        });
+        block.modifiers_mut().extend_from_slice(modifiers);
+        (cube, block)
     })
 }
 

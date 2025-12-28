@@ -336,17 +336,20 @@ impl<'u, P, Txn> Builder<'u, P, Txn> {
             read_ticket: _,
             attributes,
             primitive_builder,
-            mut modifiers,
+            modifiers: user_modifiers,
             transaction,
         } = self;
         let primitive = primitive_builder.build_primitive();
 
-        if attributes != BlockAttributes::default() {
-            modifiers.insert(0, Modifier::Attributes(Arc::new(attributes)));
-        }
+        let modifiers: Vec<Modifier> = attributes
+            .into_set_attributes()
+            .map(Modifier::SetAttribute)
+            .chain(user_modifiers)
+            .collect();
 
         let block = if matches!(primitive, Primitive::Air) && modifiers.is_empty() {
             // Avoid allocating an Arc.
+            // TODO: Should we do the same thing for common colors?
             AIR
         } else {
             Block(BlockPtr::Owned(Arc::new(BlockParts {
@@ -498,8 +501,9 @@ impl BuildPrimitive for Voxels {
 mod tests {
     use alloc::boxed::Box;
     use euclid::{point3, vec3};
+    use pretty_assertions::assert_eq;
 
-    use crate::block::{self, Resolution::*, TickAction};
+    use crate::block::{self, Resolution::*, SetAttribute, TickAction};
     use crate::content::palette;
     use crate::inv;
     use crate::math::{Face6, GridRotation, Vol, ps32};
@@ -580,17 +584,17 @@ mod tests {
                 emission,
                 collision: BlockCollision::None,
             })
-            .with_modifier(BlockAttributes {
-                display_name: "hello world".into(),
-                selectable: false,
-                placement_action,
-                inventory,
-                ambient_sound,
-                rotation_rule,
-                tick_action,
-                activation_action,
-                animation_hint: block::AnimationHint::replacement(block::AnimationChange::Shape),
-            })
+            .with_modifier(SetAttribute::DisplayName(arcstr::literal!("hello world")))
+            .with_modifier(SetAttribute::Selectable(false))
+            .with_modifier(SetAttribute::Inventory(inventory))
+            .with_modifier(SetAttribute::AmbientSound(ambient_sound))
+            .with_modifier(SetAttribute::RotationRule(rotation_rule))
+            .with_modifier(SetAttribute::PlacementAction(placement_action))
+            .with_modifier(SetAttribute::TickAction(tick_action))
+            .with_modifier(SetAttribute::ActivationAction(activation_action))
+            .with_modifier(SetAttribute::AnimationHint(
+                block::AnimationHint::replacement(block::AnimationChange::Shape)
+            ))
             .with_modifier(Modifier::Rotate(Face6::PY.clockwise()))
         );
     }
@@ -610,10 +614,9 @@ mod tests {
                 resolution: R2, // not same as space size
                 space: space_handle
             })
-            .with_modifier(Modifier::Attributes(Arc::new(BlockAttributes {
-                display_name: "hello world".into(),
-                ..BlockAttributes::default()
-            }))),
+            .with_modifier(Modifier::SetAttribute(SetAttribute::DisplayName(
+                "hello world".into(),
+            ))),
         );
     }
 
@@ -644,10 +647,7 @@ mod tests {
                 resolution,
                 space: space_handle.clone()
             })
-            .with_modifier(BlockAttributes {
-                display_name: "hello world".into(),
-                ..BlockAttributes::default()
-            }),
+            .with_modifier(SetAttribute::DisplayName(arcstr::literal!("hello world"))),
         );
 
         // Check the space's characteristics

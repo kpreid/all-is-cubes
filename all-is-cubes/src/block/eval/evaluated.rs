@@ -470,12 +470,17 @@ impl MinEval {
         }
     }
 
+    pub fn voxels(&self) -> &Evoxels {
+        &self.voxels
+    }
+
     pub fn attributes(&self) -> &BlockAttributes {
         &self.attributes
     }
 
-    pub fn voxels(&self) -> &Evoxels {
-        &self.voxels
+    pub fn attributes_mut(&mut self) -> &mut BlockAttributes {
+        self.derived = None;
+        &mut self.attributes
     }
 
     pub(crate) fn set_attributes(&mut self, attributes: BlockAttributes) {
@@ -633,6 +638,7 @@ mod tests {
     use crate::math::{Cube, Vol};
     use crate::universe::{ReadTicket, Universe};
     use indoc::indoc;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn evaluated_block_debug_simple() {
@@ -711,9 +717,7 @@ mod tests {
                             resolution: 2,
                         },
                         modifiers: [
-                            BlockAttributes {
-                                display_name: "hello",
-                            },
+                            SetAttribute::DisplayName("hello"),
                         ],
                     },
                     attributes: BlockAttributes {

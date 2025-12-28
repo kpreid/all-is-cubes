@@ -71,7 +71,7 @@ fn rotate_evaluation() {
                 ..BlockAttributes::default()
             },
             cost: block::Cost {
-                components: 3,           // Primitive + display_name + Rotate
+                components: 5,           // Primitive + 3 attributes + Rotate
                 voxels: 2u32.pow(3) * 2, // original + rotation
                 recursion: 0
             },

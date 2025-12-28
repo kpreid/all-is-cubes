@@ -156,9 +156,11 @@ fn inspect_modifier(
     block_up_to_this.modifiers_mut().truncate(modifier_index + 1);
 
     let (name, details) = match modifier {
-        block::Modifier::Attributes(a) => {
-            (literal!("Attributes"), paragraph(arcstr::format!("{a:#?}")))
-        }
+        // TODO: match the variants of SetAttribute
+        block::Modifier::SetAttribute(a) => (
+            literal!("SetAttribute"),
+            paragraph(arcstr::format!("{a:#?}")),
+        ),
         block::Modifier::Quote(q) => (literal!("Quote"), paragraph(arcstr::format!("{q:?}"))),
         block::Modifier::Rotate(rotation) => (
             literal!("Rotate"),
