@@ -100,9 +100,6 @@ mod block {
                         emission,
                         collision,
                     }) => schema::PrimitiveSer::AtomV1 {
-                        // attributes on the primitive are no longer used, but still supported
-                        // by deserialization.
-                        attributes: BlockAttributes::DEFAULT_REF.into(),
                         color: color.into(),
                         light_emission: emission.into(),
                         collision: collision.into(),
@@ -112,9 +109,6 @@ mod block {
                         offset,
                         resolution,
                     } => schema::PrimitiveSer::RecurV1 {
-                        // attributes on the primitive are no longer used, but still supported
-                        // by deserialization.
-                        attributes: BlockAttributes::DEFAULT_REF.into(),
                         space: space.clone(),
                         offset: offset.into(),
                         resolution,
@@ -143,61 +137,40 @@ mod block {
                     primitive,
                     modifiers,
                 } => {
-                    let (primitive, attributes) = primitive_from_schema(primitive);
-                    let mut block = Block::from_primitive(primitive);
-
-                    let attr_mod_iter = attributes
-                        .filter(|a| a != BlockAttributes::DEFAULT_REF)
-                        .map(Modifier::from)
-                        .into_iter();
-                    let general_mod_iter = modifiers.into_iter().map(Modifier::from);
-
-                    block.modifiers_mut().extend(attr_mod_iter.chain(general_mod_iter));
+                    let mut block = Block::from_primitive(primitive_from_schema(primitive));
+                    block.modifiers_mut().extend(modifiers.into_iter().map(Modifier::from));
                     block
                 }
             })
         }
     }
 
-    fn primitive_from_schema(value: schema::PrimitiveSer) -> (Primitive, Option<BlockAttributes>) {
+    fn primitive_from_schema(value: schema::PrimitiveSer) -> Primitive {
         match value {
-            schema::PrimitiveSer::IndirectV1 { definition } => {
-                (Primitive::Indirect(definition), None)
-            }
+            schema::PrimitiveSer::IndirectV1 { definition } => Primitive::Indirect(definition),
             schema::PrimitiveSer::AtomV1 {
-                attributes,
                 color,
                 light_emission: emission,
                 collision,
-            } => (
-                Primitive::Atom(Atom {
-                    color: Rgba::from(color),
-                    emission: Rgb::from(emission),
-                    collision: collision.into(),
-                }),
-                Some(attributes.into()),
-            ),
+            } => Primitive::Atom(Atom {
+                color: Rgba::from(color),
+                emission: Rgb::from(emission),
+                collision: collision.into(),
+            }),
             schema::PrimitiveSer::RecurV1 {
-                attributes,
                 space,
                 offset,
                 resolution,
-            } => (
-                Primitive::Recur {
-                    space,
-                    offset: offset.into(),
-                    resolution,
-                },
-                Some(attributes.into()),
-            ),
-            schema::PrimitiveSer::AirV1 => (Primitive::Air, None),
-            schema::PrimitiveSer::TextPrimitiveV1 { text, offset } => (
-                Primitive::Text {
-                    text: text.into(),
-                    offset: offset.into(),
-                },
-                None,
-            ),
+            } => Primitive::Recur {
+                space,
+                offset: offset.into(),
+                resolution,
+            },
+            schema::PrimitiveSer::AirV1 => Primitive::Air,
+            schema::PrimitiveSer::TextPrimitiveV1 { text, offset } => Primitive::Text {
+                text: text.into(),
+                offset: offset.into(),
+            },
         }
     }
 

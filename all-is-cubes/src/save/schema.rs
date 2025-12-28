@@ -87,16 +87,10 @@ pub(crate) enum PrimitiveSer {
         color: RgbaSer,
         #[serde(default, skip_serializing_if = "is_default")]
         light_emission: RgbSer,
-        /// Note: Attributes stored on the primitive are no longer used, and supported only for deserialization.
-        #[serde(flatten)]
-        attributes: BlockAttributesV1Ser,
         #[serde(default, skip_serializing_if = "is_default")]
         collision: BlockCollisionSer,
     },
     RecurV1 {
-        /// Note: Attributes stored on the primitive are no longer used, and supported only for deserialization.
-        #[serde(flatten)]
-        attributes: BlockAttributesV1Ser,
         space: Handle<space::Space>,
         #[serde(default, skip_serializing_if = "is_default")]
         offset: [i32; 3],
