@@ -9,7 +9,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::mem;
 
-use crate::block::{self, AIR, Block};
+use crate::block::{self, AIR, BlRotate, Block};
 use crate::fluff::Fluff;
 use crate::inv::{self, Inventory, InventoryTransaction};
 use crate::math::{Cube, Face6, GridAab, GridRotation, Gridgid};
@@ -431,9 +431,17 @@ impl Operation {
         }
     }
 
+    #[doc(hidden)] // TODO: unsure if good public API
+    #[must_use]
+    pub fn rotate(self, rotation: GridRotation) -> Self {
+        BlRotate::rotate(self, rotation)
+    }
+}
+
+impl BlRotate for Operation {
     /// Returns whether this operation has the same effect regardless of how the
     /// [`Operation`] is transformed before being applied to the blocks.
-    pub(crate) fn rotationally_symmetric(&self) -> bool {
+    fn rotationally_symmetric(&self) -> bool {
         match self {
             Operation::Alt(ops) => ops.iter().all(Operation::rotationally_symmetric),
             Operation::Become(block) => block.rotationally_symmetric(),
@@ -457,9 +465,7 @@ impl Operation {
         }
     }
 
-    #[doc(hidden)] // TODO: unsure if good public api
-    #[must_use]
-    pub fn rotate(self, rotation: GridRotation) -> Self {
+    fn rotate(self, rotation: GridRotation) -> Self {
         if rotation == GridRotation::IDENTITY {
             return self;
         }

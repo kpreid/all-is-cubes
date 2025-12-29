@@ -171,8 +171,10 @@ impl Composite {
             block::ModifierUnspecialize::Keep
         }
     }
+}
 
-    pub(crate) fn rotationally_symmetric(&self) -> bool {
+impl block::BlRotate for Composite {
+    fn rotationally_symmetric(&self) -> bool {
         let Self {
             source,
             operator,
@@ -182,8 +184,7 @@ impl Composite {
         source.rotationally_symmetric() && operator.rotationally_symmetric()
     }
 
-    #[must_use]
-    pub(crate) fn rotate(self, rotation: GridRotation) -> Self {
+    fn rotate(self, rotation: GridRotation) -> Self {
         let Self {
             source,
             operator,

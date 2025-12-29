@@ -131,32 +131,6 @@ impl InvInBlock {
         })
     }
 
-    pub(crate) fn rotationally_symmetric(&self) -> bool {
-        // If it doesn't display any icons, then it's symmetric.
-        self.icon_rows.is_empty()
-    }
-
-    pub(crate) fn rotate(self, rotation: GridRotation) -> Self {
-        let Self {
-            size,
-            icon_scale,
-            icon_resolution,
-            icon_rows,
-        } = self;
-        let transform = rotation.to_positive_octant_transform(icon_resolution.into());
-        let icon_size =
-            GridCoordinate::from((icon_resolution / icon_scale).unwrap_or(Resolution::R1));
-        Self {
-            size,
-            icon_scale,
-            icon_resolution,
-            icon_rows: icon_rows
-                .into_iter()
-                .filter_map(|row| row.rotate(transform, icon_size))
-                .collect(),
-        }
-    }
-
     /// Combine the two inputs to form one which has the size and display of both.
     pub(crate) fn concatenate(self, other: InvInBlock) -> InvInBlock {
         if self.size == 0 {
@@ -199,6 +173,34 @@ impl crate::universe::VisitHandles for InvInBlock {
             icon_resolution: _,
             icon_rows: _,
         } = self;
+    }
+}
+
+impl crate::block::BlRotate for InvInBlock {
+    fn rotationally_symmetric(&self) -> bool {
+        // If it doesn't display any icons, then it's symmetric.
+        self.icon_rows.is_empty()
+    }
+
+    fn rotate(self, rotation: GridRotation) -> Self {
+        let Self {
+            size,
+            icon_scale,
+            icon_resolution,
+            icon_rows,
+        } = self;
+        let transform = rotation.to_positive_octant_transform(icon_resolution.into());
+        let icon_size =
+            GridCoordinate::from((icon_resolution / icon_scale).unwrap_or(Resolution::R1));
+        Self {
+            size,
+            icon_scale,
+            icon_resolution,
+            icon_rows: icon_rows
+                .into_iter()
+                .filter_map(|row| row.rotate(transform, icon_size))
+                .collect(),
+        }
     }
 }
 

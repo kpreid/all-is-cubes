@@ -10,7 +10,9 @@ use crate::op::Operation;
 use crate::universe::{HandleVisitor, VisitHandles};
 
 use crate::block::Modifier;
+use crate::sound;
 use crate::time;
+
 #[cfg(doc)]
 use crate::{
     block::{Block, BlockDef, Primitive},
@@ -60,6 +62,23 @@ macro_rules! derive_attribute_helpers {
                 $(
                     <$field_type as VisitHandles>::visit_handles($field_name, visitor);
                 )*
+            }
+        }
+
+        impl BlRotate for BlockAttributes {
+            fn rotationally_symmetric(&self) -> bool {
+                $(
+                    <$field_type as BlRotate>::rotationally_symmetric(&self.$field_name) &&
+                )*
+                true // finish the && sequence
+            }
+
+            fn rotate(self, rotation: GridRotation) -> BlockAttributes {
+                Self {
+                    $(
+                        $field_name: <$field_type as BlRotate>::rotate(self.$field_name, rotation),
+                    )*
+                }
             }
         }
 
@@ -184,10 +203,10 @@ pub struct BlockAttributes {
 
     /// Continuous sound emission and absorption by this block.
     #[custom(
-        arbitrary_type = crate::sound::Ambient,
+        arbitrary_type = sound::Ambient,
         builder_param_style = exact,
     )]
-    pub ambient_sound: crate::sound::Ambient,
+    pub ambient_sound: sound::Ambient,
 
     /// Rule about how this block should be rotated, or not, when placed in a [`Space`] by
     /// some agent not otherwise specifying rotation.
@@ -242,7 +261,7 @@ impl BlockAttributes {
         display_name: arcstr::literal!(""),
         selectable: true,
         inventory: InvInBlock::EMPTY,
-        ambient_sound: crate::sound::Ambient::SILENT,
+        ambient_sound: sound::Ambient::SILENT,
         rotation_rule: RotationPlacementRule::Never,
         placement_action: None,
         tick_action: None,
@@ -260,53 +279,6 @@ impl BlockAttributes {
     /// in that it is a `const fn`.
     pub const fn default() -> BlockAttributes {
         Self::DEFAULT
-    }
-
-    #[mutants::skip] // currently used only as an optimization, and hard to test usefully
-    pub(crate) fn rotationally_symmetric(&self) -> bool {
-        let Self {
-            display_name: _,
-            selectable: _,
-            inventory,
-            ambient_sound: _,
-            rotation_rule,
-            placement_action,
-            tick_action,
-            activation_action,
-            animation_hint: _,
-        } = self;
-
-        inventory.rotationally_symmetric()
-            && rotation_rule.rotationally_symmetric()
-            && placement_action.as_ref().is_none_or(|a| a.rotationally_symmetric())
-            && tick_action.as_ref().is_none_or(|a| a.rotationally_symmetric())
-            && activation_action.as_ref().is_none_or(|a| a.rotationally_symmetric())
-    }
-
-    pub(crate) fn rotate(self, rotation: GridRotation) -> BlockAttributes {
-        let Self {
-            display_name,
-            selectable,
-            inventory,
-            ambient_sound,
-            rotation_rule,
-            placement_action,
-            tick_action,
-            activation_action,
-            animation_hint,
-        } = self;
-
-        Self {
-            display_name,
-            selectable,
-            inventory: inventory.rotate(rotation),
-            ambient_sound,
-            rotation_rule: rotation_rule.rotate(rotation),
-            placement_action: placement_action.map(|a| a.rotate(rotation)),
-            tick_action: tick_action.map(|a| a.rotate(rotation)),
-            activation_action: activation_action.map(|a| a.rotate(rotation)),
-            animation_hint,
-        }
     }
 }
 
@@ -374,8 +346,8 @@ pub enum RotationPlacementRule {
     },
 }
 
-impl RotationPlacementRule {
-    pub(crate) fn rotationally_symmetric(self) -> bool {
+impl BlRotate for RotationPlacementRule {
+    fn rotationally_symmetric(&self) -> bool {
         match self {
             RotationPlacementRule::Never => true,
             RotationPlacementRule::Attach { by: _ } => false,
@@ -481,6 +453,15 @@ impl VisitHandles for AnimationHint {
     fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
 }
 
+impl BlRotate for AnimationHint {
+    fn rotate(self, _: GridRotation) -> Self {
+        self
+    }
+    fn rotationally_symmetric(&self) -> bool {
+        true
+    }
+}
+
 /// Component of [`AnimationHint`], describing the type of change predicted.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -547,7 +528,7 @@ pub struct TickAction {
     pub schedule: time::Schedule,
 }
 
-impl TickAction {
+impl BlRotate for TickAction {
     fn rotationally_symmetric(&self) -> bool {
         let Self {
             operation,
@@ -605,7 +586,7 @@ pub struct PlacementAction {
     pub in_front: bool,
 }
 
-impl PlacementAction {
+impl BlRotate for PlacementAction {
     fn rotationally_symmetric(&self) -> bool {
         let Self {
             operation,
@@ -631,6 +612,65 @@ impl VisitHandles for PlacementAction {
         operation.visit_handles(visitor);
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Values which can be rotated, and have or not have symmetry with respect to that rotation
+/// operation, in the way that blocks do.
+///
+/// This trait is used to assist with rotation of [`BlockAttributes`].
+/// It is not public because there are edge cases in what it means to rotate a thing and
+/// it is implemented for only the types that it is needed for; and in general, I have not thought
+/// about whether it makes sense in general, only used it to solve a code organization problem.
+pub(crate) trait BlRotate {
+    // TODO: Add in-place rotation operation as the basic operation, to help with minimizing
+    // reallocation?
+
+    /// Rotate `self` by `rotation`.
+    #[must_use]
+    fn rotate(self, rotation: GridRotation) -> Self;
+
+    /// Returns whether [`rotate()`][Self::rotate] would have no effect.
+    #[must_use]
+    fn rotationally_symmetric(&self) -> bool;
+}
+
+mod impl_rotate {
+    use super::*;
+
+    macro_rules! impl_rotate_always_symmetric {
+        ($type:ty) => {
+            impl BlRotate for $type {
+                #[inline]
+                fn rotate(self, _: GridRotation) -> Self {
+                    self
+                }
+
+                #[inline]
+                fn rotationally_symmetric(&self) -> bool {
+                    true
+                }
+            }
+        };
+    }
+
+    impl_rotate_always_symmetric!(());
+    impl_rotate_always_symmetric!(bool);
+    impl_rotate_always_symmetric!(ArcStr);
+    impl_rotate_always_symmetric!(sound::Ambient);
+
+    impl<T: BlRotate> BlRotate for Option<T> {
+        fn rotate(self, rotation: GridRotation) -> Self {
+            self.map(|value| value.rotate(rotation))
+        }
+
+        fn rotationally_symmetric(&self) -> bool {
+            self.as_ref().is_none_or(<T as BlRotate>::rotationally_symmetric)
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

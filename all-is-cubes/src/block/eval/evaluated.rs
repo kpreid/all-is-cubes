@@ -10,7 +10,7 @@ use num_traits::float::FloatCore as _;
 
 use crate::block::eval::derived::Derived;
 use crate::block::{
-    self, Block, BlockAttributes, BlockCollision, Cost, Evoxel, Evoxels,
+    self, BlRotate as _, Block, BlockAttributes, BlockCollision, Cost, Evoxel, Evoxels,
     Resolution::{self, R1},
     VoxelOpacityMask,
 };

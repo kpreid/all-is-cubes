@@ -3,7 +3,7 @@ use core::fmt;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use crate::block::{self, Block, BlockAttributes, Evoxels, MinEval};
+use crate::block::{self, BlRotate as _, Block, BlockAttributes, Evoxels, MinEval};
 use crate::inv;
 use crate::math::{GridRotation, Vol};
 use crate::tag;
@@ -203,7 +203,7 @@ impl Modifier {
         }
     }
 
-    /// This is like `rotationally_symmetric()` on many other data types, except that it doesn't
+    /// This is like [`BlRotate::rotationally_symmetric()`], except that it doesn't
     /// describe whether it _affects_ rotations — in particular, it does not mean “this modifier
     /// commutes with `Rotate` modifiers”, but rather “will it introduce asymmetry to a block that
     /// had none”.

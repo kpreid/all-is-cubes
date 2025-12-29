@@ -810,6 +810,18 @@ impl VisitHandles for Block {
     }
 }
 
+impl BlRotate for Block {
+    fn rotate(self, rotation: GridRotation) -> Self {
+        // call inherent method
+        Block::rotate(self, rotation)
+    }
+
+    fn rotationally_symmetric(&self) -> bool {
+        // call inherent method
+        Block::rotationally_symmetric(self)
+    }
+}
+
 impl From<&'static Primitive> for Block {
     /// Constructs a [`Block`] which references the given static [`Primitive`].
     ///
