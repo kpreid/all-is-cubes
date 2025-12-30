@@ -163,6 +163,7 @@ mod tmpl {
         show_expected_for_comparison: bool,
         diffcount: String,
         flawedness: String,
+        render_info: String,
     }
 
     impl From<&ComparisonRecord> for TmplComparison {
@@ -197,6 +198,7 @@ mod tmpl {
                     ComparisonOutcome::Flawed(flaws) => format!("Flaws: {flaws}"),
                     _ => String::new(),
                 },
+                render_info: input.render_info.clone(),
             }
         }
     }

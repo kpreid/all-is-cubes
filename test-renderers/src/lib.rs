@@ -20,6 +20,7 @@ use std::time::Instant;
 
 use all_is_cubes::util::ConciseDebug;
 use all_is_cubes::util::Refmt as _;
+use all_is_cubes::util::StatusText;
 use clap::builder::PossibleValue;
 use image::RgbaImage;
 use rendiff::{Histogram, Threshold};
@@ -122,6 +123,10 @@ pub struct ComparisonRecord {
     diff_file_name: Option<String>,
     diff_histogram: Vec<usize>, // length 256; is a Vec for serializability
     outcome: ComparisonOutcome,
+
+    // Info from the renderer.
+    // Not part of the comparison, but something we want to include in the report.
+    render_info: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -161,6 +166,7 @@ impl ComparisonRecord {
         diff_file_path: Option<&Path>,
         diff_histogram: Histogram,
         outcome: ComparisonOutcome,
+        render_info: String,
     ) -> Self {
         ComparisonRecord {
             expected_file_name: expected_file_path
@@ -174,6 +180,7 @@ impl ComparisonRecord {
                 .map(|p| p.file_name().unwrap().to_str().unwrap().to_string()),
             diff_histogram: diff_histogram.0.into_iter().collect(),
             outcome,
+            render_info,
         }
     }
 
@@ -202,6 +209,7 @@ pub fn compare_rendered_image(
 ) -> ComparisonRecord {
     let start_time = Instant::now();
 
+    let info_string = format!("{}", actual_rendering.info.refmt(&StatusText::ALL));
     let actual_file_path = image_path(&test, Version::Actual);
     let diff_file_path = image_path(&test, Version::Diff);
 
@@ -238,6 +246,7 @@ pub fn compare_rendered_image(
                             None,
                             Histogram::ZERO,
                             ComparisonOutcome::NoExpected,
+                            info_string,
                         );
                     }
                 }
@@ -292,6 +301,7 @@ pub fn compare_rendered_image(
                     .map_or(0, |(i, _)| i as u8),
             }
         },
+        info_string,
     );
 
     let end_time = Instant::now();
