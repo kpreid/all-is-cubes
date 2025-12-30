@@ -1,5 +1,6 @@
 //! [`BlockAttributes`] and closely related types.
 
+use alloc::sync::Arc;
 use core::{fmt, ops};
 
 use arcstr::ArcStr;
@@ -30,7 +31,12 @@ macro_rules! derive_attribute_helpers {
         $(
             $(#[doc = $field_doc:literal])*
             #[custom(
+                // Set this to a type that implements `Arbitrary`.
                 arbitrary_type = $arbitrary_type:ty,
+                // Controls what variation of $field_type is used in `SetAttribute`.
+                // See `attribute_modifier_value_type!` for the options.
+                modifier_style = $modifier_style:tt,
+                // Controls what kind of method [`attribute_builder_method`] generates.
                 builder_param_style = $builder_param_style:tt,
             )]
             pub $field_name:ident: $field_type:ty,
@@ -45,7 +51,7 @@ macro_rules! derive_attribute_helpers {
                     #[doc = concat!(
                         "Replaces the value of [`BlockAttributes::", stringify!($field_name), "`]."
                     )]
-                    [< $field_name :camel >]($field_type),
+                    [< $field_name :camel >](attribute_modifier_value_type!($modifier_style, $field_type)),
                 )*
             }
         }
@@ -59,7 +65,9 @@ macro_rules! derive_attribute_helpers {
                     itertools::chain!(
                         $(
                             if $field_name != Self::DEFAULT_REF.$field_name {
-                                Some(SetAttribute::[< $field_name :camel >]($field_name))
+                                Some(SetAttribute::[< $field_name :camel >](
+                                    attribute_modifier_value_wrap!($modifier_style, $field_type, $field_name)
+                                ))
                             } else {
                                 None
                             }
@@ -75,7 +83,7 @@ macro_rules! derive_attribute_helpers {
                     match self {
                         $(
                             Self::[< $field_name :camel >](value) =>
-                                attributes.$field_name = <$field_type as Clone>::clone(value),
+                                attributes.$field_name = attribute_modifier_value_unwrap!($modifier_style, $field_type, value),
                         )*
                     }
                 }
@@ -171,7 +179,7 @@ macro_rules! derive_attribute_helpers {
                     match self {
                         $(
                             Self::[< $field_name :camel >]($field_name) =>
-                                <$field_type as BlRotate>::rotationally_symmetric($field_name),
+                                <attribute_modifier_value_type!($modifier_style, $field_type) as BlRotate>::rotationally_symmetric($field_name),
                         )*
                     }
                 }
@@ -181,7 +189,7 @@ macro_rules! derive_attribute_helpers {
                         $(
                             Self::[< $field_name :camel >]($field_name) =>
                                 Self::[< $field_name :camel >](
-                                    <$field_type as BlRotate>::rotate($field_name, rotation)
+                                    <attribute_modifier_value_type!($modifier_style, $field_type) as BlRotate>::rotate($field_name, rotation)
                                 ),
                         )*
                     }
@@ -294,6 +302,40 @@ macro_rules! attribute_builder_method {
     };
 }
 
+macro_rules! attribute_modifier_value_type {
+    (clone, $type:ty) => { $type };
+    (arc, $type:ty) => { Arc<$type> };
+    ((Option<Arc<$inner_type:ty>>), $type:ty) => { Option<Arc<$inner_type>> };
+}
+
+macro_rules! attribute_modifier_value_unwrap {
+    (clone, $type:ty, $modifier_value_ref:expr) => {
+        <$type as Clone>::clone($modifier_value_ref)
+    };
+    (arc, $type:ty, $modifier_value_ref:expr) => {
+        <$type as Clone>::clone($modifier_value_ref)
+    };
+    ((Option<Arc<$inner_type:ty>>), $type:ty, $modifier_value_ref:expr) => {
+        $modifier_value_ref
+            .as_ref()
+            .map(|value_arc_ref| <$inner_type as Clone>::clone(&value_arc_ref))
+    };
+}
+
+macro_rules! attribute_modifier_value_wrap {
+    (clone, $type:ty, $attr_value:expr) => {
+        $attr_value
+    };
+    (arc, $type:ty, $attr_value:expr) => {
+        Arc::new($attr_value)
+    };
+    ((Option<Arc<$inner_type:ty>>), $type:ty, $attr_value:expr) => {
+        Option::map($attr_value, Arc::new)
+    };
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Properties of blocks that are not the block’s voxels.
 ///
 /// Attributes are set on blocks using [`Modifier::SetAttribute`].
@@ -319,6 +361,7 @@ pub struct BlockAttributes {
     // allocate no additional memory.
     #[custom(
         arbitrary_type = alloc::string::String,
+        modifier_style = clone,
         builder_param_style = into,
     )]
     pub display_name: ArcStr,
@@ -328,6 +371,7 @@ pub struct BlockAttributes {
     /// The default value is `true`.
     #[custom(
         arbitrary_type = bool,
+        modifier_style = clone,
         builder_param_style = exact,
     )]
     pub selectable: bool,
@@ -336,6 +380,7 @@ pub struct BlockAttributes {
     /// what size and rendering it has.
     #[custom(
         arbitrary_type = InvInBlock,
+        modifier_style = arc,
         builder_param_style = exact,
     )]
     pub inventory: InvInBlock,
@@ -343,6 +388,7 @@ pub struct BlockAttributes {
     /// Continuous sound emission and absorption by this block.
     #[custom(
         arbitrary_type = sound::Ambient,
+        modifier_style = arc,
         builder_param_style = exact,
     )]
     pub ambient_sound: sound::Ambient,
@@ -355,6 +401,7 @@ pub struct BlockAttributes {
     // TODO: Replace this with `placement_action` features?
     #[custom(
         arbitrary_type = RotationPlacementRule,
+        modifier_style = clone,
         builder_param_style = exact,
     )]
     pub rotation_rule: RotationPlacementRule,
@@ -365,6 +412,7 @@ pub struct BlockAttributes {
     // block placement behavior?
     #[custom(
         arbitrary_type = Option<PlacementAction>,
+        modifier_style = (Option<Arc<PlacementAction>>),
         builder_param_style = into,
     )]
     pub placement_action: Option<PlacementAction>,
@@ -372,6 +420,7 @@ pub struct BlockAttributes {
     /// Something this block does when time passes.
     #[custom(
         arbitrary_type =  Option<TickAction>,
+        modifier_style = (Option<Arc<TickAction>>),
         builder_param_style = into,
     )]
     pub tick_action: Option<TickAction>,
@@ -379,6 +428,7 @@ pub struct BlockAttributes {
     /// Something this block does when activated with [`Activate`](crate::inv::Tool::Activate).
     #[custom(
         arbitrary_type = Option<Operation>,
+        modifier_style = (Option<Arc<Operation>>),
         builder_param_style = into,
     )]
     pub activation_action: Option<Operation>,
@@ -390,6 +440,7 @@ pub struct BlockAttributes {
     /// contain voxels with animation hints themselves.
     #[custom(
         arbitrary_type = AnimationHint,
+        modifier_style = clone,
         builder_param_style = exact,
     )]
     pub animation_hint: AnimationHint,
@@ -809,6 +860,17 @@ mod impl_rotate {
             self.as_ref().is_none_or(<T as BlRotate>::rotationally_symmetric)
         }
     }
+
+    impl<T: BlRotate + Clone> BlRotate for Arc<T> {
+        fn rotate(self, rotation: GridRotation) -> Self {
+            // TODO: in-place rotation would let us avoid reallocating
+            Arc::new(Arc::unwrap_or_clone(self).rotate(rotation))
+        }
+
+        fn rotationally_symmetric(&self) -> bool {
+            <T as BlRotate>::rotationally_symmetric(self)
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -819,12 +881,19 @@ mod tests {
     use alloc::string::String;
 
     #[test]
-    fn size() {
+    fn size_of_attributes() {
         let size = size_of::<BlockAttributes>();
         assert!(
             size <= 360,
             "size_of::<BlockAttributes>() = {size} unexpectedly large"
         );
+    }
+
+    #[test]
+    fn size_of_set_attribute() {
+        // `SetAttribute` consists of a discriminant and a value that is at most pointer-sized
+        // (because if it was bigger, we box it).
+        assert_eq!(size_of::<SetAttribute>(), 2 * size_of::<*const ()>());
     }
 
     /// [`BlockAttributes`] has an inherent `default()` function, which should be

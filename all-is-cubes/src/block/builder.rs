@@ -586,12 +586,16 @@ mod tests {
             })
             .with_modifier(SetAttribute::DisplayName(arcstr::literal!("hello world")))
             .with_modifier(SetAttribute::Selectable(false))
-            .with_modifier(SetAttribute::Inventory(inventory))
-            .with_modifier(SetAttribute::AmbientSound(ambient_sound))
+            .with_modifier(SetAttribute::Inventory(Arc::new(inventory)))
+            .with_modifier(SetAttribute::AmbientSound(Arc::new(ambient_sound)))
             .with_modifier(SetAttribute::RotationRule(rotation_rule))
-            .with_modifier(SetAttribute::PlacementAction(placement_action))
-            .with_modifier(SetAttribute::TickAction(tick_action))
-            .with_modifier(SetAttribute::ActivationAction(activation_action))
+            .with_modifier(SetAttribute::PlacementAction(
+                placement_action.map(Arc::new)
+            ))
+            .with_modifier(SetAttribute::TickAction(tick_action.map(Arc::new)))
+            .with_modifier(SetAttribute::ActivationAction(
+                activation_action.map(Arc::new)
+            ))
             .with_modifier(SetAttribute::AnimationHint(
                 block::AnimationHint::replacement(block::AnimationChange::Shape)
             ))

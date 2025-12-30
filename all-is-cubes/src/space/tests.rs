@@ -4,6 +4,7 @@
 
 use alloc::boxed::Box;
 use alloc::string::ToString;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::num::NonZeroU16;
 
@@ -738,10 +739,10 @@ fn block_tick_action_timing() {
     // Hook them up to turn into each other
     fn connect(from: &mut Block, to: &Block) {
         from.modifiers_mut().push(
-            block::SetAttribute::TickAction(Some(TickAction {
+            block::SetAttribute::TickAction(Some(Arc::new(TickAction {
                 operation: Operation::Become(to.clone()),
                 schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
-            }))
+            })))
             .into(),
         );
     }
@@ -793,7 +794,7 @@ fn block_tick_action_conflict() {
     ] = make_some_blocks();
     fn connect(from: &mut Block, to: &Block, face: Face6) {
         from.modifiers_mut().push(
-            block::SetAttribute::TickAction(Some(TickAction {
+            block::SetAttribute::TickAction(Some(Arc::new(TickAction {
                 // TODO: replace this with a better-behaved neighbor-modifying operation,
                 // once we have one
                 operation: Operation::Neighbors(
@@ -804,7 +805,7 @@ fn block_tick_action_conflict() {
                     .into(),
                 ),
                 schedule: time::Schedule::from_period(NonZeroU16::new(1).unwrap()),
-            }))
+            })))
             .into(),
         );
     }

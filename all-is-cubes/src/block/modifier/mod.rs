@@ -335,7 +335,6 @@ mod tests {
     /// Track the size of the `Modifier` enum to make sure we don't accidentally make it bigger
     /// by giving one variant more data.
     #[test]
-    #[ignore = "TODO: introducing SetAttribute changed things; reevaluate"]
     fn size_of_modifier() {
         // The largest modifier, currently, is `Composite`, which contains a `Block` plus
         // additional data, and a `Block` is a pointer plus additional data;

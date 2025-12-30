@@ -271,15 +271,17 @@ mod block {
                         display_name: attr_value.clone(),
                     },
                     A::Selectable(selectable) => ModifierSer::SelectableV1 { selectable },
-                    A::Inventory(ref attr_value) => ModifierSer::InvInBlockV1(attr_value.into()),
+                    A::Inventory(ref attr_value) => {
+                        ModifierSer::InvInBlockV1((&**attr_value).into())
+                    }
                     A::AmbientSound(ref attr_value) => {
-                        ModifierSer::AmbientSoundV1(attr_value.into())
+                        ModifierSer::AmbientSoundV1((&**attr_value).into())
                     }
                     A::RotationRule(attr_value) => ModifierSer::RotationRuleV1 {
                         rotation_rule: attr_value.into(),
                     },
                     A::PlacementAction(ref attr_value) => ModifierSer::PlacementActionV1 {
-                        placement_action: attr_value.clone().map(
+                        placement_action: attr_value.as_deref().cloned().map(
                             |PlacementAction {
                                  operation,
                                  in_front,
@@ -290,13 +292,15 @@ mod block {
                         ),
                     },
                     A::TickAction(ref attr_value) => ModifierSer::TickActionV1 {
-                        tick_action: attr_value.clone().map(|ta| schema::TickActionSerV1 {
-                            operation: ta.operation,
-                            schedule: ta.schedule,
+                        tick_action: attr_value.as_deref().cloned().map(|ta| {
+                            schema::TickActionSerV1 {
+                                operation: ta.operation,
+                                schedule: ta.schedule,
+                            }
                         }),
                     },
                     A::ActivationAction(ref attr_value) => ModifierSer::ActivationActionV1 {
-                        activation_action: attr_value.clone(),
+                        activation_action: attr_value.as_deref().cloned(),
                     },
                     A::AnimationHint(attr_value) => ModifierSer::AnimationHintV1(attr_value.into()),
                 },
@@ -358,8 +362,12 @@ mod block {
                 // Attributes
                 ModifierSer::DisplayNameV1 { display_name } => ms(A::DisplayName(display_name)),
                 ModifierSer::SelectableV1 { selectable } => ms(A::Selectable(selectable)),
-                ModifierSer::InvInBlockV1(attr_value) => ms(A::Inventory(attr_value.into())),
-                ModifierSer::AmbientSoundV1(attr_value) => ms(A::AmbientSound(attr_value.into())),
+                ModifierSer::InvInBlockV1(attr_value) => {
+                    ms(A::Inventory(Arc::new(attr_value.into())))
+                }
+                ModifierSer::AmbientSoundV1(attr_value) => {
+                    ms(A::AmbientSound(Arc::new(attr_value.into())))
+                }
                 ModifierSer::RotationRuleV1 { rotation_rule } => {
                     ms(A::RotationRule(rotation_rule.into()))
                 }
@@ -369,10 +377,10 @@ mod block {
                              operation,
                              in_front,
                          }| {
-                            PlacementAction {
+                            Arc::new(PlacementAction {
                                 operation,
                                 in_front,
-                            }
+                            })
                         },
                     )))
                 }
@@ -380,13 +388,15 @@ mod block {
                     |schema::TickActionSerV1 {
                          operation,
                          schedule,
-                     }| TickAction {
-                        operation,
-                        schedule,
+                     }| {
+                        Arc::new(TickAction {
+                            operation,
+                            schedule,
+                        })
                     },
                 ))),
                 ModifierSer::ActivationActionV1 { activation_action } => {
-                    ms(A::ActivationAction(activation_action))
+                    ms(A::ActivationAction(activation_action.map(Arc::new)))
                 }
                 ModifierSer::AnimationHintV1(attr_value) => ms(A::AnimationHint(attr_value.into())),
             }
