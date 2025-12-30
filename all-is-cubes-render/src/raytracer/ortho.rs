@@ -1,6 +1,7 @@
 //! Axis-aligned orthographic raytracing as a special case.
 
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
@@ -17,6 +18,8 @@ use all_is_cubes::universe::{Handle, ReadTicket};
 use crate::camera::{self, GraphicsOptions, ImagePixel};
 use crate::raytracer::{self, RaytraceInfo};
 use crate::{Flaws, Rendering};
+
+type Pixel = [u8; 4];
 
 /// Special-purpose renderer which uses a pixel-perfect orthographic projection and adapts to the
 /// size of the space input.
@@ -43,24 +46,28 @@ pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -
     // `OrthoCamera` to be more aware of its alignment with the block grid.
 
     #[cfg(feature = "auto-threads")]
-    let data = (0..camera.image_size.height)
+    let (data, info_sum): (Vec<Pixel>, raytracer::rayon_util::ParExtSum<RaytraceInfo>) = (0
+        ..camera.image_size.height)
         .into_par_iter()
         .flat_map(|y| {
             (0..camera.image_size.width)
                 .into_par_iter()
                 .map_with(Cache::default(), move |cache: &mut Cache, x| {
-                    trace_one_pixel_with_cache(camera, rt, cache, x, y).0
+                    trace_one_pixel_with_cache(camera, rt, cache, x, y)
                 })
         })
-        .collect();
+        .unzip();
+
+    #[cfg(feature = "auto-threads")]
+    let info = info_sum.result();
 
     #[cfg(not(feature = "auto-threads"))]
-    let data = (0..camera.image_size.height)
+    let (data, info): (Vec<Pixel>, RaytraceInfo) = (0..camera.image_size.height)
         .flat_map(|y| {
             let mut cache = Cache::default();
 
             (0..camera.image_size.width)
-                .map(move |x| trace_one_pixel_with_cache(camera, rt, &mut cache, x, y).0)
+                .map(move |x| trace_one_pixel_with_cache(camera, rt, &mut cache, x, y))
         })
         .collect();
 
@@ -68,7 +75,7 @@ pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -
         size: camera.image_size,
         data,
         flaws: Flaws::empty(), // TODO: missing the actual flaws
-        info: Arc::new(RaytraceInfo::default()), // TODO: need to collect infos from the tracing operation
+        info: Arc::new(info),
     }
 }
 
@@ -78,7 +85,7 @@ fn trace_one_pixel_with_cache(
     cache: &mut Cache,
     x: u32,
     y: u32,
-) -> ([u8; 4], RaytraceInfo) {
+) -> (Pixel, RaytraceInfo) {
     let (color, info) = match camera.project_pixel_into_world(point2(x, y)) {
         Some(ray) => {
             // Note that this cache key may be nonsense (using the resolution from the wrong cube),

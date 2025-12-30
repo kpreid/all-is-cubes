@@ -31,6 +31,9 @@ mod sr;
 pub use sr::{RaytraceInfo, SpaceRaytracer};
 use sr::{TracingBlock, TracingCubeData};
 
+#[cfg(feature = "auto-threads")]
+mod rayon_util;
+
 mod renderer;
 pub use renderer::{RtRenderer, RtScene};
 

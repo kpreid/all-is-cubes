@@ -7,6 +7,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
+use core::ops::AddAssign;
 
 use manyfmt::Fmt;
 /// Acts as polyfill for float methods
@@ -375,6 +376,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     where
         P: Accumulate<BlockData = D> + Into<String> + Default,
     {
+        use crate::raytracer::rayon_util::ParExtSum;
+
         let viewport = camera.viewport();
         let viewport_size = viewport.framebuffer_size.to_usize();
         let output_iterator = (0..viewport_size.height)
@@ -399,8 +402,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             })
             .flatten();
 
-        let (text, info_sum): (String, rayon_helper::ParExtSum<RaytraceInfo>) =
-            output_iterator.unzip();
+        let (text, info_sum): (String, ParExtSum<RaytraceInfo>) = output_iterator.unzip();
         stream.write_str(text.as_str())?;
 
         Ok(info_sum.result())
@@ -481,6 +483,7 @@ pub(crate) fn smoothstep(x: f64) -> f64 {
 pub struct RaytraceInfo {
     cubes_traced: usize,
 }
+
 impl core::ops::Add for RaytraceInfo {
     type Output = Self;
     fn add(mut self, other: Self) -> Self {
@@ -488,7 +491,7 @@ impl core::ops::Add for RaytraceInfo {
         self
     }
 }
-impl core::ops::AddAssign<RaytraceInfo> for RaytraceInfo {
+impl AddAssign<RaytraceInfo> for RaytraceInfo {
     fn add_assign(&mut self, other: Self) {
         self.cubes_traced += other.cubes_traced;
     }
@@ -503,6 +506,14 @@ impl core::iter::Sum for RaytraceInfo {
             sum += part;
         }
         sum
+    }
+}
+
+/// Same as the [`AddAssign`] implementation.
+/// Provided to enable `unzip()` / tuple collection use cases.
+impl Extend<RaytraceInfo> for RaytraceInfo {
+    fn extend<T: IntoIterator<Item = RaytraceInfo>>(&mut self, iter: T) {
+        iter.into_iter().for_each(|value| *self += value);
     }
 }
 
@@ -738,40 +749,6 @@ impl<P: Accumulate> TracingState<'_, P> {
             ))
         } else {
             None
-        }
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-#[cfg(feature = "auto-threads")]
-mod rayon_helper {
-    use core::iter::{Sum, empty, once};
-    use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator as _};
-
-    /// Implements [`ParallelExtend`] to just sum things, so that
-    /// [`ParallelIterator::unzip`] can produce a sum.
-    #[derive(Clone, Copy, Debug, Default)]
-    pub(crate) struct ParExtSum<T>(Option<T>);
-
-    impl<T: Sum> ParExtSum<T> {
-        pub fn result(self) -> T {
-            self.0.unwrap_or_else(|| empty().sum())
-        }
-    }
-
-    impl<T: Sum + Send> ParallelExtend<T> for ParExtSum<T> {
-        fn par_extend<I>(&mut self, par_iter: I)
-        where
-            I: IntoParallelIterator<Item = T>,
-        {
-            let new = par_iter.into_par_iter().sum();
-            // The reason we use an `Option` at all is to make it possible to move the current
-            // value.
-            self.0 = Some(match self.0.take() {
-                None => new,
-                Some(previous) => once(previous).chain(once(new)).sum(),
-            });
         }
     }
 }
