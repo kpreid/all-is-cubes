@@ -10,8 +10,9 @@ members = [
   "all-is-cubes-render",
   "all-is-cubes-server",
   "all-is-cubes-ui",
-  "test-renderers",
+  "test-aic",
   "test-mesh",
+  "test-renderers",
   "tools/xtask",
 
   # Workspaces generally expect to be able to compile everything for the same target,

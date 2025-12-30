@@ -1,0 +1,18 @@
+[package]
+name = "test-aic"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Tests for the all-is-cubes package that use other packages as test helpers."
+publish = false
+
+[dev-dependencies]
+all-is-cubes = { workspace = true }
+all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
+macro_rules_attribute = { workspace = true }
+pretty_assertions = { workspace = true }
+rstest = { workspace = true }
+smol-macros = { workspace = true }
+
+[lints]
+workspace = true

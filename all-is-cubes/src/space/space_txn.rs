@@ -628,7 +628,9 @@ impl CubeTransaction {
         }
     }
 
-    pub(crate) const ACTIVATE_BEHAVIOR: Self = Self {
+    // pub for testing only; the normal way to use this is `Tool::Activate`.
+    #[doc(hidden)]
+    pub const ACTIVATE_BEHAVIOR: Self = Self {
         old: Equal(None),
         new: Equal(None),
         conserved: false,

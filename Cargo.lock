@@ -6991,6 +6991,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-aic"
+version = "0.0.0"
+dependencies = [
+ "all-is-cubes",
+ "all-is-cubes-render",
+ "macro_rules_attribute",
+ "pretty_assertions",
+ "rstest",
+ "smol-macros",
+]
+
+[[package]]
 name = "test-mesh"
 version = "0.0.0"
 dependencies = [
