@@ -687,7 +687,6 @@ mod tests {
     use crate::block::Resolution::*;
     use crate::block::{AIR, Block};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::raytracer::print_space;
     use crate::space::Space;
     use crate::universe::Universe;
     use rand::{Rng, SeedableRng as _};
@@ -789,7 +788,10 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        print_space(&space.read(), [1., 1., 1.]);
+
+        // TODO: Figure out how to recover this visualization .. other tests using it are
+        // in `aic-test` but they don't need `all-is-cubes` internals as much.
+        // print_space(&space.read(), [1., 1., 1.]);
 
         // Set up to collide with the block such that the ray doesn't pass through it, to
         // make sure the right cube is returned.
@@ -992,7 +994,7 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        print_space(&space.read(), [1., 1., 1.]);
+        // print_space(&space.read(), [1., 1., 1.]);
 
         let aab = Aab::from_lower_upper([0., 0., 0.], [1.5, 1.5, 1.5]);
 
