@@ -7,14 +7,15 @@ use core::mem;
 
 use hashbrown::HashSet as HbHashSet;
 
-use crate::block::AIR;
-use crate::camera::GraphicsOptions;
-use crate::content::palette;
-use crate::listen::{self, Listen as _, Listener};
-use crate::math::Cube;
+use all_is_cubes::block::AIR;
+use all_is_cubes::camera::GraphicsOptions;
+use all_is_cubes::content::palette;
+use all_is_cubes::listen::{self, Listen as _, Listener};
+use all_is_cubes::math::Cube;
+use all_is_cubes::space::{self, BlockIndex, Space, SpaceChange};
+use all_is_cubes::universe::{Handle, HandleError, ReadTicket};
+
 use crate::raytracer::{RtBlockData, RtOptionsRef, SpaceRaytracer, TracingBlock, TracingCubeData};
-use crate::space::{self, BlockIndex, Space, SpaceChange};
-use crate::universe::{Handle, HandleError, ReadTicket};
 
 /// Manages a [`SpaceRaytracer`] so that it can be cheaply updated when the [`Space`] is
 /// changed.
@@ -137,10 +138,10 @@ where
             // TODO: need to listen to the options sources for accurate change detection
             let graphics_options = &*self.graphics_options.get();
             let custom_options = &*self.custom_options.get();
-            let options = RtOptionsRef {
+            let options = RtOptionsRef::_new_but_please_do_not_construct_this_if_you_are_not_all_is_cubes_itself(
                 graphics_options,
                 custom_options,
-            };
+            );
 
             let block_data_slice = space.block_data();
             if block_data_slice.len() > self.state.blocks.len() {
@@ -222,13 +223,13 @@ impl listen::Store<SpaceChange> for SrtTodo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::camera::{Camera, Viewport, eye_for_look_at};
-    use crate::content::make_some_voxel_blocks;
     use crate::raytracer::{CharacterBuf, CharacterRtData};
-    use crate::space::CubeTransaction;
-    use crate::universe::Universe;
+    use all_is_cubes::camera::{Camera, Viewport, eye_for_look_at};
+    use all_is_cubes::content::make_some_voxel_blocks;
+    use all_is_cubes::euclid::{size2, vec3};
+    use all_is_cubes::space::CubeTransaction;
+    use all_is_cubes::universe::Universe;
     use alloc::string::ToString;
-    use euclid::{size2, vec3};
     use manyfmt::{Refmt, formats::Unquote};
     use pretty_assertions::assert_eq;
 

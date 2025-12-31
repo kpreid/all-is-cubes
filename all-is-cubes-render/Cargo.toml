@@ -35,23 +35,36 @@ std = [
 # If enabled, threads may be created and the active `rayon` thread pool may be used.
 auto-threads = ["std", "dep:rayon"]
 # Adds the `raytracer` module.
-raytracer = ["dep:embedded-graphics"]
+raytracer = [
+    "dep:embedded-graphics", # to render overlay info text
+    "dep:hashbrown",
+    "dep:rand", # random bounce rays
+    "dep:rand_distr", # random bounce rays
+    "dep:unicode-segmentation", # text-output raytracer -- TODO: consider giving it its own feature
+]
 
 [dependencies]
 all-is-cubes = { workspace = true }
 bitflags = { workspace = true }
 displaydoc = { workspace = true }
-# Used to render overlay info text.
 embedded-graphics = { workspace = true, optional = true }
 futures-core = { workspace = true }
+hashbrown = { workspace = true, optional = true }
 imgref = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
+manyfmt = { workspace = true }
+mutants = { workspace = true }
+num-traits = { workspace = true }
+rand = { workspace = true, optional = true }
+rand_distr = { workspace = true, optional = true }
 rayon = { workspace = true, optional = true }
+unicode-segmentation = { workspace = true, optional = true }
 
 [dev-dependencies]
 async-io = { workspace = true }
 criterion = { workspace = true }
+pretty_assertions = { workspace = true }
 
 [lints]
 workspace = true

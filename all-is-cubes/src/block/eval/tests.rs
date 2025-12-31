@@ -616,7 +616,7 @@ fn raw_primitive() {
 }
 
 /// Fuzz-discovered test case for panic during evaluation,
-/// in `raytracer::apply_transmittance`.
+/// in [`crate::raytracer_components::apply_transmittance`].
 #[test]
 fn color_evaluation_regression_1() {
     let block = Block::builder()

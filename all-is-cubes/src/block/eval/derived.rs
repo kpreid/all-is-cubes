@@ -16,7 +16,7 @@ use crate::block::{
 use crate::math::{
     Cube, Face6, FaceMap, GridAab, Intensity, OpacityCategory, Rgb, Rgba, Vol, ZeroOne,
 };
-use crate::raytracer;
+use crate::raytracer_components::{EvalTrace, trace_for_eval};
 
 #[cfg(doc)]
 use crate::block::{EvaluatedBlock, Evoxel};
@@ -138,7 +138,7 @@ pub(in crate::block::eval) fn compute_derived(
                 );
                 cube
             })
-            .map(|cube| raytracer::trace_for_eval(voxels, cube, face.opposite(), resolution))
+            .map(|cube| trace_for_eval(voxels, cube, face.opposite(), resolution))
             .fold(VoxSum::default(), |mut sum, trace| {
                 sum += trace;
                 sum
@@ -255,9 +255,9 @@ impl VoxSum {
         }
     }
 }
-impl ops::AddAssign<raytracer::EvalTrace> for VoxSum {
-    fn add_assign(&mut self, rhs: raytracer::EvalTrace) {
-        let raytracer::EvalTrace { color, emission } = rhs;
+impl ops::AddAssign<EvalTrace> for VoxSum {
+    fn add_assign(&mut self, rhs: EvalTrace) {
+        let EvalTrace { color, emission } = rhs;
         let alpha = color.alpha().into_inner();
         // Multiply by alpha to produce an appropriately weighted sum
         self.color_sum += Vector3D::from(color.to_rgb()) * alpha;
@@ -424,7 +424,6 @@ impl fmt::Debug for VoxelOpacityMask {
 mod tests {
     use super::*;
     use crate::block::{Evoxel, Evoxels, Resolution::*};
-    use crate::raytracer::EvalTrace;
     use euclid::vec3;
 
     /// Test that resolution does not alter any derived properties, as long as the voxels are

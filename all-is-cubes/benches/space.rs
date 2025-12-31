@@ -1,19 +1,14 @@
 #![allow(missing_docs)]
 
 use std::hint::black_box;
-use std::sync::Arc;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 
-use all_is_cubes::block;
-use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::content::make_some_blocks;
-use all_is_cubes::listen;
-use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridSize};
-use all_is_cubes::raytracer::UpdatingSpaceRaytracer;
+use all_is_cubes::math::{GridAab, GridCoordinate, GridSize};
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{Handle, ReadTicket, Universe};
+use all_is_cubes::universe::ReadTicket;
 
 fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("bulk");
@@ -47,6 +42,8 @@ fn space_bulk_mutation(c: &mut Criterion) {
             )
         });
 
+        // TODO: re-enable this benchmark with a new choice of "some expensive listener"
+        #[cfg(false)]
         group.bench_function(
             BenchmarkId::new("fill() partial with notification", &size_description),
             |b| {

@@ -1,8 +1,8 @@
 use std::fmt;
 
 use all_is_cubes::euclid::Vector2D;
-use all_is_cubes::raytracer::RaytraceInfo;
 use all_is_cubes_render::camera::{ImagePixel, Viewport};
+use all_is_cubes_render::raytracer::RaytraceInfo;
 
 use super::{TerminalOptions, TextAndColor};
 

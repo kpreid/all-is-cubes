@@ -53,12 +53,6 @@ impl<T: num_traits::Euclid + Copy> Euclid for T {
     }
 }
 
-#[inline]
-pub(crate) fn smoothstep(x: f64) -> f64 {
-    let x = x.clamp(0.0, 1.0);
-    3. * x.powi(2) - 2. * x.powi(3)
-}
-
 // -------------------------------------------------------------------------------------------------
 
 /// Converts a vector with float components into a vector with finite [`NotNan`] components.
@@ -95,19 +89,5 @@ pub(crate) fn try_into_finite<T: ordered_float::FloatCore>(value: T) -> Option<N
         None
     } else {
         NotNan::new(value).ok()
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn smoothstep_test() {
-        assert_eq!(smoothstep(0.0), 0.0);
-        assert_eq!(smoothstep(0.5), 0.5);
-        assert_eq!(smoothstep(1.0), 1.0);
     }
 }

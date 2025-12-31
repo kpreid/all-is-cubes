@@ -157,6 +157,9 @@ extern crate std;
 #[macro_use]
 extern crate alloc;
 
+#[doc(inline)]
+pub use all_is_cubes_base::raycast;
+
 pub mod behavior;
 pub mod block;
 #[doc(hidden)] // Exported only for use by all_is_cubes_render
@@ -173,9 +176,8 @@ pub mod listen;
 pub mod math;
 pub mod op;
 pub mod physics;
-pub mod raycast;
-#[doc(hidden)] // Exported only for use by all_is_cubes_render
-pub mod raytracer;
+#[doc(hidden)]
+pub mod raytracer_components;
 #[doc(hidden)]
 #[cfg_attr(not(feature = "rerun"), path = "rerun_glue_disabled.rs")]
 pub mod rerun_glue;

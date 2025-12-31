@@ -1,15 +1,11 @@
-//! Algorithm for raycasting through voxel grids.
+//! Traits used by the raytracer to abstract over raycasters.
 //!
-//! This deals purely with the question “which cubes does this ray intersect”,
-//! and does not concern itself with what might occupy those cubes. If you’re
-//! looking for *raytracing*, forming an image from many rays, that’s
-//! `all_is_cubes_render::raytracer`.
+//! Arguably this belongs in [`all_is_cubes::raycast`], but I’m skeptical the traits are designed
+//! well, so I’m keeping them `pub(crate)` for now.
 
-use crate::block::Resolution;
-use crate::math::{FreeVector, GridAab};
-
-// This module is primarily a re-export.
-pub use all_is_cubes_base::raycast::*;
+use all_is_cubes::block::Resolution;
+use all_is_cubes::math::{FreeVector, GridAab};
+use all_is_cubes::raycast::{AaRay, AxisAlignedRaycaster, Ray, RaycastStep, Raycaster};
 
 /// Trait for types that can be used for raycasting.
 ///

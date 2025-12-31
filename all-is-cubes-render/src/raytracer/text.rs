@@ -5,15 +5,15 @@
 use alloc::string::String;
 use core::fmt;
 
-use arcstr::{ArcStr, Substr, literal_substr};
-use euclid::size2;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::camera::{Camera, GraphicsOptions, Viewport, eye_for_look_at};
-use crate::math::FreeVector;
-use crate::raytracer::{Accumulate, Exception, RtBlockData, RtOptionsRef, SpaceRaytracer};
-use crate::space::{self, SpaceBlockData};
+use all_is_cubes::arcstr::{ArcStr, Substr, literal_substr};
+use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport, eye_for_look_at};
+use all_is_cubes::euclid::size2;
+use all_is_cubes::math::FreeVector;
+use all_is_cubes::space::{self, SpaceBlockData};
 
+use crate::raytracer::{Accumulate, Exception, RtBlockData, RtOptionsRef, SpaceRaytracer};
 /// If you are using [`CharacterBuf`], use this [`RtBlockData`] implementation.
 // TODO: better name
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -130,6 +130,8 @@ impl From<CharacterBuf> for String {
 ///
 /// `direction` specifies the direction from which the camera will be looking towards
 /// the center of the space. The text output will be 80 columns wide.
+///
+/// This function is only available with the features `"raytracer"` **and** `"std"` enabled.
 #[cfg(any(feature = "std", test))]
 pub fn print_space(space: &space::Read<'_>, direction: impl Into<FreeVector>) {
     std::print!(
@@ -177,12 +179,12 @@ impl fmt::Display for PrintSpace<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{self, Block, Resolution::R4};
-    use crate::content::make_some_blocks;
-    use crate::math::{GridAab, Rgba};
-    use crate::space::Space;
-    use crate::universe::Universe;
-    use euclid::vec3;
+    use all_is_cubes::block::{self, Block, Resolution::R4};
+    use all_is_cubes::content::make_some_blocks;
+    use all_is_cubes::euclid::{self, vec3};
+    use all_is_cubes::math::{GridAab, Rgba};
+    use all_is_cubes::space::Space;
+    use all_is_cubes::universe::Universe;
     use std::string::ToString;
 
     #[test]

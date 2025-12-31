@@ -1,5 +1,6 @@
-//! Note: This module is hidden, and its contents re-exported as `all_is_cubes_render::raytracer`.
-//! It is located in this crate so that it can be used by unit tests.
+//! [`SpaceRaytracer`] and friends.
+//!
+//! TODO: dissolve this module to other better-named places
 
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -7,7 +8,6 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
 
-use euclid::{Vector3D, vec3};
 use manyfmt::Fmt;
 /// Acts as polyfill for float methods
 #[cfg(not(any(feature = "std", test)))]
@@ -21,37 +21,27 @@ use rand::SeedableRng;
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
-use crate::block::{AIR, Evoxels, Resolution};
-use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
-use crate::camera::{FogOption, NdcPoint2};
-#[cfg(not(any(feature = "std", test)))]
-#[allow(
-    unused_imports,
-    reason = "unclear why this warns even though it is needed"
-)]
-use crate::math::Euclid as _;
-use crate::math::{
-    Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridMatrix, Intensity, Rgb, Rgba,
-    Vol, ZeroOne, rgb_const, smoothstep,
+use all_is_cubes::block::{AIR, Evoxels};
+use all_is_cubes::camera::{Camera, GraphicsOptions, TransparencyOption};
+use all_is_cubes::camera::{FogOption, NdcPoint2};
+use all_is_cubes::euclid::{Vector3D, vec3};
+use all_is_cubes::math::{
+    Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridMatrix, Rgb, Rgba, Vol, ZeroOne,
+    rgb_const,
 };
-use crate::raycast::{self, Ray, RayIsh};
-use crate::space::{self, BlockIndex, BlockSky, PackedLight, Sky, SpaceBlockData};
-use crate::util::StatusText;
+use all_is_cubes::raycast::{self, Ray};
+use all_is_cubes::raytracer_components::apply_transmittance;
+use all_is_cubes::space::{self, BlockIndex, BlockSky, PackedLight, Sky, SpaceBlockData};
+use all_is_cubes::util::StatusText;
 
 #[cfg(doc)]
-use crate::space::Space;
+use all_is_cubes::space::Space;
 
-// -------------------------------------------------------------------------------------------------
-
-mod accum;
-pub use accum::*;
-mod surface;
-use surface::{DepthIter, DepthStep, Span, Surface, SurfaceIter, TraceStep};
-// TODO: pub use surface::*;
-mod text;
-pub use text::*;
-pub use updating::*;
-mod updating;
+use crate::raytracer::raycast_traits::RayIsh;
+use crate::raytracer::surface::{DepthIter, DepthStep, Span, Surface, SurfaceIter, TraceStep};
+use crate::raytracer::{
+    Accumulate, BounceRng, Exception, Hit, Position, RtBlockData, RtOptionsRef,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -59,14 +49,14 @@ mod updating;
 /// the methods for actually performing raytracing.
 #[allow(clippy::module_name_repetitions, reason = "TODO: find better name")]
 pub struct SpaceRaytracer<D: RtBlockData> {
-    blocks: Vec<TracingBlock<D>>,
-    cubes: Vol<Box<[TracingCubeData]>>,
+    pub(in crate::raytracer) blocks: Vec<TracingBlock<D>>,
+    pub(in crate::raytracer) cubes: Vol<Box<[TracingCubeData]>>,
 
-    graphics_options: GraphicsOptions,
-    custom_options: D::Options,
-    sky: Sky,
-    sky_data: D,
-    block_sky: BlockSky,
+    pub(in crate::raytracer) graphics_options: GraphicsOptions,
+    pub(in crate::raytracer) custom_options: D::Options,
+    pub(in crate::raytracer) sky: Sky,
+    pub(in crate::raytracer) sky_data: D,
+    pub(in crate::raytracer) block_sky: BlockSky,
 }
 
 impl<D: RtBlockData> SpaceRaytracer<D> {
@@ -142,17 +132,18 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         self.trace_ray_impl::<P, raycast::AaRay>(ray, accumulator, include_sky, true)
     }
 
-    fn trace_ray_impl<P: Accumulate<BlockData = D>, R: RayIsh>(
+    pub(crate) fn trace_ray_impl<P: Accumulate<BlockData = D>, R: RayIsh>(
         &self,
         ray: R,
         accumulator: &mut P,
         include_sky: bool,
         allow_ray_bounce: bool,
     ) -> RaytraceInfo {
-        let options = RtOptionsRef {
-            graphics_options: &self.graphics_options,
-            custom_options: &self.custom_options,
-        };
+        let options =
+            RtOptionsRef::_new_but_please_do_not_construct_this_if_you_are_not_all_is_cubes_itself(
+                &self.graphics_options,
+                &self.custom_options,
+            );
         let ray_direction = ray.direction();
 
         let sky_light = include_sky.then(|| self.sky.sample(ray.direction()));
@@ -251,14 +242,14 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     }
 
     #[inline]
-    fn get_packed_light(&self, cube: Cube) -> PackedLight {
+    pub(crate) fn get_packed_light(&self, cube: Cube) -> PackedLight {
         match self.cubes.get(cube) {
             Some(b) => b.lighting,
             None => self.block_sky.light_outside(self.cubes.bounds(), cube),
         }
     }
 
-    fn get_interpolated_light(&self, point: FreePoint, face: Face7) -> Rgb {
+    pub(crate) fn get_interpolated_light(&self, point: FreePoint, face: Face7) -> Rgb {
         // This implementation is duplicated in WGSL in interpolated_space_light()
         // in all-is-cubes-gpu/src/in_wgpu/shaders/blocks-and-lines.wgsl.
 
@@ -473,6 +464,12 @@ fn mix4(a: [f32; 4], b: [f32; 4], amount: f32) -> [f32; 4] {
     })
 }
 
+#[inline]
+pub(crate) fn smoothstep(x: f64) -> f64 {
+    let x = x.clamp(0.0, 1.0);
+    3. * x.powi(2) - 2. * x.powi(3)
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Performance info from a [`SpaceRaytracer`] operation.
@@ -528,10 +525,11 @@ fn prepare_cubes(space: &space::Read<'_>) -> Vol<Box<[TracingCubeData]>> {
     })
 }
 
+/// Data stored per space cube in a [`SpaceRaytracer`].
 #[derive(Clone, Debug)]
-struct TracingCubeData {
-    block_index: BlockIndex,
-    lighting: PackedLight,
+pub(in crate::raytracer) struct TracingCubeData {
+    pub block_index: BlockIndex,
+    pub lighting: PackedLight,
     /// True if the block is [`AIR`].
     ///
     /// This special information allows us to skip an indirect memory access in this
@@ -539,20 +537,20 @@ struct TracingCubeData {
     /// invisible, but only if *the block is not an indirection* since if it is, the
     /// block data could change without signaling a cube change, and currently we don't
     /// have a mechanism to obtain that information from the Space.
-    always_invisible: bool,
+    pub always_invisible: bool,
 }
 
 // -------------------------------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
-struct TracingBlock<D> {
-    block_data: D,
+pub(in crate::raytracer) struct TracingBlock<D> {
+    pub block_data: D,
     // TODO: `Evoxels` carries more data than we actually need (color). Experiment with using a packed format.
-    voxels: Evoxels,
+    pub voxels: Evoxels,
 }
 
 impl<D: RtBlockData> TracingBlock<D> {
-    fn from_block(
+    pub(crate) fn from_block(
         options: RtOptionsRef<'_, D::Options>,
         space_block_data: &SpaceBlockData,
     ) -> Self {
@@ -565,19 +563,17 @@ impl<D: RtBlockData> TracingBlock<D> {
 
 // -------------------------------------------------------------------------------------------------
 
-type BounceRng = rand::rngs::SmallRng;
-
 /// Holds an [`Accumulate`] and other per-ray state, and updates it
 /// according to the things it encounters.
 #[derive(Debug)]
-struct TracingState<'a, P: Accumulate> {
+pub(in crate::raytracer) struct TracingState<'a, P: Accumulate> {
     /// Conversion factor from raycaster `t` values to “true” [`Space`] distance values
     /// where 1 unit = 1 block thickness.
     t_to_absolute_distance: f64,
 
     /// Conversion factor from raycaster `t` values to fractions of
     /// `graphics_options.view_distance`.
-    t_to_view_distance: f32,
+    pub(in crate::raytracer) t_to_view_distance: f32,
 
     /// If fog is enabled, then this is what the light from the scene should be blended with.
     distance_fog_light: Option<Rgb>,
@@ -596,7 +592,7 @@ struct TracingState<'a, P: Accumulate> {
 
     /// *If* we are going to compute ray bounces, this RNG is used to decide which direction they
     /// bounce.
-    ray_bounce_rng: Option<BounceRng>,
+    pub(in crate::raytracer) ray_bounce_rng: Option<BounceRng>,
 }
 impl<P: Accumulate> TracingState<'_, P> {
     #[inline]
@@ -716,107 +712,34 @@ impl<P: Accumulate> TracingState<'_, P> {
 
         self.trace_through_surface(&surface, rt);
     }
-}
 
-// -------------------------------------------------------------------------------------------------
+    /// Compute the density of the fog (0 = transparent, 1 = opaque) at a given *t*-distance from
+    /// the view position.
+    #[inline]
+    pub(crate) fn distance_fog(&self, t_distance: f64) -> Option<(Rgb, ZeroOne<f32>)> {
+        if let Some(fog_light) = self.distance_fog_light {
+            let relative_distance = (t_distance as f32 * self.t_to_view_distance).clamp(0.0, 1.0);
 
-/// Given an `Atom`/`Evoxel` color, and the thickness of that material passed through,
-/// return the effective alpha that should replace the original, and the coefficient for
-/// scaling the light emission.
-#[inline]
-fn apply_transmittance(color: Rgba, thickness: f32) -> (Rgba, f32) {
-    // Distance calculations might produce small negative values; tolerate this.
-    let thickness = thickness.max(0.0);
+            // This logic is also implemented in a shader in all-is-cubes-gpu
+            // TODO: would it be cheaper to use an interpolated lookup table?
+            let fog_exponential = 1.0 - (-1.6 * relative_distance).exp();
+            let fog_exp_fudged = fog_exponential
+                / (
+                    // value of fog_exponential at relative_distance = 1.0
+                    0.79810348
+                );
 
-    // If the thickness is zero and the alpha is one, this is theoretically undefined.
-    // In practice, thickness has error, so we want to count this as if it were a small
-    // nonzero thickness.
-    if thickness == 0.0 {
-        return if color.fully_opaque() {
-            (color, 1.0)
+            Some((
+                fog_light,
+                ZeroOne::<f32>::new_clamped(
+                    fog_exp_fudged * (1.0 - self.distance_fog_blend)
+                        + relative_distance.powi(4) * self.distance_fog_blend,
+                ),
+            ))
         } else {
-            (Rgba::TRANSPARENT, 0.0)
-        };
-    }
-
-    // Convert alpha to transmittance (light transmitted / light received).
-    let unit_transmittance = 1.0 - color.clamp().alpha().into_inner();
-    // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
-    let depth_transmittance = unit_transmittance.powf(thickness);
-    // Convert back to alpha.
-    // TODO: skip NaN check ... this may require refactoring Surface usage.
-    // We might also benefit from an "UncheckedRgba" concept.
-    let alpha = ZeroOne::<f32>::new_clamped(1.0 - depth_transmittance);
-    let modified_color = color.to_rgb().with_alpha(alpha);
-
-    // Compute how the emission should be scaled to account for internal absorption and thickness.
-    // Since voxel emission is defined as “emitted from the surface of a unit-thickness layer”,
-    // the emission per length must be *greater* the more opaque the material is,
-    // and yet also it is reduced the deeper we go.
-    // This formula is the integral of that process.
-    let emission_coeff = if unit_transmittance == 1.0 {
-        // This is the integral
-        //     ∫{0..thickness} unit_transmittance^x dx
-        //   = ∫{0..thickness} 1 dx
-        thickness
-    } else {
-        // This is the integral
-        //     ∫{0..thickness} unit_transmittance^x dx
-        // in the case where `unit_transmittance` is not equal to 1.
-        (depth_transmittance - 1.) / (unit_transmittance - 1.)
-    };
-
-    (modified_color, emission_coeff.max(0.0))
-}
-
-// -------------------------------------------------------------------------------------------------
-
-/// Minimal raytracing helper used by block evaluation to compute aggregate properties
-/// of voxel blocks. Compared to the regular raytracer, it:
-///
-/// * Traces through `Evoxel`s instead of a `SpaceRaytracer`.
-/// * Follows an axis-aligned ray only.
-///
-/// `origin` should be the first cube to trace through *within* the grid.
-pub(crate) fn trace_for_eval(
-    voxels: &Evoxels,
-    origin: Cube,
-    direction: Face6,
-    resolution: Resolution,
-) -> EvalTrace {
-    let thickness = resolution.recip_f32();
-    let step = direction.normal_vector();
-
-    let mut cube = origin;
-    let mut color_buf = ColorBuf::default();
-    let mut emission = Vector3D::zero();
-
-    while let Some(voxel) = voxels.get(cube) {
-        let (adjusted_color, emission_coeff) = apply_transmittance(voxel.color, thickness);
-        emission += Vector3D::from(voxel.emission * emission_coeff) * color_buf.transmittance;
-        color_buf.add(Hit {
-            exception: None,
-            surface: adjusted_color.into(),
-            t_distance: None, // we could compute this but it is not used
-            block: &(),
-            position: None, // we could compute this but it is not used
-        });
-
-        if color_buf.opaque() {
-            break;
+            None
         }
-        cube += step;
     }
-    EvalTrace {
-        color: color_buf.into(),
-        emission,
-    }
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct EvalTrace {
-    pub color: Rgba,
-    pub emission: Vector3D<f32, Intensity>,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -855,82 +778,36 @@ mod rayon_helper {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Note: Further raytracer tests are found in
+#[cfg(not(any(feature = "std", test)))]
+#[allow(dead_code, reason = "unclear why this warns even though it is needed")]
+/// Identical to [`num_traits::Euclid`] except that its signatures are compatible with
+/// `std` versions.
 ///
-/// * child modules (particularly raytracer/text.rs)
-/// * the test-renderers package which does image comparison tests.
+/// Note: this code is duplicated among several crates so that it doesn't need to be public.
+pub(crate) trait Euclid {
+    fn div_euclid(self, rhs: Self) -> Self;
+    fn rem_euclid(self, rhs: Self) -> Self;
+}
+#[cfg(not(any(feature = "std", test)))]
+impl<T: num_traits::Euclid + Copy> Euclid for T {
+    fn div_euclid(self, rhs: Self) -> Self {
+        <T as num_traits::Euclid>::div_euclid(&self, &rhs)
+    }
+    fn rem_euclid(self, rhs: Self) -> Self {
+        <T as num_traits::Euclid>::rem_euclid(&self, &rhs)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::rgba_const;
 
     #[test]
-    fn apply_transmittance_identity() {
-        let color = rgba_const!(1.0, 0.5, 0.0, 0.5);
-        assert_eq!(apply_transmittance(color, 1.0), (color, 1.0));
-    }
-
-    /// `apply_transmittance` + `ColorBuf` accumulation should add up to the identity function for
-    /// any unit thickness (except for rounding error, which we are avoiding for this test case).
-    ///
-    /// TODO: test emission equivalence too
-    #[test]
-    fn apply_transmittance_equivalence() {
-        fn case(color: Rgba, count: usize) {
-            let (modified_color, _emission_coeff) =
-                apply_transmittance(color, (count as f32).recip());
-            let mut color_buf = ColorBuf::default();
-            for _ in 0..count {
-                color_buf.add(Hit {
-                    exception: None,
-                    surface: modified_color.into(),
-                    t_distance: None,
-                    block: &(),
-                    position: None,
-                });
-            }
-            let actual = Rgba::from(color_buf);
-            let error: Vec<f32> = <[f32; 4]>::from(actual)
-                .into_iter()
-                .zip(<[f32; 4]>::from(color))
-                .map(|(a, b)| a - b)
-                .collect();
-            assert!(
-                error.iter().sum::<f32>() < 0.00001,
-                "count {count}, color {color:?}, actual {actual:?}, error {error:?}"
-            );
-        }
-
-        let color = rgba_const!(1.0, 0.5, 0.0, 0.5);
-        case(color, 1);
-        case(color, 2);
-        case(color, 8);
-    }
-
-    /// Regression test for numerical error actually encountered.
-    #[test]
-    fn apply_transmittance_negative_thickness_transparent() {
-        assert_eq!(
-            apply_transmittance(rgba_const!(1.0, 0.5, 0.0, 0.5), -0.125),
-            (Rgba::TRANSPARENT, 0.0)
-        );
-    }
-    #[test]
-    fn apply_transmittance_negative_thickness_opaque() {
-        let color = rgba_const!(1.0, 0.5, 0.0, 1.0);
-        assert_eq!(apply_transmittance(color, -0.125), (color, 1.0));
-    }
-
-    #[test]
-    fn apply_transmittance_zero_thickness_transparent() {
-        assert_eq!(
-            apply_transmittance(rgba_const!(1.0, 0.5, 0.0, 0.5), 0.0),
-            (Rgba::TRANSPARENT, 0.0)
-        );
-    }
-    #[test]
-    fn apply_transmittance_zero_thickness_opaque() {
-        let color = rgba_const!(1.0, 0.5, 0.0, 1.0);
-        assert_eq!(apply_transmittance(color, 0.0), (color, 1.0));
+    fn smoothstep_test() {
+        assert_eq!(smoothstep(0.0), 0.0);
+        assert_eq!(smoothstep(0.5), 0.5);
+        assert_eq!(smoothstep(1.0), 1.0);
     }
 }

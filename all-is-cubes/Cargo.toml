@@ -156,7 +156,6 @@ rustc-hash = { workspace = true }
 # rc feature needed because we are [de]serializing `Arc`s
 # alloc feature needed for #[serde(flatten)] — https://github.com/serde-rs/serde/issues/1935
 serde = { workspace = true, optional = true, features = ["alloc", "derive", "rc"] }
-unicode-segmentation = { workspace = true }
 visibility = { workspace = true, optional = true }
 yield-progress = { workspace = true }
 

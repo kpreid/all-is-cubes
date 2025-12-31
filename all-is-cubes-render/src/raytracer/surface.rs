@@ -5,12 +5,14 @@ use rand_distr::Distribution;
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::block::{Evoxel, Resolution};
+use all_is_cubes::block::{Evoxel, Resolution};
+use all_is_cubes::math::{Cube, Face7, FreeCoordinate, FreePoint, FreeVector, Rgb, Rgba, Vol};
+use all_is_cubes::raycast::Ray;
+
 use crate::camera::LightingOption;
-use crate::math::{
-    Cube, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign, Rgb, Rgba, Vol,
-};
-use crate::raycast::{Ray, RayIsh as _, RaycasterIsh};
+use crate::raytracer::accum::IgnoreBlockData;
+use crate::raytracer::raycast_traits::{RayIsh as _, RaycasterIsh};
+use crate::raytracer::sr::TracingState;
 use crate::raytracer::{
     BounceRng, ColorBuf, RaytraceInfo, RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData,
 };
@@ -71,7 +73,7 @@ impl<D: RtBlockData> Surface<'_, D> {
     pub(crate) fn to_light<P: super::Accumulate>(
         &self,
         rt: &SpaceRaytracer<D>,
-        ts: &mut super::TracingState<'_, P>, // knowing about TracingState here is inelegant but convenient
+        ts: &mut TracingState<'_, P>, // knowing about TracingState here is inelegant but convenient
     ) -> Option<(ColorBuf, RaytraceInfo)> {
         let diffuse_color = rt.graphics_options.transparency.limit_alpha(self.diffuse_color);
         if diffuse_color.fully_transparent() && self.emission == Rgb::ZERO {
@@ -92,24 +94,9 @@ impl<D: RtBlockData> Surface<'_, D> {
         // Apply distance “fog” (not an actual scattering material, but blending into the sky).
         // This is cheaper and easier to implement than true volumetric fog (treating every
         // empty volume as being slightly opaque), and matches what the GPU renderer does.
-        if let Some(fog_light) = ts.distance_fog_light {
-            let relative_distance =
-                (self.t_distance as f32 * ts.t_to_view_distance).clamp(0.0, 1.0);
-
-            // This logic is also implemented in a shader in all-is-cubes-gpu
-            // TODO: would it be cheaper to use an interpolated lookup table?
-            let fog_exponential = 1.0 - (-1.6 * relative_distance).exp();
-            let fog_exp_fudged = fog_exponential
-                / (
-                    // value of fog_exponential at relative_distance = 1.0
-                    0.79810348
-                );
-            let fog_amount = fog_exp_fudged * (1.0 - ts.distance_fog_blend)
-                + relative_distance.powi(4) * ts.distance_fog_blend;
-
-            outgoing_rgb = outgoing_rgb * PositiveSign::<f32>::new_clamped(1.0 - fog_amount)
-                + fog_light * PositiveSign::<f32>::new_clamped(fog_amount);
-            transmittance *= 1.0 - fog_amount;
+        if let Some((fog_light, fog_amount)) = ts.distance_fog(self.t_distance) {
+            outgoing_rgb = outgoing_rgb * fog_amount.complement() + fog_light * fog_amount;
+            transmittance *= fog_amount.complement().into_inner();
         }
 
         Some((
@@ -163,7 +150,7 @@ impl<D: RtBlockData> Surface<'_, D> {
                     // Note that we pass allow_ray_bounce=false so that there will be no further
                     // bounces; the stored light data essentially completely suffices after one
                     // bounce. (This would not be true if we had any mirror reflections.)
-                    let mut light_accum_buf = <super::IgnoreBlockData<D, ColorBuf>>::default();
+                    let mut light_accum_buf = <IgnoreBlockData<D, ColorBuf>>::default();
                     let ray_info = rt.trace_ray_impl(ray, &mut light_accum_buf, true, false);
                     multi_ray_accum += Rgba::from(light_accum_buf.inner).to_rgb();
                     info_accum += ray_info;
@@ -187,6 +174,10 @@ impl<D: RtBlockData> Surface<'_, D> {
             (LightingOption::Smooth, _) => {
                 let light = rt.get_interpolated_light(self.intersection_point, self.normal);
                 (light, RaytraceInfo::default())
+            }
+
+            (lighting_option, _) => {
+                unimplemented!("missing implementation for lighting option {lighting_option:?}")
             }
         }
     }
@@ -497,17 +488,17 @@ pub(crate) enum DepthStep<'a, D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{AIR, Block, Resolution::*};
-    use crate::camera::GraphicsOptions;
-    use crate::content;
-    use crate::math::{GridAab, rgba_const};
-    use crate::raycast::{self, Ray};
-    use crate::space::Space;
-    use crate::universe::Universe;
     use TraceStep::{EnterBlock, EnterSurface, Invisible};
-    use alloc::vec::Vec;
-    use euclid::point3;
+    use all_is_cubes::block::{AIR, Block, Resolution::*};
+    use all_is_cubes::camera::GraphicsOptions;
+    use all_is_cubes::content;
+    use all_is_cubes::euclid::point3;
+    use all_is_cubes::math::{GridAab, rgba_const};
+    use all_is_cubes::raycast::{self, Ray};
+    use all_is_cubes::space::Space;
+    use all_is_cubes::universe::Universe;
     use pretty_assertions::assert_eq;
+    use std::vec::Vec;
 
     type SurfaceIterR<'a> = SurfaceIter<'a, (), raycast::Raycaster>;
 

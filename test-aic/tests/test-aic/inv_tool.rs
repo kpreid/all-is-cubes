@@ -11,12 +11,12 @@ use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, Rgba, rgba_const};
 use all_is_cubes::op::Operation;
 use all_is_cubes::raycast::Ray;
-use all_is_cubes::raytracer::print_space;
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::transaction::{Merge as _, Transaction as _};
 use all_is_cubes::universe::{Handle, Universe, UniverseTransaction};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes::{space, transaction};
+use all_is_cubes_render::raytracer::print_space;
 
 #[derive(Debug)]
 struct ToolTester {

@@ -127,7 +127,7 @@ impl PackedLight {
     /// Returns true if the light value is meaningful, or false if it is
     /// inside an opaque block or in empty unlit air (in which case [`Self::value`]
     /// always returns zero).
-    pub(crate) fn valid(self) -> bool {
+    pub fn valid(self) -> bool {
         self.status == LightStatus::Visible
     }
 
@@ -135,7 +135,11 @@ impl PackedLight {
     /// much this color should actually contribute to the surface color. It is usually
     /// 0 or 1, but is set slightly above zero for opaque blocks to create the ambient
     /// occlusion effect.
-    pub(crate) fn value_with_ambient_occlusion(self) -> [f32; 4] {
+    ///
+    /// This function is used only by `all_is_cubes_render::raytracer`, but it is
+    /// defined here because it depends on the details of [`LightStatus`].
+    #[doc(hidden)]
+    pub fn value_with_ambient_occlusion(self) -> [f32; 4] {
         [
             Self::scalar_out(self.value.x),
             Self::scalar_out(self.value.y),

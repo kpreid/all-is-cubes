@@ -50,7 +50,8 @@ impl Sky {
     }
 
     /// Resample this sky to present the colors of block faces.
-    pub(crate) fn for_blocks(&self) -> BlockSky {
+    #[doc(hidden)] // TODO: used by raytracer but not sure if we want to expose this
+    pub fn for_blocks(&self) -> BlockSky {
         BlockSky {
             faces: match *self {
                 Sky::Uniform(color) => FaceMap::splat(PackedLight::from(color)),
@@ -91,7 +92,8 @@ impl Default for Sky {
 /// This should produce the same results as the light calculation algorithm computing it
 /// by summing individual rays. TODO: Write a test validating that.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct BlockSky {
+#[doc(hidden)] // TODO: used by raytracer but not sure if we want to expose this
+pub struct BlockSky {
     faces: FaceMap<PackedLight>,
     mean: PackedLight,
 }
@@ -131,7 +133,7 @@ impl BlockSky {
     }
 
     #[inline]
-    pub(crate) fn in_direction(&self, face: Face6) -> PackedLight {
+    pub fn in_direction(&self, face: Face6) -> PackedLight {
         self.faces[face]
     }
 
@@ -139,7 +141,7 @@ impl BlockSky {
     /// This should also be approximately equal to the mean of all six [`BlockSky::in_direction()`]
     /// outputs.
     #[inline]
-    pub(crate) fn mean(&self) -> PackedLight {
+    pub fn mean(&self) -> PackedLight {
         self.mean
     }
 }

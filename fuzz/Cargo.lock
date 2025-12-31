@@ -47,7 +47,6 @@ dependencies = [
  "rand_xoshiro",
  "rustc-hash 2.1.1",
  "serde",
- "unicode-segmentation",
  "visibility",
  "yield-progress",
 ]
@@ -184,9 +183,16 @@ dependencies = [
  "displaydoc",
  "embedded-graphics",
  "futures-core",
+ "hashbrown 0.16.1",
  "imgref",
  "indoc",
  "itertools",
+ "manyfmt",
+ "mutants",
+ "num-traits",
+ "rand 0.9.2",
+ "rand_distr",
+ "unicode-segmentation",
 ]
 
 [[package]]
