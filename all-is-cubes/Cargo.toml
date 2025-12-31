@@ -5,7 +5,7 @@ authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
-description = "Recursive voxel game engine. Can be used for voxel raytracing."
+description = "Recursive voxel game engine."
 license = "MIT OR Apache-2.0"
 # TODO: revisit categories once it's more settled how useful this is as a game engine
 categories = ["games", "graphics", "rendering::engine"]
