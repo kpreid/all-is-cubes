@@ -16,9 +16,13 @@ No test failures, compilation errors, or warnings should be present.
 
 If you have added or modified any public items,
 check if their documentation is correct and comprehensible when viewed as `rustdoc` pages.
-(`cargo xtask lint` will generate the documentation along with its other checks.) 
+(Tip: `cargo xtask lint` also builds the documentation, and
+`cargo xtask doc` will build docs in the same way to avoid unnecessary rebuilds).
 
-Consider running `cargo xtask fuzz` to fuzz-test changes to modules that have fuzz test coverage.
+Consider running these additional commands when they are relevant:
+
+* `cargo xtask fuzz <duration>` will fuzz-test changes to modules that have fuzz test coverage.
+* `cargo xtask check-features` will try building all combinations of package features.
 
 Code style
 ----------
@@ -66,7 +70,8 @@ Special cases:
 *   Doc comments currently must be manually formatted.
     Their lines must be wrapped to at most 100 columns.
     Shorter wrapping such as to approximately 90 columns is encouraged,
-    to reduce churn upon reindentation and to avoid wasting mental effort on precise manual line wrapping.
+    to reduce churn upon reindentation and to avoid wasting mental effort on precise manual line
+    wrapping.
 
 *   “Semantic” line breaks (such as at the end of sentences within a paragraph)
     are encouraged in doc comments and other Markdown.
@@ -93,9 +98,12 @@ Each Git commit should be self-contained and of a comprehensible size.
 
 Each commit message should:
 
-*   Begin with a single line which summarizes the change to a level of detail that is useful when it appears in a list of commits, without being longer than necessary.
+*   Begin with a single line which summarizes the change,
+    to a level of detail that is useful when it appears in a list of commits,
+    without being longer than necessary.
 
-    The summary line may begin with a prefix describing the area or aspect it affects, if there is such a single area, such as:
+    The summary line may begin with a prefix describing the area or aspect it affects,
+    if there is such a single area, such as:
 
     *   A crate name, with the “`all-is-cubes-`” prefix removed, e.g. “`mesh:`” or
         “`xtask:`”.
