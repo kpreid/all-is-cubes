@@ -15,7 +15,6 @@ dependencies = [
  "all-is-cubes-base",
  "arbitrary",
  "arcstr",
- "arrayvec",
  "base64",
  "bevy_ecs",
  "bevy_platform",
@@ -29,7 +28,6 @@ dependencies = [
  "flate2",
  "futures-core",
  "hashbrown 0.16.1",
- "indoc",
  "itertools",
  "libm",
  "log",
@@ -58,13 +56,11 @@ dependencies = [
  "arbitrary",
  "bevy_platform",
  "bytemuck",
- "cfg-if",
  "displaydoc",
  "embedded-graphics-core",
  "euclid",
  "exhaust",
  "futures-core",
- "futures-util",
  "libm",
  "log",
  "manyfmt",
@@ -73,7 +69,6 @@ dependencies = [
  "ordered-float",
  "rand 0.9.2",
  "serde",
- "visibility",
 ]
 
 [[package]]

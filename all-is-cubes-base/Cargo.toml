@@ -31,20 +31,18 @@ serde = [
     "dep:serde",
     "ordered-float/serde",
 ]
-_special_testing = ["dep:visibility"]
+_special_testing = []
 
 [dependencies]
 arbitrary = { workspace = true, optional = true }
 bevy_platform = { workspace = true, features = ["alloc", "web"] }
 bytemuck = { workspace = true, features = ["derive"] }
-cfg-if = { workspace = true }
 displaydoc = { workspace = true }
 embedded-graphics-core = { workspace = true }
 # libm feature to guarantee compilability and compatibility with no_std
 euclid = { workspace = true, features = ["libm"] }
 exhaust = { workspace = true, default-features = false }
 futures-core = { workspace = true }
-futures-util = { workspace = true }
 libm = { workspace = true }
 log = { workspace = true }
 manyfmt = { workspace = true }
@@ -54,7 +52,6 @@ ordered-float = { workspace = true }
 rand = { workspace = true }
 re_sdk_types = { workspace = true, optional = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
-visibility = { workspace = true, optional = true }
 
 [dev-dependencies]
 indoc = { workspace = true }

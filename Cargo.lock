@@ -48,7 +48,6 @@ dependencies = [
  "allocation-counter",
  "arbitrary",
  "arcstr",
- "arrayvec",
  "async-io",
  "base64 0.22.1",
  "bevy_ecs",
@@ -102,13 +101,11 @@ dependencies = [
  "arbitrary",
  "bevy_platform",
  "bytemuck",
- "cfg-if",
  "displaydoc",
  "embedded-graphics-core",
  "euclid",
  "exhaust",
  "futures-core",
- "futures-util",
  "indoc",
  "itertools 0.14.0",
  "libm",
@@ -123,7 +120,6 @@ dependencies = [
  "re_sdk_types",
  "rstest",
  "serde",
- "visibility",
 ]
 
 [[package]]
