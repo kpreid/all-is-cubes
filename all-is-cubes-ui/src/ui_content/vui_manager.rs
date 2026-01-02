@@ -21,6 +21,7 @@ use all_is_cubes_render::camera::{FogOption, GraphicsOptions, UiViewState, Viewp
 use crate::apps::{
     ControlMessage, FullscreenSetter, FullscreenState, QuitCancelled, QuitFn, QuitResult,
 };
+use crate::settings;
 use crate::ui_content::hud::{HudBlocks, HudInputs};
 use crate::ui_content::{notification, pages};
 use crate::vui::widgets::TooltipState;
@@ -41,7 +42,7 @@ pub(crate) struct UiTargets {
 
     pub(crate) paused: listen::DynSource<bool>,
 
-    pub(crate) graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
+    pub(crate) settings: settings::Settings,
 
     pub(crate) app_control_channel: flume::Sender<ControlMessage>,
 
@@ -160,9 +161,9 @@ impl Vui {
         let cue_channel: CueNotifier = Arc::new(Notifier::new());
         let notif_hub = notification::Hub::new();
 
-        let changed_graphics_options = listen::Flag::listening(false, &params.graphics_options);
+        let changed_graphics_options = listen::Flag::listening(false, &params.settings.as_source());
         let ui_graphics_options = listen::Cell::new(Arc::new(Self::graphics_options(
-            (*params.graphics_options.get()).clone(),
+            GraphicsOptions::clone(&params.settings.get_graphics_options()),
         )));
 
         let changed_custom_commands = listen::Flag::listening(false, &params.custom_commands);
@@ -345,7 +346,7 @@ impl Vui {
         if self.changed_graphics_options.get_and_clear() {
             anything_changed = true;
             self.ui_graphics_options.set_if_unequal(Arc::new(Self::graphics_options(
-                (*self.hud_inputs.graphics_options.get()).clone(),
+                GraphicsOptions::clone(&self.hud_inputs.settings.get_graphics_options()),
             )));
         }
 
@@ -666,7 +667,7 @@ mod tests {
             mouselook_mode: listen::constant(false),
             character_source: listen::constant(None),
             paused: listen::constant(paused),
-            graphics_options: listen::constant(Arc::new(GraphicsOptions::default())),
+            settings: settings::Settings::default(),
             app_control_channel: cctx,
             viewport_source: listen::constant(Viewport::ARBITRARY),
             fullscreen_mode: listen::constant(None),

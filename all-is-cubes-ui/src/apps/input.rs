@@ -601,7 +601,7 @@ mod tests {
             mouselook_mode: listen::constant(false),
             character_source: listen::constant(None),
             paused: paused.as_source(),
-            graphics_options: listen::constant(Default::default()),
+            settings: Settings::default(),
             app_control_channel: cctx,
             viewport_source: listen::constant(Viewport::ARBITRARY),
             fullscreen_mode: listen::constant(None),

@@ -1,4 +1,3 @@
-use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
@@ -193,7 +192,7 @@ fn graphics_toggle_button(
         text,
     };
     let button = widgets::ToggleButton::new(
-        hud_inputs.graphics_options.clone(),
+        hud_inputs.settings.as_source(),
         {
             let getter = getter.clone();
             move |arc_opt| getter(arc_opt)
@@ -201,14 +200,9 @@ fn graphics_toggle_button(
         label,
         &hud_inputs.hud_blocks.widget_theme,
         {
-            let cc = hud_inputs.app_control_channel.clone();
+            let settings = hud_inputs.settings.clone();
             move || {
-                let getter = getter.clone();
-                let setter = setter.clone();
-                let _ignore_errors =
-                    cc.send(ControlMessage::ModifySettings(Box::new(move |settings| {
-                        settings.mutate_graphics_options(|go| setter(go, !getter(go)))
-                    })));
+                settings.mutate_graphics_options(|go| setter(go, !getter(go)));
             }
         },
     );
@@ -243,7 +237,7 @@ fn graphics_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'stati
                 .into_iter()
                 .chain(list.into_iter().map(|value| {
                     let button = widgets::ToggleButton::new(
-                        hud_inputs.graphics_options.clone(),
+                        hud_inputs.settings.as_source(),
                         {
                             let value_to_compare = value.clone();
                             move |options| *getter(options) == value_to_compare
@@ -251,15 +245,9 @@ fn graphics_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'stati
                         arcstr::format!("{:?}", value), // TODO: quick kludge; need real labels
                         &hud_inputs.hud_blocks.widget_theme,
                         {
-                            let cc = hud_inputs.app_control_channel.clone();
+                            let settings = hud_inputs.settings.clone();
                             move || {
-                                let value_to_send = value.clone();
-                                let _ignore_errors = cc.send(ControlMessage::ModifySettings(
-                                    Box::new(move |settings| {
-                                        settings
-                                            .mutate_graphics_options(|go| setter(go, value_to_send))
-                                    }),
-                                ));
+                                settings.mutate_graphics_options(|go| setter(go, value.clone()));
                             }
                         },
                     );

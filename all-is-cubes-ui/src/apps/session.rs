@@ -521,9 +521,6 @@ impl Session {
                     ControlMessage::ToggleMouselook => {
                         self.input_processor.toggle_mouselook_mode();
                     }
-                    ControlMessage::ModifySettings(function) => {
-                        function(&self.shuttle().settings);
-                    }
                 },
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {
@@ -881,7 +878,7 @@ impl SessionBuilder {
                     mouselook_mode: input_processor.mouselook_mode(),
                     character_source: game_character.as_source(),
                     paused: paused.as_source(),
-                    graphics_options: settings.as_source(),
+                    settings: settings.clone(),
                     app_control_channel: control_send.clone(),
                     viewport_source: viewport,
                     fullscreen_mode: fullscreen_state,
@@ -1013,8 +1010,6 @@ pub(crate) enum ControlMessage {
     TogglePause,
 
     ToggleMouselook,
-
-    ModifySettings(Box<dyn FnOnce(&Settings) + Send>),
 }
 
 impl fmt::Debug for ControlMessage {
@@ -1027,7 +1022,6 @@ impl fmt::Debug for ControlMessage {
             Self::EnterDebug => write!(f, "EnterDebug"),
             Self::TogglePause => write!(f, "TogglePause"),
             Self::ToggleMouselook => write!(f, "ToggleMouselook"),
-            Self::ModifySettings(_func) => f.debug_struct("ModifySettings").finish_non_exhaustive(),
         }
     }
 }
