@@ -8,6 +8,14 @@ use core::fmt;
 use all_is_cubes::listen::{self, Source as _};
 use all_is_cubes_render::camera::GraphicsOptions;
 
+// -------------------------------------------------------------------------------------------------
+
+// TODO: decide whether flattening all of this is good actually
+mod schema;
+pub use schema::*;
+
+// -------------------------------------------------------------------------------------------------
+
 /// Currently, the settings data is *only* graphics options.
 /// We want to add more settings (e.g. keybindings, startup behavior options, etc),
 /// and not use `GraphicsOptions`'s exact serialization, but that will come later.
@@ -161,6 +169,42 @@ impl Default for Settings {
         Self::new(Default::default())
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Identifies an individual setting in [`Settings`], and allows accessing it as type `T`.
+///
+/// You can obtain these from [the constants in this module](self#constants), such as [`FOG`].
+pub struct TypedKey<T> {
+    key: Key,
+    reader: fn(&GraphicsOptions) -> &T,
+    writer: fn(&mut GraphicsOptions, T),
+}
+
+impl<T> TypedKey<T> {
+    /// Returns the untyped key.
+    pub fn key(&self) -> &Key {
+        &self.key
+    }
+
+    /// Returns the current value of this setting.
+    pub fn read<'d>(&self, data: &'d Data) -> &'d T {
+        (self.reader)(data)
+    }
+
+    /// Overwrites the current value of this setting.
+    pub fn write(&self, settings: &Settings, value: T) {
+        settings.mutate_graphics_options(|g| (self.writer)(g, value));
+    }
+}
+
+impl<T> fmt::Debug for TypedKey<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{key}: {type}", key = self.key, type = core::any::type_name::<T>())
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

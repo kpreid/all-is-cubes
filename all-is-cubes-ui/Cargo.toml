@@ -45,13 +45,14 @@ futures-task = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
 indoc = { workspace = true }
 log = { workspace = true }
+macro_rules_attribute = { workspace = true }
 num-traits = { workspace = true }
+paste = { workspace = true }
 scopeguard = { workspace = true, optional = true }
 sync_wrapper = { workspace = true, optional = true }
 
 [dev-dependencies]
 futures-channel = { workspace = true }
-macro_rules_attribute = { workspace = true }
 pretty_assertions = { workspace = true }
 # Using smol for async test-running.
 # TODO: Consider defining our own macros and stripping down the dependencies.

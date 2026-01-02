@@ -360,6 +360,7 @@ dependencies = [
  "log",
  "macro_rules_attribute",
  "num-traits",
+ "paste",
  "pretty_assertions",
  "scopeguard",
  "smol-macros",
