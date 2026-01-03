@@ -79,32 +79,34 @@ impl SettingsArgs {
             set: to_override,
         } = self;
 
-        let settings = if no_config_files {
+        let persisted_settings = if no_config_files {
             Settings::new(Arc::new(GraphicsOptions::default()))
         } else {
             load_config().context("Error loading configuration files")?
         };
 
+        let session_settings = Settings::inherit(persisted_settings);
+
         if !to_override.is_empty() {
-            settings.disinherit();
+            session_settings.disinherit();
             // TODO: this is weirdly specific because right now, graphics options are the *only*
             // settings. This code *should* change when we have more settings and the data model
             // is more like a generic key-value store.
             let Ok(serde_json::Value::Object(mut current_settings)) =
-                serde_json::to_value(settings.get_graphics_options())
+                serde_json::to_value(session_settings.get_graphics_options())
             else {
                 unreachable!("graphis options should appear as a json object");
             };
             for (key, value) in to_override {
                 current_settings.insert(key, value);
             }
-            settings.set_graphics_options(
+            session_settings.set_graphics_options(
                 serde_json::from_value(serde_json::Value::Object(current_settings))
                     .context("--set did not produce valid settings")?,
             );
         }
 
-        Ok(settings)
+        Ok(session_settings)
     }
 }
 

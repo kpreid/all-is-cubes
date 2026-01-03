@@ -147,6 +147,9 @@ impl Settings {
     /// If this `Settings` was constructed to share another’s state using
     /// [`inherit()`](Self::inherit), make it stop.
     /// Current values will be kept, but future changes will not affect the parent.
+    ///
+    /// Note that this does not affect persistence of this `Settings`; it will continue writing
+    /// to wherever it would have.
     pub fn disinherit(&self) {
         // TODO: this should be an atomic transaction but is not
         // TODO: We should also drop `self.inherit` since it will no longer be used
