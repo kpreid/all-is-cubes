@@ -226,19 +226,17 @@ static GRAPHICS_HELP_LONG: LazyLock<String> = LazyLock::new(|| {
 #[non_exhaustive]
 pub(crate) enum GraphicsType {
     // These variants are sorted for the benefit of the help text presentation.
-    #[value(help = "Open a window (uses GPU rendering)")]
+    #[value(help = "Open a window")]
     Window,
-    #[value(help = "EXPERIMENTAL: Open a window (uses CPU raytracing)")]
-    WindowRt,
 
     #[cfg(feature = "terminal")]
-    #[value(help = "Colored text in this terminal (uses raytracing)")]
+    #[value(help = "Colored text in this terminal")]
     Terminal,
 
     #[value(help = "Non-interactive; don't draw anything but only simulates")]
     Headless,
 
-    #[value(help = "Non-interactive; save an image or video (uses raytracing)")]
+    #[value(help = "Non-interactive; save an image or video")]
     #[cfg(feature = "record")]
     Record,
 
@@ -255,7 +253,6 @@ impl GraphicsType {
     pub(crate) fn is_headless(self) -> bool {
         match self {
             GraphicsType::Window => false,
-            GraphicsType::WindowRt => false,
             #[cfg(feature = "terminal")]
             GraphicsType::Terminal => false,
 

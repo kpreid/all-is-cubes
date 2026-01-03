@@ -145,7 +145,7 @@ fn main() -> Result<(), anyhow::Error> {
     // Note that while its return type is nominally Result<()>, it does not necessarily
     // ever return “successfully”, so no code should follow it.
     match graphics_type {
-        GraphicsType::Window | GraphicsType::WindowRt => {
+        GraphicsType::Window => {
             winit_main_loop_and_init(
                 Box::new(move |_inner_params, elwt| {
                     // TODO: this logic should not be inside main(), really, it should be part
@@ -163,12 +163,6 @@ fn main() -> Result<(), anyhow::Error> {
                         .context("failed to create window")?,
                     ))
                     .context("failed to create session")?;
-                    if graphics_type == GraphicsType::WindowRt {
-                        // TODO: improve on this kludge by just having a general cmdline graphics config
-                        dsession.session.settings().mutate_graphics_options(|o| {
-                            o.render_method = all_is_cubes_render::camera::RenderMethod::Reference;
-                        });
-                    }
                     Ok(dsession)
                 }),
                 inner_params,
