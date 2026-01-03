@@ -19,7 +19,7 @@ pub use schema::*;
 /// Currently, the settings data is *only* graphics options.
 /// We want to add more settings (e.g. keybindings, startup behavior options, etc),
 /// and not use `GraphicsOptions`'s exact serialization, but that will come later.
-type Data = Arc<GraphicsOptions>;
+pub(crate) type Data = Arc<GraphicsOptions>;
 
 /// User-facing interactively editable and persisted settings for All is Cubes sessions.
 ///
@@ -131,6 +131,17 @@ impl Settings {
         let mut options: Arc<GraphicsOptions> = self.get_graphics_options();
         f(Arc::make_mut(&mut options));
         self.set_state(options);
+    }
+
+    /// Modify one setting by calling `updater` with the old value to compute a new value.
+    ///
+    /// This operation is not atomic; that is,
+    /// if multiple threads are calling it, then one’s effect may be overwritten.
+    pub fn update<T: Clone>(&self, key: &TypedKey<T>, updater: impl FnOnce(T, &Data) -> T) {
+        let data = self.as_source().get();
+        let old_value: T = key.read(&data).clone();
+        let new_value: T = updater(old_value, &data);
+        key.write(self, new_value);
     }
 
     /// If this `Settings` was constructed to share another’s state using

@@ -6,9 +6,10 @@ use all_is_cubes::arcstr::{self, literal};
 use all_is_cubes::block::text;
 use all_is_cubes::math::{Face6, zo32};
 use all_is_cubes::universe::ReadTicket;
-use all_is_cubes_render::camera::{self, AntialiasingOption, GraphicsOptions};
+use all_is_cubes_render::camera::{self, AntialiasingOption};
 
 use crate::apps::ControlMessage;
+use crate::settings;
 use crate::ui_content::hud::HudInputs;
 use crate::vui::{self, LayoutTree, UiBlocks, Widget, WidgetTree, widgets};
 
@@ -42,20 +43,18 @@ pub(crate) fn graphics_options_widgets(
     // of the enums, to reduce the chances of unintentional non-exhaustiveness.
     // TODO: allow setting fov_y, tone_mapping, exposure, view_distance
     w.extend([
-        graphics_enum_button(
+        setting_enum_button(
             hud_inputs,
             style,
             literal!("Render Method"),
-            |g| &g.render_method,
-            |g, v| g.render_method = v,
+            settings::RENDER_METHOD,
             [camera::RenderMethod::Mesh, camera::RenderMethod::Reference],
         ),
-        graphics_enum_button(
+        setting_enum_button(
             hud_inputs,
             style,
             literal!("Fog"),
-            |g| &g.fog,
-            |g, v| g.fog = v,
+            settings::FOG,
             [
                 camera::FogOption::None,
                 camera::FogOption::Abrupt,
@@ -63,20 +62,18 @@ pub(crate) fn graphics_options_widgets(
                 camera::FogOption::Physical,
             ],
         ),
-        graphics_enum_button(
+        setting_enum_button(
             hud_inputs,
             style,
             literal!("Bloom"),
-            |g| &g.bloom_intensity,
-            |g, v| g.bloom_intensity = v,
+            settings::BLOOM_INTENSITY,
             [zo32(0.0), zo32(0.03125), zo32(0.125)],
         ),
-        graphics_enum_button(
+        setting_enum_button(
             hud_inputs,
             style,
             literal!("Light"),
-            |g| &g.lighting_display,
-            |g, v| g.lighting_display = v,
+            settings::LIGHTING_DISPLAY,
             [
                 camera::LightingOption::None,
                 camera::LightingOption::Flat,
@@ -84,12 +81,11 @@ pub(crate) fn graphics_options_widgets(
                 camera::LightingOption::Bounce,
             ],
         ),
-        graphics_enum_button(
+        setting_enum_button(
             hud_inputs,
             style,
             literal!("Transparency"),
-            |g| &g.transparency,
-            |g, v| g.transparency = v,
+            settings::TRANSPARENCY,
             [
                 camera::TransparencyOption::Surface,
                 camera::TransparencyOption::Volumetric,
@@ -99,81 +95,79 @@ pub(crate) fn graphics_options_widgets(
         // TODO: this properly should be a graphics_enum_button with 3 states,
         // but it is currently convenient to have toggleability for testing.
         // Find a way to support this better.
-        graphics_toggle_button(
+        arb_toggle_button(
             read_ticket,
             hud_inputs,
             style,
             UiBlocks::AntialiasButtonLabel,
-            |g| g.antialiasing != AntialiasingOption::None,
-            |g, _v| {
-                g.antialiasing = match g.antialiasing {
-                    AntialiasingOption::None => AntialiasingOption::Always,
-                    AntialiasingOption::IfCheap => AntialiasingOption::None,
-                    AntialiasingOption::Always => AntialiasingOption::None,
-                    _ => AntialiasingOption::None,
-                }
+            |s| *settings::ANTIALIASING.read(s) != AntialiasingOption::None,
+            |s, _v| {
+                settings::ANTIALIASING.write(
+                    s,
+                    match *settings::ANTIALIASING.read(&s.get_graphics_options()) {
+                        AntialiasingOption::None => AntialiasingOption::Always,
+                        AntialiasingOption::IfCheap => AntialiasingOption::None,
+                        AntialiasingOption::Always => AntialiasingOption::None,
+                        _ => AntialiasingOption::None,
+                    },
+                );
             },
         ),
-        graphics_toggle_button(
+        setting_toggle_button(
             read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugInfoTextButtonLabel,
-            |g| g.debug_info_text,
-            |g, v| g.debug_info_text = v,
+            settings::DEBUG_INFO_TEXT,
         ),
-        graphics_toggle_button(
+        setting_toggle_button(
             read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugPixelPerformanceButtonLabel,
-            |g| g.debug_pixel_cost,
-            |g, v| g.debug_pixel_cost = v,
+            settings::DEBUG_PIXEL_COST,
         ),
-        graphics_toggle_button(
+        setting_toggle_button(
             read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugBehaviorsButtonLabel,
-            |g| g.debug_behaviors,
-            |g, v| g.debug_behaviors = v,
+            settings::DEBUG_BEHAVIORS,
         ),
-        graphics_toggle_button(
+        setting_toggle_button(
             read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugChunkBoxesButtonLabel,
-            |g| g.debug_chunk_boxes,
-            |g, v| g.debug_chunk_boxes = v,
+            settings::DEBUG_CHUNK_BOXES,
         ),
-        graphics_toggle_button(
+        setting_toggle_button(
             read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugCollisionBoxesButtonLabel,
-            |g| g.debug_collision_boxes,
-            |g, v| g.debug_collision_boxes = v,
+            settings::DEBUG_COLLISION_BOXES,
         ),
-        graphics_toggle_button(
+        setting_toggle_button(
             read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugLightRaysButtonLabel,
-            |g| g.debug_light_rays_at_cursor,
-            |g, v| g.debug_light_rays_at_cursor = v,
+            settings::DEBUG_LIGHT_RAYS_AT_CURSOR,
         ),
     ]);
     w
 }
 
-/// Generate a button that toggles a boolean graphics option.
-fn graphics_toggle_button(
+/// Generate a button that toggles a boolean that is read and written from the settings
+/// using arbitrary functions.
+fn arb_toggle_button(
     read_ticket: ReadTicket<'_>,
     hud_inputs: &HudInputs,
     style: OptionsStyle,
     icon_key: UiBlocks,
-    getter: impl Fn(&GraphicsOptions) -> bool + Clone + Send + Sync + 'static,
-    setter: impl Fn(&mut GraphicsOptions, bool) + Clone + Send + Sync + 'static,
+    getter: impl Fn(&settings::Data) -> bool + Clone + Send + Sync + 'static,
+    setter: impl Fn(&settings::Settings, bool) + Clone + Send + Sync + 'static,
 ) -> WidgetTree {
     let icon = hud_inputs.hud_blocks.ui_blocks[icon_key].clone();
     let text: Option<widgets::Label> = match style {
@@ -195,14 +189,53 @@ fn graphics_toggle_button(
         hud_inputs.settings.as_source(),
         {
             let getter = getter.clone();
-            move |arc_opt| getter(arc_opt)
+            move |data| getter(data)
         },
         label,
         &hud_inputs.hud_blocks.widget_theme,
         {
             let settings = hud_inputs.settings.clone();
             move || {
-                settings.mutate_graphics_options(|go| setter(go, !getter(go)));
+                setter(&settings, getter(&settings.get_graphics_options()));
+            }
+        },
+    );
+    vui::leaf_widget(button)
+}
+
+/// Generate a button that toggles a boolean setting.
+fn setting_toggle_button(
+    read_ticket: ReadTicket<'_>,
+    hud_inputs: &HudInputs,
+    style: OptionsStyle,
+    icon_key: UiBlocks,
+    key: &'static settings::TypedKey<bool>,
+) -> WidgetTree {
+    let icon = hud_inputs.hud_blocks.ui_blocks[icon_key].clone();
+    let text: Option<widgets::Label> = match style {
+        OptionsStyle::CompactRow => None,
+        OptionsStyle::LabeledColumn => Some(
+            icon.evaluate(read_ticket) // TODO(read_ticket): we should probably get the label text elsewhere and remove this need for a read ticket
+                .unwrap()
+                .attributes()
+                .display_name
+                .clone()
+                .into(),
+        ),
+    };
+    let label = widgets::ButtonLabel {
+        icon: Some(icon),
+        text,
+    };
+    let button = widgets::ToggleButton::new(
+        hud_inputs.settings.as_source(),
+        move |data| *key.read(data),
+        label,
+        &hud_inputs.hud_blocks.widget_theme,
+        {
+            let settings = hud_inputs.settings.clone();
+            move || {
+                key.write(&settings, !key.read(&settings.get_graphics_options()));
             }
         },
     );
@@ -212,12 +245,11 @@ fn graphics_toggle_button(
 /// Generate a group of buttons that selects one of an enum of options.
 ///
 /// These buttons do not show up in the compact style.
-fn graphics_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'static>(
+fn setting_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'static>(
     hud_inputs: &HudInputs,
     style: OptionsStyle,
     label: arcstr::ArcStr,
-    getter: fn(&GraphicsOptions) -> &T,
-    setter: fn(&mut GraphicsOptions, T),
+    key: &'static settings::TypedKey<T>,
     list: impl IntoIterator<Item = T>,
 ) -> WidgetTree {
     let label = vui::leaf_widget(widgets::Label::with_font(
@@ -240,14 +272,14 @@ fn graphics_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'stati
                         hud_inputs.settings.as_source(),
                         {
                             let value_to_compare = value.clone();
-                            move |options| *getter(options) == value_to_compare
+                            move |options| *key.read(options) == value_to_compare
                         },
                         arcstr::format!("{:?}", value), // TODO: quick kludge; need real labels
                         &hud_inputs.hud_blocks.widget_theme,
                         {
                             let settings = hud_inputs.settings.clone();
                             move || {
-                                settings.mutate_graphics_options(|go| setter(go, value.clone()));
+                                key.write(&settings, value.clone());
                             }
                         },
                     );

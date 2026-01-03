@@ -14,6 +14,7 @@ use all_is_cubes_render::camera::{
     FogOption, LightingOption, NdcPoint2, NominalPixel, RenderMethod, TransparencyOption, Viewport,
 };
 
+use crate::settings;
 use crate::{apps::ControlMessage, settings::Settings};
 
 type MousePoint = Point2D<f64, NominalPixel>;
@@ -351,14 +352,14 @@ impl InputProcessor {
                 }
                 Key::Character('i') => {
                     if let Some(settings) = settings {
-                        settings.mutate_graphics_options(|options| {
-                            options.lighting_display = match options.lighting_display {
+                        settings.update(settings::LIGHTING_DISPLAY, |setting, others| {
+                            match setting {
                                 LightingOption::None => LightingOption::Flat,
                                 LightingOption::Flat => LightingOption::Smooth,
                                 LightingOption::Smooth => {
                                     // TODO: the question we actually want to ask is,
                                     // what does the *current renderer* support?
-                                    if options.render_method == RenderMethod::Reference {
+                                    if others.render_method == RenderMethod::Reference {
                                         LightingOption::Bounce
                                     } else {
                                         LightingOption::None
@@ -366,7 +367,7 @@ impl InputProcessor {
                                 }
                                 LightingOption::Bounce => LightingOption::None,
                                 _ => LightingOption::None, // TODO: either stop doing cycle-commands or put it on the enum so it can be exhaustive
-                            };
+                            }
                         });
                     }
                 }
@@ -381,15 +382,15 @@ impl InputProcessor {
                 }
                 Key::Character('o') => {
                     if let Some(settings) = settings {
-                        settings.mutate_graphics_options(|options| {
-                            options.transparency = match options.transparency {
+                        settings.update(settings::TRANSPARENCY, |setting, _| {
+                            match setting {
                                 TransparencyOption::Surface => TransparencyOption::Volumetric,
                                 TransparencyOption::Volumetric => {
                                     TransparencyOption::Threshold(zo32(0.5))
                                 }
                                 TransparencyOption::Threshold(_) => TransparencyOption::Surface,
                                 _ => TransparencyOption::Surface, // TODO: either stop doing cycle-commands or put it on the enum so it can be exhaustive
-                            };
+                            }
                         });
                     }
                 }
@@ -401,25 +402,23 @@ impl InputProcessor {
                 }
                 Key::Character('u') => {
                     if let Some(settings) = settings {
-                        settings.mutate_graphics_options(|options| {
-                            options.fog = match options.fog {
+                        settings.update(settings::FOG, |setting, _| {
+                            match setting {
                                 FogOption::None => FogOption::Abrupt,
                                 FogOption::Abrupt => FogOption::Compromise,
                                 FogOption::Compromise => FogOption::Physical,
                                 FogOption::Physical => FogOption::None,
                                 _ => FogOption::None, // TODO: either stop doing cycle-commands or put it on the enum so it can be exhaustive
-                            };
+                            }
                         });
                     }
                 }
                 Key::Character('y') => {
                     if let Some(settings) = settings {
-                        settings.mutate_graphics_options(|options| {
-                            options.render_method = match options.render_method {
-                                RenderMethod::Mesh => RenderMethod::Reference,
-                                RenderMethod::Reference => RenderMethod::Mesh,
-                                _ => RenderMethod::Reference,
-                            };
+                        settings.update(settings::RENDER_METHOD, |setting, _| match setting {
+                            RenderMethod::Mesh => RenderMethod::Reference,
+                            RenderMethod::Reference => RenderMethod::Mesh,
+                            _ => RenderMethod::Reference,
                         });
                     }
                 }
