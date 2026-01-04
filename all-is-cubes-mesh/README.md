@@ -16,7 +16,7 @@ you may use the raytracer in [`all-is-cubes-render`],
 License
 -------
 
-All source code and other materials are Copyright © 2020-2025 Kevin Reid, and licensed under either of
+All source code and other materials are Copyright © 2020-2026 Kevin Reid, and licensed under either of
 
  * Apache License, Version 2.0
    ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
