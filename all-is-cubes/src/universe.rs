@@ -583,6 +583,18 @@ impl Universe {
         )
     }
 
+    /// Unchecked access to the ECS world.
+    #[cfg(test)]
+    pub(crate) fn ecs(&self) -> &ecs::World {
+        &self.world
+    }
+
+    /// Unchecked access to the ECS world.
+    #[cfg(test)]
+    pub(crate) fn ecs_mut(&mut self) -> &mut ecs::World {
+        &mut self.world
+    }
+
     /// An escape hatch from the [`Transaction`] and [`Handle`] system: allows mutating components
     /// directly, if they permit this type of access.
     #[doc(hidden)]

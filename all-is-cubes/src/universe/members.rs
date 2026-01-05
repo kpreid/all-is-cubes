@@ -47,14 +47,11 @@ pub(crate) trait SealedMember: Sized {
         Self: UniverseMember;
 
     /// Constructs `Self::Read` from an [`ecs::EntityRef`].
-    /// This may be used when queries are not feasible.
+    /// This may be used when queries are not feasible or not needed.
     ///
     /// Returns [`None`] when the entity does not have the components it should have.
     /// No other validation is guaranteed to be performed.
-    #[expect(
-        unused,
-        reason = "TODO(ecs): remove this if we turn out to never need it"
-    )]
+    #[cfg_attr(not(test), expect(dead_code))]
     fn read_from_entity_ref(entity: ecs::EntityRef<'_>) -> Option<Self::Read<'_>>
     where
         Self: UniverseMember;
