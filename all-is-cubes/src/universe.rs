@@ -157,18 +157,9 @@ impl Universe {
 
         // Configure the World state.
         {
-            // Configure schedules.
-            {
-                let mut schedules = world.get_resource_or_init::<ecs::Schedules>();
-                // Insist on no ambiguous scheduling.
-                schedules.configure_schedules(bevy_ecs::schedule::ScheduleBuildSettings {
-                    ambiguity_detection: bevy_ecs::schedule::LogLevel::Error,
-                    ..Default::default()
-                });
-            }
-
             // Register various components and resources which are *not* visible state of the
             // universe, but have data derived from others or are used temporarily.
+            world.init_resource::<ecs::Schedules>();
             world.init_resource::<NameMap>();
             world.init_resource::<CurrentStep>();
             world.register_component::<Membership>();
@@ -190,6 +181,15 @@ impl Universe {
             character::add_eye_systems(&mut world);
             physics::step::add_systems(&mut world);
             space::step::add_space_systems(&mut world);
+
+            // Configure schedules to insist on no ambiguity.
+            // This applies only to *existing* schedules, so must be done last.
+            world.resource_mut::<ecs::Schedules>().configure_schedules(
+                bevy_ecs::schedule::ScheduleBuildSettings {
+                    ambiguity_detection: bevy_ecs::schedule::LogLevel::Error,
+                    ..Default::default()
+                },
+            );
         }
 
         Box::write(
