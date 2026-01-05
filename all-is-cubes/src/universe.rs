@@ -38,7 +38,6 @@ pub use members::{AnyHandle, UniverseMember};
 
 mod ecs_details;
 use ecs_details::NameMap;
-// TODO(ecs): try to eliminate uses of get_one_mut_and_ticket in favor of normal queries
 pub use ecs_details::PubliclyMutableComponent;
 pub(crate) use ecs_details::{CurrentStep, InfoCollector, Membership, QueryStateBundle};
 
@@ -350,7 +349,7 @@ impl Universe {
 
         // Post-step state cleanup
         self.world.resource_mut::<CurrentStep>().0 = None;
-        //self.world.run_schedule(time::schedule::AfterStepReset); // TODO(ecs): move things into this
+        //self.world.run_schedule(time::schedule::AfterStepReset); // TODO(ecs): move cleanup from this function into the schedule
 
         // Gather info
         let computation_time = time::Instant::now().saturating_duration_since(start_time);

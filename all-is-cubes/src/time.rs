@@ -283,6 +283,9 @@ impl fmt::Debug for Clock {
 // -------------------------------------------------------------------------------------------------
 
 /// [`ScheduleLabel`]s relating to time passing in a [`Universe`].
+///
+/// TODO(ecs): We are probably using `ScheduleLabel`s for some things that should actually be
+/// `SystemSet`s to allow more parallelism.
 pub(crate) mod schedule {
     use bevy_ecs::schedule::ScheduleLabel;
 

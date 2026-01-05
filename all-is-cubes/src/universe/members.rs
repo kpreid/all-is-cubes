@@ -26,7 +26,6 @@ use crate::universe::{
 
 /// Not-externally-implementable supertrait for [`UniverseMember`] to make it sealed and hide
 /// implementation details.
-// TODO(ecs): make Component not a supertrait once we have split members into multiple components.
 pub(crate) trait SealedMember: Sized {
     /// Components to spawn when inserting a member of this type into a universe.
     type Bundle: ecs::Bundle;
@@ -133,30 +132,22 @@ macro_rules! impl_universe_member_for_single_component_type {
             fn read_from_standalone(
                 value: &Self,
             ) -> <Self as $crate::universe::UniverseMember>::Read<'_> {
-                // TODO(ecs): when we have multiple components, this will need to be defined
-                // separately for each member type.
                 value
             }
 
             fn read_from_query(
                 data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'_>,
             ) -> <Self as $crate::universe::UniverseMember>::Read<'_> {
-                // TODO(ecs): when we have multiple components, this will need to be defined
-                // separately for each member type.
                 data
             }
 
             fn read_from_entity_ref(
                 entity: ::bevy_ecs::world::EntityRef<'_>,
             ) -> Option<<Self as $crate::universe::UniverseMember>::Read<'_>> {
-                // TODO(ecs): when we have multiple components, this will need to be defined
-                // separately for each member type.
                 entity.get::<$member_type>()
             }
 
             fn into_bundle(value: ::alloc::boxed::Box<Self>) -> Self::Bundle {
-                // TODO(ecs): when we have multiple components, this will need to be defined
-                // separately for each member type.
                 (*value,)
             }
         }
