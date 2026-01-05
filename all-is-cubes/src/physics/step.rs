@@ -29,7 +29,9 @@ pub(crate) fn add_systems(world: &mut ecs::World) {
     let mut schedules = world.resource_mut::<ecs::Schedules>();
     schedules.add_systems(
         time::schedule::Step,
-        body_physics_step_system.in_set(BodyPhysicsSet),
+        body_physics_step_system
+            .in_set(BodyPhysicsSet)
+            .after(space::step::SpaceUpdateSet),
     );
 }
 

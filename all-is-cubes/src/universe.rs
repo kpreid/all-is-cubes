@@ -306,15 +306,7 @@ impl Universe {
         // Synchronize in case BeforeStep did anything.
         self.world.run_schedule(time::schedule::Synchronize);
 
-        // Execute the tick actions of blocks in spaces.
-        if !paused {
-            // TODO: put this system in a schedule once there are no obstacles to doing so.
-            self.world
-                .run_system_cached(space::step::execute_tick_actions_system)
-                .unwrap()
-                .unwrap();
-        }
-
+        // TODO: Move this out of `Universe::step()` into schedules (requires rewording the transactions).
         let transactions_from_space_behaviors = self
             .world
             .run_system_cached(space::step::step_behaviors_system)
@@ -322,8 +314,6 @@ impl Universe {
             .unwrap();
 
         self.world.run_schedule(time::schedule::Synchronize);
-
-        self.world.run_system_cached(space::step::update_light_system).unwrap().unwrap();
 
         if !tick.paused() {
             self.world.run_schedule(time::schedule::Step);

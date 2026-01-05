@@ -13,6 +13,7 @@ use core::ops;
 use core::time::Duration;
 
 use bevy_ecs::prelude as ecs;
+use bevy_ecs::schedule::IntoScheduleConfigs as _;
 use bevy_platform::time::Instant;
 use hashbrown::{HashMap as HbHashMap, HashSet as HbHashSet};
 
@@ -25,7 +26,7 @@ use crate::space::{
     self, Contents, LightStorage, LightUpdatesInfo, Notifiers, Palette, Space, SpacePhysics,
     SpaceStepInfo, SpaceTransaction, Ticks,
 };
-use crate::time::TimeStats;
+use crate::time::{self, TimeStats};
 use crate::transaction::{Merge as _, Transaction as _};
 use crate::universe::{
     self, InfoCollector, QueryStateBundle as _, ReadTicket, SealedMember as _, UniverseId,
@@ -36,9 +37,8 @@ use super::palette;
 
 // -------------------------------------------------------------------------------------------------
 
-// TODO(ecs): Create and use this system set so that eventual plug-ins can choose when they run
-// #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, bevy_ecs::schedule::SystemSet)]
-// pub(crate) struct SpacePaletteUpdateSet;
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, bevy_ecs::schedule::SystemSet)]
+pub(crate) struct SpaceUpdateSet;
 
 /// Install systems related to `Space`s.
 pub(crate) fn add_space_systems(world: &mut ecs::World) {
@@ -49,6 +49,12 @@ pub(crate) fn add_space_systems(world: &mut ecs::World) {
     InfoCollector::<TickActionsInfo>::register(world);
     InfoCollector::<LightUpdatesInfo>::register(world);
     InfoCollector::<behavior::BehaviorSetStepInfo, Space>::register(world);
+
+    let mut schedules = world.resource_mut::<ecs::Schedules>();
+    schedules.add_systems(
+        time::schedule::Step,
+        (update_light_system, execute_tick_actions_system).chain().in_set(SpaceUpdateSet),
+    );
 
     palette::add_palette_systems(world);
 }
@@ -319,7 +325,7 @@ pub(crate) fn execute_tick_actions_system(
     Ok(())
 }
 
-pub(crate) fn update_light_system(
+fn update_light_system(
     current_step: ecs::Res<'_, universe::CurrentStep>,
     info_collector: ecs::ResMut<InfoCollector<LightUpdatesInfo>>,
     mut spaces_query: ecs::Query<(&Palette, &mut LightStorage, &mut Contents, &Notifiers)>,
