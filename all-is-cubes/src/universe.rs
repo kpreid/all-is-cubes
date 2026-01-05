@@ -175,7 +175,6 @@ impl Universe {
             Self::register_all_member_components(&mut world);
             InfoCollector::<BlockDefStepInfo>::register(&mut world);
             InfoCollector::<BodyStepInfo>::register(&mut world);
-            InfoCollector::<space::LightUpdatesInfo>::register(&mut world);
 
             // Register things that are user-visible state of the universe.
             // When new such resources are added, also mention them in the documentation when

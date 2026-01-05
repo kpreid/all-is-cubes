@@ -781,7 +781,13 @@ pub(super) fn add_palette_systems(world: &mut ecs::World) {
 
     schedules.add_systems(
         time::schedule::Synchronize,
-        (update_palette_phase_1, update_palette_phase_2).in_set(SpacePaletteUpdateSet),
+        (update_palette_phase_1, update_palette_phase_2)
+            .chain()
+            .in_set(SpacePaletteUpdateSet)
+            // Block evaluation reads block defs and spaces, and both Spaces and BlockDefs do
+            // block evaluation, so we must pick an update order. This choice is mostly arbitrary,
+            // but *is* detectable as behavior inside the simulation.
+            .after(block::BlockDefUpdateSet),
     );
 }
 
