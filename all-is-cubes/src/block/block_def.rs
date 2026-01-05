@@ -50,8 +50,7 @@ pub struct BlockDef {
 }
 
 /// Subset of [`BlockDef`] that is constructed anew when its block is replaced.
-// TODO(ecs): make this private once the system fn types are no longer exposed
-pub(crate) struct BlockDefState {
+struct BlockDefState {
     /// The current value.
     block: Block,
 
@@ -504,8 +503,7 @@ pub(crate) fn add_block_def_systems(world: &mut ecs::World) {
 /// into the `BlockDef` component.
 ///
 #[derive(ecs::Component, Default)]
-// TODO(ecs): make this private once the system fn types are no longer exposed
-pub(crate) enum BlockDefNextValue {
+enum BlockDefNextValue {
     #[default]
     None,
     NewEvaluation(EvalResult),
@@ -516,7 +514,7 @@ pub(crate) enum BlockDefNextValue {
 /// ECS system function that looks for `BlockDef`s needing reevaluation, then writes the new
 /// evaluations into `BlockDefNextValue`.
 #[allow(clippy::needless_pass_by_value)]
-pub(crate) fn update_phase_1(
+fn update_phase_1(
     mut info_collector: ecs::ResMut<universe::InfoCollector<BlockDefStepInfo>>,
     mut defs: ecs::Query<(&BlockDef, &mut BlockDefNextValue)>,
     data_sources: universe::QueryBlockDataSources,
@@ -575,7 +573,7 @@ pub(crate) fn update_phase_1(
 ///
 /// This system being separate resolves the borrow conflict between different `BlockDef`s reading
 /// each other (possibly circularly) and writing themselves.
-pub(crate) fn update_phase_2(
+fn update_phase_2(
     mut defs: ecs::Query<
         '_,
         '_,
