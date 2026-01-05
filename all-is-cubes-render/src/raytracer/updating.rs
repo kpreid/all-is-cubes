@@ -331,41 +331,35 @@ mod tests {
         // TODO: Also test changing existing block's data
     }
 
-    // TODO(ecs): This test seems no longer possible to write; does it still mean anything?
-    // Is the conflict it tests possible or practical?
-    //     #[test]
-    //     fn updating_after_space_is_unavailable() {
-    //         let mut universe = Universe::new();
-    //         let mut space = Space::empty_positive(3, 2, 3);
-    //
-    //         // Initial state
-    //         let [block1, block2] = make_some_voxel_blocks(&mut universe);
-    //         space
-    //             .mutate(universe.read_ticket(), |m| m.set([0, 0, 0], &block1))
-    //             .unwrap();
-    //
-    //         let space = universe.insert_anonymous(space);
-    //         let mut tester = EquivalenceTester::new(universe.read_ticket(), space.clone());
-    //
-    //         {
-    //             let _obstruction = space.try_borrow_mut().unwrap();
-    //
-    //             assert_eq!(
-    //                 tester.updating.update(universe.read_ticket()).unwrap_err(),
-    //                 HandleError::InUse(space.name().clone()),
-    //             );
-    //         }
-    //
-    //         // Now after the failure, we should still successfully update.
-    //         tester.update_and_assert(universe.read_ticket()).unwrap();
-    //
-    //         // And also follow changes correctly.
-    //         universe
-    //             .execute_1(
-    //                 &space,
-    //                 &CubeTransaction::replacing(None, Some(block2)).at(Cube::new(1, 0, 0)),
-    //             )
-    //             .unwrap();
-    //         tester.update_and_assert(universe.read_ticket()).unwrap();
-    //     }
+    /// Test that `update()` gracefully handles read errors.
+    ///
+    /// (Note: this test was more meaningful in the past when it was possible to attempt to
+    /// concurrently read and mutate a `Handle`. But it still matters, in principle, that a read
+    /// failure doesn’t result in forgetting to update.)
+    #[test]
+    fn updating_after_space_is_inaccessible() {
+        let mut universe = Universe::new();
+        let mut space = Space::empty_positive(3, 2, 3);
+
+        // Initial state
+        let [block1, block2] = make_some_voxel_blocks(&mut universe);
+        space.mutate(universe.read_ticket(), |m| m.set([0, 0, 0], &block1)).unwrap();
+
+        let space = universe.insert_anonymous(space);
+        let mut tester = EquivalenceTester::new(universe.read_ticket(), space.clone());
+
+        tester.updating.update(ReadTicket::stub()).unwrap_err();
+
+        // Now after the failure, we should still successfully update.
+        tester.update_and_assert(universe.read_ticket()).unwrap();
+
+        // And also follow changes correctly.
+        universe
+            .execute_1(
+                &space,
+                CubeTransaction::replacing(None, Some(block2)).at(Cube::new(1, 0, 0)),
+            )
+            .unwrap();
+        tester.update_and_assert(universe.read_ticket()).unwrap();
+    }
 }
