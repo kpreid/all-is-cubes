@@ -99,35 +99,49 @@ pub struct BlockSky {
 }
 
 impl BlockSky {
-    /// Returns the light that should be considered to occupy `cube`, which is a cube
-    /// on the outside surface of the [`Space`] bounds `bounds`.
+    /// Returns the light that should be considered to occupy `cube` when it is outside of
+    /// the [`Space`] bounds `bounds`.
     ///
     /// For example, if `bounds` is from [0, 0, 0] to [5, 5, 5] and `cube` is [-1, 2, 2],
     /// then `cube` is on the -X face of `bounds`.
     ///
-    /// Returns [`PackedLight::UNINITIALIZED_AND_BLACK`] if `cube` is not on the surface of `bounds`.
+    /// # Edge cases
+    ///
+    /// * Returns [`PackedLight::UNINITIALIZED_AND_BLACK`] if `cube` is inside of `bounds`
+    ///   (which is not the intended use of this function).
+    /// * Returns [`PackedLight::NO_RAYS`] if `cube` is not touching one face of `bounds`.
     pub fn light_outside(&self, bounds: GridAab, cube: Cube) -> PackedLight {
-        // Note: cube.upper_bounds() is defined to be maybe panicking, so we can't use it.
-        let lower = bounds
-            .lower_bounds()
-            .zip(cube.lower_bounds(), |bl, cl| bl.checked_sub(cl) == Some(1));
-        let upper = bounds.upper_bounds().zip(cube.lower_bounds(), |bu, cl| bu == cl);
-        match (lower.x, lower.y, lower.z, upper.x, upper.y, upper.z) {
-            (true, false, false, false, false, false) => self.faces.nx,
-            (false, true, false, false, false, false) => self.faces.ny,
-            (false, false, true, false, false, false) => self.faces.nz,
-            (false, false, false, true, false, false) => self.faces.px,
-            (false, false, false, false, true, false) => self.faces.py,
-            (false, false, false, false, false, true) => self.faces.pz,
+        use core::cmp::Ordering::{Equal, Less};
 
-            // Cannot be inside the bounds or beyond the surface
-            (false, false, false, false, false, false) => {
+        // For each face of the bounds, compute whether the cube is inside the bounds (`Less`),
+        // touching the bounds from outside (`Equal`), or further outside (`Greater`).
+        // Note: cube.upper_bounds() is defined to be maybe panicking, so we can't use it.
+        let lower = bounds.lower_bounds().zip(cube.lower_bounds(), |bl, cl| {
+            if let Some(beyond) = bl.checked_sub(1) {
+                beyond.cmp(&cl)
+            } else {
+                // Cube can't possibly be outside the bounds
+                Less
+            }
+        });
+        let upper = bounds.upper_bounds().zip(cube.lower_bounds(), |bu, cl| cl.cmp(&bu));
+
+        match (lower.x, lower.y, lower.z, upper.x, upper.y, upper.z) {
+            (Equal, Less, Less, Less, Less, Less) => self.faces.nx,
+            (Less, Equal, Less, Less, Less, Less) => self.faces.ny,
+            (Less, Less, Equal, Less, Less, Less) => self.faces.nz,
+            (Less, Less, Less, Equal, Less, Less) => self.faces.px,
+            (Less, Less, Less, Less, Equal, Less) => self.faces.py,
+            (Less, Less, Less, Less, Less, Equal) => self.faces.pz,
+
+            // Undefined if inside the bounds
+            (Less, Less, Less, Less, Less, Less) => {
                 // panic!("invalid cube position in BlockSky::light_outside({bounds:?}, {cube:?})");
                 PackedLight::UNINITIALIZED_AND_BLACK
             }
 
-            // If it's at a corner or edge, then make it NO_RAYS, just like the block lighting
-            // algorithm would do.
+            // If it's at a corner or edge, or beyond the surface, then make it NO_RAYS,
+            // just like the light algorithm would calculate if this cube were inside the bounds.
             _ => PackedLight::NO_RAYS,
         }
     }

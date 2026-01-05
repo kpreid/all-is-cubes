@@ -66,8 +66,11 @@ fn initial_value_initialized_after_creation() {
     // TODO: also test what happens on updates?
 }
 
-#[test]
-fn out_of_bounds_lighting_value() {
+/// Tests that the values returned from [`Space::get_lighting()`] on out-of-bounds cubes
+/// match the sky, when they should.
+#[rstest::rstest]
+fn out_of_bounds_light_is_sky(#[values(0.0, 0.5, 1.0)] opacity: f32) {
+    // TOOD: For more coverage, add a non-opaque block
     let space = Space::builder(GridAab::ORIGIN_CUBE)
         .sky(Sky::Octants([
             Rgb::ONE * 2.0,
@@ -79,11 +82,22 @@ fn out_of_bounds_lighting_value() {
             Rgb::ONE * 17.0,
             Rgb::ONE * 19.0,
         ]))
+        .filled_with(Block::from(Rgba::new(1.0, 0.0, 0.0, opacity)))
         .build();
-    for face in Face6::ALL {
+    for neighboring_cube in space.bounds().expand(FaceMap::splat(2)).interior_iter() {
+        if neighboring_cube == Cube::ORIGIN {
+            continue;
+        }
         assert_eq!(
-            space.physics().sky.for_blocks().in_direction(face),
-            space.get_lighting(Cube::ORIGIN + face.normal_vector())
+            space.get_lighting(neighboring_cube),
+            // TODO: This should also be NO_RAYS in the case where it would be NO_RAYS inside the
+            // space, that is, when the adjacent cube inside the space is transparent.
+            if let Ok(face) = Face6::try_from(neighboring_cube.lower_bounds().to_vector()) {
+                space.physics().sky.for_blocks().in_direction(face)
+            } else {
+                PackedLight::NO_RAYS
+            },
+            "{neighboring_cube:?}",
         );
     }
 }
