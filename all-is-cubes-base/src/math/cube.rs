@@ -278,6 +278,20 @@ mod arithmetic {
         }
     }
 
+    impl ops::Sub<Face6> for Cube {
+        type Output = Self;
+        #[inline]
+        fn sub(self, rhs: Face6) -> Self::Output {
+            self - rhs.normal_vector()
+        }
+    }
+    impl ops::SubAssign<Face6> for Cube {
+        #[inline]
+        fn sub_assign(&mut self, rhs: Face6) {
+            *self -= rhs.normal_vector()
+        }
+    }
+
     impl ops::Index<Axis> for Cube {
         type Output = GridCoordinate;
         #[inline]
