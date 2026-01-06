@@ -62,41 +62,47 @@ pub(super) fn body_physics_step_system(
             Vector3D::zero()
         };
 
-        physics_output.last_step_info = if let Ok(space) = space_handle.read_from_query(&spaces) {
-            let colliding_cubes = &mut physics_output.colliding_cubes;
-            colliding_cubes.clear();
-            let body_info = body.step_with_rerun(
-                tick,
-                control_delta_v,
-                Some(&space),
-                |cube| {
-                    colliding_cubes.insert(cube);
-                },
-                rerun_destination,
-            );
+        physics_output.last_step_info = match space_handle.read_from_query(&spaces) {
+            Ok(space) => {
+                let colliding_cubes = &mut physics_output.colliding_cubes;
+                colliding_cubes.clear();
+                let body_info = body.step_with_rerun(
+                    tick,
+                    control_delta_v,
+                    Some(&space),
+                    |cube| {
+                        colliding_cubes.insert(cube);
+                    },
+                    rerun_destination,
+                );
 
-            // TODO(ecs): report push_out in a way that `CharacterEye` can receive it
-            // if let Some(push_out_displacement) = info.push_out {
-            //     // Smooth out camera effect of push-outs
-            //     eye.eye_displacement_pos -= push_out_displacement;
-            // }
+                // TODO(ecs): report push_out in a way that `CharacterEye` can receive it
+                // if let Some(push_out_displacement) = info.push_out {
+                //     // Smooth out camera effect of push-outs
+                //     eye.eye_displacement_pos -= push_out_displacement;
+                // }
 
-            if let Some(fluff) = body_info.impact_fluff().and_then(|fluff| {
-                Some(space::SpaceFluff {
-                    fluff,
-                    position: Cube::containing(body.position())?,
-                })
-            }) {
-                space.fluff_notifier().notify(&fluff)
+                if let Some(fluff) = body_info.impact_fluff().and_then(|fluff| {
+                    Some(space::SpaceFluff {
+                        fluff,
+                        position: Cube::containing(body.position())?,
+                    })
+                }) {
+                    space.fluff_notifier().notify(&fluff)
+                }
+
+                Some(body_info)
             }
-
-            Some(body_info)
-        } else {
-            if cfg!(debug_assertions) {
-                panic!("failed to read space handle for physics");
-            } else {
-                // TODO: set a warning flag that we failed to step
-                None
+            Err(error) => {
+                if cfg!(debug_assertions) {
+                    panic!(
+                        "failed to read space handle for physics: {}",
+                        crate::util::ErrorChain(&error)
+                    );
+                } else {
+                    // TODO: set a warning flag that we failed to step
+                    None
+                }
             }
         };
 
