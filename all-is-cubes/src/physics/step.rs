@@ -66,7 +66,7 @@ pub(super) fn body_physics_step_system(
             Ok(space) => {
                 let colliding_cubes = &mut physics_output.colliding_cubes;
                 colliding_cubes.clear();
-                let body_info = body.step_with_rerun(
+                let body_info = body.step(
                     tick,
                     control_delta_v,
                     Some(&space),

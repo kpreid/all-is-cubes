@@ -69,8 +69,10 @@ impl BodyTester {
             .unwrap();
         body_entity_mut.get_mut::<Body>().unwrap().step(
             tick,
+            Vector3D::zero(),
             Space::read_from_entity_ref(space_entity_mut.as_readonly()).as_ref(),
             collision_callback,
+            &Default::default(),
         )
     }
 

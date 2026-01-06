@@ -197,26 +197,6 @@ impl Body {
         }
     }
 
-    /// `step_with_rerun()` but with no rerun arg for use by tests.
-    #[cfg(test)]
-    pub(crate) fn step<CC>(
-        &mut self,
-        tick: Tick,
-        colliding_space: Option<&space::Read<'_>>,
-        collision_callback: CC,
-    ) -> BodyStepDetails
-    where
-        CC: FnMut(Contact),
-    {
-        self.step_with_rerun(
-            tick,
-            Vector3D::zero(),
-            colliding_space,
-            collision_callback,
-            &Default::default(),
-        )
-    }
-
     /// Advances time for the body.
     ///
     /// If `colliding_space` is present then the body may collide with blocks in that space
@@ -227,7 +207,7 @@ impl Body {
     /// This method is private because the exact details of what inputs are required are
     /// unstable.
     // TODO(ecs): make this part of the stepping system instead, after updating tests to permit it
-    pub(crate) fn step_with_rerun<CC>(
+    pub(crate) fn step<CC>(
         &mut self,
         tick: Tick,
         external_delta_v: Vector3D<NotNan<FreeCoordinate>, Velocity>,
