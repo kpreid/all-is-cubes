@@ -51,7 +51,7 @@ pub(crate) trait SealedMember: Sized {
     ///
     /// Returns [`None`] when the entity does not have the components it should have.
     /// No other validation is guaranteed to be performed.
-    #[cfg_attr(not(test), expect(dead_code))]
+    #[expect(dead_code, reason = "intermittently useful in tests")]
     fn read_from_entity_ref(entity: ecs::EntityRef<'_>) -> Option<Self::Read<'_>>
     where
         Self: UniverseMember;

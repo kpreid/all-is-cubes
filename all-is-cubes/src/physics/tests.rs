@@ -16,12 +16,12 @@ use crate::character::ParentSpace;
 use crate::content::{make_slab, make_some_blocks};
 use crate::math::{Aab, Cube, CubeFace, Face7, FreeCoordinate, GridAab, chebyshev_length};
 use crate::physics::{
-    Body, BodyStepDetails, Contact, ContactSet, POSITION_EPSILON, VELOCITY_MAGNITUDE_LIMIT,
-    Velocity,
+    Body, BodyStepDetails, Contact, ContactSet, POSITION_EPSILON, PhysicsOutputs,
+    VELOCITY_MAGNITUDE_LIMIT, Velocity,
 };
 use crate::space::{Space, SpacePhysics};
 use crate::time;
-use crate::universe::{self, SealedMember as _, Universe};
+use crate::universe::{self, Universe};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -30,6 +30,8 @@ pub(crate) struct BodyTester {
     universe: Box<Universe>,
 
     /// We need this `StrongHandle` because GC doesn't look at our body entity.
+    /// (If we start using non-`Character` bodies for non-test purposes, we’ll need to fix that.)
+    #[expect(dead_code)]
     space: universe::StrongHandle<Space>,
 
     body_entity: ecs::Entity,
@@ -49,35 +51,18 @@ impl BodyTester {
     }
 
     pub fn step(&mut self) -> (ContactSet, BodyStepDetails) {
-        // TODO: refactor tests so that we can use universe stepping and don't need to specially
-        // hook up a collision callback, and can just:
-        //
-        // self.universe.step(false, time::Deadline::Whenever);
-        // self.universe
-        //     .ecs()
-        //     .get::<PhysicsOutputs>(self.body_entity)
-        //     .expect("PhysicsOutputs missing")
-        //     .last_step_info
-        //     .expect("last_step_info missing")
+        self.universe.step(false, time::Deadline::Whenever);
 
-        let space_entity = self.space.as_entity(self.universe.universe_id()).unwrap();
-        let tick = self.universe.clock().next_tick(false);
-        let mut contacts = ContactSet::new();
-
-        let [mut body_entity_mut, space_entity_mut] = self
+        let outputs = self
             .universe
-            .ecs_mut()
-            .get_entity_mut([self.body_entity, space_entity])
-            .unwrap();
-        let info = body_entity_mut.get_mut::<Body>().unwrap().step(
-            tick,
-            Vector3D::zero(),
-            Space::read_from_entity_ref(space_entity_mut.as_readonly()).as_ref(),
-            &mut contacts,
-            &Default::default(),
-        );
+            .ecs()
+            .get::<PhysicsOutputs>(self.body_entity)
+            .expect("PhysicsOutputs missing");
 
-        (contacts, info)
+        (
+            outputs.colliding_cubes.clone(),
+            outputs.last_step_info.expect("last_step_info missing"),
+        )
     }
 
     pub fn body(&self) -> &Body {
