@@ -4,7 +4,6 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use euclid::Vector3D;
-use hashbrown::HashSet as HbHashSet;
 
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
@@ -13,7 +12,7 @@ use num_traits::float::FloatCore as _;
 
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, GridAab, Vol, lines};
-use crate::physics::POSITION_EPSILON;
+use crate::physics::{ContactSet, POSITION_EPSILON};
 use crate::raycast::{Ray, Raycaster};
 use crate::space;
 use crate::util::{ConciseDebug, MapExtend, Refmt as _};
@@ -209,7 +208,7 @@ where
     Sp: CollisionSpace,
     CC: FnMut(Contact),
 {
-    let mut already_colliding: HbHashSet<Contact> = HbHashSet::new();
+    let mut already_colliding: ContactSet = ContactSet::new();
 
     debug_assert!(
         ray.direction.square_length() < super::body::VELOCITY_MAGNITUDE_LIMIT_SQUARED * 2.,

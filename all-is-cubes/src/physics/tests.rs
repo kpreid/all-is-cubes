@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use alloc::vec::Vec;
+use itertools::Itertools;
 use std::collections::VecDeque;
 
 use bevy_ecs::prelude as ecs;
@@ -16,7 +16,8 @@ use crate::character::ParentSpace;
 use crate::content::{make_slab, make_some_blocks};
 use crate::math::{Aab, Cube, CubeFace, Face7, FreeCoordinate, GridAab, chebyshev_length};
 use crate::physics::{
-    Body, BodyStepDetails, Contact, POSITION_EPSILON, VELOCITY_MAGNITUDE_LIMIT, Velocity,
+    Body, BodyStepDetails, Contact, ContactSet, POSITION_EPSILON, VELOCITY_MAGNITUDE_LIMIT,
+    Velocity,
 };
 use crate::space::{Space, SpacePhysics};
 use crate::time;
@@ -47,7 +48,7 @@ impl BodyTester {
         }
     }
 
-    pub fn step(&mut self, collision_callback: impl FnMut(Contact)) -> BodyStepDetails {
+    pub fn step(&mut self) -> (ContactSet, BodyStepDetails) {
         // TODO: refactor tests so that we can use universe stepping and don't need to specially
         // hook up a collision callback, and can just:
         //
@@ -61,19 +62,22 @@ impl BodyTester {
 
         let space_entity = self.space.as_entity(self.universe.universe_id()).unwrap();
         let tick = self.universe.clock().next_tick(false);
+        let mut contacts = ContactSet::new();
 
         let [mut body_entity_mut, space_entity_mut] = self
             .universe
             .ecs_mut()
             .get_entity_mut([self.body_entity, space_entity])
             .unwrap();
-        body_entity_mut.get_mut::<Body>().unwrap().step(
+        let info = body_entity_mut.get_mut::<Body>().unwrap().step(
             tick,
             Vector3D::zero(),
             Space::read_from_entity_ref(space_entity_mut.as_readonly()).as_ref(),
-            collision_callback,
+            &mut contacts,
             &Default::default(),
-        )
+        );
+
+        (contacts, info)
     }
 
     pub fn body(&self) -> &Body {
@@ -86,8 +90,6 @@ impl BodyTester {
 }
 
 // -------------------------------------------------------------------------------------------------
-
-fn collision_noop(_: Contact) {}
 
 fn test_body() -> Body {
     Body::new_minimal([0., 2., 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5))
@@ -113,9 +115,9 @@ fn freefall(#[values(false, true)] gravity: bool) {
         time::TickSchedule::per_second(4),
     );
 
-    tester.step(collision_noop);
+    tester.step();
     let p1 = tester.body().position();
-    tester.step(collision_noop);
+    tester.step();
     let p2 = tester.body().position();
 
     assert_eq!(
@@ -163,8 +165,7 @@ fn falling_collision() {
         time::TickSchedule::per_second(1),
     );
 
-    let mut contacts = Vec::new();
-    tester.step(|c| contacts.push(c));
+    let (contacts, _info) = tester.step();
 
     assert_eq!(tester.body().position().x, 2.0);
     assert_eq!(tester.body().position().z, 0.0);
@@ -174,7 +175,7 @@ fn falling_collision() {
         tester.body().position()
     );
     assert_eq!(
-        contacts,
+        contacts.into_iter().collect_vec(),
         vec![Contact::Block(CubeFace::new([0, 0, 0], Face7::PY))]
     );
 }
@@ -201,8 +202,7 @@ fn falling_collision_partial_block() {
         time::TickSchedule::per_second(1),
     );
 
-    let mut contacts = Vec::new();
-    dbg!(tester.step(|c| contacts.push(c)));
+    let (contacts, _info) = dbg!(tester.step());
 
     dbg!(tester.body().collision_box_abs());
 
@@ -215,7 +215,7 @@ fn falling_collision_partial_block() {
     );
     assert!(
         matches!(
-            contacts[0],
+            contacts.iter().exactly_one().unwrap(),
             Contact::Voxel {
                 cube: Cube::ORIGIN,
                 resolution: RES,
@@ -225,8 +225,7 @@ fn falling_collision_partial_block() {
                 },
             }
         ),
-        "contact not as expected {:?}",
-        contacts[0]
+        "contact not as expected {contacts:?}",
     );
 
     // Remove horizontal velocity, then let time proceed and see if any falling through happens.
@@ -240,7 +239,7 @@ fn falling_collision_partial_block() {
 
     for t in 1..=1000 {
         eprintln!("--- step {t}");
-        tester.step(collision_noop);
+        tester.step();
         assert!(
             (tester.body().position().y - 1.0).abs() < 1e-6,
             "not touching surface on step {:?}: {:?}",
@@ -267,8 +266,7 @@ fn push_out_simple() {
         time::TickSchedule::per_second(1),
     );
 
-    let mut contacts = Vec::new();
-    let info = tester.step(|c| contacts.push(c));
+    let (_contacts, info) = dbg!(tester.step());
     dbg!(info);
 
     assert_eq!(
@@ -299,9 +297,7 @@ fn push_out_voxels() {
         time::TickSchedule::per_second(1),
     );
 
-    let mut contacts = Vec::new();
-    let info = tester.step(|c| contacts.push(c));
-    dbg!(info);
+    dbg!(tester.step());
 
     assert_eq!(
         tester.body().position(),
@@ -364,7 +360,7 @@ fn no_passing_through_blocks() {
             // Reset velocity every frame as an approximation of the effect of player input.
             tester.body_mut().set_velocity(velocity);
             position_history.push_front(tester.body().position());
-            tester.step(|_contact| {});
+            tester.step();
 
             let distance_from_start = chebyshev_length(tester.body().position() - start);
             assert!(
@@ -443,7 +439,7 @@ fn velocity_limit() {
         schedule,
     );
 
-    tester.step(collision_noop);
+    tester.step();
 
     // Velocity is capped and *then* applied to position
     assert_eq!(

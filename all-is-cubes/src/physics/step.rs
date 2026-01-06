@@ -70,9 +70,7 @@ pub(super) fn body_physics_step_system(
                     tick,
                     control_delta_v,
                     Some(&space),
-                    |cube| {
-                        colliding_cubes.insert(cube);
-                    },
+                    colliding_cubes,
                     rerun_destination,
                 );
 

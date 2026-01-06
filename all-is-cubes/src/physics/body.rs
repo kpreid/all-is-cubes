@@ -53,6 +53,11 @@ pub(crate) const VELOCITY_MAGNITUDE_LIMIT: FreeCoordinate = 1e4_f64;
 pub(crate) const VELOCITY_MAGNITUDE_LIMIT_SQUARED: FreeCoordinate =
     VELOCITY_MAGNITUDE_LIMIT * VELOCITY_MAGNITUDE_LIMIT;
 
+/// Set of [`Contact`]s produced by a collision.
+pub type ContactSet = hashbrown::HashSet<Contact>;
+
+// -------------------------------------------------------------------------------------------------
+
 /// An object with a position, velocity, and collision volume.
 /// What it collides with is determined externally.
 #[derive(Clone, PartialEq, ecs::Component)]
@@ -200,34 +205,30 @@ impl Body {
     /// Advances time for the body.
     ///
     /// If `colliding_space` is present then the body may collide with blocks in that space
-    /// (constraining possible movement) and `collision_callback` will be called with all
-    /// such blocks. It is not guaranteed that `collision_callback` will be called only once
-    /// per block.
+    /// (constraining possible movement) and `contact_accum` will be filled with all
+    /// such blocks.
     ///
     /// This method is private because the exact details of what inputs are required are
     /// unstable.
     // TODO(ecs): make this part of the stepping system instead, after updating tests to permit it
-    pub(crate) fn step<CC>(
+    pub(crate) fn step(
         &mut self,
         tick: Tick,
         external_delta_v: Vector3D<NotNan<FreeCoordinate>, Velocity>,
         mut colliding_space: Option<&space::Read<'_>>,
-        mut collision_callback: CC,
+        contact_set: &mut ContactSet,
         rerun_destination: &crate::rerun_glue::Destination,
-    ) -> BodyStepDetails
-    where
-        CC: FnMut(Contact),
-    {
+    ) -> BodyStepDetails {
         #[cfg(not(feature = "rerun"))]
         let _ = rerun_destination;
+
+        assert!(contact_set.is_empty());
 
         let velocity_before_gravity_and_collision = self.velocity;
         let dt = tick.delta_t_ps64();
         let mut move_segments = [MoveSegment::default(); 3];
         let mut move_segment_index = 0;
         let mut already_colliding = None;
-        #[cfg(feature = "rerun")]
-        let mut contact_accum: Vec<Contact> = Vec::new();
 
         self.velocity += external_delta_v;
 
@@ -239,10 +240,7 @@ impl Body {
             if contact.normal() == Face7::Within {
                 already_colliding = Some(contact);
             }
-            collision_callback(contact);
-
-            #[cfg(feature = "rerun")]
-            contact_accum.push(contact);
+            contact_set.insert(contact);
         };
 
         if !self.position.to_vector().square_length().is_finite() {
@@ -361,7 +359,7 @@ impl Body {
                     .map(|cube| {
                         // O(n) but n is small
                         let this_contact =
-                            contact_accum.iter().find(|contact| contact.cube() == cube);
+                            contact_set.iter().find(|contact| contact.cube() == cube);
                         if let Some(this_contact) = this_contact {
                             if this_contact.normal() == Face7::Within {
                                 (
