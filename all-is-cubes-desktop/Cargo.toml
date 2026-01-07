@@ -57,6 +57,7 @@ audio = ["dep:kira"]
 # Adds rerun logging support. Intended mainly for development of All is Cubes itself.
 rerun = [
     "dep:re_sdk",
+    "dep:re_sdk_types",
     "dep:all-is-cubes-mesh",
     "all-is-cubes/rerun",
     "all-is-cubes-gpu/rerun",
@@ -97,9 +98,10 @@ log = { workspace = true }
 mint = { workspace = true }
 png = { workspace = true, optional = true }
 rand = { workspace = true, features = ["thread_rng"] }
-# re_sdk is a data-logging and visualization tool; we are currently using it _only_ for
+# re_* is a data-logging and visualization tool; we are currently using it _only_ for
 # development of All is Cubes itself.
 re_sdk = { workspace = true, optional = true }
+re_sdk_types = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 simplelog = { workspace = true }
