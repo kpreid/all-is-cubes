@@ -225,27 +225,39 @@ macro_rules! derive_attribute_helpers {
             }
         }
 
-        #[cfg(feature = "arbitrary")]
-        #[mutants::skip]
-        impl<'a> arbitrary::Arbitrary<'a> for SetAttribute {
-            fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-                _ = u;
-                todo!()
+        paste::paste! {
+            /// Mirror of [`SetAttribute`] that is compatible with `derive(Arbitrary)`.
+            #[cfg(feature = "arbitrary")]
+            #[derive(arbitrary::Arbitrary)]
+            enum SetAttributeArbitraryHelper {
+                $(
+                    [< $field_name :camel >]($arbitrary_type),
+                )*
             }
 
-            fn size_hint(depth: usize) -> (usize, Option<usize>) {
-                Self::try_size_hint(depth).unwrap_or_default()
-            }
-            fn try_size_hint(
-                depth: usize,
-            ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
-                arbitrary::size_hint::try_recursion_guard(depth, |depth| {
-                    Ok(arbitrary::size_hint::or_all(&[
+            #[cfg(feature = "arbitrary")]
+            #[mutants::skip]
+            impl<'a> arbitrary::Arbitrary<'a> for SetAttribute {
+                fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+                    Ok(match SetAttributeArbitraryHelper::arbitrary(u)? {
                         $(
-                            <$arbitrary_type as arbitrary::Arbitrary>::try_size_hint(depth)?,
+                            SetAttributeArbitraryHelper::[< $field_name :camel >](value) => {
+                                Self::[< $field_name :camel >](
+                                    attribute_modifier_value_wrap!(
+                                        $modifier_style, $field_type, value.into()))
+                            }
                         )*
-                    ]))
-                })
+                    })
+                }
+
+                fn size_hint(depth: usize) -> (usize, Option<usize>) {
+                    Self::try_size_hint(depth).unwrap_or_default()
+                }
+                fn try_size_hint(
+                    depth: usize,
+                ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+                    SetAttributeArbitraryHelper::try_size_hint(depth)
+                }
             }
         }
 
