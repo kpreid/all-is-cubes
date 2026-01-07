@@ -6,10 +6,12 @@ mod body;
 pub use body::*;
 mod collision;
 pub use collision::*;
+
 pub(crate) mod step;
+pub(crate) use step::VELOCITY_MAGNITUDE_LIMIT_SQUARED;
 #[doc(hidden)] // pub to be used by all-is-cubes-gpu and fuzz_physics
 #[allow(clippy::module_name_repetitions)]
-pub use step::PhysicsOutputs;
+pub use step::{BodyStepDetails, PhysicsOutputs};
 
 #[cfg(test)]
 mod tests;

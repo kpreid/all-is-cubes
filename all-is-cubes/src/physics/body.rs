@@ -1,5 +1,3 @@
-#[cfg(feature = "rerun")]
-use alloc::vec::Vec;
 use core::fmt;
 use core::ops;
 
@@ -7,7 +5,7 @@ use bevy_ecs::prelude as ecs;
 use euclid::{Point3D, Vector3D};
 use ordered_float::NotNan;
 
-/// Acts as polyfill for float methods
+/// Acts as polyfill for float methods like `hypot()` and `atan2()`
 #[cfg(not(any(feature = "std", test)))]
 #[allow(
     unused_imports,
@@ -15,12 +13,7 @@ use ordered_float::NotNan;
 )]
 use num_traits::float::Float as _;
 
-use super::collision::{
-    Contact, aab_raycast, collide_along_ray, escape_along_ray, find_colliding_cubes, nudge_on_ray,
-};
-use crate::block::{BlockCollision, Resolution};
 use crate::camera::Eye;
-use crate::fluff::Fluff;
 #[cfg(not(any(feature = "std", test)))]
 #[allow(
     unused_imports,
@@ -28,30 +21,15 @@ use crate::fluff::Fluff;
 )]
 use crate::math::Euclid as _;
 use crate::math::{
-    Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign, notnan,
-    try_into_finite_point, try_into_finite_vector,
+    Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, try_into_finite_point,
+    try_into_finite_vector,
 };
-use crate::physics::step::PhysicsOutputs;
-use crate::physics::{POSITION_EPSILON, StopAt, Velocity};
-use crate::raycast::Ray;
+use crate::physics::{Velocity, collision::Contact, step::PhysicsOutputs};
 use crate::rerun_glue as rg;
-use crate::space;
-use crate::time::Tick;
 use crate::transaction::{self, Equal, Transaction};
 use crate::util::{ConciseDebug, Fmt, Refmt as _, StatusText};
 
 // -------------------------------------------------------------------------------------------------
-
-/// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
-const VELOCITY_EPSILON_SQUARED: NotNan<FreeCoordinate> = notnan!(1e-12);
-
-/// Velocities larger than this (in cubes per second) are clamped.
-///
-/// This provides an upper limit on the collision detection computation,
-/// per body per frame.
-pub(crate) const VELOCITY_MAGNITUDE_LIMIT: FreeCoordinate = 1e4_f64;
-pub(crate) const VELOCITY_MAGNITUDE_LIMIT_SQUARED: FreeCoordinate =
-    VELOCITY_MAGNITUDE_LIMIT * VELOCITY_MAGNITUDE_LIMIT;
 
 /// Set of [`Contact`]s produced by a collision.
 pub type ContactSet = hashbrown::HashSet<Contact>;
@@ -73,12 +51,12 @@ pub struct Body {
     // Also, we really want a type that does not have signed zeroes for consistency (see
     // <https://github.com/kpreid/all-is-cubes/issues/537>) and it might be even better to use
     // fixed-point positions instead of floating-point.
-    position: Point3D<NotNan<FreeCoordinate>, Cube>,
+    pub(in crate::physics) position: Point3D<NotNan<FreeCoordinate>, Cube>,
 
     /// Velocity, in position units per second.
     //---
     // TODO: NaN should be prohibited here too
-    velocity: Vector3D<NotNan<FreeCoordinate>, Velocity>,
+    pub(in crate::physics) velocity: Vector3D<NotNan<FreeCoordinate>, Velocity>,
 
     /// Volume that this body attempts to occupy, in coordinates relative to `self.position`.
     ///
@@ -87,7 +65,7 @@ pub struct Body {
     ///
     /// It does not change as a consequence of physics stepping; it is configuration rather than
     /// instantaneous state.
-    collision_box: Aab,
+    pub(in crate::physics) collision_box: Aab,
 
     /// Volume that this body believes it is successfully occupying, in coordinates relative to
     /// the [`Space`] it collides with.
@@ -96,7 +74,7 @@ pub struct Body {
     /// In practice, it will differ at least due to rounding errors, and additionally due to
     /// numerical error during collision resolution, or be shrunk by large distances if the body has
     /// been squeezed by moving obstacles (TODO: not implemented yet).
-    occupying: Aab,
+    pub(in crate::physics) occupying: Aab,
 
     /// Is this body not subject to gravity?
     pub flying: bool,
@@ -199,446 +177,6 @@ impl Body {
             noclip: false,
             yaw: 0.0,
             pitch: 0.0,
-        }
-    }
-
-    /// Advances time for the body.
-    ///
-    /// If `colliding_space` is present then the body may collide with blocks in that space
-    /// (constraining possible movement) and `contact_accum` will be filled with all
-    /// such blocks.
-    ///
-    /// This method is private because the exact details of what inputs are required are
-    /// unstable.
-    // TODO(ecs): make this part of the stepping system instead, after updating tests to permit it
-    pub(crate) fn step(
-        &mut self,
-        tick: Tick,
-        external_delta_v: Vector3D<NotNan<FreeCoordinate>, Velocity>,
-        mut colliding_space: Option<&space::Read<'_>>,
-        contact_set: &mut ContactSet,
-        rerun_destination: &crate::rerun_glue::Destination,
-    ) -> BodyStepDetails {
-        #[cfg(not(feature = "rerun"))]
-        let _ = rerun_destination;
-
-        assert!(contact_set.is_empty());
-
-        let velocity_before_gravity_and_collision = self.velocity;
-        let dt = tick.delta_t_ps64();
-        let mut move_segments = [MoveSegment::default(); 3];
-        let mut move_segment_index = 0;
-        let mut already_colliding = None;
-
-        self.velocity += external_delta_v;
-
-        if self.noclip {
-            colliding_space = None;
-        }
-
-        let mut collision_callback = |contact: Contact| {
-            if contact.normal() == Face7::Within {
-                already_colliding = Some(contact);
-            }
-            contact_set.insert(contact);
-        };
-
-        if !self.position.to_vector().square_length().is_finite() {
-            // If position is NaN or infinite, can't do anything, but don't panic.
-            // TODO: Instead of this condition, self.position should be statically typed to not
-            // contain any infinity.
-            return BodyStepDetails {
-                quiescent: false,
-                already_colliding,
-                push_out: None,
-                move_segments,
-                delta_v: Vector3D::zero(),
-            };
-        }
-
-        if !self.flying
-            && !tick.paused()
-            && let Some(space) = colliding_space
-        {
-            self.velocity += space.physics().gravity.cast_unit() * NotNan::from(dt);
-        }
-
-        // TODO: attempt to expand `occupying` to fit `collision_box`.
-
-        #[cfg(feature = "rerun")]
-        let position_before_push_out = self.position;
-        let push_out_info = if let Some(space) = colliding_space {
-            self.push_out(space)
-        } else {
-            None
-        };
-
-        let velocity_magnitude_squared = self.velocity.square_length();
-        if !velocity_magnitude_squared.is_finite() {
-            self.velocity = Vector3D::zero();
-        } else if velocity_magnitude_squared <= VELOCITY_EPSILON_SQUARED || tick.paused() {
-            return BodyStepDetails {
-                quiescent: true,
-                already_colliding,
-                push_out: push_out_info,
-                move_segments,
-                delta_v: self.velocity - velocity_before_gravity_and_collision,
-            };
-        } else if velocity_magnitude_squared.into_inner() > VELOCITY_MAGNITUDE_LIMIT_SQUARED {
-            self.velocity *=
-                NotNan::new(VELOCITY_MAGNITUDE_LIMIT / velocity_magnitude_squared.sqrt()).unwrap();
-        }
-
-        // TODO: correct integration of acceleration due to gravity
-        let unobstructed_delta_position: Vector3D<_, _> =
-            self.velocity.map(NotNan::into_inner).cast_unit() * dt.into_inner();
-
-        // Do collision detection and resolution.
-        #[cfg(feature = "rerun")]
-        let position_before_move_segments = self.position;
-        if let Some(space) = colliding_space {
-            let mut delta_position = unobstructed_delta_position;
-            while delta_position != Vector3D::zero() {
-                assert!(
-                    move_segment_index < 3,
-                    "sliding collision loop did not finish"
-                );
-                // Each call to collide_and_advance will zero at least one axis of delta_position.
-                // The nonzero axes are for sliding movement.
-                let (new_delta_position, segment) =
-                    self.collide_and_advance(space, &mut collision_callback, delta_position);
-                delta_position = new_delta_position;
-
-                // Diagnostic recording of the individual move segments
-                move_segments[move_segment_index] = segment;
-
-                move_segment_index += 1;
-            }
-        } else {
-            self.set_position(self.position.map(NotNan::into_inner) + unobstructed_delta_position);
-            move_segments[0] = MoveSegment {
-                delta_position: unobstructed_delta_position,
-                stopped_by: None,
-            };
-        }
-
-        // TODO: after gravity, falling-below-the-world protection
-
-        let info = BodyStepDetails {
-            quiescent: false,
-            already_colliding,
-            push_out: push_out_info,
-            move_segments,
-            delta_v: self.velocity - velocity_before_gravity_and_collision,
-        };
-
-        #[cfg(feature = "rerun")]
-        {
-            use crate::content::palette;
-
-            // Log step info as text.
-            rerun_destination.log(
-                &rg::entity_path!["step_info"],
-                &rg::archetypes::TextDocument::new(format!("{:#?}", info.refmt(&ConciseDebug))),
-            );
-
-            // Log nearby cubes and whether they are contacts.
-            if let Some(space) = colliding_space {
-                // TODO: If we make more general use of rerun, this is going to need to be moved from
-                // here to `Space` itself
-                let cubes = self
-                    .collision_box_abs()
-                    .expand(0.875)
-                    .round_up_to_grid()
-                    .interior_iter()
-                    .filter(|cube| {
-                        space.get_evaluated(*cube).uniform_collision() != Some(BlockCollision::None)
-                    });
-                let (class_ids, colors): (Vec<rg::ClassId>, Vec<_>) = cubes
-                    .clone()
-                    .map(|cube| {
-                        // O(n) but n is small
-                        let this_contact =
-                            contact_set.iter().find(|contact| contact.cube() == cube);
-                        if let Some(this_contact) = this_contact {
-                            if this_contact.normal() == Face7::Within {
-                                (
-                                    rg::ClassId::CollisionContactWithin,
-                                    palette::DEBUG_COLLISION_CUBE_WITHIN,
-                                )
-                            } else {
-                                (
-                                    rg::ClassId::CollisionContactAgainst,
-                                    palette::DEBUG_COLLISION_CUBE_AGAINST,
-                                )
-                            }
-                        } else {
-                            (rg::ClassId::SpaceBlock, space.get_evaluated(cube).color())
-                        }
-                    })
-                    .unzip();
-                rerun_destination.log(
-                    &rg::entity_path!["blocks"],
-                    &rg::convert_aabs(
-                        cubes.map(|cube| {
-                            let ev = space.get_evaluated(cube);
-                            // approximation of block's actual collision bounds
-                            ev.voxels_bounds()
-                                .to_free()
-                                .scale(ev.voxels().resolution().recip_f64())
-                                .translate(cube.lower_bounds().to_f64().to_vector())
-                        }),
-                        FreeVector::zero(),
-                    )
-                    .with_radii(class_ids.iter().map(|class| match class {
-                        rg::ClassId::SpaceBlock => 0.001,
-                        rg::ClassId::CollisionContactAgainst => 0.002,
-                        rg::ClassId::CollisionContactWithin => 0.005,
-                        _ => unreachable!(),
-                    }))
-                    .with_class_ids(class_ids)
-                    .with_colors(colors),
-                );
-            }
-
-            // Log body position point
-            rerun_destination.log(
-                &rg::EntityPath::new(vec![]),
-                &rg::archetypes::Points3D::new([rg::convert_point(self.position)]),
-            );
-
-            // Log body collision box
-            rerun_destination.log(
-                &rg::entity_path!["collision_box"],
-                &rg::convert_aabs(
-                    [self.collision_box],
-                    self.position.map(NotNan::into_inner).to_vector(),
-                )
-                .with_class_ids([rg::ClassId::BodyCollisionBox]),
-            );
-            rerun_destination.log(
-                &rg::entity_path!["occupying"],
-                &rg::convert_aabs([self.occupying], FreeVector::zero())
-                    .with_class_ids([rg::ClassId::BodyCollisionBox]),
-            );
-
-            // Our movement arrows shall be logged relative to all collision box corners
-            // for legibility of how they interact with things.
-            let arrow_offsets = || self.collision_box.corner_points().map(|p| p.to_vector());
-
-            // Log push_out operation
-            // TODO: should this be just a maybe-fourth movement arrow?
-            match push_out_info {
-                Some(push_out_vector) => rerun_destination.log(
-                    &rg::entity_path!["push_out"],
-                    &rg::archetypes::Arrows3D::from_vectors(
-                        arrow_offsets().map(|_| rg::convert_vec(push_out_vector)),
-                    )
-                    .with_origins(arrow_offsets().map(|offset| {
-                        rg::convert_point(position_before_push_out.map(NotNan::into_inner) + offset)
-                    })),
-                ),
-                None => rerun_destination.clear_recursive(&rg::entity_path!["push_out"]),
-            }
-
-            // Log move segments
-            {
-                let move_segments = &move_segments[..move_segment_index]; // trim empty entries
-                rerun_destination.log(
-                    &rg::entity_path!["move_segment"],
-                    &rg::archetypes::Arrows3D::from_vectors(arrow_offsets().flat_map(|_| {
-                        move_segments.iter().map(|seg| rg::convert_vec(seg.delta_position))
-                    }))
-                    .with_origins(arrow_offsets().flat_map(|offset| {
-                        move_segments.iter().scan(
-                            position_before_move_segments.map(NotNan::into_inner) + offset,
-                            |pos, seg| {
-                                let arrow_origin = rg::convert_point(*pos);
-                                *pos += seg.delta_position;
-                                Some(arrow_origin)
-                            },
-                        )
-                    })),
-                );
-            }
-        }
-
-        info
-    }
-
-    /// Perform a single straight-line position change, stopping at the first obstacle.
-    /// Returns the remainder of `delta_position` that should be retried for sliding movement.
-    fn collide_and_advance<CC>(
-        &mut self,
-        space: &space::Read<'_>,
-        collision_callback: &mut CC,
-        mut delta_position: FreeVector,
-    ) -> (FreeVector, MoveSegment)
-    where
-        CC: FnMut(Contact),
-    {
-        let movement_ignoring_collision =
-            Ray::new(self.position.map(NotNan::into_inner), delta_position);
-        let collision = collide_along_ray(
-            space,
-            movement_ignoring_collision,
-            self.collision_box, // TODO: use occupying
-            collision_callback,
-            StopAt::NotAlreadyColliding,
-        );
-
-        if let Some(collision) = collision {
-            let axis = collision
-                .contact
-                .normal()
-                .axis()
-                .expect("Face7::Within collisions should not reach here");
-            // Advance however much straight-line distance is available.
-            // But a little bit back from that, to avoid floating point error pushing us
-            // into being already colliding next frame.
-            let motion_segment = nudge_on_ray(
-                self.collision_box, // TODO: use occupying
-                movement_ignoring_collision.scale_direction(collision.t_distance),
-                collision.contact.normal().opposite(),
-                collision.contact.resolution(),
-                true,
-            );
-            let unobstructed_delta_position = motion_segment.direction;
-            self.set_position(self.position.map(NotNan::into_inner) + unobstructed_delta_position);
-            // Figure the distance we have have left.
-            delta_position -= unobstructed_delta_position;
-            // Convert it to sliding movement for the axes we didn't collide in.
-            delta_position[axis] = 0.0;
-
-            // Zero the velocity in that direction.
-            // (This is the velocity part of collision response. That is, if we supported bouncy
-            // objects, we'd do something different here.)
-            self.velocity[axis] = notnan!(0.0);
-
-            (
-                delta_position,
-                MoveSegment {
-                    delta_position: unobstructed_delta_position,
-                    stopped_by: Some(collision.contact),
-                },
-            )
-        } else {
-            // We did not hit anything for the length of the raycast. Proceed unobstructed.
-            self.set_position(self.position.map(NotNan::into_inner) + delta_position);
-            (
-                Vector3D::zero(),
-                MoveSegment {
-                    delta_position,
-                    stopped_by: None,
-                },
-            )
-        }
-    }
-
-    /// Check if we're intersecting any blocks and fix that if so.
-    fn push_out(&mut self, space: &space::Read<'_>) -> Option<FreeVector> {
-        // TODO: need to unsquash the `occupying` box if possible
-
-        let colliding = find_colliding_cubes(space, self.collision_box_abs()).next().is_some();
-        if colliding {
-            let exit_backwards: FreeVector = -self.velocity.map(NotNan::into_inner).cast_unit(); // don't care about magnitude
-            let shortest_push_out = (-1..=1)
-                .flat_map(move |dx| {
-                    (-1..=1).flat_map(move |dy| {
-                        (-1..=1).map(move |dz| {
-                            let direction = Vector3D::new(dx, dy, dz).map(FreeCoordinate::from);
-                            if direction == Vector3D::zero() {
-                                // We've got an extra case, and an item to delete from the combinations,
-                                // so substitute the one from the other.
-                                exit_backwards
-                            } else {
-                                direction
-                            }
-                        })
-                    })
-                })
-                .filter_map(|direction| self.attempt_push_out(space, direction))
-                .min_by_key(|(_, distance)| *distance);
-
-            if let Some((new_position, _)) = shortest_push_out {
-                let old_position: FreePoint = self.position.map(NotNan::into_inner);
-                self.set_position(new_position);
-                return Some(new_position - old_position);
-            }
-        }
-        None
-    }
-
-    /// Try moving in the given direction, find an empty space, and
-    /// return the new position and distance to it.
-    fn attempt_push_out(
-        &self,
-        space: &space::Read<'_>,
-        direction: FreeVector,
-    ) -> Option<(FreePoint, NotNan<FreeCoordinate>)> {
-        if false {
-            // TODO: This attempted reimplementation does not work yet.
-            // Once `escape_along_ray()` is working properly, we can enable this and make
-            // push-out actually work with recursive blocks.
-
-            let direction = direction.normalize(); // TODO: set this to a max distance
-            if direction.x.is_nan() {
-                // This case happens in push_out() when the velocity is zero.
-                // Checking exactly here is a cheap way to catch it.
-                return None;
-            }
-
-            let ray = Ray::new(self.position.map(NotNan::into_inner), direction);
-
-            let end = escape_along_ray(
-                space,
-                ray,
-                self.collision_box, /* TODO: use occupying */
-            )?;
-
-            let nudged_distance = end.t_distance + POSITION_EPSILON;
-            Some((
-                ray.scale_direction(nudged_distance).unit_endpoint(),
-                NotNan::new(nudged_distance).ok()?,
-            ))
-        } else {
-            let ray = Ray::new(self.position.map(NotNan::into_inner), direction);
-            // TODO: upper bound on distance to try
-            'raycast: for ray_step in
-                aab_raycast(self.collision_box /* TODO: use occupying */, ray, true)
-            {
-                let adjusted_segment = nudge_on_ray(
-                    self.collision_box, /* TODO: use occupying */
-                    ray.scale_direction(ray_step.t_distance()),
-                    ray_step.face(),
-                    Resolution::R1,
-                    true,
-                );
-                let step_aab = self
-                    .collision_box /* TODO: use occupying */
-                    .translate(adjusted_segment.unit_endpoint().to_vector());
-                for cube in step_aab.round_up_to_grid().interior_iter() {
-                    // TODO: refactor to combine this with other collision attribute tests
-                    match space.get_evaluated(cube).uniform_collision() {
-                        Some(BlockCollision::Hard) => {
-                            // Not a clear space
-                            continue 'raycast;
-                        }
-                        Some(BlockCollision::None) => {}
-                        None => {
-                            // TODO: Either check collision, or continue
-                            //continue 'raycast;
-                        }
-                    }
-                }
-                // No collisions, so we can use this.
-                return Some((
-                    adjusted_segment.unit_endpoint(),
-                    NotNan::new(ray_step.t_distance() * direction.length()).ok()?,
-                ));
-            }
-
-            None
         }
     }
 
@@ -845,97 +383,6 @@ impl ops::AddAssign for BodyStepInfo {
     fn add_assign(&mut self, other: Self) {
         let Self { count } = self;
         *count += other.count;
-    }
-}
-
-/// Diagnostic data produced by stepping a [`Body`] about how it moved and collided.
-#[derive(Clone, Copy, Debug)]
-#[non_exhaustive]
-#[doc(hidden)] // public only for all-is-cubes-gpu debug visualization, and testing
-pub struct BodyStepDetails {
-    /// Whether movement computation was skipped due to approximately zero velocity.
-    quiescent: bool,
-
-    /// If the body was pushed out of something it was found to be already colliding with,
-    /// then this is the change in its position.
-    #[doc(hidden)] // pub for fuzz_physics
-    pub push_out: Option<FreeVector>,
-
-    already_colliding: Option<Contact>,
-
-    /// Details on movement and collision. A single frame's movement may have up to three
-    /// segments as differently oriented faces are collided with.
-    move_segments: [MoveSegment; 3],
-
-    /// Change in velocity during this step.
-    delta_v: Vector3D<NotNan<f64>, Velocity>,
-}
-
-impl Fmt<ConciseDebug> for BodyStepDetails {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &ConciseDebug) -> fmt::Result {
-        fmt.debug_struct("BodyStepDetails")
-            .field("quiescent", &self.quiescent)
-            .field("already_colliding", &self.already_colliding)
-            .field("push_out", &self.push_out.as_ref().map(|v| v.refmt(fopt)))
-            .field("move_segments", &self.move_segments.refmt(fopt))
-            .field("delta_v", &self.delta_v.refmt(fopt))
-            .finish()
-    }
-}
-
-impl BodyStepDetails {
-    pub(crate) fn impact_fluff(&self) -> Option<Fluff> {
-        let velocity = self.delta_v.map(NotNan::into_inner).length();
-        // don't emit anything for slow change or movement in the air
-        if velocity >= 0.25 && self.move_segments.iter().any(|s| s.stopped_by.is_some()) {
-            Some(Fluff::BlockImpact {
-                velocity: PositiveSign::try_from(velocity as f32).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-}
-
-/// One of the individual straight-line movement segments of a [`BodyStepDetails`].
-#[derive(Clone, Copy, Debug)]
-#[non_exhaustive]
-pub(crate) struct MoveSegment {
-    /// The change in position.
-    pub delta_position: FreeVector,
-    /// What solid object stopped this segment from continuing further
-    /// (there may be others, but this is one of them), or None if there
-    /// was no obstacle.
-    pub stopped_by: Option<Contact>,
-}
-
-impl Fmt<ConciseDebug> for MoveSegment {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &ConciseDebug) -> fmt::Result {
-        let mut nonempty = false;
-        if self.delta_position != FreeVector::zero() {
-            nonempty = true;
-            write!(fmt, "move {:?}", self.delta_position.refmt(fopt))?;
-        }
-        if let Some(stopped_by) = &self.stopped_by {
-            if nonempty {
-                write!(fmt, " ")?;
-            }
-            nonempty = true;
-            write!(fmt, "stopped by {stopped_by:?}")?;
-        }
-        if !nonempty {
-            write!(fmt, "0")?;
-        }
-        Ok(())
-    }
-}
-
-impl Default for MoveSegment {
-    fn default() -> Self {
-        Self {
-            delta_position: Vector3D::zero(),
-            stopped_by: None,
-        }
     }
 }
 

@@ -15,9 +15,10 @@ use crate::block::{
 use crate::character::ParentSpace;
 use crate::content::{make_slab, make_some_blocks};
 use crate::math::{Aab, Cube, CubeFace, Face7, FreeCoordinate, GridAab, chebyshev_length};
+use crate::physics::step::PhysicsOutputs;
 use crate::physics::{
-    Body, BodyStepDetails, Contact, ContactSet, POSITION_EPSILON, PhysicsOutputs,
-    VELOCITY_MAGNITUDE_LIMIT, Velocity,
+    Body, BodyStepDetails, Contact, ContactSet, POSITION_EPSILON, Velocity,
+    step::VELOCITY_MAGNITUDE_LIMIT,
 };
 use crate::space::{Space, SpacePhysics};
 use crate::time;

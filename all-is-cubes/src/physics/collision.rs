@@ -211,7 +211,7 @@ where
     let mut already_colliding: ContactSet = ContactSet::new();
 
     debug_assert!(
-        ray.direction.square_length() < super::body::VELOCITY_MAGNITUDE_LIMIT_SQUARED * 2.,
+        ray.direction.square_length() < super::VELOCITY_MAGNITUDE_LIMIT_SQUARED * 2.,
         "Attempting to collide_along_ray a very long distance: {ray:?}"
     );
 
