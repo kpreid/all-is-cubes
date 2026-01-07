@@ -8,6 +8,8 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use bevy_ecs::prelude as ecs;
+use re_sdk::blueprint as b;
+use re_sdk_types::blueprint::components::PanelState;
 
 use crate::math::{self, Axis, Rgb, Rgba, lines, rgba_const};
 
@@ -99,7 +101,7 @@ impl Destination {
 ///
 /// The purpose of this enum is to document what path prefixes we use in a single
 /// location, which will be used to match blueprint data to logged data.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Stem {
     /// 3D things with the coordinate system of the game world (the `Space` that the player
     /// character occupies).
@@ -172,6 +174,68 @@ impl RootDestination {
             path: stem.entity_path_prefix(),
         }
     }
+}
+
+/// Create the blueprint that agrees with [`Stem`]'s entity paths.
+pub fn create_blueprint(stems: &mut dyn Iterator<Item = Stem>) -> re_sdk::blueprint::Blueprint {
+    macro_rules! containers {
+        ($( $elem:expr ),* $(,)?) => {
+            [$( b::ContainerLike::from($elem) ),*]
+        };
+    }
+
+    let stems: hashbrown::HashSet<Stem> = stems.collect();
+
+    let root = b::Grid::new(containers![
+        b::Spatial3DView::new("World")
+            .with_origin(Stem::World.entity_path_prefix())
+            .with_visible(stems.contains(&Stem::World)),
+        b::Grid::new(containers![
+            b::Spatial2DView::new("Rendered World")
+                .with_origin(Stem::WorldImage.entity_path_prefix())
+                .with_visible(stems.contains(&Stem::WorldImage)),
+            b::Grid::new(containers![
+                b::Spatial3DView::new("Texture (Reflectance)").with_origin("/texture/reflectance"),
+                b::Spatial3DView::new("Texture (Reflectance, Emission)")
+                    .with_origin("/texture/reflectance_and_emission"),
+            ])
+            .with_name("Textures")
+            .with_visible(stems.contains(&Stem::Textures)),
+            b::Grid::new(containers![
+                b::TimeSeriesView::new("Render Timing")
+                    .with_origin(Stem::RenderPerf.entity_path_prefix())
+                    .with_visible(stems.contains(&Stem::RenderPerf)),
+                b::TextDocumentView::new("Render Info (World)")
+                    .with_origin(
+                        Stem::RenderPerf.entity_path_prefix().join(&entity_path!["world", "info"])
+                    )
+                    .with_visible(stems.contains(&Stem::RenderPerf)),
+                b::TextDocumentView::new("Render Info (UI)")
+                    .with_origin(
+                        Stem::RenderPerf.entity_path_prefix().join(&entity_path!["ui", "info"])
+                    )
+                    .with_visible(stems.contains(&Stem::RenderPerf)),
+            ])
+            .with_name("Render Performance")
+            .with_visible(stems.contains(&Stem::RenderPerf)),
+            // TODO: add TextLogView when supported
+        ])
+        .with_grid_columns(1)
+    ])
+    .with_grid_columns(2);
+
+    b::Blueprint::new(root)
+        .with_auto_views(true) // we don't have full coverage yet
+        .with_auto_layout(false)
+        .with_blueprint_panel(b::BlueprintPanel::from_state(PanelState::Expanded))
+        .with_selection_panel(b::SelectionPanel::from_state(PanelState::Expanded))
+        .with_time_panel(
+            b::TimePanel::new().with_state(PanelState::Expanded),
+            // TODO: session_step_time is not always produced.
+            // We should fix that and then enable this line, but it causes further problems.
+            //
+            //.with_timeline("session_step_time"),
+        )
 }
 
 // -------------------------------------------------------------------------------------------------

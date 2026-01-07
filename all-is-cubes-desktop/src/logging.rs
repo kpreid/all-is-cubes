@@ -77,6 +77,9 @@ pub fn install(
     let (rerun_destination_general, rerun_destination_logging) = if !kinds.is_empty() {
         let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes")
             .default_enabled(true)
+            .with_blueprint(rg::create_blueprint(
+                &mut kinds.iter().flat_map(|kind| kind.stems()),
+            ))
             .connect_grpc()
             .unwrap_or_else(|e| {
                 log::error!("failed to build Rerun stream; will not log: {e}");
@@ -200,20 +203,40 @@ pub fn common_progress_style() -> indicatif::ProgressStyle {
 }
 
 /// Types of data that command line options can request be written to Rerun.
-#[derive(Debug, Clone, Eq, Hash, PartialEq, clap::ValueEnum)]
+#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd, clap::ValueEnum)]
 pub(crate) enum RerunDataKind {
-    /// Send log messages.
-    Log,
-    /// Send data about the game world (particularly collisions).
+    /// Send spatial data about the world around the player character (particularly collisions).
     World,
-    /// Send rendering performance data, for plotting.
-    RenderPerf,
-    /// Send the rendered image (including depth).
-    RenderImage,
+
     /// Send the mesh used for rendering.
     RenderMesh,
-    /// Send the texture atlases used for rendering.
+
+    /// Send the rendered image (including depth).
+    RenderImage,
+
+    /// Send the 3D texture atlases used for rendering.
     RenderTextures,
+
+    /// Send rendering performance data, as a chart.
+    RenderPerf,
+
+    /// Send log messages (the same ones that would ordinarily go to stderr).
+    Log,
+}
+
+impl RerunDataKind {
+    #[cfg(feature = "rerun")]
+    fn stems(&self) -> impl Iterator<Item = rg::Stem> {
+        <[_]>::iter(match self {
+            RerunDataKind::World => &[rg::Stem::World],
+            RerunDataKind::RenderMesh => &[rg::Stem::World],
+            RerunDataKind::RenderImage => &[rg::Stem::World, rg::Stem::WorldImage],
+            RerunDataKind::RenderTextures => &[rg::Stem::Textures],
+            RerunDataKind::RenderPerf => &[rg::Stem::RenderPerf],
+            RerunDataKind::Log => &[rg::Stem::Log],
+        })
+        .copied()
+    }
 }
 
 /// Input for logging-like initialization that needs to happen later when we have more information.
