@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use itertools::Itertools as _;
+
 use all_is_cubes::block::Resolution;
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::{Handle, ReadTicket};
@@ -21,6 +23,28 @@ pub(crate) async fn export_to_dot_vox_data(
     let spaces_to_export = source.contents.extract_type::<Space>();
     let blocks_to_export = source.contents.extract_type::<all_is_cubes::block::BlockDef>();
     source.reject_unsupported(Format::DotVox)?;
+
+    // TODO: this value is not used except in logging, but will be used with export_space_as_scene()
+    let maximum_resolution_in_all_spaces: (Option<&Handle<Space>>, Resolution) = spaces_to_export
+        .iter()
+        .map(
+            |handle| -> Result<(Option<&Handle<Space>>, Resolution), ExportError> {
+                Ok((
+                    Some(handle),
+                    maximum_resolution_of_all_blocks(&handle.read(read_ticket)?),
+                ))
+            },
+        )
+        .process_results(|resolutions| resolutions.max_by_key(|&(_, resolution)| resolution))?
+        .unwrap_or((None, Resolution::R1));
+
+    log::info!(
+        ".vox: given {b} blocks and {s} spaces to export; \
+        maximum resolution in spaces is {resolution}",
+        b = blocks_to_export.len(),
+        s = spaces_to_export.len(),
+        resolution = maximum_resolution_in_all_spaces.1,
+    );
 
     let mut palette: Vec<dot_vox::Color> = Vec::new();
     let mut models: Vec<dot_vox::Model> =
@@ -158,10 +182,6 @@ async fn export_space_as_scene(
     Ok(())
 }
 
-#[expect(
-    dead_code,
-    reason = "TODO: to be used to decide how to apply export_space_as_scene()"
-)]
 fn maximum_resolution_of_all_blocks(space: &space::Read<'_>) -> Resolution {
     space
         .block_data()
