@@ -17,14 +17,13 @@ use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::light::chart::generator;
 
 fn main() {
-    let destination = rg::Destination {
-        stream: rg::RecordingStreamBuilder::new("all-is-cubes/light-tree")
+    let destination = rg::RootDestination::wrap_and_initialize(
+        rg::RecordingStreamBuilder::new("all-is-cubes/light-tree")
             .default_enabled(true)
             .connect_grpc()
             .unwrap(),
-        path: rg::entity_path![],
-    };
-    destination.log_initialization();
+    )
+    .get(rg::Stem::World);
 
     // let num_rays = generator::generate_light_ray_pattern().count();
     // eprintln!(

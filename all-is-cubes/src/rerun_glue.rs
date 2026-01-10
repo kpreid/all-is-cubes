@@ -1,3 +1,9 @@
+#![expect(
+    clippy::exhaustive_enums,
+    clippy::exhaustive_structs,
+    reason = "internal use only"
+)]
+
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -41,19 +47,6 @@ impl Default for Destination {
 }
 
 impl Destination {
-    /// Log the initial data every stream should have.
-    pub fn log_initialization(&self) {
-        let path = EntityPath::from(vec![]);
-        self.catch(|| {
-            self.stream.log_static(path.clone(), &annotation_context())?;
-            self.stream.log_static(
-                path.clone(),
-                &archetypes::ViewCoordinates::new(OUR_VIEW_COORDINATES),
-            )?;
-            Ok(())
-        });
-    }
-
     pub fn is_enabled(&self) -> bool {
         self.stream.is_enabled()
     }
@@ -73,18 +66,6 @@ impl Destination {
     pub fn log_static(&self, path_suffix: &EntityPath, data: &impl re_sdk::AsComponents) {
         self.catch(|| self.stream.log_static(self.path.join(path_suffix), data))
     }
-
-    // pub fn log_component_batches<'a>(
-    //     &self,
-    //     path_suffix: &EntityPath,
-    //     r#static: bool,
-    //     data: impl IntoIterator<Item = &'a dyn re_sdk::ComponentBatch>,
-    // ) {
-    //     self.catch(|| {
-    //         self.stream
-    //             .log_component_batches(self.path.join(path_suffix), r#static, data)
-    //     })
-    // }
 
     pub fn clear_recursive(&self, path_suffix: &EntityPath) {
         // TODO: this is no longer necessary
@@ -107,9 +88,100 @@ impl Destination {
     }
 }
 
-// --- Timeless configuration ---
+// -------------------------------------------------------------------------------------------------
+
+/// Identifies entity paths for different kinds of logging that we want to
+/// give different views.
+///
+/// Note that these are *not* the same as the selections of which information can be logged or
+/// not logged (but perhaps they should be), but rather the distinct coordinate spaces and views.
+/// Some pieces of information may share the same `Stem`, and some `Stem`s may overlap.
+///
+/// The purpose of this enum is to document what path prefixes we use in a single
+/// location, which will be used to match blueprint data to logged data.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Stem {
+    /// 3D things with the coordinate system of the game world (the `Space` that the player
+    /// character occupies).
+    World,
+    /// 2D rendered image of the game world, also positioned within [`Self::World`].
+    WorldImage,
+    /// Time series of performance data, and info text (multiple text entities under this path).
+    RenderPerf,
+    /// 3D texture atlases (multiple coordinate frames inside of this).
+    Textures,
+    /// The same logging that would go to stderr.
+    Log,
+}
+
+impl Stem {
+    pub fn entity_path_prefix(self) -> EntityPath {
+        // Each of these must be distinct from each other.
+        match self {
+            Stem::World => entity_path!["world"],
+            Stem::WorldImage => entity_path!["world", "image"],
+            Stem::RenderPerf => entity_path!["perf"],
+            Stem::Textures => entity_path!["texture"],
+            Stem::Log => entity_path!["log"],
+        }
+    }
+}
+
+/// Source of [`Destination`]s when combined with a [`Root`].
+#[derive(Clone)]
+pub struct RootDestination {
+    pub stream: RecordingStream,
+}
+
+impl fmt::Debug for RootDestination {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RootDestination").finish_non_exhaustive()
+    }
+}
+
+impl Default for RootDestination {
+    fn default() -> Self {
+        Self {
+            stream: RecordingStream::disabled(),
+        }
+    }
+}
+
+impl RootDestination {
+    pub fn wrap_and_initialize(stream: RecordingStream) -> Self {
+        let new_self = Self { stream };
+
+        match (|| -> RecordingStreamResult<()> {
+            new_self.stream.log_static(entity_path![], &annotation_context())?;
+            new_self.get(Stem::World).log_static(
+                &entity_path![],
+                &archetypes::ViewCoordinates::new(OUR_VIEW_COORDINATES),
+            );
+            Ok(())
+        })() {
+            Ok(()) => {}
+            Err(e) => log::error!("Rerun logging failed: {e}", e = crate::util::ErrorChain(&e)),
+        }
+
+        new_self
+    }
+
+    pub fn get(&self, stem: Stem) -> Destination {
+        Destination {
+            stream: self.stream.clone(),
+            path: stem.entity_path_prefix(),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Timeless configuration
 
 const OUR_VIEW_COORDINATES: components::ViewCoordinates = components::ViewCoordinates::RUB;
+
+pub fn our_view_coordinates() -> archetypes::ViewCoordinates {
+    archetypes::ViewCoordinates::new(OUR_VIEW_COORDINATES)
+}
 
 /// Enum describing class id numbers we use in our rerun streams.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -176,7 +248,8 @@ fn annotation_context() -> archetypes::AnnotationContext {
     }))
 }
 
-// --- Data conversion ---
+// -------------------------------------------------------------------------------------------------
+// Data conversion
 
 pub fn convert_point<S, U>(point: euclid::Point3D<S, U>) -> components::Position3D
 where

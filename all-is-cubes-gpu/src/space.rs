@@ -102,7 +102,7 @@ pub(crate) struct SpaceRenderer {
     particle_rx: mpsc::Receiver<ParticleSet>,
 
     #[cfg(feature = "rerun")]
-    rerun_destination: all_is_cubes::rerun_glue::Destination,
+    rerun_perf_destination: all_is_cubes::rerun_glue::Destination,
 }
 
 /// GPU resources for each chunk of the space.
@@ -166,7 +166,7 @@ impl SpaceRenderer {
                 rx
             },
             #[cfg(feature = "rerun")]
-            rerun_destination: Default::default(),
+            rerun_perf_destination: Default::default(),
         }
     }
 
@@ -217,7 +217,7 @@ impl SpaceRenderer {
             particle_sets,
             particle_rx,
             #[cfg(feature = "rerun")]
-                rerun_destination: _,
+                rerun_perf_destination: _,
         } = self;
 
         *todo = {
@@ -232,7 +232,7 @@ impl SpaceRenderer {
         // TODO: rescue ChunkChart and maybe block meshes from the old `csm`.
         #[cfg(feature = "rerun")]
         {
-            new_csm.log_to_rerun(self.rerun_destination.clone());
+            new_csm.log_time_series_to_rerun(self.rerun_perf_destination.clone());
         }
 
         {
@@ -288,7 +288,7 @@ impl SpaceRenderer {
             particle_sets,
             particle_rx,
             #[cfg(feature = "rerun")]
-                rerun_destination: _,
+                rerun_perf_destination: _,
         } = self;
 
         // detach from space notifier, and also request rebuilding the skybox
@@ -447,8 +447,8 @@ impl SpaceRenderer {
         };
 
         #[cfg(feature = "rerun")]
-        if self.rerun_destination.is_enabled() {
-            info.write_to_rerun(&self.rerun_destination);
+        if self.rerun_perf_destination.is_enabled() {
+            info.write_to_rerun(&self.rerun_perf_destination);
         }
         Ok(info)
     }
@@ -845,16 +845,16 @@ impl SpaceRenderer {
 
     /// Activate logging performance information to a Rerun stream.
     #[cfg(feature = "rerun")]
-    pub fn log_to_rerun(&mut self, destination: rg::Destination) {
+    pub fn log_perf_to_rerun(&mut self, destination: rg::Destination) {
         if let Some(csm) = &mut self.csm {
-            csm.log_to_rerun(destination.clone());
+            csm.log_time_series_to_rerun(destination.clone());
         }
-        self.rerun_destination = destination;
+        self.rerun_perf_destination = destination;
     }
 
     /// This is separate so we can run it once for the shared allocator.
     #[cfg(feature = "rerun")]
-    pub(crate) fn texture_allocator_log_to_rerun(&self, destination: rg::Destination) {
+    pub(crate) fn log_texture_allocator_to_rerun(&self, destination: rg::Destination) {
         self.block_texture.log_to_rerun(destination);
     }
 }

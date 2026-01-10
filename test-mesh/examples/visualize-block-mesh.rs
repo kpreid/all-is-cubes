@@ -40,7 +40,7 @@ fn main() {
             .unwrap(),
         path: rg::entity_path![],
     };
-    destination.log_initialization();
+    destination.log_static(&rg::entity_path![], &rg::our_view_coordinates());
 
     let mut universe = Universe::new();
     let blocks = make_example_blocks(&mut universe);

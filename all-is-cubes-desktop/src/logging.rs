@@ -82,26 +82,18 @@ pub fn install(
                 log::error!("failed to build Rerun stream; will not log: {e}");
                 rg::RecordingStream::disabled()
             });
-        let destination = rg::Destination {
-            stream,
-            // Note: This must not be empty for ViewCoordinates to work
-            // https://github.com/rerun-io/rerun/issues/3538
-            path: rg::entity_path!["dt"],
-        };
-
-        // Log timeless configuration
-        destination.log_initialization();
+        let destination = rg::RootDestination::wrap_and_initialize(stream);
 
         // Hook up [`log`] logging if requested.
         let dl = if kinds.contains(&RerunDataKind::Log) {
-            destination.child(&rg::entity_path!["log"])
+            destination.get(rg::Stem::Log)
         } else {
             rg::Destination::default()
         };
 
         (destination, dl)
     } else {
-        (rg::Destination::default(), rg::Destination::default())
+        (rg::RootDestination::default(), rg::Destination::default())
     };
 
     let our_combined_logger = AicLogger {
@@ -232,7 +224,7 @@ pub(crate) enum RerunDataKind {
 pub struct LateLogging {
     kinds: HashSet<RerunDataKind>,
     #[cfg(feature = "rerun")]
-    rerun_destination: rg::Destination,
+    rerun_destination: rg::RootDestination,
 }
 
 #[allow(clippy::unnecessary_wraps)]
@@ -316,12 +308,12 @@ fn log_universe_to_rerun(this: &LateLogging, universe: &mut all_is_cubes::univer
     // before other initial logging.
     // TODO: We need a solution for worlds loaded after app start
     if kinds.contains(&RerunDataKind::World) {
-        universe.log_to_rerun(destination.clone());
+        universe.log_time_to_rerun(destination.clone());
         if let Some(character) = universe.get_default_character() {
             universe
                 .log_member_to_rerun(
                     &character,
-                    destination.child(&rg::entity_path!["character"]),
+                    destination.get(rg::Stem::World).into_child(&rg::entity_path!["character"]),
                 )
                 .unwrap();
         }
@@ -334,7 +326,7 @@ fn log_universe_to_rerun(this: &LateLogging, universe: &mut all_is_cubes::univer
             // TODO: implement live updates -- need to permanently attach this to the session
             // as another renderer, sort of.
             let mut rm = crate::glue::rerun_mesh::RerunMesher::new(
-                destination.child(&rg::entity_path!("world-mesh")),
+                destination.get(rg::Stem::World).child(&rg::entity_path!("world-mesh")),
                 character.space().clone(),
             );
             rm.update(

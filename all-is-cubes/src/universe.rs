@@ -132,7 +132,7 @@ pub struct Universe {
     spaces_with_work: usize,
 
     #[cfg(feature = "rerun")]
-    rerun_destination: crate::rerun_glue::Destination,
+    rerun_time_destination: crate::rerun_glue::Destination,
 }
 
 #[derive(ecs::FromWorld)]
@@ -205,7 +205,7 @@ impl Universe {
                 session_step_time: 0,
                 spaces_with_work: 0,
                 #[cfg(feature = "rerun")]
-                rerun_destination: Default::default(),
+                rerun_time_destination: Default::default(),
             },
         )
     }
@@ -657,20 +657,11 @@ impl Universe {
 
     /// Activate logging this universe's time to a Rerun stream.
     #[cfg(feature = "rerun")]
-    pub fn log_to_rerun(&mut self, destination: rg::Destination) {
-        self.rerun_destination = destination;
-
-        // Initialize axes.
-        // TODO: this should be per-Space in principle
-        self.rerun_destination.log_static(
-            &rg::entity_path![],
-            &rg::archetypes::ViewCoordinates::new(
-                rg::components::ViewCoordinates::from_up_and_handedness(
-                    crate::math::Face6::PY.into(),
-                    rg::view_coordinates::Handedness::Right,
-                ),
-            ),
-        );
+    pub fn log_time_to_rerun(&mut self, destination: rg::RootDestination) {
+        self.rerun_time_destination = rg::Destination {
+            stream: destination.stream,
+            path: rg::entity_path![],
+        };
 
         // Write current timepoint
         self.log_rerun_time();
@@ -695,7 +686,7 @@ impl Universe {
     fn log_rerun_time(&self) {
         #[cfg(feature = "rerun")]
         #[expect(clippy::cast_possible_wrap)]
-        self.rerun_destination
+        self.rerun_time_destination
             .stream
             .set_time_sequence("session_step_time", self.session_step_time as i64);
     }
@@ -713,7 +704,7 @@ impl fmt::Debug for Universe {
             session_step_time,
             spaces_with_work,
             #[cfg(feature = "rerun")]
-                rerun_destination: _,
+                rerun_time_destination: _,
         } = self;
 
         let mut ds = fmt.debug_struct("Universe");

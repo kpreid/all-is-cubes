@@ -669,9 +669,9 @@ where
         }
     }
 
-    /// Activate logging performance information to a Rerun stream.
+    /// Activate logging performance information as time series to a Rerun stream.
     #[cfg(feature = "rerun")]
-    pub fn log_to_rerun(&mut self, destination: rg::Destination) {
+    pub fn log_time_series_to_rerun(&mut self, destination: rg::Destination) {
         self.rerun_destination = destination;
 
         // Set up time series styling

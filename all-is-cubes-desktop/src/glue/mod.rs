@@ -34,7 +34,7 @@ impl Window for () {
 pub trait Renderer {
     // having the filter here is an abstraction violation but meh
     #[cfg(feature = "rerun")]
-    fn log_to_rerun(&mut self, destination: rg::Destination, filter: GpuRerunFilter) {
+    fn log_to_rerun(&mut self, destination: rg::RootDestination, filter: GpuRerunFilter) {
         let _ = destination;
         let _ = filter;
     }
@@ -44,7 +44,7 @@ impl Renderer for () {}
 
 impl Renderer for all_is_cubes_gpu::SurfaceRenderer {
     #[cfg(feature = "rerun")]
-    fn log_to_rerun(&mut self, destination: rg::Destination, filter: GpuRerunFilter) {
+    fn log_to_rerun(&mut self, destination: rg::RootDestination, filter: GpuRerunFilter) {
         // calling inherent method
         self.log_to_rerun(destination, filter);
     }

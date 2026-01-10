@@ -750,25 +750,31 @@ impl EverythingRenderer {
 
     /// Activate logging performance information to a Rerun stream.
     #[cfg(feature = "rerun")]
-    pub fn log_to_rerun(&mut self, destination: rg::Destination, filter: RerunFilter) {
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "avoiding extra clone more trouble than it's worth"
+    )]
+    pub fn log_to_rerun(&mut self, destination: rg::RootDestination, filter: RerunFilter) {
         let RerunFilter {
             performance,
             image,
             textures,
         } = filter;
         if performance {
-            self.space_renderers
-                .world
-                .log_to_rerun(destination.child(&rg::entity_path!["world"]));
-            self.space_renderers.ui.log_to_rerun(destination.child(&rg::entity_path!["ui"]));
+            self.space_renderers.world.log_perf_to_rerun(
+                destination.get(rg::Stem::RenderPerf).into_child(&rg::entity_path!["world"]),
+            );
+            self.space_renderers.ui.log_perf_to_rerun(
+                destination.get(rg::Stem::RenderPerf).into_child(&rg::entity_path!["ui"]),
+            );
         }
         if image {
-            self.rerun_image.log_to_rerun(destination.child(&rg::entity_path!["image"]));
+            self.rerun_image.log_to_rerun(destination.get(rg::Stem::WorldImage));
         }
         if textures {
             self.space_renderers
                 .world
-                .texture_allocator_log_to_rerun(destination.into_child(&rg::entity_path!["atlas"]));
+                .log_texture_allocator_to_rerun(destination.get(rg::Stem::Textures));
         }
     }
 }

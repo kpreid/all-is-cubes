@@ -190,7 +190,7 @@ impl SurfaceRenderer {
 
     /// Activate logging performance information state to a Rerun stream.
     #[cfg(feature = "rerun")]
-    pub fn log_to_rerun(&mut self, destination: rg::Destination, filter: RerunFilter) {
+    pub fn log_to_rerun(&mut self, destination: rg::RootDestination, filter: RerunFilter) {
         self.everything.log_to_rerun(destination, filter)
     }
 }
