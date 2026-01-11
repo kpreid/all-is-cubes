@@ -1,4 +1,5 @@
 use core::cmp::Ordering;
+use core::error::Error;
 use core::fmt;
 use core::hash;
 use core::iter;
@@ -435,6 +436,36 @@ impl<T: fmt::Display> fmt::Display for ZeroOne<T> {
     }
 }
 
+impl<T> core::str::FromStr for PositiveSign<T>
+where
+    T: core::str::FromStr<Err = core::num::ParseFloatError>
+        + TryInto<Self, Error = NotPositiveSign<T>>,
+{
+    type Err = ParseOrRangeError<NotPositiveSign<T>>;
+
+    #[allow(clippy::missing_inline_in_public_items)]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse::<T>()
+            .map_err(ParseOrRangeError::Parse)?
+            .try_into()
+            .map_err(ParseOrRangeError::Range)
+    }
+}
+impl<T> core::str::FromStr for ZeroOne<T>
+where
+    T: core::str::FromStr<Err = core::num::ParseFloatError> + TryInto<Self, Error = NotZeroOne<T>>,
+{
+    type Err = ParseOrRangeError<NotZeroOne<T>>;
+
+    #[allow(clippy::missing_inline_in_public_items)]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse::<T>()
+            .map_err(ParseOrRangeError::Parse)?
+            .try_into()
+            .map_err(ParseOrRangeError::Range)
+    }
+}
+
 // The derived PartialEq implementation is okay, but we need to add Eq.
 impl<T: PartialEq> Eq for PositiveSign<T> {}
 impl<T: PartialEq> Eq for ZeroOne<T> {}
@@ -801,12 +832,22 @@ where
 // --- Errors --------------------------------------------------------------------------------------
 
 /// Error from attempting to construct a [`PositiveSign`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct NotPositiveSign<T>(T);
 
 /// Error from attempting to construct a [`ZeroOne`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct NotZeroOne<T>(T);
+
+/// Error from attempting to parse a [`PositiveSign`] or [`ZeroOne`] from a string.
+#[derive(Clone, Debug, PartialEq)]
+#[allow(clippy::exhaustive_enums)]
+pub enum ParseOrRangeError<R> {
+    /// The string was not parseable.
+    Parse(core::num::ParseFloatError),
+    /// The value was recognized but is not in the correct range.
+    Range(R),
+}
 
 impl<T: FloatCore + fmt::Display> fmt::Display for NotPositiveSign<T> {
     #[inline(never)]
@@ -834,8 +875,27 @@ impl<T: FloatCore + fmt::Display> fmt::Display for NotZeroOne<T> {
     }
 }
 
-impl<T: FloatCore + fmt::Display + fmt::Debug> core::error::Error for NotPositiveSign<T> {}
-impl<T: FloatCore + fmt::Display + fmt::Debug> core::error::Error for NotZeroOne<T> {}
+impl<R: fmt::Display> fmt::Display for ParseOrRangeError<R> {
+    #[inline(never)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParseOrRangeError::Parse(e) => e.fmt(f),
+            ParseOrRangeError::Range(e) => e.fmt(f),
+        }
+    }
+}
+
+impl<T: FloatCore + fmt::Display + fmt::Debug> Error for NotPositiveSign<T> {}
+impl<T: FloatCore + fmt::Display + fmt::Debug> Error for NotZeroOne<T> {}
+impl<R: Error> Error for ParseOrRangeError<R> {
+    #[allow(clippy::missing_inline_in_public_items)]
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            ParseOrRangeError::Parse(e) => e.source(),
+            ParseOrRangeError::Range(e) => e.source(),
+        }
+    }
+}
 
 #[track_caller]
 #[cold]
@@ -1081,6 +1141,80 @@ mod tests {
         ] {
             zo32(f).consistency_check();
         }
+    }
+
+    /// Test `impl FromStr for PositiveSign` in cases equivalent to the underlying type.
+    #[test]
+    fn ps_parse_in_range_or_err() {
+        for string in [
+            "-0.0", "0.0", "", "1.0", "+1.0", "2.5", "1e100", "INF", "Infinity",
+        ] {
+            assert_eq!(
+                string.parse::<f32>().map(|value| PositiveSign::try_from(value).unwrap()),
+                string.parse::<PositiveSign<f32>>().map_err(|e| {
+                    if let ParseOrRangeError::Parse(pe) = e {
+                        pe
+                    } else {
+                        panic!("unexpected error {e:?}")
+                    }
+                }),
+                "{string:?}",
+            )
+        }
+    }
+
+    /// Test that negative zero is accepted, but does not leak through.
+    #[test]
+    fn ps_parse_negative_zero_as_positive_zero() {
+        let negative_zero = "-0.0".parse::<PositiveSign<f32>>().unwrap();
+        assert_eq!(negative_zero, ps32(0.0));
+        assert_eq!(negative_zero.into_inner().signum(), 1.0);
+    }
+
+    #[test]
+    fn ps_parse_out_of_range() {
+        assert_eq!(
+            "-1.0".parse::<PositiveSign<f32>>(),
+            Err(ParseOrRangeError::Range(NotPositiveSign(-1.0f32)))
+        );
+    }
+
+    /// Test `impl FromStr for ZeroOne` in cases equivalent to the underlying type.
+    #[test]
+    fn zo_parse_in_range_or_err() {
+        for string in ["-0.0", "0.0", "0.5", "2e-3", "1.0", "+1.0", "1e0"] {
+            assert_eq!(
+                string.parse::<f32>().map(|value| ZeroOne::try_from(value).unwrap()),
+                string.parse::<ZeroOne<f32>>().map_err(|e| {
+                    if let ParseOrRangeError::Parse(pe) = e {
+                        pe
+                    } else {
+                        panic!("unexpected error {e:?}")
+                    }
+                }),
+                "{string:?}",
+            )
+        }
+    }
+
+    /// Test that negative zero is accepted, but does not leak through.
+    #[test]
+    fn zo_parse_negative_zero_as_positive_zero() {
+        let negative_zero = "-0.0".parse::<ZeroOne<f32>>().unwrap();
+        assert_eq!(negative_zero, zo32(0.0));
+        assert_eq!(negative_zero.into_inner().signum(), 1.0);
+    }
+
+    #[test]
+    fn zo_parse_out_of_range() {
+        assert_eq!(
+            "-1.0".parse::<ZeroOne<f32>>(),
+            Err(ParseOrRangeError::Range(NotZeroOne(-1.0f32)))
+        );
+        assert_eq!(
+            "1.1".parse::<ZeroOne<f32>>(),
+            Err(ParseOrRangeError::Range(NotZeroOne(1.1f32)))
+        );
     }
 
     #[cfg(feature = "arbitrary")]
