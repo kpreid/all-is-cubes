@@ -89,6 +89,10 @@ impl Cube {
     // This is not a `const fn` because `f64::floor()` is not available in `core` and
     // `FloatCore::floor()` is not a `const fn`.
     #[inline]
+    #[allow(
+        clippy::needless_bitwise_bool,
+        reason = "superior code size and equal performance"
+    )]
     pub fn containing(point: FreePoint) -> Option<Self> {
         const MIN_INCLUSIVE: FreeCoordinate = GridCoordinate::MIN as FreeCoordinate;
         const MAX_EXCLUSIVE: FreeCoordinate = GridCoordinate::MAX as FreeCoordinate + 1.0;

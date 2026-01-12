@@ -891,6 +891,10 @@ impl fmt::Display for VolLengthError {
 /// This function can only be called through [`Vol`] which does check; it is the implementation
 /// of [`Vol::index()`].
 #[inline(always)] // very hot code
+#[allow(
+    clippy::needless_bitwise_bool,
+    reason = "better code size and performance"
+)]
 fn index_into_aab_zmaj(bounds: GridAab, cube: Cube) -> Option<usize> {
     let sizes = bounds.size();
 
