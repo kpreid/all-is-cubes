@@ -17,8 +17,11 @@ use crate::{block::Block, camera::Camera, space::Space};
 // (Due to crate splitting that can't be a doc-link.)
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "save", serde(default))]
+#[cfg_attr(
+    feature = "_serde_math_and_graphics_options",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+#[cfg_attr(feature = "_serde_math_and_graphics_options", serde(default))]
 #[non_exhaustive]
 pub struct GraphicsOptions {
     /// Overall rendering technique to use.
@@ -59,7 +62,10 @@ pub struct GraphicsOptions {
     /// available range.
     ///
     /// The default value is ∞.
-    #[cfg_attr(feature = "save", serde(with = "serialize_infinity_as_none"))]
+    #[cfg_attr(
+        feature = "_serde_math_and_graphics_options",
+        serde(with = "serialize_infinity_as_none")
+    )]
     pub maximum_intensity: PositiveSign<f32>,
 
     /// “Camera exposure” value: a scaling factor from scene luminance to displayed
@@ -277,7 +283,10 @@ impl Default for GraphicsOptions {
 
 /// Choices for [`GraphicsOptions::render_method`].
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "_serde_math_and_graphics_options",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[non_exhaustive]
 pub enum RenderMethod {
     /// Use whichever method is presumed to be better for the current situation.
@@ -309,7 +318,10 @@ pub enum RenderMethod {
 ///
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "_serde_math_and_graphics_options",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[non_exhaustive]
 pub enum FogOption {
     /// No fog: objects will maintain their color and disappear raggedly.
@@ -326,7 +338,10 @@ pub enum FogOption {
 ///
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "_serde_math_and_graphics_options",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[non_exhaustive]
 pub enum ToneMappingOperator {
     /// Limit values above the maximum (or below zero) to lie within that range.
@@ -371,7 +386,10 @@ impl ToneMappingOperator {
 ///
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "_serde_math_and_graphics_options",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[non_exhaustive]
 pub enum ExposureOption {
     /// Constant exposure; light values in the scene are multiplied by this value
@@ -414,7 +432,10 @@ impl Default for ExposureOption {
 ///
 /// [`Space`]: crate::space::Space
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "_serde_math_and_graphics_options",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[non_exhaustive]
 pub enum LightingOption {
     /// No lighting: objects will be displayed with their intrinsically defined surface color,
@@ -444,7 +465,10 @@ pub enum LightingOption {
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "_serde_math_and_graphics_options",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[non_exhaustive]
 pub enum TransparencyOption {
     /// Conventional transparent surfaces.
@@ -486,7 +510,10 @@ impl TransparencyOption {
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "_serde_math_and_graphics_options",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[non_exhaustive]
 pub enum AntialiasingOption {
     /// Do not apply antialiasing. Every pixel of the rendered image will be the exact
@@ -533,7 +560,7 @@ impl AntialiasingOption {
 /// does not accept it in deserialization. Work around this by adding an `Option`.
 /// Arguably this should be done in `PositiveSign` itself, but I don’t want to do this to more
 /// general types.
-#[cfg(feature = "save")]
+#[cfg(feature = "_serde_math_and_graphics_options")]
 mod serialize_infinity_as_none {
     use crate::math::PositiveSign;
     use serde::{Deserialize, Serialize};

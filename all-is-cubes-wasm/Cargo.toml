@@ -31,7 +31,8 @@ all-is-cubes = { path = "../all-is-cubes", version = "0.10.0" }
 all-is-cubes-content = { path = "../all-is-cubes-content", version = "0.10.0" }
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", version = "0.10.0", features = ["wgpu"] }
 all-is-cubes-port = { path = "../all-is-cubes-port", version = "0.10.0", features = ["import", "all-formats"] }
-all-is-cubes-render = { path = "../all-is-cubes-render", version = "0.10.0" }
+# TODO: serde feature is for saving GraphicsOptions — when we change how settings serialization works, it will no longer be relevant
+all-is-cubes-render = { path = "../all-is-cubes-render", version = "0.10.0", features = ["serde"] }
 all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.10.0", features = ["session"] }
 console_log = "1.0.0"
 console_error_panic_hook = "0.1.5"

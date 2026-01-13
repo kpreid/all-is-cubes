@@ -29,7 +29,7 @@ bitflags::bitflags! {
     ///  I apologize for this being so specific to All is Cubes internals.
     #[derive(Clone, Copy, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
     // TODO: deserialization should be lenient and ignore unknown textual flags
-    #[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+    #[cfg_attr(feature = "_serde_math_and_graphics_options", derive(serde::Serialize, serde::Deserialize))]
     pub struct ShowStatus: u32 {
         /// The “game world” universe (not the UI).
         const WORLD = 1 << 0;

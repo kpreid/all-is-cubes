@@ -75,14 +75,14 @@ arbitrary = [
     "euclid/arbitrary",
     "ordered-float/arbitrary",
 ]
-# Adds serde implementations.
+# Adds serde implementations for `Universe` and its components.
 save = [
     "std", # TODO: Eliminate dependency on std (requires replacing flate2)
     "dep:base64", # encoded compressed data
     "dep:flate2", # compression
     "dep:serde",
-    "all-is-cubes-base/serde",
-    "bitflags/serde", # serialize for util::ShowStatus
+    "all-is-cubes-base/serde", # math types
+    "bitflags/serde", # serde for util::ShowStatus
     "bytemuck/extern_crate_std", # impl Error for CheckedCastError
     "ordered-float/serde",
 ]
@@ -103,6 +103,14 @@ auto-threads = [
     "bevy_ecs/multi_threaded",
     "bevy_ecs/std", # shouldn't be necessary
     "bevy_ecs/async_executor", # shouldn't be necessary
+]
+# Not for external use.
+# Enables serialization of `GraphicsOptions`, its components, and `math` types.
+_serde_math_and_graphics_options = [
+    "dep:serde",
+    "all-is-cubes-base/serde", # serde for math
+    "bitflags/serde", # serde for util::ShowStatus
+    "ordered-float/serde", # serde for NotNan
 ]
 # Makes certain internal items public.
 # This feature is intended only for use when developing All is Cubes,

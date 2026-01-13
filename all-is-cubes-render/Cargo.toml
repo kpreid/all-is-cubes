@@ -42,6 +42,8 @@ raytracer = [
     "dep:rand_distr", # random bounce rays
     "dep:unicode-segmentation", # text-output raytracer -- TODO: consider giving it its own feature
 ]
+# Enables `serde` serialization for `GraphicsOptions` and its component types.
+serde = ["all-is-cubes/_serde_math_and_graphics_options"]
 
 [dependencies]
 all-is-cubes = { workspace = true }
