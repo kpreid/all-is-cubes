@@ -39,7 +39,7 @@ pub(crate) struct Membership {
 
 fn add_membership_hook(
     mut world: bevy_ecs::world::DeferredWorld<'_>,
-    context: bevy_ecs::component::HookContext,
+    context: bevy_ecs::lifecycle::HookContext,
 ) {
     let membership = world.get::<Membership>(context.entity).unwrap().clone();
     world.resource_mut::<NameMap>().map.insert(membership.name, membership.handle);
@@ -47,7 +47,7 @@ fn add_membership_hook(
 
 fn remove_membership_hook(
     mut world: bevy_ecs::world::DeferredWorld<'_>,
-    context: bevy_ecs::component::HookContext,
+    context: bevy_ecs::lifecycle::HookContext,
 ) {
     let name: Name = world.get::<Membership>(context.entity).unwrap().name.clone();
     world.resource_mut::<NameMap>().map.remove(&name);

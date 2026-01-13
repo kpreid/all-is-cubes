@@ -138,6 +138,7 @@ pub struct Universe {
 #[derive(ecs::FromWorld)]
 #[macro_rules_attribute::derive(ecs_details::derive_manual_query_bundle!)]
 struct Queries {
+    all_entities_query: ecs::QueryState<ecs::EntityRef<'static>>,
     all_members_query: ecs::QueryState<(Entity, &'static Membership)>,
     read_members: MemberReadQueryStates,
     write_members: MemberWriteQueryStates,
@@ -307,11 +308,8 @@ impl Universe {
         self.world.run_schedule(time::schedule::Synchronize);
 
         // TODO: Move this out of `Universe::step()` into schedules (requires rewording the transactions).
-        let transactions_from_space_behaviors = self
-            .world
-            .run_system_cached(space::step::step_behaviors_system)
-            .unwrap()
-            .unwrap();
+        let transactions_from_space_behaviors: Vec<UniverseTransaction> =
+            self.world.run_system_cached(space::step::step_behaviors_system).unwrap();
 
         self.world.run_schedule(time::schedule::Synchronize);
 
@@ -725,13 +723,16 @@ impl fmt::Debug for Universe {
             // A more “raw” dump of the ECS world which doesn't depend for correctness on
             // all_members_query having been updated, and can see non-"member" entities.
             // TODO(ecs): Decide whether to keep or discard this.
-            let raw_entities: Vec<(Option<Name>, Vec<&str>)> = world
-                .iter_entities()
+            let raw_entities: Vec<(Option<Name>, Vec<_>)> = self
+                .queries
+                .all_entities_query
+                .iter_manual(world)
                 .map(|er| {
                     let components = er
                         .archetype()
                         .components()
-                        .map(|cid| world.components().get_info(cid).unwrap().name())
+                        .iter()
+                        .map(|&cid| world.components().get_info(cid).unwrap().name())
                         .collect();
                     let name = er.get::<Membership>().map(|m| m.name.clone());
                     (name, components)

@@ -342,9 +342,9 @@ impl universe::SealedMember for Character {
             ambient_sound: &sound::SpatialAmbient::SILENT,
         }
     }
-    fn read_from_query(
-        data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'_>,
-    ) -> <Self as universe::UniverseMember>::Read<'_> {
+    fn read_from_query<'r>(
+        data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'r, '_>,
+    ) -> <Self as universe::UniverseMember>::Read<'r> {
         let (core, body, ParentSpace(space), inventory, physics, sound_state) = data;
         Read {
             core,
