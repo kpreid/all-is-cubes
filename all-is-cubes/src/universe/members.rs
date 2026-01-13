@@ -42,7 +42,9 @@ pub(crate) trait SealedMember: Sized {
         Self: UniverseMember;
 
     /// Constructs `Self::Read` from query data.
-    fn read_from_query(data: <Self::ReadQueryData as QueryData>::Item<'_>) -> Self::Read<'_>
+    fn read_from_query<'r>(
+        data: <Self::ReadQueryData as QueryData>::Item<'r, '_>,
+    ) -> Self::Read<'r>
     where
         Self: UniverseMember;
 
@@ -132,9 +134,9 @@ macro_rules! impl_universe_member_for_single_component_type {
                 value
             }
 
-            fn read_from_query(
-                data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'_>,
-            ) -> <Self as $crate::universe::UniverseMember>::Read<'_> {
+            fn read_from_query<'r>(
+                data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'r, '_>,
+            ) -> <Self as $crate::universe::UniverseMember>::Read<'r> {
                 data
             }
 

@@ -34,6 +34,8 @@ all-is-cubes-port = { path = "../all-is-cubes-port", version = "0.10.0", feature
 # TODO: serde feature is for saving GraphicsOptions — when we change how settings serialization works, it will no longer be relevant
 all-is-cubes-render = { path = "../all-is-cubes-render", version = "0.10.0", features = ["serde"] }
 all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.10.0", features = ["session"] }
+# Feature enabling. TODO: This would ideally be delegated through an all-is-cubes feature
+bevy_platform = { version = "0.18.0", default-features = false, features = ["web"] }
 console_log = "1.0.0"
 console_error_panic_hook = "0.1.5"
 # using flume instead of `futures_channel::mpsc` because it has `try_send(&self)` instead of `try_send(&mut self)`, and it is also used elsewhere in the project
