@@ -188,12 +188,25 @@ fn run(
         'input: while crossterm::event::poll(Duration::ZERO)
             .context("crossterm input poll() failed")?
         {
+            // TODO: Instead of having two layers of key binding processing here,
+            // `InputProcessor` should support custom keybindings.
+
             let event = crossterm::event::read().context("crossterm input read() failed")?;
-            if let Some(aic_event) = event_to_key(&event)
-                && dsession.session.input_processor.key_momentary(aic_event)
-            {
-                // Handled by input_processor
-                continue 'input;
+            if let Some(aic_event) = event_to_key(&event) {
+                let processed: bool = if dsession.window.keyboard_enhancement {
+                    if event.is_key_release() {
+                        dsession.session.input_processor.key_up(aic_event);
+                        false // processing key-up by both paths should be harmless
+                    } else {
+                        dsession.session.input_processor.key_down(aic_event)
+                    }
+                } else {
+                    dsession.session.input_processor.key_momentary(aic_event)
+                };
+                if processed {
+                    // Handled by input_processor
+                    continue 'input;
+                }
             }
             let options = &mut dsession.renderer.options;
             match event {
