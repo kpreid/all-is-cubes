@@ -23,15 +23,15 @@ user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.anstyle-query]]
-version = "1.1.4"
-when = "2025-08-05"
+version = "1.1.5"
+when = "2025-11-13"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.anstyle-wincon]]
-version = "3.0.10"
-when = "2025-08-05"
+version = "3.0.11"
+when = "2025-11-13"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
@@ -51,15 +51,15 @@ user-login = "fitzgen"
 user-name = "Nick Fitzgerald"
 
 [[publisher.clap]]
-version = "4.5.50"
-when = "2025-10-20"
+version = "4.5.53"
+when = "2025-11-19"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.clap_builder]]
-version = "4.5.50"
-when = "2025-10-20"
+version = "4.5.53"
+when = "2025-11-19"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
@@ -204,183 +204,169 @@ user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
 
 [[publisher.re_arrow_util]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_build_info]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_build_tools]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_byte_size]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_case]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_chunk]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_error]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_format]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_grpc_client]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_grpc_server]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_log]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_log_encoding]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_log_types]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_memory]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_protos]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_sdk]]
-version = "0.27.2"
-when = "2025-11-14"
-user-id = 197939
-user-login = "rerunio"
-user-name = "rerun.io"
-
-[[publisher.re_smart_channel]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_sorbet]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_span]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_string_interner]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_tracing]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_tuid]]
-version = "0.27.2"
-when = "2025-11-14"
-user-id = 197939
-user-login = "rerunio"
-user-name = "rerun.io"
-
-[[publisher.re_types]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_types_core]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_uri]]
-version = "0.27.2"
-when = "2025-11-14"
+version = "0.28.1"
+when = "2025-12-19"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.rendiff]]
-version = "0.2.1"
-when = "2024-06-10"
+version = "0.2.2"
+when = "2025-12-26"
 user-id = 98157
 user-login = "kpreid"
 user-name = "Kevin Reid"
@@ -435,50 +421,43 @@ user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.snapbox]]
-version = "0.6.22"
-when = "2025-10-15"
+version = "0.6.23"
+when = "2025-10-29"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.snapbox-macros]]
-version = "0.3.10"
-when = "2024-07-25"
+version = "0.4.0"
+when = "2025-10-29"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.toml_datetime]]
-version = "0.6.11"
-when = "2025-06-06"
-user-id = 6743
-user-login = "epage"
-user-name = "Ed Page"
-
-[[publisher.toml_datetime]]
-version = "0.7.3"
-when = "2025-10-09"
+version = "0.7.5+spec-1.1.0"
+when = "2025-12-18"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.toml_edit]]
-version = "0.22.27"
-when = "2025-06-06"
+version = "0.23.9"
+when = "2025-12-06"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.toml_edit]]
-version = "0.23.7"
-when = "2025-10-09"
+version = "0.24.0+spec-1.1.0"
+when = "2025-12-18"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
 [[publisher.trycmd]]
-version = "0.15.10"
-when = "2025-07-10"
+version = "0.15.11"
+when = "2025-11-17"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
@@ -533,29 +512,29 @@ user-login = "alexcrichton"
 user-name = "Alex Crichton"
 
 [[publisher.wgpu]]
-version = "27.0.1"
-when = "2025-10-02"
+version = "28.0.0"
+when = "2025-12-18"
 user-id = 53780
 user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
 
 [[publisher.wgpu-core]]
-version = "27.0.0"
-when = "2025-10-01"
+version = "28.0.0"
+when = "2025-12-18"
 user-id = 53780
 user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
 
 [[publisher.wgpu-hal]]
-version = "27.0.4"
-when = "2025-10-23"
+version = "28.0.0"
+when = "2025-12-18"
 user-id = 53780
 user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
 
 [[publisher.winnow]]
-version = "0.7.13"
-when = "2025-08-22"
+version = "0.7.14"
+when = "2025-11-26"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
@@ -763,6 +742,11 @@ who = "Pat Hickey <phickey@fastly.com>"
 criteria = "safe-to-deploy"
 version = "0.1.1"
 
+[[audits.bytecode-alliance.audits.futures]]
+who = "Joel Dice <joel.dice@gmail.com>"
+criteria = "safe-to-deploy"
+version = "0.3.31"
+
 [[audits.bytecode-alliance.audits.futures-channel]]
 who = "Joel Dice <joel.dice@gmail.com>"
 criteria = "safe-to-deploy"
@@ -778,6 +762,11 @@ notes = "Unsafe used to implement a concurrency primitive AtomicWaker. Well-comm
 who = "Pat Hickey <pat@moreproductive.org>"
 criteria = "safe-to-deploy"
 delta = "0.3.28 -> 0.3.31"
+
+[[audits.bytecode-alliance.audits.futures-executor]]
+who = "Joel Dice <joel.dice@gmail.com>"
+criteria = "safe-to-deploy"
+version = "0.3.31"
 
 [[audits.bytecode-alliance.audits.futures-io]]
 who = "Joel Dice <joel.dice@gmail.com>"
@@ -953,6 +942,26 @@ notes = "No substantive changes in this update"
 who = "Pat Hickey <phickey@fastly.com>"
 criteria = "safe-to-deploy"
 version = "0.1.0"
+
+[[audits.bytecode-alliance.audits.pkg-config]]
+who = "Pat Hickey <phickey@fastly.com>"
+criteria = "safe-to-deploy"
+version = "0.3.25"
+notes = "This crate shells out to the pkg-config executable, but it appears to sanitize inputs reasonably."
+
+[[audits.bytecode-alliance.audits.pkg-config]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "0.3.26 -> 0.3.29"
+notes = """
+No `unsafe` additions or anything outside of the purview of the crate in this
+change.
+"""
+
+[[audits.bytecode-alliance.audits.pkg-config]]
+who = "Chris Fallin <chris@cfallin.org>"
+criteria = "safe-to-deploy"
+delta = "0.3.29 -> 0.3.32"
 
 [[audits.bytecode-alliance.audits.rustc-demangle]]
 who = "Alex Crichton <alex@alexcrichton.com>"
@@ -2776,15 +2785,15 @@ criteria = "safe-to-run"
 delta = "0.5.1 -> 0.6.0"
 notes = "No new unsafe code and nothing suspicious in build scripts."
 
-[[audits.isrg.audits.criterion-plot]]
-who = "David Cook <dcook@divviup.org>"
+[[audits.isrg.audits.criterion]]
+who = "J.C. Jones <jc@divviup.org>"
 criteria = "safe-to-run"
-delta = "0.6.0 -> 0.7.0"
+delta = "0.8.0 -> 0.8.1"
 
 [[audits.isrg.audits.criterion-plot]]
-who = "David Cook <dcook@divviup.org>"
+who = "J.C. Jones <jc@divviup.org>"
 criteria = "safe-to-run"
-delta = "0.7.0 -> 0.8.0"
+version = "0.8.1"
 
 [[audits.isrg.audits.num-iter]]
 who = "David Cook <dcook@divviup.org>"
@@ -3443,6 +3452,12 @@ criteria = "safe-to-deploy"
 delta = "0.26.0 -> 0.27.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
+[[audits.mozilla.audits.gpu-allocator]]
+who = "Erich Gubler <erichdongubler@gmail.com>"
+criteria = "safe-to-deploy"
+delta = "0.27.0 -> 0.28.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
 [[audits.mozilla.audits.hashbrown]]
 who = "Erich Gubler <erichdongubler@gmail.com>"
 criteria = "safe-to-deploy"
@@ -3453,6 +3468,12 @@ aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-ch
 who = "Erich Gubler <erichdongubler@gmail.com>"
 criteria = "safe-to-deploy"
 delta = "0.15.5 -> 0.16.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.hex]]
+who = "Simon Friedberger <simon@mozilla.com>"
+criteria = "safe-to-deploy"
+version = "0.4.3"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.iana-time-zone]]
@@ -3678,6 +3699,12 @@ criteria = "safe-to-deploy"
 delta = "0.31.0 -> 0.32.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
+[[audits.mozilla.audits.metal]]
+who = "Jim Blandy <jimb@red-bean.com>"
+criteria = "safe-to-deploy"
+delta = "0.32.0 -> 0.33.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
 [[audits.mozilla.audits.naga]]
 who = "Dzmitry Malyshau <kvark@fastmail.com>"
 criteria = "safe-to-deploy"
@@ -3791,6 +3818,17 @@ criteria = "safe-to-deploy"
 delta = "26.0.0 -> 27.0.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
+[[audits.mozilla.audits.naga]]
+who = [
+    "Andy Leiserson <aleiserson@mozilla.com>",
+    "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
+    "Erich Gubler <erichdongubler@gmail.com>",
+    "Jim Blandy <jimb@red-bean.com>",
+]
+criteria = "safe-to-deploy"
+delta = "27.0.0 -> 28.0.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
 [[audits.mozilla.audits.nix]]
 who = "Gabriele Svelto <gsvelto@mozilla.com>"
 criteria = "safe-to-deploy"
@@ -3825,6 +3863,12 @@ aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-ch
 who = "Mike Hommey <mh+mozilla@glandium.org>"
 criteria = "safe-to-deploy"
 delta = "0.4.0 -> 0.4.2"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.objc2]]
+who = "Andy Leiserson <aleiserson@mozilla.com>"
+criteria = "safe-to-deploy"
+version = "0.6.3"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.once_cell]]
@@ -3867,6 +3911,12 @@ Only functional change is to work around a bug in the negative_impls feature
 (https://github.com/taiki-e/pin-project/issues/340#issuecomment-2432146009)
 """
 aggregated-from = "https://raw.githubusercontent.com/mozilla/cargo-vet/main/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.pkg-config]]
+who = "Mike Hommey <mh+mozilla@glandium.org>"
+criteria = "safe-to-deploy"
+delta = "0.3.25 -> 0.3.26"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.powerfmt]]
 who = "Alex Franchuk <afranchuk@mozilla.com>"
@@ -4198,6 +4248,17 @@ criteria = "safe-to-deploy"
 delta = "26.0.0 -> 27.0.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
+[[audits.mozilla.audits.wgpu-core-deps-apple]]
+who = [
+    "Andy Leiserson <aleiserson@mozilla.com>",
+    "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
+    "Erich Gubler <erichdongubler@gmail.com>",
+    "Jim Blandy <jimb@red-bean.com>",
+]
+criteria = "safe-to-deploy"
+delta = "27.0.0 -> 28.0.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
 [[audits.mozilla.audits.wgpu-core-deps-windows-linux-android]]
 who = "Erich Gubler <erichdongubler@gmail.com>"
 criteria = "safe-to-deploy"
@@ -4219,6 +4280,17 @@ who = [
 ]
 criteria = "safe-to-deploy"
 delta = "26.0.0 -> 27.0.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.wgpu-core-deps-windows-linux-android]]
+who = [
+    "Andy Leiserson <aleiserson@mozilla.com>",
+    "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
+    "Erich Gubler <erichdongubler@gmail.com>",
+    "Jim Blandy <jimb@red-bean.com>",
+]
+criteria = "safe-to-deploy"
+delta = "27.0.0 -> 28.0.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.wgpu-types]]
