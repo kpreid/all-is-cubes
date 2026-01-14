@@ -35,6 +35,10 @@ pub struct TerminalWindow {
 
     /// Last retrieved size of the terminal.
     viewport_position: Rect,
+
+    /// Value of [`crossterm::terminal::supports_keyboard_enhancement()`], indicating whether
+    /// we will receive key-up events.
+    pub(crate) keyboard_enhancement: bool,
 }
 
 #[derive(Debug)]
@@ -73,6 +77,9 @@ struct TerminalState {
     /// True if we should clean up on drop.
     reset_terminal_on_drop: bool,
 
+    /// True if we are doing [`crossterm::event::PushKeyboardEnhancementFlags`].
+    keyboard_enhancement: bool,
+
     /// Region of the terminal the scene is drawn into;
     /// updated when `ratatui` layout runs.
     pub(crate) viewport_position: Rect,
@@ -88,7 +95,14 @@ enum MaybeTui {
 }
 
 impl TerminalWindow {
+    /// Construct a [`TerminalWindow`] attached to stdout.
+    ///
+    /// This function blocks on some queries to the terminal for size and capabilities.
     pub(super) fn new() -> Result<Self, anyhow::Error> {
+        let has_terminal_stdin = io::IsTerminal::is_terminal(&io::stdin());
+        let keyboard_enhancement = has_terminal_stdin
+            && crossterm::terminal::supports_keyboard_enhancement().unwrap_or(false);
+
         let tui = match Terminal::new(CrosstermBackend::new(io::stdout())) {
             Ok(tui) => MaybeTui::Tui(tui),
             Err(io_error) => {
@@ -103,9 +117,10 @@ impl TerminalWindow {
         let state = TerminalState {
             tui,
             in_sender,
-            has_terminal_stdin: io::IsTerminal::is_terminal(&io::stdin()),
+            has_terminal_stdin,
             viewport_position: Rect::default(),
             reset_terminal_on_drop: true,
+            keyboard_enhancement,
             widths: HashMap::new(),
         };
 
@@ -119,6 +134,7 @@ impl TerminalWindow {
             in_receiver,
             thread: Some(thread),
             viewport_position: Rect::default(),
+            keyboard_enhancement,
         })
     }
 
@@ -201,6 +217,7 @@ impl MaybeTui {
 
 fn terminal_thread_loop(output_channel: mpsc::Receiver<OutMsg>, mut state: TerminalState) {
     log::trace!("entering terminal_thread_loop()");
+
     for command in output_channel {
         // TODO: handle IO errors
         log::trace!("received command {command:?}");
@@ -229,9 +246,18 @@ impl TerminalState {
     fn begin_fullscreen(&mut self) -> anyhow::Result<()> {
         match &mut self.tui {
             MaybeTui::Tui(terminal) => {
+                use crossterm::event::KeyboardEnhancementFlags as Kef;
+
                 self.reset_terminal_on_drop = true;
                 if self.has_terminal_stdin {
                     crossterm::terminal::enable_raw_mode()?;
+                }
+                if self.keyboard_enhancement {
+                    terminal.backend_mut().queue(
+                        crossterm::event::PushKeyboardEnhancementFlags(
+                            Kef::REPORT_EVENT_TYPES | Kef::REPORT_ALL_KEYS_AS_ESCAPE_CODES,
+                        ),
+                    )?;
                 }
                 terminal.backend_mut().queue(crossterm::event::EnableMouseCapture)?;
                 terminal.clear()?;
@@ -258,6 +284,9 @@ impl TerminalState {
             log_if_fails(out.queue(SetColors(Colors::new(Color::Reset, Color::Reset))));
             log_if_fails(out.queue(cursor::Show));
             log_if_fails(out.queue(crossterm::event::DisableMouseCapture));
+            if self.keyboard_enhancement {
+                log_if_fails(out.queue(crossterm::event::PopKeyboardEnhancementFlags));
+            }
             log_if_fails(crossterm::terminal::disable_raw_mode());
             self.reset_terminal_on_drop = false;
         }
