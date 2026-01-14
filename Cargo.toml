@@ -82,10 +82,10 @@ async_fn_traits = { version = "0.1.1", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bevy_ecs = { version = "0.18.0", default-features = false }
 bevy_platform = { version = "0.18.0", default-features = false, features = ["alloc"] }
-bitflags = { version = "2.9.0", default-features = false }
+bitflags = { version = "2.10.0", default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1.24.0", default-features = false, features = ["derive", "must_cast"] }
-cfg-if = { version = "1.0.0", default-features = false }
+cfg-if = { version = "1.0.4", default-features = false }
 # When upgrading clap, beware text output changes causing integration tests to fail.
 clap = { version = "4.5", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
 criterion = { version = "0.8.0", features = ["async", "cargo_bench_support", "html_reports"] }
@@ -144,7 +144,7 @@ rustc-hash = { version = "2.1.1", default-features = false }
 scopeguard = { version = "1.2.0", default-features = false }
 # "futures" feature is used by all-is-cubes-gpu, but it's small so we enable it everywhere 
 send_wrapper = { version = "0.6.0", default-features = false, features = ["futures"] }
-serde = { version = "1.0.225", default-features = false, features = ["derive"] }
+serde = { version = "1.0.228", default-features = false, features = ["derive"] }
 # TODO: currently all crates that use serde_json also need std, but that should change
 serde_json = { version = "1.0.142", default-features = false, features = ["std"] }
 simplelog = { version = "0.12.0", default-features = false, features = ["local-offset"] }
@@ -156,7 +156,7 @@ strum = { version = "0.26.3", default-features = false, features = ["derive"] }
 sync_wrapper = { version = "1.0.2", default-features = false }
 tempfile = { version = "3.23.0", default-features = false }
 thiserror = { version = "2.0.17", default-features = false }
-time = { version = "0.3.36", default-features = false }
+time = { version = "0.3.37", default-features = false }
 # Tokio is used for certain binaries.
 # The library crates do not require Tokio.
 tokio = { version = "1.47.1", default-features = false }

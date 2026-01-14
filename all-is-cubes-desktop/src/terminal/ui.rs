@@ -11,7 +11,7 @@ use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color as TuiColor, Modifier, Style};
+use ratatui::style::{Color as TuiColor, Style};
 use ratatui::text::Span;
 use ratatui::widgets::{Borders, Paragraph};
 
@@ -74,7 +74,7 @@ struct TerminalState {
     reset_terminal_on_drop: bool,
 
     /// Region of the terminal the scene is drawn into;
-    /// updated when `tui` layout runs.
+    /// updated when `ratatui` layout runs.
     pub(crate) viewport_position: Rect,
 
     /// The widths of "single characters" according to the terminal's interpretation
@@ -329,7 +329,7 @@ impl TerminalState {
         Ok(())
     }
 
-    /// Lay out and write the UI using [`tui`] -- everything on screen *except* for
+    /// Lay out and write the UI using [`ratatui`] -- everything on screen *except* for
     /// the raytraced scene.
     ///
     /// This function also stores the current scene viewport for future frames.
@@ -380,14 +380,14 @@ impl TerminalState {
 
                 const SELECTED_BLANK: Span<'static> = Span {
                     content: Cow::Borrowed(" "),
-                    style: STYLE_NONE,
+                    style: Style::new(),
                 };
                 const SELECTED_0: Span<'static> = Span {
                     content: Cow::Borrowed("1"),
                     style: Style {
                         fg: Some(TuiColor::Black),
                         bg: Some(TuiColor::Red),
-                        ..STYLE_NONE
+                        ..Style::new()
                     },
                 };
                 const SELECTED_1: Span<'static> = Span {
@@ -395,7 +395,7 @@ impl TerminalState {
                     style: Style {
                         fg: Some(TuiColor::Black),
                         bg: Some(TuiColor::Yellow),
-                        ..STYLE_NONE
+                        ..Style::new()
                     },
                 };
 
@@ -538,11 +538,3 @@ impl InventoryDisplay {
         }
     }
 }
-
-/// An empty style value (which `tui` doesn't provide as a constant)
-const STYLE_NONE: Style = Style {
-    fg: None,
-    bg: None,
-    add_modifier: Modifier::empty(),
-    sub_modifier: Modifier::empty(),
-};

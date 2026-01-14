@@ -39,6 +39,7 @@ allow-wildcard-paths = true
 skip = [
     { name = "rustc-hash" }, # lightweight, used by naga
     { name = "float-cmp" }, # lightweight, used by embedded-graphics (0.9) and stl_io (0.10)
+    { name = "spin" }, # used by bevy_platform and flume
 ]
 
 skip-tree = [
