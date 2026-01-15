@@ -77,7 +77,7 @@ impl Drop for MultiFailure {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{panic, *}; // resolve `ambiguous_panic_imports` <https://github.com/rust-lang/rust/issues/147319>
 
     #[test]
     fn expected_success() {
