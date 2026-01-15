@@ -272,7 +272,7 @@ fn run_command(
                 XtaskCommand::Update {
                     to: UpdateTo::Minimal,
                     dry_run: true,
-                    additional_args: Vec::new(),
+                    additional_args: vec!["--quiet".into()],
                 },
                 time_log,
             )?;
