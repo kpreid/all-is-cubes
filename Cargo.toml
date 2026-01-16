@@ -1,5 +1,8 @@
 [workspace]
 members = [
+  # When adding a package to this list, also add it to:
+  # * the lists of packages and any applicable special rules in tools/xtask/
+  # * the list of optimization settings in [profile.dev] below
   "all-is-cubes",
   "all-is-cubes-base",
   "all-is-cubes-content",
@@ -276,26 +279,31 @@ unused_async = "warn"
 wrong_self_convention = "warn"
 
 [profile.dev]
-# Enable some optimization to improve interactive performance in manual testing/experimenting.
-# In particular, inlining is crucial.
-opt-level = 2
-# Yes, this is the default for dev, but I want to be precise here: overflow checks are enabled
-# for ALL profiles. (Because not catching overflows in release mode is unwise when this is
-# precisely where the program is *likely to encounter bigger numbers than in testing*.)
-overflow-checks = true
 # Faster builds at the cost of pathname-sensitive debug info.
 # TODO: Disabled for <https://github.com/rust-lang/rust/issues/103976> in CI
 # split-debuginfo = "unpacked"
 
-# For packages whose code is not as performance-critical, spend less time optimizing
+# Optimization settings.
+# All is Cubes contains many operations that need to be optimized for acceptable
+# performance even during testing. In particular, inlining is crucial.
+# However, this is not true of every package, so we are deciding per package as well.
+opt-level = 1 # non-package-specific fallback value
+package."*".opt-level = 2 # applies to all packages not in the workspace
+package.all-is-cubes.opt-level = 1
+package.all-is-cubes-base.opt-level = 1
 package.all-is-cubes-content.opt-level = 1
+package.all-is-cubes-desktop.opt-level = 1
+package.all-is-cubes-gpu.opt-level = 1
 package.all-is-cubes-port.opt-level = 1
+package.all-is-cubes-render.opt-level = 1
 package.all-is-cubes-server.opt-level = 1
 package.all-is-cubes-ui.opt-level = 1
-package.test-renderers.opt-level = 1
+package.test-aic.opt-level = 0
+package.test-mesh.opt-level = 0
+package.test-renderers.opt-level = 0
+package.xtask.opt-level = 0
 
 [profile.release]
-# TODO: review recommended options for wasm releases
 overflow-checks = true
 
 [profile.test]
