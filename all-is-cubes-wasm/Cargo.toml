@@ -212,19 +212,21 @@ wrong_self_convention = "warn"
 arc_with_non_send_sync = "allow"
 
 [profile.dev]
-# Enable some optimization to improve interactive performance in manual testing/experimenting.
-# In particular, inlining is crucial.
-opt-level = 2
-# Yes, this is the default for dev, but I want to be precise here: overflow checks are enabled
-# for ALL profiles. (Because not catching overflows in release mode is unwise when this is
-# precisely where the program is *likely to encounter bigger numbers than in testing*.)
-overflow-checks = true
 # Faster builds at the cost of pathname-sensitive debug info.
 split-debuginfo = "unpacked"
 
-# For packages whose code is not as performance-critical, spend less time optimizing
+# Optimization settings.
+# All is Cubes contains many operations that need to be optimized for acceptable
+# performance even during testing. In particular, inlining is crucial.
+# However, this is not true of every package, so we are deciding per package as well.
+opt-level = 1 # non-package-specific fallback value
+package."*".opt-level = 2 # applies to all packages not in the workspace
+package.all-is-cubes.opt-level = 1
+package.all-is-cubes-base.opt-level = 1
 package.all-is-cubes-content.opt-level = 1
+package.all-is-cubes-gpu.opt-level = 1
 package.all-is-cubes-port.opt-level = 1
+package.all-is-cubes-render.opt-level = 1
 package.all-is-cubes-ui.opt-level = 1
 
 [profile.release]
