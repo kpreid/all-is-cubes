@@ -173,8 +173,9 @@ impl Raycaster {
     /// but may affect calculation precision, so should not be especially large or small.
     /// It also appears as the scale of the output field [`RaycastStep::t_distance`].
     ///
-    /// Note that this is an infinite iterator by default. Use [`.within()`](Self::within)
-    /// to restrict it.
+    /// Note that a raycast is unbounded by default — iteration will continue until the limits of
+    /// numeric representation of rays and cubes are reached.
+    /// Use [`.within()`](Self::within) to restrict it to a region of interest.
     ///
     /// ```
     /// # use all_is_cubes_base as all_is_cubes;
@@ -510,10 +511,16 @@ impl State {
     #[inline(always)]
     /// Constructor from [`Parameters`], and non-generic to discourage excess codegen.
     fn from_parameters(param: Parameters) -> Self {
-        // If there is no enclosing cube then the current cube is undefined so we cannot make
-        // meaningful progress. (In the event of within(), we could in theory have a
-        // suitably bounded interpretation, but that is not of practical interest.)
-        let cube = match Cube::containing(param.ray.origin) {
+        // If the origin has no enclosing cube, then we cannot make progress.
+        // In principle, we could intersect the ray with the bounds and proceed from there, but
+        // at these extreme distances we run into various numeric edge cases which it is easier
+        // to reject entirely.
+        //
+        // The check against MAXIMUM_BOUNDS protects `fast_forward()` from having to deal with
+        // some numerical issues from those few additional representable `Cube`s.
+        let cube = match Cube::containing(param.ray.origin)
+            .filter(|&cube| MAXIMUM_BOUNDS.contains_cube(cube))
+        {
             Some(cube) => cube.lower_bounds(),
             None => {
                 // Return a raycaster which emits no cubes.
