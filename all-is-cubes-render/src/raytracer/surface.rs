@@ -256,6 +256,7 @@ where
 {
     type Item = TraceStep<'a, D>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(b) = &mut self.current_block
             && let Some(surface) = b.next()
