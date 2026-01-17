@@ -4,12 +4,14 @@
     reason = "Bevy systems"
 )]
 
+use alloc::boxed::Box;
 use alloc::sync::Arc;
-use bevy_ecs::change_detection::DetectChangesMut;
 use core::{fmt, mem, ops};
 
+use bevy_ecs::change_detection::DetectChangesMut;
 use bevy_ecs::prelude as ecs;
 use bevy_ecs::schedule::IntoScheduleConfigs as _;
+use nosy::Listen as _;
 
 use crate::block::{self, Block, BlockChange, EvalBlockError, InEvalError, MinEval};
 use crate::listen::{self, Gate, IntoListener as _, Listener, Notifier};
@@ -36,21 +38,19 @@ type EvalResult = Result<MinEval, EvalBlockError>;
 /// Note that this cache only updates when the owning [`Universe`] is being stepped, or when
 /// a direct mutation to this [`BlockDef`] is performed, not when the contained [`Block`]
 /// sends a change notification.
-#[derive(bevy_ecs::component::Component)]
-#[require(BlockDefNextValue)]
 pub struct BlockDef {
     state: BlockDefState,
 
-    /// Notifier of changes to this `BlockDef`'s evaluation result, either via transaction or via
-    /// the contained block itself changing.
-    ///
-    /// Note that this fires only when the cache is refreshed, not when the underlying block sends
-    /// a change notification.
     notifier: Arc<Notifier<BlockChange>>,
 }
 
 /// Subset of [`BlockDef`] that is constructed anew when its block is replaced.
-struct BlockDefState {
+///
+/// The visibility of `pub(crate)` is necessary for the `SealedMember` implementation.
+/// This type is not actually used outside the module.
+#[derive(ecs::Component)]
+#[require(BlockDefNextValue, NotifierComponent)]
+pub(crate) struct BlockDefState {
     /// The current value.
     block: Block,
 
@@ -80,6 +80,29 @@ struct BlockDefState {
     block_listen_gate: Gate,
 }
 
+/// Notifier of changes to this `BlockDef` entity's evaluation result, either via transaction or via
+/// the contained block itself changing.
+///
+/// Note that this fires only when the cache is refreshed, not when the underlying block sends
+/// a change notification.
+///
+/// The visibility of `pub(crate)` is necessary for the `SealedMember` implementation.
+/// This type is not actually used outside the module.
+#[derive(Default, ecs::Component)]
+#[component(immutable)]
+pub(crate) struct NotifierComponent(Arc<Notifier<BlockChange>>);
+
+/// Read access to a [`BlockDef`] that is currently in a [`Universe`][universe::Universe].
+#[derive(Clone, Copy)]
+pub struct Read<'ticket> {
+    state: &'ticket BlockDefState,
+
+    notifier: &'ticket Notifier<BlockChange>,
+}
+
+// -------------------------------------------------------------------------------------------------
+
+// Methods on this `impl` should be duplicated in [`Read`].
 impl BlockDef {
     /// Constructs a new [`BlockDef`] that stores the given block (which may be replaced
     /// in the future).
@@ -93,7 +116,7 @@ impl BlockDef {
     /// Returns the current block value.
     ///
     /// Note that if you wish to get the [`EvaluatedBlock`] result, you should obtain the cached
-    /// value by calling `BlockDef.evaluate()`, or by using a [`Primitive::Indirect`],
+    /// value by calling [`BlockDef::evaluate()`], or by using a [`Primitive::Indirect`],
     /// not by calling `.block().evaluate()`, which is not cached.
     pub fn block(&self) -> &Block {
         &self.state.block
@@ -116,40 +139,10 @@ impl BlockDef {
                 // block with Primitive::Indirect.
                 block::Budget::decrement_components(&filter.budget).unwrap();
 
-                self.evaluate_impl(&filter)
+                universe::SealedMember::read_from_standalone(self).evaluate_impl(&filter)
             },
             &filter,
         )
-    }
-
-    /// Implementation of block evaluation used by a [`Primitive::Indirect`] pointing to this.
-    pub(super) fn evaluate_impl(
-        &self,
-        filter: &block::EvalFilter<'_>,
-    ) -> Result<MinEval, InEvalError> {
-        let &block::EvalFilter {
-            read_ticket: _,
-            skip_eval,
-            ref listener,
-            budget: _, // already accounted in the caller
-        } = filter;
-
-        if let Some(listener) = listener {
-            <BlockDef as listen::Listen>::listen(self, listener.clone());
-        }
-
-        if skip_eval {
-            // In this case, don't use the cache, because it might contain an error, which
-            // would imply the *listen* part also failed, which it did not.
-            Ok(block::AIR_EVALUATED_MIN)
-        } else {
-            // TODO: Rework the `MinEval` type or the signatures of evaluation internals
-            // so that we can benefit from caching the `EvaluatedBlock` and not just the `MinEval`.
-            self.state
-                .cache
-                .clone()
-                .map_err(EvalBlockError::into_internal_error_for_block_def)
-        }
     }
 }
 
@@ -203,6 +196,29 @@ impl fmt::Debug for BlockDef {
     }
 }
 
+impl fmt::Debug for Read<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // TODO: Consider printing the cache, but only if it wouldn't be redundant?
+        let Self {
+            state:
+                BlockDefState {
+                    block,
+                    cache: _,
+                    cache_dirty,
+                    listeners_ok,
+                    block_listen_gate: _,
+                },
+            notifier,
+        } = self;
+        f.debug_struct("BlockDef")
+            .field("block", &block)
+            .field("cache_dirty", &cache_dirty)
+            .field("listeners_ok", &listeners_ok)
+            .field("notifier", &notifier)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Registers a listener for whenever the result of evaluation of this block definition changes.
 /// Note that this only occurs when the owning [`Universe`] is being stepped.
 impl listen::Listen for BlockDef {
@@ -222,24 +238,65 @@ impl AsRef<Block> for BlockDef {
 
 impl VisitHandles for BlockDef {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        let Self { state, notifier: _ } = self;
+        state.visit_handles(visitor);
+    }
+}
+
+impl VisitHandles for BlockDefState {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         let Self {
-            state:
-                BlockDefState {
-                    block,
-                    // Not 100% sure we shouldn't visit the cache too, but
-                    // it's not serialized, at least, which is a sign that no.
-                    cache: _,
-                    cache_dirty: _,
-                    listeners_ok: _,
-                    block_listen_gate: _,
-                },
-            notifier: _,
+            block,
+            // Not 100% sure we shouldn't visit the cache too, but
+            // it's not serialized, at least, which is a sign that no.
+            cache: _,
+            cache_dirty: _,
+            listeners_ok: _,
+            block_listen_gate: _,
         } = self;
         block.visit_handles(visitor);
     }
 }
 
-universe::impl_universe_member_for_single_component_type!(BlockDef);
+impl universe::SealedMember for BlockDef {
+    type Bundle = (BlockDefState, NotifierComponent);
+
+    type ReadQueryData = (&'static BlockDefState, &'static NotifierComponent);
+
+    fn register_all_member_components(world: &mut ecs::World) {
+        world.register_component::<NotifierComponent>(); // does not need to be visited
+        universe::VisitableComponents::register::<BlockDefState>(world);
+        world.register_component::<BlockDefNextValue>(); // does not need to be visited
+    }
+
+    fn read_from_standalone(value: &Self) -> Read<'_> {
+        Read {
+            state: &value.state,
+            notifier: &value.notifier,
+        }
+    }
+
+    fn read_from_query<'r>(
+        (state, NotifierComponent(notifier)): <Self::ReadQueryData as bevy_ecs::query::QueryData>::Item<'r, '_>,
+    ) -> Read<'r> {
+        Read { state, notifier }
+    }
+
+    fn read_from_entity_ref(entity: ecs::EntityRef<'_>) -> Option<Read<'_>> {
+        Some(Read {
+            state: entity.get()?,
+            notifier: &entity.get::<NotifierComponent>()?.0,
+        })
+    }
+
+    fn into_bundle(value: Box<Self>) -> Self::Bundle {
+        (value.state, NotifierComponent(value.notifier))
+    }
+}
+
+impl universe::UniverseMember for BlockDef {
+    type Read<'ticket> = Read<'ticket>;
+}
 
 impl transaction::Transactional for BlockDef {
     type Transaction = BlockDefTransaction;
@@ -256,6 +313,76 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockDef {
         Block::size_hint(depth)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+impl Read<'_> {
+    /// Returns the current block value.
+    ///
+    /// Note that if you wish to get the [`EvaluatedBlock`] result, you should obtain the cached
+    /// value by calling [`BlockDef::evaluate()`], or by using a [`Primitive::Indirect`],
+    /// not by calling `.block().evaluate()`, which is not cached.
+    pub fn block(&self) -> &Block {
+        &self.state.block
+    }
+
+    /// Returns the current cached evaluation of the current block value.
+    ///
+    /// This returns the same success or error as `Block::from(handle_to_self).evaluate()` would,
+    /// not the same as `.block().evaluate()` would.
+    pub fn evaluate(
+        &self,
+        read_ticket: ReadTicket<'_>,
+    ) -> Result<block::EvaluatedBlock, EvalBlockError> {
+        let filter = block::EvalFilter::new(read_ticket);
+        block::finish_evaluation(
+            self.block().clone(),
+            filter.budget.get(),
+            {
+                // This decrement makes the cost consistent with evaluating a
+                // block with Primitive::Indirect.
+                block::Budget::decrement_components(&filter.budget).unwrap();
+
+                self.evaluate_impl(&filter)
+            },
+            &filter,
+        )
+    }
+
+    /// Implementation of block evaluation used by a [`Primitive::Indirect`] pointing to a
+    /// [`BlockDef`], or by [`BlockDef::evaluate()`].
+    pub(super) fn evaluate_impl(
+        &self,
+        filter: &block::EvalFilter<'_>,
+    ) -> Result<MinEval, InEvalError> {
+        let &block::EvalFilter {
+            read_ticket: _,
+            skip_eval,
+            ref listener,
+            budget: _, // already accounted in the caller
+        } = filter;
+
+        if let Some(listener) = listener {
+            self.notifier.listen_raw(listener.clone());
+        }
+
+        if skip_eval {
+            // In this case, don't use the cache, because it might contain an error, which
+            // would imply the *listen* part also failed, which it did not.
+            Ok(block::AIR_EVALUATED_MIN)
+        } else {
+            // TODO: Rework the `MinEval` type or the signatures of evaluation internals
+            // so that we can benefit from caching the `EvaluatedBlock` and not just the `MinEval`.
+            self.state
+                .cache
+                .clone()
+                .map_err(EvalBlockError::into_internal_error_for_block_def)
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Transaction for modifying `BlockDef`
 
 /// A [`Transaction`] which replaces (or checks) the [`Block`] stored in a [`BlockDef`].
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
@@ -303,6 +430,7 @@ pub struct Check {
     new_state: Option<BlockDefState>,
 }
 
+// TODO: consider deleting this impl since there is little point to mutating a BlockDef outside a Universe
 impl Transaction for BlockDefTransaction {
     type Target = BlockDef;
     type Context<'a> = ReadTicket<'a>;
@@ -348,22 +476,41 @@ impl Transaction for BlockDefTransaction {
 }
 
 impl universe::TransactionOnEcs for BlockDefTransaction {
-    type WriteQueryData = &'static mut Self::Target;
+    type WriteQueryData = (&'static mut BlockDefState, &'static NotifierComponent);
 
     fn check(
         &self,
-        target: &BlockDef,
+        target: Read<'_>,
         read_ticket: ReadTicket<'_>,
     ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        Transaction::check(self, target, read_ticket)
+        // Check the transaction precondition
+        self.old.check(&target.state.block).map_err(|_| BlockDefMismatch::Unexpected)?;
+
+        // Perform evaluation now, while we have the read ticket.
+        //
+        // Evaluation errors are not transaction errors, to ensure that editing the world is always
+        // possible even when in a situation with multiple errors that need to be fixed separately.
+        //
+        // TODO: Maybe add an option to the transaction to be strict?
+        Ok(Check {
+            new_state: self.new.0.clone().map(|block| BlockDefState::new(block, read_ticket)),
+        })
     }
 
     fn commit(
         self,
-        mut target: ecs::Mut<'_, BlockDef>,
+        (mut state, NotifierComponent(notifier)): (ecs::Mut<'_, BlockDefState>, &NotifierComponent),
         check: Self::CommitCheck,
     ) -> Result<(), transaction::CommitError> {
-        Transaction::commit(self, &mut *target, check, &mut transaction::no_outputs)
+        match (self.new, check.new_state) {
+            (Equal(Some(_)), Some(new_state)) => {
+                *state = new_state;
+                notifier.notify(&BlockChange::new());
+            }
+            (Equal(None), None) => {}
+            _ => panic!("BlockDefTransaction check value is inconsistent"),
+        }
+        Ok(())
     }
 }
 
@@ -486,6 +633,7 @@ impl manyfmt::Fmt<crate::util::StatusText> for BlockDefStepInfo {
 }
 
 // -------------------------------------------------------------------------------------------------
+// Systems for re-evaluating changed block defs
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, bevy_ecs::schedule::SystemSet)]
 pub(crate) struct BlockDefUpdateSet;
@@ -516,35 +664,34 @@ enum BlockDefNextValue {
 #[allow(clippy::needless_pass_by_value)]
 fn update_phase_1(
     mut info_collector: ecs::ResMut<universe::InfoCollector<BlockDefStepInfo>>,
-    mut defs: ecs::Query<(&BlockDef, &mut BlockDefNextValue)>,
+    mut defs: ecs::Query<(&BlockDefState, &mut BlockDefNextValue)>,
     data_sources: universe::QueryBlockDataSources,
 ) {
     let mq = data_sources.get();
     let read_ticket = ReadTicket::from_queries(&mq);
     let mut info = BlockDefStepInfo::default();
     // TODO(ecs): parallel iter
-    for (def, mut next) in defs.iter_mut() {
+    for (def_state, mut next) in defs.iter_mut() {
         debug_assert!(
             matches!(*next, BlockDefNextValue::None),
             "BlockDefNextValue should have been cleared",
         );
 
-        if !def.state.listeners_ok {
+        if !def_state.listeners_ok {
             info.attempted += 1;
             // If there was an evaluation error, then we may also be missing listeners.
             // Start over.
             *next = BlockDefNextValue::NewState(BlockDefState::new(
-                def.state.block.clone(),
+                def_state.block.clone(),
                 read_ticket,
             ));
             info.updated += 1;
-        } else if def.state.cache_dirty.get_and_clear() {
+        } else if def_state.cache_dirty.get_and_clear() {
             // We have a cached value, but it is stale.
 
             info.attempted += 1;
 
-            let new_cache = def
-                .state
+            let new_cache = def_state
                 .block
                 .evaluate2(&block::EvalFilter {
                     read_ticket,
@@ -555,14 +702,14 @@ fn update_phase_1(
                 .map(MinEval::from);
 
             // Write the new cache data *unless* it is a transient error.
-            if !matches!(new_cache, Err(ref e) if e.is_transient()) && new_cache != def.state.cache
+            if !matches!(new_cache, Err(ref e) if e.is_transient()) && new_cache != def_state.cache
             {
                 *next = BlockDefNextValue::NewEvaluation(new_cache);
                 info.updated += 1;
             }
         }
 
-        if info.attempted > 0 && matches!(def.state.cache, Err(ref e) if e.is_transient()) {
+        if info.attempted > 0 && matches!(def_state.cache, Err(ref e) if e.is_transient()) {
             info.was_in_use += 1;
         }
     }
@@ -577,26 +724,31 @@ fn update_phase_2(
     mut defs: ecs::Query<
         '_,
         '_,
-        (&mut BlockDef, &mut BlockDefNextValue),
+        (
+            &mut BlockDefState,
+            &NotifierComponent,
+            &mut BlockDefNextValue,
+        ),
         ecs::Changed<BlockDefNextValue>,
     >,
 ) {
-    defs.par_iter_mut().for_each(|(mut def, mut next)| {
-        // By bypassing change detection, we avoid detecting this consumption of the change.
-        // (This means that change detection no longer strictly functions as change detection,
-        // but that is okay because `BlockDefNextValue` is *only* for this.)
-        match mem::take(next.bypass_change_detection()) {
-            BlockDefNextValue::NewEvaluation(result) => {
-                def.state.cache = result;
-                def.notifier.notify(&BlockChange::new());
+    defs.par_iter_mut()
+        .for_each(|(mut def_state, NotifierComponent(notifier), mut next)| {
+            // By bypassing change detection, we avoid detecting this consumption of the change.
+            // (This means that change detection no longer strictly functions as change detection,
+            // but that is okay because `BlockDefNextValue` is *only* for this.)
+            match mem::take(next.bypass_change_detection()) {
+                BlockDefNextValue::NewEvaluation(result) => {
+                    def_state.cache = result;
+                    notifier.notify(&BlockChange::new());
+                }
+                BlockDefNextValue::NewState(result) => {
+                    *def_state = result;
+                    notifier.notify(&BlockChange::new());
+                }
+                BlockDefNextValue::None => {}
             }
-            BlockDefNextValue::NewState(result) => {
-                def.state = result;
-                def.notifier.notify(&BlockChange::new());
-            }
-            BlockDefNextValue::None => {}
-        }
-    });
+        });
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -619,15 +771,24 @@ mod tests {
 
         let eval_bare = block.evaluate(universe.read_ticket()).unwrap();
         let block_def = BlockDef::new(universe.read_ticket(), block.clone());
-        let eval_def = block_def.evaluate(universe.read_ticket()).unwrap();
+        let eval_def_standalone = block_def.evaluate(universe.read_ticket()).unwrap();
         let block_def_handle = universe.insert_anonymous(block_def);
+        let eval_def_handle = block_def_handle
+            .read(universe.read_ticket())
+            .unwrap()
+            .evaluate(universe.read_ticket())
+            .unwrap();
         let indirect_block = Block::from(block_def_handle);
         let eval_indirect = indirect_block.evaluate(universe.read_ticket()).unwrap();
 
         assert_eq!(
+            eval_def_standalone, eval_def_handle,
+            "BlockDef::evaluate() same as Read::evaluate()"
+        );
+        assert_eq!(
             block::EvaluatedBlock {
                 block: indirect_block,
-                ..eval_def.clone()
+                ..eval_def_standalone.clone()
             },
             eval_indirect,
             "BlockDef::evaluate() same except for block as Primitive::Indirect"
@@ -636,7 +797,7 @@ mod tests {
             block::EvaluatedBlock {
                 block,
                 cost: eval_bare.cost,
-                ..eval_def
+                ..eval_def_standalone
             },
             eval_bare,
             "BlockDef::evaluate() same except for block and cost as the def block"

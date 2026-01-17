@@ -1166,8 +1166,8 @@ mod universe {
     };
     use schema::{HandleSer, MemberDe, NameSer};
 
-    impl From<&BlockDef> for schema::MemberSer<'_> {
-        fn from(block_def: &BlockDef) -> Self {
+    impl From<crate::block::Read<'_>> for schema::MemberSer<'_> {
+        fn from(block_def: crate::block::Read<'_>) -> Self {
             schema::MemberSer::Block {
                 value: block_def.block().clone(),
             }
