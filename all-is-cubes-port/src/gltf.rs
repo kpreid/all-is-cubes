@@ -385,12 +385,11 @@ pub(crate) fn export_gltf(
         .map(|block_def_handle| -> Result<_, ExportError> {
             let block_def = block_def_handle.read(read_ticket)?;
             let name = block_def_handle.name();
-            let evaluation =
-                block_def.evaluate(read_ticket).map_err(|eve| ExportError::NotRepresentable {
-                    format: Format::Gltf,
-                    name: Some(name.clone()),
-                    reason: format!("block evaluation failed: {eve}"),
-                })?;
+            let evaluation = block_def.evaluate().map_err(|eve| ExportError::NotRepresentable {
+                format: Format::Gltf,
+                name: Some(name.clone()),
+                reason: format!("block evaluation failed: {eve}"),
+            })?;
             Ok((name, evaluation))
         })
         .collect::<Result<_, ExportError>>()?;

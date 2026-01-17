@@ -41,12 +41,14 @@ pub(crate) fn export_stl(
     }
 
     for block_def in block_defs {
-        let ev = block_def.read(read_ticket)?.evaluate(read_ticket).map_err(|error| {
-            crate::ExportError::Eval {
-                name: block_def.name(),
-                error,
-            }
-        })?;
+        let ev =
+            block_def
+                .read(read_ticket)?
+                .evaluate()
+                .map_err(|error| crate::ExportError::Eval {
+                    name: block_def.name(),
+                    error,
+                })?;
         items.insert(
             source.member_export_path(destination, &block_def),
             block_to_stl_triangles(&ev),

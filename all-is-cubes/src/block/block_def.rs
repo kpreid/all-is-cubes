@@ -126,11 +126,9 @@ impl BlockDef {
     ///
     /// This returns the same success or error as `Block::from(handle_to_self).evaluate()` would,
     /// not the same as `.block().evaluate()` would.
-    pub fn evaluate(
-        &self,
-        read_ticket: ReadTicket<'_>,
-    ) -> Result<block::EvaluatedBlock, EvalBlockError> {
-        let filter = block::EvalFilter::new(read_ticket);
+    pub fn evaluate(&self) -> Result<block::EvaluatedBlock, EvalBlockError> {
+        // Ticket can be stub because we don't actually use it in this case.
+        let filter = block::EvalFilter::new(ReadTicket::stub());
         block::finish_evaluation(
             self.block().clone(),
             filter.budget.get(),
@@ -330,11 +328,9 @@ impl Read<'_> {
     ///
     /// This returns the same success or error as `Block::from(handle_to_self).evaluate()` would,
     /// not the same as `.block().evaluate()` would.
-    pub fn evaluate(
-        &self,
-        read_ticket: ReadTicket<'_>,
-    ) -> Result<block::EvaluatedBlock, EvalBlockError> {
-        let filter = block::EvalFilter::new(read_ticket);
+    pub fn evaluate(&self) -> Result<block::EvaluatedBlock, EvalBlockError> {
+        // Ticket can be stub because we don't actually use it in this case.
+        let filter = block::EvalFilter::new(ReadTicket::stub());
         block::finish_evaluation(
             self.block().clone(),
             filter.budget.get(),
@@ -351,12 +347,14 @@ impl Read<'_> {
 
     /// Implementation of block evaluation used by a [`Primitive::Indirect`] pointing to a
     /// [`BlockDef`], or by [`BlockDef::evaluate()`].
+    ///
+    /// The [`EvalFilter::read_ticket`] is not used.
     pub(super) fn evaluate_impl(
         &self,
         filter: &block::EvalFilter<'_>,
     ) -> Result<MinEval, InEvalError> {
         let &block::EvalFilter {
-            read_ticket: _,
+            read_ticket: _, // unused because we are returning the cache only
             skip_eval,
             ref listener,
             budget: _, // already accounted in the caller
@@ -771,13 +769,10 @@ mod tests {
 
         let eval_bare = block.evaluate(universe.read_ticket()).unwrap();
         let block_def = BlockDef::new(universe.read_ticket(), block.clone());
-        let eval_def_standalone = block_def.evaluate(universe.read_ticket()).unwrap();
+        let eval_def_standalone = block_def.evaluate().unwrap();
         let block_def_handle = universe.insert_anonymous(block_def);
-        let eval_def_handle = block_def_handle
-            .read(universe.read_ticket())
-            .unwrap()
-            .evaluate(universe.read_ticket())
-            .unwrap();
+        let eval_def_handle =
+            block_def_handle.read(universe.read_ticket()).unwrap().evaluate().unwrap();
         let indirect_block = Block::from(block_def_handle);
         let eval_indirect = indirect_block.evaluate(universe.read_ticket()).unwrap();
 
