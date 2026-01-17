@@ -131,6 +131,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "0.0.3"
 
+[[audits.mutants]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.0.3 -> 0.0.4"
+
 [[audits.ordered-float]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
