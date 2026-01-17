@@ -25,16 +25,22 @@ struct TestData {
 impl TestData {
     async fn new() -> Self {
         let mut universe = Universe::new();
-        let space = lighting_bench_space(
+        let mut space = lighting_bench_space(
             &mut universe,
             yield_progress_for_testing(),
             size3(54, 16, 54),
         )
         .await
         .unwrap();
+
+        // Make sure the space has actual light data in case it being all-default has any effect
+        // on the benchmark’s branching behavior or such.
+        space.mutate(universe.read_ticket(), |m| m.evaluate_light(1, drop));
+
         let space = universe.insert_anonymous(space);
         let character = StrongHandle::from(
-            universe.insert_anonymous(Character::spawn_default(universe.read_ticket(), space).unwrap()),
+            universe
+                .insert_anonymous(Character::spawn_default(universe.read_ticket(), space).unwrap()),
         );
         Self {
             universe,
@@ -48,7 +54,9 @@ impl TestData {
         let mut renderer = RtRenderer::new(
             StandardCameras::new(
                 listen::constant(Arc::new(options)),
-                listen::constant(Viewport::with_scale(1.0, [64, 16])),
+                // Note that the aspect ratio of the viewport affects how many pixels are sky vs.
+                // blocks.
+                listen::constant(Viewport::with_scale(1.0, [64, 64])),
                 listen::constant(Some(self.character.clone())),
                 listen::constant(Arc::new(UiViewState::default())),
             ),
@@ -61,6 +69,21 @@ impl TestData {
 
     fn bench(&self, b: &mut Bencher<'_, WallTime>, options_fn: impl FnOnce(&mut GraphicsOptions)) {
         let renderer = self.renderer(options_fn);
+
+        #[cfg(false)]
+        {
+            // Dump the image to allow checking whether the benchmark is actually rendering a scene.
+            let image = renderer.draw_rgba(|_| String::new());
+            image::RgbaImage::from_vec(
+                image.size.width,
+                image.size.height,
+                image.data.into_flattened(),
+            )
+            .unwrap()
+            .save("raytrace-bench-output.png")
+            .unwrap();
+        }
+
         b.iter_with_large_drop(|| renderer.draw_rgba(|_| String::new()))
     }
 }
