@@ -27,8 +27,8 @@ use all_is_cubes::camera::{Camera, GraphicsOptions, TransparencyOption};
 use all_is_cubes::camera::{FogOption, NdcPoint2};
 use all_is_cubes::euclid::{Vector3D, vec3};
 use all_is_cubes::math::{
-    Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridMatrix, Rgb, Rgba, Vol, ZeroOne,
-    rgb_const,
+    Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridRotation, Rgb, Rgba, Vol,
+    ZeroOne, rgb_const,
 };
 use all_is_cubes::raycast::{self, Ray};
 use all_is_cubes::raytracer_components::apply_transmittance;
@@ -262,13 +262,14 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
         // Find linear interpolation coefficients based on where we are relative to
         // a half-cube-offset grid.
-        let reference_frame = match Face6::try_from(face) {
-            Ok(face) => face.face_transform(0).to_matrix(),
-            Err(_) => GridMatrix::ZERO,
-        }
-        .to_free();
-        let reference_frame_x = reference_frame.transform_vector3d(vec3(1., 0., 0.));
-        let reference_frame_y = reference_frame.transform_vector3d(vec3(0., 1., 0.));
+        let reference_frame: GridRotation = match Face6::try_from(face) {
+            Ok(face) => face.rotation_from_nz(),
+            Err(_) => GridRotation::IDENTITY, // doesn't matter; we shouldn't get here
+        };
+        let reference_frame_x: FreeVector =
+            reference_frame.transform_vector(vec3(1, 0, 0)).to_f64();
+        let reference_frame_y: FreeVector =
+            reference_frame.transform_vector(vec3(0, 1, 0)).to_f64();
 
         let mut mix_1 = (origin.dot(reference_frame_x) - 0.5).rem_euclid(1.0);
         let mut mix_2 = (origin.dot(reference_frame_y) - 0.5).rem_euclid(1.0);
