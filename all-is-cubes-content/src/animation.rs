@@ -2,7 +2,6 @@
 
 use alloc::boxed::Box;
 use alloc::sync::Arc;
-use core::f64::consts::TAU;
 use core::fmt;
 use core::time::Duration;
 
@@ -207,67 +206,69 @@ impl VisitHandles for Fire {
 /// a basis of whole seconds and individual frames.
 ///
 /// The block must have resolution 16.
+/// The universe `TickSchedule` must have divisor 60.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Clock {
-    /// How many [`Tick`]s we've seen.
-    ///
-    /// TODO: Revisit this data storage once we've nailed down questions of how long a tick
-    /// will ever be.
-    ticks: u64,
+    phase: u16,
 }
 
 impl Clock {
     pub(crate) fn new() -> Self {
-        Self { ticks: 0 }
+        Self { phase: 0 }
     }
 
     fn paint(&self) -> SpaceTransaction {
-        // TODO: While these don't actually need to allocate anything, we ought to make them
-        // constants to keep the per-frame cost minial.
-        let rim = block::from_color!(0.7, 0.7, 0.4, 1.0);
-        let marks = block::from_color!(palette::ALMOST_BLACK);
-        let trail = block::from_color!(0.5, 0.5, 0.5, 1.0);
-        let background = if self.ticks.rem_euclid(120) >= 60 {
-            block::from_color!(0.6, 0.6, 0.6, 1.0)
-        } else {
-            block::from_color!(1.0, 1.0, 1.0, 1.0)
-        };
+        const BACKGROUND: Block = block::from_color!(0.7, 0.7, 0.4, 1.0);
+        const MARKED: Block = block::from_color!(palette::ALMOST_BLACK);
+        const UNMARKED: Block = block::from_color!(1.0, 1.0, 1.0, 1.0);
 
-        let time_angle = self.ticks.rem_euclid(60) as f64 / 60.0;
-        let frame_angle = self.ticks.rem_euclid(4) as f64 / 4.0;
+        const BG: u8 = 80;
+
+        #[rustfmt::skip]
+        const PATTERN: [[u8; 16]; 16] = [
+            [ 0,  1,  2,  3,  4,  5,  6,   7,   8,  9, 10, 11, 12, 13, 14, 15],
+            [59, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 16],
+            [58, BG,  0,  0, BG, BG, BG,  BG,  BG, BG, BG, BG, 15, 15, BG, 17],
+            [57, BG,  0,  0, BG, BG, BG,  BG,  BG, BG, BG, BG, 15, 15, BG, 18],
+
+            [56, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 19],
+            [55, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 20],
+            [54, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 21],
+            [53, BG, BG, BG, BG, BG, BG, 100, 101, BG, BG, BG, BG, BG, BG, 22],
+
+            [52, BG, BG, BG, BG, BG, BG, 102, 103, BG, BG, BG, BG, BG, BG, 23],
+            [51, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 24],
+            [50, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 25],
+            [49, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 26],
+
+            [48, BG, 45, 45, BG, BG, BG,  BG,  BG, BG, BG, BG, 30, 30, BG, 27],
+            [47, BG, 45, 45, BG, BG, BG,  BG,  BG, BG, BG, BG, 30, 30, BG, 28],
+            [46, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 29],
+            [45, 44, 43, 42, 41, 40, 39,  38,  37, 36, 35, 34, 33, 32, 31, 30],
+        ];
 
         SpaceTransaction::filling(GridAab::from_lower_size([0, 0, 0], [16, 16, 1]), |cube| {
-            let centered_point = (cube - GridVector::new(8, 8, 0)).center();
-            let r = centered_point.to_vector().length();
-            let block = {
-                let base_angle = centered_point.x.atan2(centered_point.y) / TAU;
-                if r > 8.0 {
-                    // Surrounding area — do nothing
-                    return CubeTransaction::default();
-                } else if r > 7.0 {
-                    // Outside edge
-                    rim.clone()
-                } else if r > 2.5 {
-                    // Big sweep hand
-                    let clock_angle = (time_angle - base_angle).rem_euclid(1.0);
-                    if clock_angle < 0.03 {
-                        marks.clone()
-                    } else if clock_angle < 0.06 {
-                        trail.clone()
+            let pattern_value = PATTERN[15 - cube.y as usize][cube.x as usize];
+
+            let block = match pattern_value {
+                0..60 => {
+                    if u16::from(pattern_value) == self.phase {
+                        MARKED
                     } else {
-                        background.clone()
+                        UNMARKED
                     }
-                } else if r > 1.5 {
-                    // Border
-                    background.clone()
-                } else {
-                    // Advances 1 tick per frame in one of 4 patches
-                    let clock_angle = (base_angle - frame_angle).rem_euclid(1.0);
-                    if clock_angle < 0.25 {
-                        marks.clone()
+                }
+                100..104 => {
+                    if u16::from(pattern_value - 100) == self.phase % 4 {
+                        MARKED
                     } else {
-                        background.clone()
+                        UNMARKED
                     }
+                }
+                BG => BACKGROUND,
+                _ => {
+                    // shouldn't happen
+                    block::from_color!(1.0, 0.0, 0.0, 1.0)
                 }
             };
             CubeTransaction::replacing(None, Some(block))
@@ -281,7 +282,7 @@ impl behavior::Behavior<Space> for Clock {
         context: &behavior::Context<'_, '_, Space>,
     ) -> (UniverseTransaction, behavior::Then) {
         let mut mut_self = self.clone();
-        mut_self.ticks += 1;
+        mut_self.phase = context.tick.next_phase();
         (
             context
                 .bind_host(mut_self.paint())
