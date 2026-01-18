@@ -1,5 +1,5 @@
-
 use core::iter::{Sum, empty, once};
+
 use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator as _};
 
 /// Implements [`ParallelExtend`] to just sum things, so that

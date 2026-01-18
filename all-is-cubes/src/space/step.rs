@@ -53,7 +53,9 @@ pub(crate) fn add_space_systems(world: &mut ecs::World) {
     let mut schedules = world.resource_mut::<ecs::Schedules>();
     schedules.add_systems(
         time::schedule::Step,
-        (update_light_system, execute_tick_actions_system).chain().in_set(SpaceUpdateSet),
+        (update_light_system, execute_tick_actions_system)
+            .chain()
+            .in_set(SpaceUpdateSet),
     );
 
     palette::add_palette_systems(world);

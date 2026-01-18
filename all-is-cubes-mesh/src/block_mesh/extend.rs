@@ -23,10 +23,7 @@ pub(crate) enum BoxColoring<M: MeshTypes> {
 
 /// Append triangles to `output` which form a single box,
 /// and set the `fully_opaque` flags true when appropriate.
-#[allow(
-    clippy::needless_bitwise_bool,
-    reason = "TODO: evaluate performance"
-)]
+#[allow(clippy::needless_bitwise_bool, reason = "TODO: evaluate performance")]
 pub(crate) fn push_box<M: MeshTypes>(
     output: &mut BlockMesh<M>,
     resolution: Resolution,
