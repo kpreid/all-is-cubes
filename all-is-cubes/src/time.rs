@@ -86,9 +86,15 @@ impl Tick {
     }
 
     /// Returns the phase of the originating clock *before* this tick happens.
-    /// (After this tick happens, the phase is this value plus 1.)
+    /// (After this tick happens, the phase is this value plus 1, wrapped.)
     pub fn prev_phase(self) -> u16 {
         self.prev_phase
+    }
+
+    /// Returns the phase of the originating clock *after* this tick happens.
+    /// (Before this tick happens, the phase is this value minus 1, wrapped.)
+    pub fn next_phase(self) -> u16 {
+        (self.prev_phase + 1) % self.schedule.divisor
     }
 
     /// Set the paused flag. See [`Tick::paused`] for more information.
@@ -248,7 +254,7 @@ impl Clock {
     pub fn advance(&mut self, paused: bool) -> Tick {
         let tick = self.next_tick(paused);
         if !paused {
-            self.phase = (self.phase + 1) % self.schedule.divisor;
+            self.phase = tick.next_phase();
         }
         tick
     }
@@ -345,10 +351,24 @@ mod tests {
     fn clock_phase_advance() {
         let mut clock = Clock::new(TickSchedule::per_second(3), 0);
         assert_eq!(
-            std::iter::repeat_with(|| clock.advance(false).prev_phase())
-                .take(10)
-                .collect::<Vec<_>>(),
-            vec![0, 1, 2, 0, 1, 2, 0, 1, 2, 0],
+            std::iter::repeat_with(|| {
+                let tick = clock.advance(false);
+                (tick.prev_phase(), tick.next_phase())
+            })
+            .take(10)
+            .collect::<Vec<_>>(),
+            vec![
+                (0, 1),
+                (1, 2),
+                (2, 0),
+                (0, 1),
+                (1, 2),
+                (2, 0),
+                (0, 1),
+                (1, 2),
+                (2, 0),
+                (0, 1)
+            ],
         );
     }
 
