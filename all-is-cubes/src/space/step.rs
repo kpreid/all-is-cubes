@@ -157,7 +157,7 @@ pub(crate) fn execute_tick_actions_system(
                     schedule,
                 }) = palette.entry(contents.0[cube]).evaluated.attributes().tick_action
                 {
-                    if schedule.contains(tick) {
+                    if !schedule.contains(tick) {
                         // Don't tick yet.
                         false
                     } else {

@@ -138,7 +138,8 @@ impl Schedule {
         period: NonZeroU16::MIN,
     };
 
-    /// Creates a schedule which specifies executing some action every `period` ticks.
+    /// Creates a schedule which specifies an event occurring every `period` ticks,
+    /// starting with the tick from phase 0 to phase 1.
     ///
     /// The `period` should be divisible by the universe’s [`TickSchedule`]’s divisor.
     /// If it is not, then schedule will have uneven periods.
@@ -147,8 +148,9 @@ impl Schedule {
         Schedule { period }
     }
 
-    pub(crate) fn contains(self, tick: Tick) -> bool {
-        tick.prev_phase().rem_euclid(self.period.get()) != 0
+    /// Returns whether this schedule specifies that the event should occur during the given `tick`.
+    pub fn contains(self, tick: Tick) -> bool {
+        tick.prev_phase().is_multiple_of(self.period.get())
     }
 
     /// If this schedule is of the form “every N ticks”, return N.
@@ -379,5 +381,25 @@ mod tests {
     fn tick_schedule_duration() {
         let schedule = TickSchedule::per_second(60);
         assert_eq!(schedule.delta_t(), Duration::from_nanos(1_000_000_000 / 60));
+    }
+
+    #[test]
+    fn schedule_evaluation() {
+        let mut clock = Clock::new(TickSchedule::per_second(8), 0);
+        let schedule = Schedule::from_period(NonZeroU16::new(4).unwrap());
+        assert_eq!(
+            std::iter::repeat_with(|| {
+                let tick = clock.advance(false);
+                schedule.contains(tick)
+            })
+            .take(16)
+            .collect::<Vec<bool>>(),
+            vec![
+                true, false, false, false, //
+                true, false, false, false, //
+                true, false, false, false, //
+                true, false, false, false
+            ]
+        )
     }
 }
