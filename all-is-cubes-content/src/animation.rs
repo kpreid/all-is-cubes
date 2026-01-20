@@ -12,13 +12,10 @@ use all_is_cubes::block::{self, AIR, Block, BlockCollision};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{Cube, GridAab, GridRotation, GridVector, Rgba, Vol, rgba_const};
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
-use all_is_cubes::time::Tick;
+use all_is_cubes::time;
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{HandleVisitor, UniverseTransaction, VisitHandles};
 use all_is_cubes::{behavior, op};
-
-#[cfg(doc)]
-use all_is_cubes::time::TickSchedule;
 
 /// A [`Behavior`] which animates a recursive block by periodically recomputing all of its
 /// voxels.
@@ -30,7 +27,8 @@ pub(crate) struct AnimatedVoxels<F> {
     /// The animation frame number, periodically incremented and fed to the function.
     frame: u64,
 
-    /// How much time to wait before incrementing the frame counter, measured in [`TickSchedule`] ticks (i.e. steps).
+    /// How much time to wait before incrementing the frame counter, measured in
+    /// [`time::TickSchedule`] ticks (i.e. steps).
     frame_period: u16,
 }
 
@@ -101,7 +99,8 @@ pub(crate) struct Fire {
     fire_state: Vol<Box<[u8]>>,
     rng: Xoshiro256Plus,
     /// Time accumulation not yet equal to a whole frame.
-    /// TODO: Give [`Tick`] a concept of discrete time units we can reuse instead of
+    ///
+    /// TODO: Give [`time::Tick`] a concept of discrete time units we can reuse instead of
     /// separate things having their own float-based clocks.
     accumulator: Duration,
 }
@@ -130,7 +129,7 @@ impl Fire {
         }
     }
 
-    fn tick_state(&mut self, tick: Tick) -> bool {
+    fn tick_state(&mut self, tick: time::Tick) -> bool {
         const PERIOD: Duration = Duration::from_nanos(1_000_000_000 / 32);
         self.accumulator += tick.delta_t_duration();
         if self.accumulator >= PERIOD {
@@ -206,10 +205,10 @@ impl VisitHandles for Fire {
 /// a basis of whole seconds and individual frames.
 ///
 /// The block must have resolution 16.
-/// The universe `TickSchedule` must have divisor 60.
+/// The universe [`time::TickSchedule`] must have divisor 60.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Clock {
-    phase: u16,
+    phase: time::Phase,
 }
 
 impl Clock {

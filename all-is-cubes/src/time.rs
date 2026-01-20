@@ -15,6 +15,9 @@ use crate::universe::Universe;
 #[doc(inline)]
 pub use all_is_cubes_base::time::*;
 
+/// Numeric type for the phase of a [`Clock`].
+pub type Phase = u16;
+
 /// Specifies an amount of time passing “in game” in a [`Universe`] and its contents.
 ///
 /// [`Tick`] values are passed along through the `step()` operations that advance time.
@@ -27,7 +30,7 @@ pub struct Tick {
 
     /// The phase of the clock *before* this tick happens.
     /// (After this tick happens, the phase is this value plus 1.)
-    prev_phase: u16,
+    prev_phase: Phase,
 
     /// Whether game time is paused, and `delta_t` should not be considered
     /// as an amount of game time passing. See [`Self::paused()`] for details.
@@ -35,7 +38,7 @@ pub struct Tick {
 }
 
 impl Tick {
-    fn new(schedule: TickSchedule, prev_phase: u16) -> Self {
+    fn new(schedule: TickSchedule, prev_phase: Phase) -> Self {
         Self {
             schedule,
             prev_phase,
@@ -87,13 +90,13 @@ impl Tick {
 
     /// Returns the phase of the originating clock *before* this tick happens.
     /// (After this tick happens, the phase is this value plus 1, wrapped.)
-    pub fn prev_phase(self) -> u16 {
+    pub fn prev_phase(self) -> Phase {
         self.prev_phase
     }
 
     /// Returns the phase of the originating clock *after* this tick happens.
     /// (Before this tick happens, the phase is this value minus 1, wrapped.)
-    pub fn next_phase(self) -> u16 {
+    pub fn next_phase(self) -> Phase {
         (self.prev_phase + 1) % self.schedule.divisor
     }
 
@@ -226,14 +229,14 @@ pub struct Clock {
     /// * It should always be the case that `phase < schedule.divisor`.
     /// * The initial phase, such as for a universe that has just been been created but
     ///   not yet stepped, is `0`.
-    phase: u16,
+    phase: Phase,
 }
 
 impl Clock {
     /// Creates a new [`Clock`] with the given state.
     ///
     /// If the `phase` is out of range, it is reduced modulo `schedule.divisor`.
-    pub const fn new(schedule: TickSchedule, phase: u16) -> Self {
+    pub const fn new(schedule: TickSchedule, phase: Phase) -> Self {
         Self {
             schedule,
             phase: phase % schedule.divisor.get(),
