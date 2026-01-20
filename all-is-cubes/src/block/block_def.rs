@@ -14,7 +14,7 @@ use bevy_ecs::schedule::IntoScheduleConfigs as _;
 use nosy::Listen as _;
 
 use crate::block::{self, Block, BlockChange, EvalBlockError, InEvalError, MinEval};
-use crate::listen::{self, Gate, IntoListener as _, Listener, Notifier};
+use crate::listen::{self, Notifier};
 use crate::time;
 use crate::transaction::{self, Equal, Transaction};
 use crate::universe::{self, HandleVisitor, ReadTicket, VisitHandles};
@@ -26,7 +26,10 @@ use crate::universe::Universe;
 
 // -------------------------------------------------------------------------------------------------
 
-type EvalResult = Result<MinEval, EvalBlockError>;
+mod cache;
+use cache::{CacheUpdate, CachedBlock};
+
+// -------------------------------------------------------------------------------------------------
 
 /// Contains a [`Block`] and can be stored in a [`Universe`].
 /// Together with [`Primitive::Indirect`], this allows mutation of a block definition such
@@ -44,40 +47,14 @@ pub struct BlockDef {
     notifier: Arc<Notifier<BlockChange>>,
 }
 
-/// Subset of [`BlockDef`] that is constructed anew when its block is replaced.
+/// Component of [`BlockDef`] that is replaced when its definition is overwritten.
 ///
 /// The visibility of `pub(crate)` is necessary for the `SealedMember` implementation.
 /// This type is not actually used outside the module.
 #[derive(ecs::Component)]
-#[require(BlockDefNextValue, NotifierComponent)]
+#[require(CacheUpdate, NotifierComponent)]
 pub(crate) struct BlockDefState {
-    /// The current value.
-    block: Block,
-
-    /// Cache of evaluation results.
-    ///
-    /// If the current value is an `Err`, then it is also the case that `cache_dirty` may not have
-    /// a listener hooked up.
-    ///
-    /// Design rationale for caching and this particular arrangement of caching:
-    ///
-    /// * Deduplicating evaluation calculations, when a block is in multiple spaces,
-    ///   is wrapped with different modifiers, or is removed and reinserted.
-    /// * Moving the cost of evaluation to a consistent, deferred point.
-    /// * Fewer chains of forwarded notifications, improving data and instruction cache locality.
-    /// * Breaking data dependency cycles, so that if a `Space` contains itself
-    ///   via a block definition, this results in iterative convergence rather than an error.
-    cache: EvalResult,
-
-    /// Whether the cache needs to be updated.
-    cache_dirty: listen::Flag,
-
-    /// Whether we have successfully installed a listener on `self.block`.
-    listeners_ok: bool,
-
-    /// Gate with which to interrupt previous listening to a contained block.
-    #[expect(unused, reason = "used only for its `Drop` behavior")]
-    block_listen_gate: Gate,
+    cached_block: CachedBlock,
 }
 
 /// Notifier of changes to this `BlockDef` entity's evaluation result, either via transaction or via
@@ -108,7 +85,9 @@ impl BlockDef {
     /// in the future).
     pub fn new(read_ticket: ReadTicket<'_>, block: Block) -> Self {
         BlockDef {
-            state: BlockDefState::new(block, read_ticket),
+            state: BlockDefState {
+                cached_block: CachedBlock::new(block, read_ticket),
+            },
             notifier: Arc::new(Notifier::new()),
         }
     }
@@ -119,7 +98,7 @@ impl BlockDef {
     /// value by calling [`BlockDef::evaluate()`], or by using a [`Primitive::Indirect`],
     /// not by calling `.block().evaluate()`, which is not cached.
     pub fn block(&self) -> &Block {
-        &self.state.block
+        self.state.cached_block.block()
     }
 
     /// Returns the current cached evaluation of the current block value.
@@ -144,53 +123,17 @@ impl BlockDef {
     }
 }
 
-impl BlockDefState {
-    #[inline]
-    fn new(block: Block, read_ticket: ReadTicket<'_>) -> Self {
-        let cache_dirty = listen::Flag::new(false);
-        let (block_listen_gate, block_listener) =
-            Listener::<BlockChange>::gate(cache_dirty.listener());
-
-        let cache = block
-            .evaluate2(&block::EvalFilter {
-                read_ticket,
-                skip_eval: false,
-                listener: Some(block_listener.into_listener()),
-                budget: Default::default(),
-            })
-            .map(MinEval::from);
-
-        BlockDefState {
-            listeners_ok: cache.is_ok(),
-
-            block,
-            cache,
-            cache_dirty,
-            block_listen_gate,
-        }
-    }
-}
-
 impl fmt::Debug for BlockDef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO: Consider printing the cache, but only if it wouldn't be redundant?
         let Self {
-            state:
-                BlockDefState {
-                    block,
-                    cache: _,
-                    cache_dirty,
-                    listeners_ok,
-                    block_listen_gate: _,
-                },
+            state: BlockDefState { cached_block },
             notifier,
         } = self;
         f.debug_struct("BlockDef")
-            .field("block", &block)
-            .field("cache_dirty", &cache_dirty)
-            .field("listeners_ok", &listeners_ok)
+            .field("cached_block", &cached_block)
             .field("notifier", &notifier)
-            .finish_non_exhaustive()
+            .finish()
     }
 }
 
@@ -198,22 +141,13 @@ impl fmt::Debug for Read<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO: Consider printing the cache, but only if it wouldn't be redundant?
         let Self {
-            state:
-                BlockDefState {
-                    block,
-                    cache: _,
-                    cache_dirty,
-                    listeners_ok,
-                    block_listen_gate: _,
-                },
+            state: BlockDefState { cached_block },
             notifier,
         } = self;
         f.debug_struct("BlockDef")
-            .field("block", &block)
-            .field("cache_dirty", &cache_dirty)
-            .field("listeners_ok", &listeners_ok)
+            .field("cached_block", &cached_block)
             .field("notifier", &notifier)
-            .finish_non_exhaustive()
+            .finish()
     }
 }
 
@@ -230,7 +164,7 @@ impl listen::Listen for BlockDef {
 
 impl AsRef<Block> for BlockDef {
     fn as_ref(&self) -> &Block {
-        &self.state.block
+        self.block()
     }
 }
 
@@ -243,16 +177,8 @@ impl VisitHandles for BlockDef {
 
 impl VisitHandles for BlockDefState {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
-        let Self {
-            block,
-            // Not 100% sure we shouldn't visit the cache too, but
-            // it's not serialized, at least, which is a sign that no.
-            cache: _,
-            cache_dirty: _,
-            listeners_ok: _,
-            block_listen_gate: _,
-        } = self;
-        block.visit_handles(visitor);
+        let Self { cached_block } = self;
+        cached_block.visit_handles(visitor);
     }
 }
 
@@ -264,7 +190,7 @@ impl universe::SealedMember for BlockDef {
     fn register_all_member_components(world: &mut ecs::World) {
         world.register_component::<NotifierComponent>(); // does not need to be visited
         universe::VisitableComponents::register::<BlockDefState>(world);
-        world.register_component::<BlockDefNextValue>(); // does not need to be visited
+        world.register_component::<CacheUpdate>(); // does not need to be visited
     }
 
     fn read_from_standalone(value: &Self) -> Read<'_> {
@@ -321,7 +247,7 @@ impl Read<'_> {
     /// value by calling [`BlockDef::evaluate()`], or by using a [`Primitive::Indirect`],
     /// not by calling `.block().evaluate()`, which is not cached.
     pub fn block(&self) -> &Block {
-        &self.state.block
+        self.state.cached_block.block()
     }
 
     /// Returns the current cached evaluation of the current block value.
@@ -369,12 +295,7 @@ impl Read<'_> {
             // would imply the *listen* part also failed, which it did not.
             Ok(block::AIR_EVALUATED_MIN)
         } else {
-            // TODO: Rework the `MinEval` type or the signatures of evaluation internals
-            // so that we can benefit from caching the `EvaluatedBlock` and not just the `MinEval`.
-            self.state
-                .cache
-                .clone()
-                .map_err(EvalBlockError::into_internal_error_for_block_def)
+            self.state.cached_block.cached_evaluation()
         }
     }
 }
@@ -424,7 +345,8 @@ impl BlockDefTransaction {
 #[expect(missing_debug_implementations)]
 #[doc(hidden)] // would be impl Trait if we could
 pub struct Check {
-    /// May be `None` if the transaction has no new block and was only comparing the old block.
+    /// May be `None` if the transaction has no new definition and was only comparing the old
+    /// definition.
     new_state: Option<BlockDefState>,
 }
 
@@ -442,7 +364,9 @@ impl Transaction for BlockDefTransaction {
         read_ticket: Self::Context<'_>,
     ) -> Result<Self::CommitCheck, Self::Mismatch> {
         // Check the transaction precondition
-        self.old.check(&target.state.block).map_err(|_| BlockDefMismatch::Unexpected)?;
+        self.old
+            .check(target.state.cached_block.block())
+            .map_err(|_| BlockDefMismatch::Unexpected)?;
 
         // Perform evaluation now, while we have the read ticket.
         //
@@ -451,7 +375,9 @@ impl Transaction for BlockDefTransaction {
         //
         // TODO: Maybe add an option to the transaction to be strict?
         Ok(Check {
-            new_state: self.new.0.clone().map(|block| BlockDefState::new(block, read_ticket)),
+            new_state: self.new.0.clone().map(|block| BlockDefState {
+                cached_block: CachedBlock::new(block, read_ticket),
+            }),
         })
     }
 
@@ -482,7 +408,9 @@ impl universe::TransactionOnEcs for BlockDefTransaction {
         read_ticket: ReadTicket<'_>,
     ) -> Result<Self::CommitCheck, Self::Mismatch> {
         // Check the transaction precondition
-        self.old.check(&target.state.block).map_err(|_| BlockDefMismatch::Unexpected)?;
+        self.old
+            .check(target.state.cached_block.block())
+            .map_err(|_| BlockDefMismatch::Unexpected)?;
 
         // Perform evaluation now, while we have the read ticket.
         //
@@ -491,7 +419,9 @@ impl universe::TransactionOnEcs for BlockDefTransaction {
         //
         // TODO: Maybe add an option to the transaction to be strict?
         Ok(Check {
-            new_state: self.new.0.clone().map(|block| BlockDefState::new(block, read_ticket)),
+            new_state: self.new.0.clone().map(|block| BlockDefState {
+                cached_block: CachedBlock::new(block, read_ticket),
+            }),
         })
     }
 
@@ -645,24 +575,12 @@ pub(crate) fn add_block_def_systems(world: &mut ecs::World) {
     );
 }
 
-/// When updating block definitions, this temporarily stores the value that should be written
-/// into the `BlockDef` component.
-///
-#[derive(ecs::Component, Default)]
-enum BlockDefNextValue {
-    #[default]
-    None,
-    NewEvaluation(EvalResult),
-    /// Used when the prior attempt to add listeners failed.
-    NewState(BlockDefState),
-}
-
 /// ECS system function that looks for `BlockDef`s needing reevaluation, then writes the new
-/// evaluations into `BlockDefNextValue`.
+/// evaluations into `CacheUpdate`.
 #[allow(clippy::needless_pass_by_value)]
 fn update_phase_1(
     mut info_collector: ecs::ResMut<universe::InfoCollector<BlockDefStepInfo>>,
-    mut defs: ecs::Query<(&BlockDefState, &mut BlockDefNextValue)>,
+    mut defs: ecs::Query<(&BlockDefState, &mut CacheUpdate)>,
     data_sources: universe::QueryBlockDataSources,
 ) {
     let mq = data_sources.get();
@@ -671,50 +589,18 @@ fn update_phase_1(
     // TODO(ecs): parallel iter
     for (def_state, mut next) in defs.iter_mut() {
         debug_assert!(
-            matches!(*next, BlockDefNextValue::None),
-            "BlockDefNextValue should have been cleared",
+            matches!(*next, CacheUpdate::None),
+            "CacheUpdate should have been cleared",
         );
 
-        if !def_state.listeners_ok {
-            info.attempted += 1;
-            // If there was an evaluation error, then we may also be missing listeners.
-            // Start over.
-            *next = BlockDefNextValue::NewState(BlockDefState::new(
-                def_state.block.clone(),
-                read_ticket,
-            ));
-            info.updated += 1;
-        } else if def_state.cache_dirty.get_and_clear() {
-            // We have a cached value, but it is stale.
-
-            info.attempted += 1;
-
-            let new_cache = def_state
-                .block
-                .evaluate2(&block::EvalFilter {
-                    read_ticket,
-                    skip_eval: false,
-                    listener: None, // we already have a listener installed
-                    budget: Default::default(),
-                })
-                .map(MinEval::from);
-
-            // Write the new cache data *unless* it is a transient error.
-            if !matches!(new_cache, Err(ref e) if e.is_transient()) && new_cache != def_state.cache
-            {
-                *next = BlockDefNextValue::NewEvaluation(new_cache);
-                info.updated += 1;
-            }
-        }
-
-        if info.attempted > 0 && matches!(def_state.cache, Err(ref e) if e.is_transient()) {
-            info.was_in_use += 1;
+        if let Some(update) = def_state.cached_block.update_phase_1(&mut info, read_ticket) {
+            *next = update;
         }
     }
     info_collector.record(info);
 }
 
-/// ECS system function that moves new evaluations from `BlockDefNextValue` to `BlockDef`.
+/// ECS system function that moves new evaluations from `CacheUpdate` to `BlockDef`.
 ///
 /// This system being separate resolves the borrow conflict between different `BlockDef`s reading
 /// each other (possibly circularly) and writing themselves.
@@ -722,29 +608,19 @@ fn update_phase_2(
     mut defs: ecs::Query<
         '_,
         '_,
-        (
-            &mut BlockDefState,
-            &NotifierComponent,
-            &mut BlockDefNextValue,
-        ),
-        ecs::Changed<BlockDefNextValue>,
+        (&mut BlockDefState, &NotifierComponent, &mut CacheUpdate),
+        ecs::Changed<CacheUpdate>,
     >,
 ) {
     defs.par_iter_mut()
         .for_each(|(mut def_state, NotifierComponent(notifier), mut next)| {
             // By bypassing change detection, we avoid detecting this consumption of the change.
             // (This means that change detection no longer strictly functions as change detection,
-            // but that is okay because `BlockDefNextValue` is *only* for this.)
-            match mem::take(next.bypass_change_detection()) {
-                BlockDefNextValue::NewEvaluation(result) => {
-                    def_state.cache = result;
-                    notifier.notify(&BlockChange::new());
-                }
-                BlockDefNextValue::NewState(result) => {
-                    *def_state = result;
-                    notifier.notify(&BlockChange::new());
-                }
-                BlockDefNextValue::None => {}
+            // but that is okay because `CacheUpdate` is *only* for this.)
+            let changed =
+                def_state.cached_block.update_phase_2(mem::take(next.bypass_change_detection()));
+            if changed {
+                notifier.notify(&BlockChange::new());
             }
         });
 }

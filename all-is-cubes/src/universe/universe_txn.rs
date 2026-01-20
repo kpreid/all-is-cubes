@@ -1182,13 +1182,15 @@ mod tests {
                 },
                 [anonymous pending]: Insert(
                     Handle([pending anonymous] in no universe) = BlockDef {
-                        block: Block {
-                            primitive: Air,
+                        cached_block: CachedBlock {
+                            block: Block {
+                                primitive: Air,
+                            },
+                            cache_dirty: Flag(false),
+                            listeners_ok: true,
+                            ..
                         },
-                        cache_dirty: Flag(false),
-                        listeners_ok: true,
                         notifier: Notifier(0),
-                        ..
                     },
                 ),
             }
