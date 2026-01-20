@@ -3,7 +3,6 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::fmt;
-use core::time::Duration;
 
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
@@ -27,9 +26,8 @@ pub(crate) struct AnimatedVoxels<F> {
     /// The animation frame number, periodically incremented and fed to the function.
     frame: u64,
 
-    /// How much time to wait before incrementing the frame counter, measured in
-    /// [`time::TickSchedule`] ticks (i.e. steps).
-    frame_period: u16,
+    /// When to increment the frame number.
+    schedule: time::Schedule,
 }
 
 impl<F: Fn(Cube, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
@@ -37,7 +35,7 @@ impl<F: Fn(Cube, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
         Self {
             function,
             frame: 0,
-            frame_period: 4,
+            schedule: time::Schedule::from_period(core::num::NonZeroU16::new(4).unwrap()),
         }
     }
 
@@ -56,7 +54,7 @@ impl<F: Fn(Cube, u64) -> Block + Clone + Send + Sync + 'static> behavior::Behavi
         &self,
         context: &behavior::Context<'_, '_, Space>,
     ) -> (UniverseTransaction, behavior::Then) {
-        let txn = if context.tick.prev_phase().rem_euclid(self.frame_period) == 0 {
+        let txn = if self.schedule.contains(context.tick) {
             let mut mut_self: AnimatedVoxels<F> = self.clone();
             mut_self.frame = mut_self.frame.wrapping_add(1);
 
@@ -81,7 +79,7 @@ impl<F> fmt::Debug for AnimatedVoxels<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AnimatedVoxels")
             .field("frame", &self.frame)
-            .field("frame_period", &self.frame_period)
+            .field("frame_period", &self.schedule)
             .finish_non_exhaustive()
     }
 }
@@ -98,11 +96,7 @@ pub(crate) struct Fire {
     // TODO: should be using the attachment bounds instead of internally stored bounds
     fire_state: Vol<Box<[u8]>>,
     rng: Xoshiro256Plus,
-    /// Time accumulation not yet equal to a whole frame.
-    ///
-    /// TODO: Give [`time::Tick`] a concept of discrete time units we can reuse instead of
-    /// separate things having their own float-based clocks.
-    accumulator: Duration,
+    schedule: time::Schedule,
 }
 
 impl Fire {
@@ -125,16 +119,12 @@ impl Fire {
             blocks,
             fire_state: Vol::from_fn(bounds, |_cube| 0),
             rng,
-            accumulator: Duration::ZERO,
+            schedule: time::Schedule::from_period(core::num::NonZeroU16::new(2).unwrap()),
         }
     }
 
     fn tick_state(&mut self, tick: time::Tick) -> bool {
-        const PERIOD: Duration = Duration::from_nanos(1_000_000_000 / 32);
-        self.accumulator += tick.delta_t_duration();
-        if self.accumulator >= PERIOD {
-            self.accumulator -= PERIOD;
-        } else {
+        if !self.schedule.contains(tick) {
             return false;
         }
 
