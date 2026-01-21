@@ -2,15 +2,17 @@
 //! or UI.
 
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::fmt;
 use core::num::NonZeroU16;
 
 use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
+use all_is_cubes::arcstr::literal;
 use all_is_cubes::block::{
-    self, AIR, AnimationHint, Block, BlockCollision, Resolution::*, RotationPlacementRule,
-    TickAction,
+    self, AIR, AnimationHint, Block, BlockCollision, BlockDef, Resolution::*,
+    RotationPlacementRule, TickAction,
 };
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::Vector3D;
@@ -22,9 +24,8 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::sound;
-use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
+use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::time;
-use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
@@ -467,21 +468,37 @@ fn demo_blocks_generator(
                 .build(),
 
             Clock => {
-                let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [16, 16, 1]))
-                    .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-                    .build();
-                SpaceTransaction::add_behavior(space.bounds(), crate::animation::Clock::new())
-                    .execute(&mut space, ReadTicket::stub(), &mut transaction::no_outputs)
-                    .unwrap();
-                Block::builder()
-                    .display_name("Clock")
-                    .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
-                    .animation_hint(AnimationHint::redefinition(
-                        block::AnimationChange::ColorSameCategory,
-                    ))
-                    // Clock behavior assumes R16
-                    .voxels_handle(R16, txn.insert_anonymous(space))
-                    .build()
+                let bounds = GridAab::from_lower_size([0, 0, 0], [16, 16, 1]);
+                let frames = (0..60)
+                    .map(|phase: time::Phase| {
+                        let space = Space::builder(bounds)
+                            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+                            .build_and_mutate(|m| {
+                                m.fill(bounds, |cube| {
+                                    Some(crate::animation::paint_clock(phase, cube))
+                                })
+                            })
+                            .unwrap();
+                        (
+                            phase,
+                            Block::builder()
+                                .display_name(literal!("Clock"))
+                                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
+                                // TODO: Ideally, animated BlockDefs would automatically set the
+                                // animation hint.
+                                .animation_hint(AnimationHint::redefinition(
+                                    block::AnimationChange::ColorSameCategory,
+                                ))
+                                .voxels_handle(R16, txn.insert_anonymous(space))
+                                .build(),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                let block_def = BlockDef::new_animated(txn.read_ticket(), frames);
+                // TODO: it would be more efficient to return an animated BlockDef directly,
+                // but `BlockProvider` doesn’t let us do that.
+                Block::from(txn.insert_anonymous(block_def))
             }
 
             BecomeBlinker(state) => Block::builder()

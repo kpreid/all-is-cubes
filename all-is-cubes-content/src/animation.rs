@@ -191,104 +191,64 @@ impl VisitHandles for Fire {
     }
 }
 
-/// Behavior that draws a clock face that shows the progress of time, on a
-/// a basis of whole seconds and individual frames.
+/// Function that returns voxels of an image of a clock face that shows the progress of time, on a
+/// a basis of whole seconds and individual ticks.
 ///
 /// The block must have resolution 16.
 /// The universe [`time::TickSchedule`] must have divisor 60.
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Clock {
-    phase: time::Phase,
-}
+pub(crate) fn paint_clock(phase: time::Phase, cube: Cube) -> &'static Block {
+    const BACKGROUND: &Block = &block::from_color!(0.7, 0.7, 0.4, 1.0);
+    const MARKED: &Block = &block::from_color!(palette::ALMOST_BLACK);
+    const UNMARKED: &Block = &block::from_color!(1.0, 1.0, 1.0, 1.0);
 
-impl Clock {
-    pub(crate) fn new() -> Self {
-        Self { phase: 0 }
+    const BG: u8 = 80;
+
+    #[rustfmt::skip]
+    const PATTERN: [[u8; 16]; 16] = [
+        [ 0,  1,  2,  3,  4,  5,  6,   7,   8,  9, 10, 11, 12, 13, 14, 15],
+        [59, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 16],
+        [58, BG,  0,  0, BG, BG, BG,  BG,  BG, BG, BG, BG, 15, 15, BG, 17],
+        [57, BG,  0,  0, BG, BG, BG,  BG,  BG, BG, BG, BG, 15, 15, BG, 18],
+
+        [56, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 19],
+        [55, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 20],
+        [54, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 21],
+        [53, BG, BG, BG, BG, BG, BG, 100, 101, BG, BG, BG, BG, BG, BG, 22],
+
+        [52, BG, BG, BG, BG, BG, BG, 102, 103, BG, BG, BG, BG, BG, BG, 23],
+        [51, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 24],
+        [50, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 25],
+        [49, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 26],
+
+        [48, BG, 45, 45, BG, BG, BG,  BG,  BG, BG, BG, BG, 30, 30, BG, 27],
+        [47, BG, 45, 45, BG, BG, BG,  BG,  BG, BG, BG, BG, 30, 30, BG, 28],
+        [46, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 29],
+        [45, 44, 43, 42, 41, 40, 39,  38,  37, 36, 35, 34, 33, 32, 31, 30],
+    ];
+
+    let pattern_value = PATTERN[15 - cube.y as usize][cube.x as usize];
+
+    match pattern_value {
+        0..60 => {
+            if u16::from(pattern_value) == phase {
+                MARKED
+            } else {
+                UNMARKED
+            }
+        }
+        100..104 => {
+            if u16::from(pattern_value - 100) == phase % 4 {
+                MARKED
+            } else {
+                UNMARKED
+            }
+        }
+        BG => BACKGROUND,
+        _ => {
+            // shouldn't happen
+            const { &block::from_color!(1.0, 0.0, 0.0, 1.0) }
+        }
     }
-
-    fn paint(&self) -> SpaceTransaction {
-        const BACKGROUND: Block = block::from_color!(0.7, 0.7, 0.4, 1.0);
-        const MARKED: Block = block::from_color!(palette::ALMOST_BLACK);
-        const UNMARKED: Block = block::from_color!(1.0, 1.0, 1.0, 1.0);
-
-        const BG: u8 = 80;
-
-        #[rustfmt::skip]
-        const PATTERN: [[u8; 16]; 16] = [
-            [ 0,  1,  2,  3,  4,  5,  6,   7,   8,  9, 10, 11, 12, 13, 14, 15],
-            [59, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 16],
-            [58, BG,  0,  0, BG, BG, BG,  BG,  BG, BG, BG, BG, 15, 15, BG, 17],
-            [57, BG,  0,  0, BG, BG, BG,  BG,  BG, BG, BG, BG, 15, 15, BG, 18],
-
-            [56, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 19],
-            [55, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 20],
-            [54, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 21],
-            [53, BG, BG, BG, BG, BG, BG, 100, 101, BG, BG, BG, BG, BG, BG, 22],
-
-            [52, BG, BG, BG, BG, BG, BG, 102, 103, BG, BG, BG, BG, BG, BG, 23],
-            [51, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 24],
-            [50, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 25],
-            [49, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 26],
-
-            [48, BG, 45, 45, BG, BG, BG,  BG,  BG, BG, BG, BG, 30, 30, BG, 27],
-            [47, BG, 45, 45, BG, BG, BG,  BG,  BG, BG, BG, BG, 30, 30, BG, 28],
-            [46, BG, BG, BG, BG, BG, BG,  BG,  BG, BG, BG, BG, BG, BG, BG, 29],
-            [45, 44, 43, 42, 41, 40, 39,  38,  37, 36, 35, 34, 33, 32, 31, 30],
-        ];
-
-        SpaceTransaction::filling(GridAab::from_lower_size([0, 0, 0], [16, 16, 1]), |cube| {
-            let pattern_value = PATTERN[15 - cube.y as usize][cube.x as usize];
-
-            let block = match pattern_value {
-                0..60 => {
-                    if u16::from(pattern_value) == self.phase {
-                        MARKED
-                    } else {
-                        UNMARKED
-                    }
-                }
-                100..104 => {
-                    if u16::from(pattern_value - 100) == self.phase % 4 {
-                        MARKED
-                    } else {
-                        UNMARKED
-                    }
-                }
-                BG => BACKGROUND,
-                _ => {
-                    // shouldn't happen
-                    block::from_color!(1.0, 0.0, 0.0, 1.0)
-                }
-            };
-            CubeTransaction::replacing(None, Some(block))
-        })
-    }
-}
-
-impl behavior::Behavior<Space> for Clock {
-    fn step(
-        &self,
-        context: &behavior::Context<'_, '_, Space>,
-    ) -> (UniverseTransaction, behavior::Then) {
-        let mut mut_self = self.clone();
-        mut_self.phase = context.tick.next_phase();
-        (
-            context
-                .bind_host(mut_self.paint())
-                .merge(context.replace_self(mut_self))
-                .unwrap(),
-            behavior::Then::Step,
-        )
-    }
-
-    fn persistence(&self) -> Option<behavior::Persistence> {
-        // TODO: serialize
-        None
-    }
-}
-
-impl VisitHandles for Clock {
-    fn visit_handles(&self, _visitor: &mut dyn HandleVisitor) {}
 }
 
 /// Returns an [`op::Operation`] which, if used as a [`block::TickAction`], causes the block
