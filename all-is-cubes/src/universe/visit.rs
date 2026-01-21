@@ -80,7 +80,31 @@ impl<T: VisitHandles, const N: usize> VisitHandles for [T; N] {
     }
 }
 
-// The following no-op VisitHandles implementations allow simpler code in BlockAttributes.
+impl<K: VisitHandles, V: VisitHandles> VisitHandles for alloc::collections::BTreeMap<K, V> {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        for (key, value) in self {
+            key.visit_handles(visitor);
+            value.visit_handles(visitor);
+        }
+    }
+}
+
+// Implementations for types that contain no handles
+impl VisitHandles for u8 {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
+}
+impl VisitHandles for u16 {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
+}
+impl VisitHandles for u32 {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
+}
+impl VisitHandles for u64 {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
+}
+impl VisitHandles for u128 {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
+}
 impl VisitHandles for arcstr::ArcStr {
     fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
 }

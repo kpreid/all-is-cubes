@@ -5,6 +5,8 @@
 ### Added
 
 * `all-is-cubes` library:
+    * `block::BlockDef` can now be used to make block definitions that are looping animations.
+      New items `block::Animation` and `block::BlockDef::new_animated()` support this functionality.
     * `block::SetAttribute` is a modifier which overrides a single attribute of a block, instead of all of them.
       It replaces `Modifier::Attributes`.
     * `math::Vol::origin_empty()`, infallible construction of empty volume.
@@ -17,6 +19,8 @@
 ### Changed
 
 * `all-is-cubes` library:
+    * `block::BlockDefTransaction`’s constructors now take `impl Into<Animation>` instead of `Block`.
+      They accept `Block` as a specific case, but may be newly ambiguous.
     * `Handle::<BlockDef>::read()` no longer returns a `&BlockDef`, but a separate `Read` type.
     * `chunking::point_to_chunk()` now returns `None` in case of out-of-range input instead of panicking.
 
@@ -25,6 +29,7 @@
 ### Removed
 
 * `all-is-cubes` library:
+    * `block::BlockDef` no longer implements `AsRef<Block>`.
     * `block::Modifier::Attributes` has been replaced by `SetAttribute`.
 
 
