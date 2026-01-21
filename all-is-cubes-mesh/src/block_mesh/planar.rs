@@ -294,11 +294,10 @@ impl PlanarTriangulator {
                 .new_frontier
                 .back()
                 .is_some_and(|v| self.basis.connectivity(&v.v, false, true));
-            while let Some(v) = self.old_frontier.front()
-                && self.basis.compare_perp(&v.v, &input_fv.v).is_lt()
+            while let Some(passed_over_fv) = self
+                .old_frontier
+                .pop_front_if(|v| self.basis.compare_perp(&v.v, &input_fv.v).is_lt())
             {
-                let passed_over_fv = self.old_frontier.pop_front().unwrap();
-
                 if previous_should_connect_forward
                     && self.basis.connectivity(&passed_over_fv.v, true, true)
                     && let triangle = [
@@ -351,17 +350,11 @@ impl PlanarTriangulator {
             } else {
                 // The next question to ask is: is the new vertex equal in perpendicular position
                 // to a vertex in the old frontier (which it would replace), or not?
-                let is_perpendicularly_aligned = if let Some(old_fv) = self.old_frontier.front() {
-                    self.basis.compare_perp(&old_fv.v, &input_fv.v).is_eq()
-                } else {
-                    false
-                };
-
-                if is_perpendicularly_aligned {
-                    // The new vertex is directly ahead of a vertex in the old frontier, and
-                    // therefore replaces it. Remove it from the old frontier.
-                    let predecessor_vertex = self.old_frontier.pop_front().unwrap();
-
+                // If so, remove that old vertex from the old frontier so it can be replaced.
+                if let Some(predecessor_vertex) = self
+                    .old_frontier
+                    .pop_front_if(|old_fv| self.basis.compare_perp(&old_fv.v, &input_fv.v).is_eq())
+                {
                     // We must emit one or two triangles that cover the area bounded by the old
                     // vertex, the new vertex, and its neighbors in the frontier.
                     if self.basis.connectivity(&predecessor_vertex.v, true, false) {
