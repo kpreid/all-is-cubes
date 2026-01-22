@@ -162,6 +162,17 @@ impl listen::Listen for BlockDef {
     }
 }
 
+/// Registers a listener for whenever the result of evaluation of this block definition changes.
+/// Note that this only occurs when the owning [`Universe`] is being stepped.
+impl listen::Listen for Read<'_> {
+    type Msg = BlockChange;
+    type Listener = <Notifier<Self::Msg> as listen::Listen>::Listener;
+
+    fn listen_raw(&self, listener: Self::Listener) {
+        self.notifier.listen_raw(listener)
+    }
+}
+
 impl AsRef<Block> for BlockDef {
     fn as_ref(&self) -> &Block {
         self.block()
