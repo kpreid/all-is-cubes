@@ -264,6 +264,15 @@ impl Clock {
         tick
     }
 
+    /// Returns the current phase of the clock.
+    ///
+    /// The phase is a value which is incremented once per tick, and wraps around to 0
+    /// at a value determined by [`self.schedule()`][Self::schedule].
+    /// It is also available through [`Tick::prev_phase()`] and [`Tick::next_phase()`].
+    pub fn phase(&self) -> Phase {
+        self.phase
+    }
+
     /// Returns the tick that will happen the next time [`Self::advance()`] is called,
     /// if the schedule is not changed before then.
     pub fn next_tick(&self, paused: bool) -> Tick {
