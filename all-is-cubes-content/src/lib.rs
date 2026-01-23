@@ -50,6 +50,7 @@ pub use landscape::*;
 mod menu;
 #[doc(hidden)] // TODO
 pub use menu::template_menu_space;
+pub mod pipe;
 mod template;
 pub use template::*;
 mod tree;

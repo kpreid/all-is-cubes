@@ -1,7 +1,5 @@
-use hashbrown::HashMap;
-use itertools::Itertools;
-
 use super::prelude::*;
+use crate::pipe;
 
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
@@ -38,16 +36,16 @@ fn INVENTORY(ctx: Context<'_>) {
         ))
         .build_txn(&mut txn);
 
-    let (straight_pipe_block, elbow_pipe_block) = make_pipe_blocks(&mut txn);
+    let (straight_pipe_block, elbow_pipe_block) = pipe::make_pipe_blocks(&mut txn);
 
-    let pipe_table = prepare_pipes([
+    let kit = pipe::Kit::new_with_rotations([
         // TODO: Should prepare_pipes() automatically fix the lack of inventories?
-        PipeData {
+        pipe::Descriptor {
             block: straight_pipe_block.evaluate(txn.read_ticket()).unwrap().with_inventory([]),
             from_face: Face6::NZ,
             to_face: Face6::PZ,
         },
-        PipeData {
+        pipe::Descriptor {
             block: elbow_pipe_block.evaluate(txn.read_ticket()).unwrap().with_inventory([]),
             from_face: Face6::NZ,
             to_face: Face6::NX,
@@ -78,8 +76,7 @@ fn INVENTORY(ctx: Context<'_>) {
             ],
         )?;
 
-        for (cube, block) in fit_pipes(
-            &pipe_table,
+        for (cube, block) in kit.fit(
             [
                 [2, 0, 0],
                 [2, 1, 0],
@@ -122,179 +119,4 @@ fn INVENTORY(ctx: Context<'_>) {
     })?;
 
     Ok((space, txn))
-}
-
-struct PipeData {
-    block: Block,
-    from_face: Face6,
-    to_face: Face6,
-}
-
-// Assumed to be complete
-type PipeTable = HashMap<(Face6, Face6), Block>;
-
-/// Take a set of [`PipeData`] and expand it with rotations of those pipes.
-fn prepare_pipes(pipes: impl IntoIterator<Item = PipeData>) -> PipeTable {
-    let mut table: HashMap<(Face6, Face6), Block> = HashMap::new();
-    for pipe in pipes {
-        // TODO: Allow caller — or the individual pipes — to rank preferred and dispreferred
-        // rotations more finely than "prefer IDENTITY".
-        for rotation in GridRotation::ALL_BUT_REFLECTIONS {
-            let faces = (
-                rotation.transform(pipe.from_face),
-                rotation.transform(pipe.to_face),
-            );
-            if rotation == GridRotation::IDENTITY {
-                // Unconditionally insert.
-                table.insert(faces, pipe.block.clone().rotate(rotation));
-            } else {
-                // Insert only if we don't have one already.
-                table.entry(faces).or_insert_with(|| pipe.block.clone().rotate(rotation));
-            }
-        }
-    }
-    table
-}
-
-/// Given a set of `pipes`, rotate and place them so that they follow the `path`.
-///
-/// The first and last elements of `path` are left unaltered and indicate the starting and
-/// ending faces the pipes should connect to.
-///
-/// `pipes` should contain a straight pipe and a right-angle pipe.
-/// If `pipes` contains multiple elements with the same angle, the one which does not require
-/// rotation will be preferred.
-///
-/// Panics if any element of `path` is not adjacent to the previous element.
-/// Panics if `pipes` does not contain a straight pipe and a right-angle pipe and one is needed.
-#[track_caller]
-fn fit_pipes(
-    pipes: &PipeTable,
-    path: impl IntoIterator<Item = Cube>,
-) -> impl Iterator<Item = (Cube, &Block)> {
-    path.into_iter().tuple_windows().map(|(cube_behind, cube_here, cube_ahead)| {
-        let face_behind = Face6::try_from(cube_behind - cube_here).expect("invalid path");
-        let face_ahead = Face6::try_from(cube_ahead - cube_here).expect("invalid path");
-
-        (cube_here, &pipes[&(face_behind, face_ahead)])
-    })
-}
-
-fn make_pipe_blocks(txn: &mut ExhibitTransaction) -> (Block, Block) {
-    // TODO: Move this to `DemoBlocks`?
-
-    let pipe_corner_material = block::from_color!(0.6, 0.2, 0.2);
-    let pipe_side_pattern_material = block::from_color!(0.3, 0.1, 0.1);
-    let pipe_side_glass = block::from_color!(0.4, 0.4, 0.4, 0.2);
-    let pipe_box_style = BoxStyle::from_fn(|part| {
-        if part.is_corner() || part.is_edge() {
-            Some(pipe_corner_material.clone())
-        } else if part.is_face() && !part.is_on_face(Face6::NZ) && !part.is_on_face(Face6::PZ) {
-            // replaced in actual use
-            Some(block::from_color!(0.1, 0.1, 0.1))
-        } else {
-            None
-        }
-    });
-
-    let resolution = R32;
-    let pipe_scale = R4;
-    let pipe_slots = inv::Ix::from(pipe_scale) * 2 - 1;
-    let straight_pipe_box = GridAab::from_lower_upper([11, 11, 0], [21, 21, 32]);
-
-    let straight_voxels_fn = |cube| {
-        let Some(part) = BoxPart::from_cube(straight_pipe_box, cube) else {
-            return &AIR;
-        };
-        if part.is_face() && !part.is_on_face(Face6::NZ) && !part.is_on_face(Face6::PZ) {
-            // Sides of the pipe get an arrow pattern
-            let xy_diamond_radius = (cube.x * 2 - 31).abs().min((cube.y * 2 - 31).abs());
-            if (cube.z + xy_diamond_radius + 2).rem_euclid(32) < 12 {
-                &pipe_side_pattern_material
-            } else {
-                &pipe_side_glass
-            }
-        } else {
-            pipe_box_style[part].as_ref().unwrap_or(&AIR)
-        }
-    };
-
-    let straight_pipe = Block::builder()
-        .display_name("Pipe")
-        .voxels_fn(resolution, straight_voxels_fn)
-        .unwrap()
-        .inventory_config(inv::InvInBlock::new(
-            pipe_slots,
-            pipe_scale,
-            resolution,
-            // pipe slots overlap by half to allow a smoothish movement
-            vec![inv::IconRow::new(
-                0..pipe_slots,
-                point3(12, 12, 0),
-                vec3(0, 0, 4),
-            )],
-        ))
-        .tick_action(block::TickAction {
-            operation: Operation::Alt(
-                [
-                    Operation::MoveInventory {
-                        transfer_into_adjacent: Some(Face6::PZ),
-                    },
-                    // This turns failures to move into do-nothing successes.
-                    // TODO: there should be a simple empty operation.
-                    Operation::Neighbors([].into()),
-                ]
-                .into(),
-            ),
-            schedule: time::Schedule::from_period(NonZero::new(6).unwrap()),
-        })
-        .animation_hint(block::AnimationHint::replacement(
-            block::AnimationChange::Shape,
-        ))
-        .build_txn(txn);
-
-    let elbow_pipe = Block::builder()
-        .display_name("Pipe")
-        .voxels_fn(resolution, |mut cube| {
-            // Bevel-join the pipe so that it connects NZ to NX instead of PZ.
-            if cube.x < cube.z {
-                (cube.x, cube.z) = (cube.z, 31 - cube.x);
-            }
-            straight_voxels_fn(cube)
-        })
-        .unwrap()
-        .inventory_config(inv::InvInBlock::new(
-            pipe_slots,
-            pipe_scale,
-            R32,
-            // pipe slots overlap by half to allow a smoothish movement
-            vec![
-                inv::IconRow::new(0..(pipe_slots / 2), point3(12, 12, 0), vec3(0, 0, 4)),
-                inv::IconRow::new(
-                    (pipe_slots / 2)..pipe_slots,
-                    point3(12, 12, 12),
-                    vec3(-4, 0, 0),
-                ),
-            ],
-        ))
-        .tick_action(block::TickAction {
-            operation: Operation::Alt(
-                [
-                    Operation::MoveInventory {
-                        transfer_into_adjacent: Some(Face6::NX),
-                    },
-                    // This turns failures to move into do-nothing successes.
-                    // TODO: there should be a simple empty operation.
-                    Operation::Neighbors([].into()),
-                ]
-                .into(),
-            ),
-            schedule: time::Schedule::from_period(NonZero::new(6).unwrap()),
-        })
-        .animation_hint(block::AnimationHint::replacement(
-            block::AnimationChange::Shape,
-        ))
-        .build_txn(txn);
-
-    (straight_pipe, elbow_pipe)
 }
