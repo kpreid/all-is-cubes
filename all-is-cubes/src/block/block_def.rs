@@ -224,7 +224,7 @@ impl universe::SealedMember for BlockDef {
         })
     }
 
-    fn into_bundle(value: Box<Self>) -> Self::Bundle {
+    fn into_bundle(value: Box<Self>, _context: &universe::IntoBundleContext<'_>) -> Self::Bundle {
         (value.state, NotifierComponent(value.notifier))
     }
 }

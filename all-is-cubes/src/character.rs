@@ -367,7 +367,7 @@ impl universe::SealedMember for Character {
             ambient_sound: entity.get::<ambient_sound::State>()?.sound_average(),
         })
     }
-    fn into_bundle(value: Box<Self>) -> Self::Bundle {
+    fn into_bundle(value: Box<Self>, _context: &universe::IntoBundleContext<'_>) -> Self::Bundle {
         let Self {
             core,
             body,

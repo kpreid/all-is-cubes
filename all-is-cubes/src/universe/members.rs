@@ -6,6 +6,7 @@
 
 use alloc::boxed::Box;
 use core::any::Any;
+use core::marker::PhantomData;
 use core::{fmt, hash};
 
 use bevy_ecs::prelude as ecs;
@@ -16,6 +17,7 @@ use crate::character::Character;
 use crate::sound::SoundDef;
 use crate::space::Space;
 use crate::tag::TagDef;
+use crate::time;
 use crate::transaction;
 use crate::universe::{
     self, ErasedHandle, Handle, InsertError, Name, Universe, handle::HandlePtr, universe_txn as ut,
@@ -60,7 +62,7 @@ pub(crate) trait SealedMember: Sized {
 
     /// Converts `Self` (the form independent of a universe) into a bundle to be part of a
     /// newly spawned entity.
-    fn into_bundle(value: Box<Self>) -> Self::Bundle;
+    fn into_bundle(value: Box<Self>, context: &IntoBundleContext<'_>) -> Self::Bundle;
 }
 
 /// Trait for every type which can be a named member of a universe and be referred to by
@@ -112,6 +114,21 @@ pub(in crate::universe) trait MemberBoilerplate: Sized {
         Self: UniverseMember;
 }
 
+/// Data that may be useful for [`SealedMember::into_bundle()`].
+pub(crate) struct IntoBundleContext<'u> {
+    pub(crate) clock: time::Clock,
+    _phantom: PhantomData<&'u Universe>,
+}
+
+impl<'u> IntoBundleContext<'u> {
+    pub(crate) fn new(universe: &'u Universe) -> Self {
+        Self {
+            clock: universe.clock(),
+            _phantom: PhantomData,
+        }
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Use this macro to implement [`UniverseMember`] and related traits for any member type whose only
@@ -146,7 +163,10 @@ macro_rules! impl_universe_member_for_single_component_type {
                 entity.get::<$member_type>()
             }
 
-            fn into_bundle(value: ::alloc::boxed::Box<Self>) -> Self::Bundle {
+            fn into_bundle(
+                value: ::alloc::boxed::Box<Self>,
+                _context: &$crate::universe::IntoBundleContext<'_>,
+            ) -> Self::Bundle {
                 (*value,)
             }
         }

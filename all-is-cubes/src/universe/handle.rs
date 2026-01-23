@@ -21,7 +21,7 @@ use bevy_ecs::prelude as ecs;
 use bevy_platform::sync::{Mutex, MutexGuard};
 
 use crate::universe::{
-    AnyHandle, InsertError, InsertErrorKind, MemberBoilerplate, Membership, Name, ReadTicket,
+    self, AnyHandle, InsertError, InsertErrorKind, MemberBoilerplate, Membership, Name, ReadTicket,
     ReadTicketError, SealedMember, Universe, UniverseId, UniverseMember, VisitHandles,
     id::OnceUniverseId, name::OnceName,
 };
@@ -233,11 +233,12 @@ impl<T: 'static> Handle<T> {
         *state_guard = State::Member { entity };
         drop(state_guard);
 
+        let bundle = SealedMember::into_bundle(value, &universe::IntoBundleContext::new(universe));
         universe
             .world
             .get_entity_mut(entity)
             .expect("handle's entity missing")
-            .insert(SealedMember::into_bundle(value));
+            .insert(bundle);
         // We may have created a new archetype.
         universe.update_archetypes();
         Ok(())
@@ -622,16 +623,14 @@ impl<T: 'static> Handle<T> {
             .expect("can't happen: universe ID already set");
 
         // Create handle’s corresponding entity in the universe.
-        let entity = universe
-            .world
-            .spawn((
-                Membership {
-                    name: new_name,
-                    handle: T::into_any_handle(self.clone()),
-                },
-                SealedMember::into_bundle(value),
-            ))
-            .id();
+        let bundle = (
+            Membership {
+                name: new_name,
+                handle: T::into_any_handle(self.clone()),
+            },
+            SealedMember::into_bundle(value, &universe::IntoBundleContext::new(universe)),
+        );
+        let entity = universe.world.spawn(bundle).id();
         // We may have created a new archetype.
         universe.update_archetypes();
 

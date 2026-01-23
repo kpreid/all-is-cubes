@@ -930,7 +930,7 @@ impl universe::SealedMember for Space {
             notifiers: entity.get()?,
         })
     }
-    fn into_bundle(value: Box<Self>) -> Self::Bundle {
+    fn into_bundle(value: Box<Self>, _context: &universe::IntoBundleContext<'_>) -> Self::Bundle {
         let Self {
             palette,
             contents,
