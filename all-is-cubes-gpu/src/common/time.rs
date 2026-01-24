@@ -48,4 +48,4 @@ impl FrameBudget {
 /// A Duration long enough that it is not interesting in questions of rendering, but not
 /// so long that adding a reasonable number of it to an [`Instant`] will overflow.
 /// TODO: Replace all this with the newer `Deadline` concept?
-const VERY_LONG: Duration = Duration::from_secs(86400 * 7);
+const VERY_LONG: Duration = Duration::from_hours(24 * 7);
