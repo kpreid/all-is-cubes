@@ -5,6 +5,7 @@ use core::num::NonZero;
 use hashbrown::HashMap;
 use itertools::Itertools;
 
+use all_is_cubes::block::BlockDef;
 use all_is_cubes::euclid::{point3, vec3};
 use all_is_cubes::math::{Cube, Face6, GridCoordinate, GridRotation};
 use all_is_cubes::op::Operation;
@@ -100,7 +101,8 @@ pub(crate) fn make_pipe_blocks(txn: &mut UniverseTransaction) -> (Block, Block) 
 
     let pipe_corner_material = block::from_color!(0.6, 0.2, 0.2);
     let pipe_side_pattern_material = block::from_color!(0.3, 0.1, 0.1);
-    let pipe_side_glass = block::from_color!(0.4, 0.4, 0.4, 0.2);
+    let pipe_side_glass = block::from_color!(0.4, 0.4, 0.4, 0.99);
+    let pipe_flow = block::from_color!(1.0, 1.0, 1.0, 0.2);
     let pipe_box_style = BoxStyle::from_fn(|part| {
         if part.is_corner() || part.is_edge() {
             Some(pipe_corner_material.clone())
@@ -119,7 +121,7 @@ pub(crate) fn make_pipe_blocks(txn: &mut UniverseTransaction) -> (Block, Block) 
     let straight_pipe_box = GridAab::from_lower_upper([11, 11, 0], [21, 21, 32]);
     let animation_hint = block::AnimationHint::replacement(block::AnimationChange::Shape);
 
-    let straight_pipe_voxels_fn = |cube| {
+    let straight_pipe_voxels_fn = |cube, phase| {
         let Some(part) = BoxPart::from_cube(straight_pipe_box, cube) else {
             return &block::AIR;
         };
@@ -131,6 +133,11 @@ pub(crate) fn make_pipe_blocks(txn: &mut UniverseTransaction) -> (Block, Block) 
             } else {
                 &pipe_side_glass
             }
+        } else if part == BoxPart::INTERIOR
+            && (cube.z - i32::from(phase) * 4).rem_euclid(voxels_per_movement_step * 5)
+                < voxels_per_movement_step
+        {
+            &pipe_flow
         } else {
             pipe_box_style[part].as_ref().unwrap_or(&block::AIR)
         }
@@ -153,55 +160,71 @@ pub(crate) fn make_pipe_blocks(txn: &mut UniverseTransaction) -> (Block, Block) 
         }
     };
 
-    let straight_pipe = Block::builder()
-        .display_name("Pipe")
-        .voxels_fn(resolution, straight_pipe_voxels_fn)
-        .unwrap()
-        .inventory_config(inv::InvInBlock::new(
-            pipe_slots,
-            pipe_scale,
-            resolution,
-            // pipe slots overlap by half to allow a smoothish movement
-            vec![inv::IconRow::new(
-                0..pipe_slots,
-                point3(12, 12, 0),
-                vec3(0, 0, voxels_per_movement_step),
-            )],
-        ))
-        .tick_action(tick_action(Face6::PZ))
-        .animation_hint(animation_hint)
-        .build_txn(txn);
+    /// Build the animation from a function of frames.
+    fn build_animation(
+        txn: &mut UniverseTransaction,
+        mut f: impl FnMut(&mut UniverseTransaction, time::Phase) -> Block,
+    ) -> Block {
+        // frames are offset by 1 so that the frames take effect at the same time as the *effect*
+        // of the tick_action. TODO: evidence we need to change how Schedule works.
+        let animation =
+            block::Animation::new((1..60).step_by(6).map(|phase| (phase + 1, f(txn, phase))));
+        Block::from(txn.insert_anonymous(BlockDef::new_animated(txn.read_ticket(), animation)))
+    }
 
-    let elbow_pipe = Block::builder()
-        .display_name("Pipe")
-        .voxels_fn(resolution, |mut cube| {
-            // Bevel-join the pipe so that it connects NZ to NX instead of PZ.
-            if cube.x < cube.z {
-                (cube.x, cube.z) = (cube.z, 31 - cube.x);
-            }
-            straight_pipe_voxels_fn(cube)
-        })
-        .unwrap()
-        .inventory_config(inv::InvInBlock::new(
-            pipe_slots,
-            pipe_scale,
-            R32,
-            vec![
-                inv::IconRow::new(
-                    0..(pipe_slots / 2),
+    let straight_pipe = build_animation(txn, |txn, phase| {
+        Block::builder()
+            .display_name("Pipe")
+            .voxels_fn(resolution, |cube| straight_pipe_voxels_fn(cube, phase))
+            .unwrap()
+            .inventory_config(inv::InvInBlock::new(
+                pipe_slots,
+                pipe_scale,
+                resolution,
+                // pipe slots overlap by half to allow a smoothish movement
+                vec![inv::IconRow::new(
+                    0..pipe_slots,
                     point3(12, 12, 0),
                     vec3(0, 0, voxels_per_movement_step),
-                ),
-                inv::IconRow::new(
-                    (pipe_slots / 2)..pipe_slots,
-                    point3(12, 12, 12),
-                    vec3(-voxels_per_movement_step, 0, 0),
-                ),
-            ],
-        ))
-        .tick_action(tick_action(Face6::NX))
-        .animation_hint(animation_hint)
-        .build_txn(txn);
+                )],
+            ))
+            .tick_action(tick_action(Face6::PZ))
+            .animation_hint(animation_hint)
+            .build_txn(txn)
+    });
+
+    let elbow_pipe = build_animation(txn, |txn, phase| {
+        Block::builder()
+            .display_name("Pipe")
+            .voxels_fn(resolution, |mut cube| {
+                // Bevel-join the pipe so that it connects NZ to NX instead of PZ.
+                if cube.x < cube.z {
+                    (cube.x, cube.z) = (cube.z, 31 - cube.x);
+                }
+                straight_pipe_voxels_fn(cube, phase)
+            })
+            .unwrap()
+            .inventory_config(inv::InvInBlock::new(
+                pipe_slots,
+                pipe_scale,
+                R32,
+                vec![
+                    inv::IconRow::new(
+                        0..(pipe_slots / 2),
+                        point3(12, 12, 0),
+                        vec3(0, 0, voxels_per_movement_step),
+                    ),
+                    inv::IconRow::new(
+                        (pipe_slots / 2)..pipe_slots,
+                        point3(12, 12, 12),
+                        vec3(-voxels_per_movement_step, 0, 0),
+                    ),
+                ],
+            ))
+            .tick_action(tick_action(Face6::NX))
+            .animation_hint(animation_hint)
+            .build_txn(txn)
+    });
 
     (straight_pipe, elbow_pipe)
 }
