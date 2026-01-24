@@ -6,9 +6,10 @@ use hashbrown::HashMap;
 use itertools::Itertools;
 
 use all_is_cubes::euclid::{point3, vec3};
-use all_is_cubes::math::{Cube, Face6, GridRotation};
+use all_is_cubes::math::{Cube, Face6, GridCoordinate, GridRotation};
 use all_is_cubes::op::Operation;
 use all_is_cubes::time;
+use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::{
     block::{
         self, Block,
@@ -94,9 +95,7 @@ impl Kit {
 }
 
 // TODO: return value isn't specific enough to be good public API yet
-pub(crate) fn make_pipe_blocks(
-    txn: &mut all_is_cubes::universe::UniverseTransaction,
-) -> (Block, Block) {
+pub(crate) fn make_pipe_blocks(txn: &mut UniverseTransaction) -> (Block, Block) {
     // TODO: Move this to `DemoBlocks`?
 
     let pipe_corner_material = block::from_color!(0.6, 0.2, 0.2);
@@ -113,12 +112,14 @@ pub(crate) fn make_pipe_blocks(
         }
     });
 
+    let voxels_per_movement_step: GridCoordinate = 4;
     let resolution = R32;
     let pipe_scale = R4;
     let pipe_slots = inv::Ix::from(pipe_scale) * 2 - 1;
     let straight_pipe_box = GridAab::from_lower_upper([11, 11, 0], [21, 21, 32]);
+    let animation_hint = block::AnimationHint::replacement(block::AnimationChange::Shape);
 
-    let straight_voxels_fn = |cube| {
+    let straight_pipe_voxels_fn = |cube| {
         let Some(part) = BoxPart::from_cube(straight_pipe_box, cube) else {
             return &block::AIR;
         };
@@ -135,9 +136,26 @@ pub(crate) fn make_pipe_blocks(
         }
     };
 
+    let tick_action = |output_face| {
+        block::TickAction {
+            operation: Operation::Alt(
+                [
+                    Operation::MoveInventory {
+                        transfer_into_adjacent: Some(output_face),
+                    },
+                    // This turns failures to move into do-nothing successes.
+                    // TODO: there should be a simple empty operation.
+                    Operation::Neighbors([].into()),
+                ]
+                .into(),
+            ),
+            schedule: time::Schedule::from_period(NonZero::new(6).unwrap()),
+        }
+    };
+
     let straight_pipe = Block::builder()
         .display_name("Pipe")
-        .voxels_fn(resolution, straight_voxels_fn)
+        .voxels_fn(resolution, straight_pipe_voxels_fn)
         .unwrap()
         .inventory_config(inv::InvInBlock::new(
             pipe_slots,
@@ -147,26 +165,11 @@ pub(crate) fn make_pipe_blocks(
             vec![inv::IconRow::new(
                 0..pipe_slots,
                 point3(12, 12, 0),
-                vec3(0, 0, 4),
+                vec3(0, 0, voxels_per_movement_step),
             )],
         ))
-        .tick_action(block::TickAction {
-            operation: Operation::Alt(
-                [
-                    Operation::MoveInventory {
-                        transfer_into_adjacent: Some(Face6::PZ),
-                    },
-                    // This turns failures to move into do-nothing successes.
-                    // TODO: there should be a simple empty operation.
-                    Operation::Neighbors([].into()),
-                ]
-                .into(),
-            ),
-            schedule: time::Schedule::from_period(NonZero::new(6).unwrap()),
-        })
-        .animation_hint(block::AnimationHint::replacement(
-            block::AnimationChange::Shape,
-        ))
+        .tick_action(tick_action(Face6::PZ))
+        .animation_hint(animation_hint)
         .build_txn(txn);
 
     let elbow_pipe = Block::builder()
@@ -176,40 +179,28 @@ pub(crate) fn make_pipe_blocks(
             if cube.x < cube.z {
                 (cube.x, cube.z) = (cube.z, 31 - cube.x);
             }
-            straight_voxels_fn(cube)
+            straight_pipe_voxels_fn(cube)
         })
         .unwrap()
         .inventory_config(inv::InvInBlock::new(
             pipe_slots,
             pipe_scale,
             R32,
-            // pipe slots overlap by half to allow a smoothish movement
             vec![
-                inv::IconRow::new(0..(pipe_slots / 2), point3(12, 12, 0), vec3(0, 0, 4)),
+                inv::IconRow::new(
+                    0..(pipe_slots / 2),
+                    point3(12, 12, 0),
+                    vec3(0, 0, voxels_per_movement_step),
+                ),
                 inv::IconRow::new(
                     (pipe_slots / 2)..pipe_slots,
                     point3(12, 12, 12),
-                    vec3(-4, 0, 0),
+                    vec3(-voxels_per_movement_step, 0, 0),
                 ),
             ],
         ))
-        .tick_action(block::TickAction {
-            operation: Operation::Alt(
-                [
-                    Operation::MoveInventory {
-                        transfer_into_adjacent: Some(Face6::NX),
-                    },
-                    // This turns failures to move into do-nothing successes.
-                    // TODO: there should be a simple empty operation.
-                    Operation::Neighbors([].into()),
-                ]
-                .into(),
-            ),
-            schedule: time::Schedule::from_period(NonZero::new(6).unwrap()),
-        })
-        .animation_hint(block::AnimationHint::replacement(
-            block::AnimationChange::Shape,
-        ))
+        .tick_action(tick_action(Face6::NX))
+        .animation_hint(animation_hint)
         .build_txn(txn);
 
     (straight_pipe, elbow_pipe)
