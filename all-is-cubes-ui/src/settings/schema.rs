@@ -44,8 +44,7 @@ macro_rules! derive_settings_schema_from_keys {
             /// Returns the name for this setting to show to users.
             pub fn display_name(&self) -> &str {
                 match self {
-                    // TODO: have an actual name rather than reiterating the for-machines string.
-                    $( Key::$variant => $key_string, )*
+                    $( Key::$variant => $display_name, )*
                 }
             }
 
