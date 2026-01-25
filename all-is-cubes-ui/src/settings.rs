@@ -279,4 +279,28 @@ mod tests {
             "mutated values after disinherit"
         );
     }
+
+    #[test]
+    fn persistence() {
+        use std::sync::mpsc::TryRecvError::Empty;
+
+        let (ptx, prx) = std::sync::mpsc::channel();
+        let settings = Settings::with_persistence(
+            Default::default(),
+            Arc::new(move |data: &Data| ptx.send(data.clone()).unwrap()),
+        );
+
+        // No initial write
+        assert_eq!(prx.try_recv(), Err(Empty));
+
+        settings.mutate_graphics_options(|g| g.show_ui = false);
+        assert_eq!(
+            prx.try_recv(),
+            Ok(Arc::new({
+                let mut g = GraphicsOptions::default();
+                g.show_ui = false;
+                g
+            }))
+        );
+    }
 }
