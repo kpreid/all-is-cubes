@@ -8,10 +8,12 @@ use core::str::FromStr;
 use bevy_platform::sync::LazyLock;
 
 use all_is_cubes::arcstr::ArcStr;
-use all_is_cubes::math::{FreeCoordinate, PositiveSign, ZeroOne};
+use all_is_cubes::math::{FreeCoordinate, PositiveSign, ZeroOne, ps32, zo32};
 use all_is_cubes_render::camera::{self, GraphicsOptions};
 
-use crate::settings::serialize::{DeserializeError, StringForm};
+use crate::settings::serialize::{
+    DeserializeError, StringForm, impl_string_form_via_from_str_and_display,
+};
 use crate::settings::{ParseError, TypedKey};
 
 #[cfg(doc)]
@@ -170,12 +172,19 @@ pub enum Key {
     )]
     MaximumIntensity,
 
-    // TODO: should split into enum + separate number
     #[custom(
-        key = "graphics/exposure",
-        type = camera::ExposureOption,
+        key = "graphics/exposure-mode",
+        type = ExposureMode,
+        display_name = "Auto exposure",
+        default = ExposureMode::default()
+    )]
+    ExposureMode,
+
+    #[custom(
+        key = "graphics/fixed-exposure",
+        type = PositiveSign<f32>,
         display_name = "Exposure",
-        default = GraphicsOptions::default().exposure
+        default = ps32(1.0)
     )]
     Exposure,
 
@@ -204,12 +213,20 @@ pub enum Key {
     LightingDisplay,
 
     #[custom(
-        key = "graphics/transparency",
-        type = camera::TransparencyOption, // TODO: split threshold to its own option to not lose it
+        key = "graphics/transparency-mode",
+        type = TransparencyMode,
         display_name = "Transparency",
-        default = GraphicsOptions::default().transparency
+        default = TransparencyMode::default()
     )]
     Transparency,
+
+    #[custom(
+        key = "graphics/transparency-threshold",
+        type = ZeroOne<f32>,
+        display_name = "Transparency Threshold",
+        default = zo32(0.5)
+    )]
+    TransparencyThreshold,
 
     #[custom(
         key = "graphics/show-ui",
@@ -302,6 +319,44 @@ impl<'de> serde::Deserialize<'de> for Key {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Settings translating to `GraphicsOptions`
+
+/// Value of the [`EXPOSURE_MODE`] setting.
+///
+/// Differs from [`camera::ExposureOption`] in that it is a value-less enum; the fixed exposure is
+/// stored separately.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, strum::Display, strum::EnumString)]
+#[non_exhaustive]
+pub enum ExposureMode {
+    /// Constant exposure; light values in the scene are multiplied by this value
+    /// before the tone mapping operator is applied.
+    Fixed,
+    /// Exposure adjusts to compensate for the actual brightness of the scene.
+    #[default]
+    Automatic,
+}
+impl_string_form_via_from_str_and_display!(ExposureMode);
+
+/// Value of the [`TRANSPARENCY`] setting.
+///
+/// Differs from [`camera::TransparencyOption`] in that it is a value-less enum; the threshold is
+/// stored separately.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, strum::Display, strum::EnumString)]
+#[non_exhaustive]
+pub enum TransparencyMode {
+    /// Conventional transparent surfaces.
+    Surface,
+    /// Accounts for the thickness of material passed through; colors' alpha values are
+    /// interpreted as the opacity of a unit thickness of the material.
+    #[default]
+    Volumetric,
+    /// Alpha above or below a threshold value will be rounded to fully opaque
+    /// or fully transparent, respectively.
+    Threshold,
+}
+impl_string_form_via_from_str_and_display!(TransparencyMode);
+
 pub(super) fn assemble_graphics_options(data: &super::Data) -> GraphicsOptions {
     // TODO: add exhaustivity, perhaps by moving code to the all-is-cubes crate.
     let mut options = GraphicsOptions::default();
@@ -311,11 +366,20 @@ pub(super) fn assemble_graphics_options(data: &super::Data) -> GraphicsOptions {
     options.fov_y = *data.get(FOV_Y);
     options.tone_mapping = data.get(TONE_MAPPING).clone();
     options.maximum_intensity = *data.get(MAXIMUM_INTENSITY);
-    options.exposure = data.get(EXPOSURE).clone();
+    options.exposure = match data.get(EXPOSURE_MODE) {
+        ExposureMode::Fixed => camera::ExposureOption::Fixed(*data.get(EXPOSURE)),
+        ExposureMode::Automatic => camera::ExposureOption::Automatic,
+    };
     options.bloom_intensity = *data.get(BLOOM_INTENSITY);
     options.view_distance = *data.get(VIEW_DISTANCE);
     options.lighting_display = data.get(LIGHTING_DISPLAY).clone();
-    options.transparency = data.get(TRANSPARENCY).clone();
+    options.transparency = match data.get(TRANSPARENCY) {
+        TransparencyMode::Surface => camera::TransparencyOption::Surface,
+        TransparencyMode::Volumetric => camera::TransparencyOption::Volumetric,
+        TransparencyMode::Threshold => {
+            camera::TransparencyOption::Threshold(*data.get(TRANSPARENCY_THRESHOLD))
+        }
+    };
     options.show_ui = *data.get(SHOW_UI);
     options.antialiasing = data.get(ANTIALIASING).clone();
     options.debug_info_text = *data.get(DEBUG_INFO_TEXT);
@@ -350,7 +414,7 @@ impl core::error::Error for UnknownSetting {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::settings::Settings;
+    use crate::settings::{Data, Settings};
 
     #[test]
     fn read_write_round_trip() {
@@ -363,6 +427,58 @@ mod tests {
         assert_eq!(
             *RENDER_METHOD.read(&settings.get()),
             camera::RenderMethod::Reference
+        );
+    }
+
+    /// [`camera::ExposureOption`] is built from [`EXPOSURE_MODE`] and [`EXPOSURE`].
+    #[test]
+    fn exposure() {
+        assert_eq!(
+            assemble_graphics_options(&Data::default()).exposure,
+            camera::ExposureOption::Automatic
+        );
+        assert_eq!(
+            assemble_graphics_options(&Data::from_iter([
+                (EXPOSURE_MODE.key(), "Fixed".into()),
+                (EXPOSURE.key(), "1.234".into())
+            ]))
+            .exposure,
+            camera::ExposureOption::Fixed(ps32(1.234))
+        );
+        assert_eq!(
+            assemble_graphics_options(&Data::from_iter([(
+                EXPOSURE_MODE.key(),
+                "Automatic".into()
+            )]))
+            .exposure,
+            camera::ExposureOption::Automatic
+        );
+    }
+
+    /// [`camera::TransparencyOption`] is built from [`TRANSPARENCY`] and [`TRANSPARENCY_THRESHOLD`].
+    #[test]
+    fn transparency() {
+        assert_eq!(
+            assemble_graphics_options(&Data::default()).transparency,
+            GraphicsOptions::default().transparency
+        );
+        assert_eq!(
+            assemble_graphics_options(&Data::from_iter([(TRANSPARENCY.key(), "Surface".into())]))
+                .transparency,
+            camera::TransparencyOption::Surface
+        );
+        assert_eq!(
+            assemble_graphics_options(&Data::from_iter([(
+                TRANSPARENCY.key(),
+                "Volumetric".into()
+            )]))
+            .transparency,
+            camera::TransparencyOption::Volumetric
+        );
+        assert_eq!(
+            assemble_graphics_options(&Data::from_iter([(TRANSPARENCY.key(), "Threshold".into())]))
+                .transparency,
+            camera::TransparencyOption::Threshold(zo32(0.5))
         );
     }
 }

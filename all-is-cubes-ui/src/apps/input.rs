@@ -6,12 +6,12 @@ use all_is_cubes::character::{self, Character};
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::inv;
 use all_is_cubes::listen;
-use all_is_cubes::math::{FreeCoordinate, FreeVector, zo32};
+use all_is_cubes::math::{FreeCoordinate, FreeVector};
 use all_is_cubes::physics;
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{self, Handle, Universe};
 use all_is_cubes_render::camera::{
-    FogOption, LightingOption, NdcPoint2, NominalPixel, RenderMethod, TransparencyOption, Viewport,
+    FogOption, LightingOption, NdcPoint2, NominalPixel, RenderMethod, Viewport,
 };
 
 use crate::settings;
@@ -385,13 +385,11 @@ impl InputProcessor {
                 Key::Character('o') => {
                     if let Some(settings) = settings {
                         settings.update(settings::TRANSPARENCY, |setting, _| {
+                            use settings::TransparencyMode as Tr;
                             match setting {
-                                TransparencyOption::Surface => TransparencyOption::Volumetric,
-                                TransparencyOption::Volumetric => {
-                                    TransparencyOption::Threshold(zo32(0.5))
-                                }
-                                TransparencyOption::Threshold(_) => TransparencyOption::Surface,
-                                _ => TransparencyOption::Surface, // TODO: either stop doing cycle-commands or put it on the enum so it can be exhaustive
+                                Tr::Surface => Tr::Volumetric,
+                                Tr::Volumetric => Tr::Threshold,
+                                Tr::Threshold => Tr::Surface,
                             }
                         });
                     }

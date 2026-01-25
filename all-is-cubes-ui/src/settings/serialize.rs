@@ -329,21 +329,24 @@ impl serde::de::Error for DeserializeError {
 
 macro_rules! impl_string_form_via_from_str_and_display {
     ($type:ty) => {
-        impl StringForm for $type {
-            fn serialize(&self) -> ArcStr {
-                arcstr::format!("{self}")
+        impl $crate::settings::serialize::StringForm for $type {
+            fn serialize(&self) -> ::all_is_cubes::arcstr::ArcStr {
+                ::all_is_cubes::arcstr::format!("{self}")
             }
 
-            fn deserialize(value: &str) -> Result<Self, DeserializeError> {
+            fn deserialize(
+                value: &str,
+            ) -> Result<Self, $crate::settings::serialize::DeserializeError> {
                 value.parse::<Self>().map_err(|e| {
                     // Bad practice: this discards the error source().
                     // But it is unlikely there is any.
-                    DeserializeError(arcstr::format!("{e}"))
+                    DeserializeError(::all_is_cubes::arcstr::format!("{e}"))
                 })
             }
         }
     };
 }
+pub(super) use impl_string_form_via_from_str_and_display;
 
 impl_string_form_via_from_str_and_display!(bool);
 impl_string_form_via_from_str_and_display!(i8);
@@ -367,33 +370,39 @@ macro_rules! impl_string_form_via_serde {
     ($type:ty) => {
         impl StringForm for $type {
             fn serialize(&self) -> ArcStr {
-                match serde::Serialize::serialize(self, SettingSerializer) {
+                match ::serde::Serialize::serialize(
+                    self,
+                    $crate::settings::serialize::SettingSerializer
+                ) {
                     Ok(string) => string,
                     Err(e) => {
                         panic!(
                             "setting serialization should never fail; \
                              setting type {type} has a bug: {e}",
-                            type = stringify!($type),
+                            type = ::core::stringify!($type),
                         )
                     }
                 }
             }
 
-            fn deserialize(value: &str) -> Result<Self, DeserializeError> {
-                <Self as serde::Deserialize>::deserialize(value.into_deserializer())
+            fn deserialize(
+                value: &str
+            ) -> Result<Self, $crate::settings::serialize::DeserializeError> {
+                <Self as ::serde::Deserialize>::deserialize(value.into_deserializer())
             }
         }
     };
 }
 
+// Note: This list must contain only values that can serialize to a single string, such as
+// fieldless enums. But even then, consider using `impl_string_form_via_from_str_and_display`
+// when possible instead, since that involves less complex generic code than using `serde`.
 impl_string_form_via_serde!(all_is_cubes::util::ShowStatus);
 impl_string_form_via_serde!(camera::AntialiasingOption);
-impl_string_form_via_serde!(camera::ExposureOption);
 impl_string_form_via_serde!(camera::FogOption);
 impl_string_form_via_serde!(camera::LightingOption);
 impl_string_form_via_serde!(camera::RenderMethod);
 impl_string_form_via_serde!(camera::ToneMappingOperator);
-impl_string_form_via_serde!(camera::TransparencyOption);
 
 // -------------------------------------------------------------------------------------------------
 

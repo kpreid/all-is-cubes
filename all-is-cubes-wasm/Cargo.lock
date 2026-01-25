@@ -214,6 +214,7 @@ dependencies = [
  "paste",
  "scopeguard",
  "serde",
+ "strum",
  "sync_wrapper",
 ]
 

@@ -367,6 +367,7 @@ dependencies = [
  "scopeguard",
  "serde",
  "smol-macros",
+ "strum 0.26.3",
  "sync_wrapper",
 ]
 

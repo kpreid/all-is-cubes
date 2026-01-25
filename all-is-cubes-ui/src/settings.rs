@@ -305,17 +305,25 @@ impl PartialEq for Data {
 
 impl FromIterator<(ArcStr, Value)> for Data {
     fn from_iter<T: IntoIterator<Item = (ArcStr, Value)>>(iter: T) -> Self {
-        Self::from_sv(HashMap::from_iter(iter.into_iter().filter_map(
-            |(key_str, value_str)| {
-                // TODO: preserve unknown keys instead of discarding them
-                let key: Key = key_str.parse().ok()?;
-                Some((
+        Self::from_iter(iter.into_iter().filter_map(|(key_str, value_str)| {
+            // TODO: preserve unknown keys instead of discarding them
+            let key: Key = key_str.parse().ok()?;
+            Some((key, value_str))
+        }))
+    }
+}
+
+impl FromIterator<(Key, Value)> for Data {
+    fn from_iter<T: IntoIterator<Item = (Key, Value)>>(iter: T) -> Self {
+        Self::from_sv(HashMap::from_iter(iter.into_iter().map(
+            |(key, value_str)| {
+                (
                     key,
                     StoredValue {
                         parsed: key.deserialize_erased(&value_str).ok(),
                         unparsed: value_str,
                     },
-                ))
+                )
             },
         )))
     }
@@ -357,8 +365,8 @@ pub struct TypedKey<T> {
 
 impl<T: Send + Sync + 'static> TypedKey<T> {
     /// Returns the untyped form of this key.
-    pub fn key(&self) -> &Key {
-        &self.key
+    pub fn key(&self) -> Key {
+        self.key
     }
 
     /// Gets the current value of this setting.

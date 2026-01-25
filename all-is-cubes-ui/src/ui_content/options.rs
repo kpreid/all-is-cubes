@@ -87,9 +87,9 @@ pub(crate) fn graphics_options_widgets(
             literal!("Transparency"),
             settings::TRANSPARENCY,
             [
-                camera::TransparencyOption::Surface,
-                camera::TransparencyOption::Volumetric,
-                camera::TransparencyOption::Threshold(zo32(0.5)),
+                settings::TransparencyMode::Surface,
+                settings::TransparencyMode::Volumetric,
+                settings::TransparencyMode::Threshold,
             ],
         ),
         // TODO: this properly should be a graphics_enum_button with 3 states,
