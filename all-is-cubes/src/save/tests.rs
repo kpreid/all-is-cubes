@@ -1081,12 +1081,12 @@ fn partial_universe() {
     let expected_json = universe_with_one_of_each_json();
     let json_value = to_value(&value).expect("failed to serialize");
     assert_eq!(json_value, expected_json, "json_value != expected_json");
-    assert_round_trip_json::<Universe>(json_value);
+    assert_round_trip_json::<Box<Universe>>(json_value);
 }
 
 #[test]
 fn universe_de_duplicate_member() {
-    assert_de_error::<Universe>(
+    assert_de_error::<Box<Universe>>(
         json!({
             "type": "UniverseV1",
             "members": [
@@ -1112,7 +1112,7 @@ fn universe_de_duplicate_member() {
 
 #[test]
 fn universe_de_missing_member() {
-    assert_de_error::<Universe>(
+    assert_de_error::<Box<Universe>>(
         json!({
             "type": "UniverseV1",
             "members": [
@@ -1137,7 +1137,7 @@ fn universe_de_missing_member() {
 /// Concretely: we must not use `serde(untagged)`
 #[test]
 fn universe_de_error_in_member() {
-    assert_de_error::<Universe>(
+    assert_de_error::<Box<Universe>>(
         json!({
             "type": "UniverseV1",
             "members": [

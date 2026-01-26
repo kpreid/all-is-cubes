@@ -36,7 +36,7 @@ fn save_space(c: &mut Criterion) {
     c.bench_function("load", |b| {
         b.iter_batched(
             || serialized.clone(),
-            |s| serde_json::from_value::<Universe>(s).unwrap(),
+            |s| serde_json::from_value::<Box<Universe>>(s).unwrap(),
             BatchSize::LargeInput,
         );
     });

@@ -1239,7 +1239,9 @@ mod universe {
         }
     }
 
-    impl<'de> Deserialize<'de> for Universe {
+    /// Deserialization is implemented for [`Box<Universe>`][Box] rather than [`Universe`]
+    /// to minimize the frequency of placing [`Universe`], a very large struct, on the stack.
+    impl<'de> Deserialize<'de> for Box<Universe> {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             let (data, mut universe) = {
                 let scope = tl::Scope::install(tl::Context {
@@ -1278,7 +1280,7 @@ mod universe {
             // to pass.
             universe.step(true, time::Deadline::Asap);
 
-            Ok(*universe)
+            Ok(universe)
         }
     }
 

@@ -23,6 +23,7 @@
       They accept `Block` as a specific case, but may be newly ambiguous.
     * `Handle::<BlockDef>::read()` no longer returns a `&BlockDef`, but a separate `Read` type.
     * `chunking::point_to_chunk()` now returns `None` in case of out-of-range input instead of panicking.
+    * `universe::Universe` no longer implements `Default` and `Deserialize`; instead, `Box<Universe>` does.
 
     * Renamed `time::Tick::delta_t()` to `delta_t_duration()`, to make room for other variations.
 

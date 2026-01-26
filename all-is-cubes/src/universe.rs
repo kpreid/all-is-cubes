@@ -759,9 +759,13 @@ impl fmt::Debug for Universe {
     }
 }
 
-impl Default for Universe {
+/// Same as [`Universe::new()`].
+///
+/// Implemented for [`Box<Universe>`][Box] rather than [`Universe`]
+/// to minimize the frequency of placing [`Universe`], a very large struct, on the stack.
+impl Default for Box<Universe> {
     fn default() -> Self {
-        *Self::new()
+        Universe::new()
     }
 }
 
