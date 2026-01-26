@@ -80,19 +80,9 @@ pub fn export_to_path(
                 }))
             }
             #[cfg(feature = "gltf")]
-            Format::Gltf => Box::pin(crate::gltf::export_gltf(
-                progress,
-                read_ticket,
-                source,
-                destination,
-            )?),
+            Format::Gltf => crate::gltf::export_gltf(progress, read_ticket, source, destination)?,
             #[cfg(feature = "stl")]
-            Format::Stl => Box::pin(crate::stl::export_stl(
-                progress,
-                read_ticket,
-                source,
-                &destination,
-            )?),
+            Format::Stl => crate::stl::export_stl(progress, read_ticket, source, &destination)?,
             #[allow(unreachable_patterns)]
             // TODO: distinguish between disabled and unsupported
             // (not currently necessary because we have no import-only formats)

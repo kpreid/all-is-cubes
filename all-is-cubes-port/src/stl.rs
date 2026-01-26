@@ -25,8 +25,10 @@ pub(crate) fn export_stl(
     read_ticket: universe::ReadTicket<'_>,
     mut source: crate::ExportSet,
     destination: &std::path::Path,
-) -> Result<impl Future<Output = Result<(), crate::ExportError>> + Send + 'static, crate::ExportError>
-{
+) -> Result<
+    futures_core::future::BoxFuture<'static, Result<(), crate::ExportError>>,
+    crate::ExportError,
+> {
     let spaces = source.contents.extract_type::<Space>();
     let block_defs = source.contents.extract_type::<block::BlockDef>();
     source.reject_unsupported(crate::Format::Stl)?;
@@ -55,7 +57,7 @@ pub(crate) fn export_stl(
         );
     }
 
-    Ok(async move {
+    Ok(Box::pin(async move {
         #[allow(clippy::shadow_unrelated)]
         for (progress, (path, triangles)) in progress.split_evenly(items.len()).zip(items) {
             stl_io::write_stl(&mut fs::File::create(path)?, triangles.into_iter())?;
@@ -63,7 +65,7 @@ pub(crate) fn export_stl(
         }
 
         Ok(())
-    })
+    }))
 }
 
 pub(crate) fn space_to_stl_triangles(space: &space::Read<'_>) -> Vec<Triangle> {

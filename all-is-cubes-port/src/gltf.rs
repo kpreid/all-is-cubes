@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use std::{fmt, fs, io};
 
+use futures_core::future::BoxFuture;
 pub use gltf_json as json;
 use gltf_json::Index;
 use gltf_json::validation::Checked::Valid;
@@ -371,7 +372,7 @@ pub(crate) fn export_gltf(
     read_ticket: ReadTicket<'_>,
     mut source: ExportSet,
     destination: PathBuf,
-) -> Result<impl Future<Output = Result<(), ExportError>> + Send + 'static, ExportError> {
+) -> Result<BoxFuture<'static, Result<(), ExportError>>, ExportError> {
     let block_defs = source.contents.extract_type::<block::BlockDef>();
     let spaces = source.contents.extract_type::<all_is_cubes::space::Space>();
     source.reject_unsupported(Format::Gltf)?;
@@ -408,7 +409,7 @@ pub(crate) fn export_gltf(
         })
         .collect::<Result<_, ExportError>>()?;
 
-    Ok(async move {
+    Ok(Box::pin(async move {
         let [block_def_progress, space_progress] = progress.split(0.5); // TODO: ratio
 
         // TODO: deduplicate these two extremely similar loops
@@ -479,7 +480,7 @@ pub(crate) fn export_gltf(
         }
 
         Ok(())
-    })
+    }))
 }
 
 /// Construct gltf camera entity.
