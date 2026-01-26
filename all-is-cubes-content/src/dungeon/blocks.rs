@@ -230,24 +230,41 @@ pub(crate) async fn install_dungeon_blocks(
             .display_name("Key")
             .build_txn(txn),
 
-            ItemHolder => Block::builder()
-                .display_name("Item")
-                .color(Rgba::TRANSPARENT) // TODO: have a shape
-                .collision(block::BlockCollision::None)
-                // TODO: instead of or in addition to having a special action for this, it should
-                // also be expressible as something that happens when the entire block is taken,
-                // as part of Block::unspecialize().
-                .activation_action(op::Operation::TakeInventory {
-                    destroy_if_empty: true,
-                })
-                .inventory_config(inv::InvInBlock::new(
-                    1,
-                    R2,
-                    R32, // to allow a shrunk R16 tool icon
-                    // Bottom middle.
-                    vec![inv::IconRow::new(0..1, point3(8, 0, 8), vec3(0, 0, 0))],
-                ))
-                .build(),
+            ItemHolder => {
+                // Makes the contained item float with a varying height
+                let blocks_by_y_position: [Block; 3] = core::array::from_fn(|y| {
+                    Block::builder()
+                        .display_name("Item")
+                        .color(Rgba::TRANSPARENT) // TODO: have a shape?
+                        .collision(block::BlockCollision::None)
+                        // TODO: instead of or in addition to having a special action for this,
+                        // it should also be expressible as something that happens when the entire
+                        // block is taken, as part of Block::unspecialize().
+                        .activation_action(op::Operation::TakeInventory {
+                            destroy_if_empty: true,
+                        })
+                        .inventory_config(inv::InvInBlock::new(
+                            1,
+                            R2,
+                            R32, // to allow a shrunk R16 tool icon
+                            // Bottom middle.
+                            vec![inv::IconRow::new(
+                                0..1,
+                                point3(8, 1 + y as i32, 8),
+                                vec3(0, 0, 0),
+                            )],
+                        ))
+                        .build()
+                });
+
+                let animated_def = block::BlockDef::new_animated(
+                    txn.read_ticket(),
+                    [(0, 0), (20, 1), (30, 2), (50, 1)]
+                        .into_iter()
+                        .map(|(phase, y)| (phase, blocks_by_y_position[y].clone())),
+                );
+                Block::from(txn.insert_anonymous(animated_def))
+            }
 
             DoorwaySideMask => Block::builder()
                 .display_name("Doorway Side Mask")
