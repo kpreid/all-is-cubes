@@ -135,11 +135,12 @@ impl Vui {
     ///
     /// This is an async function for the sake of cancellation and optional cooperative
     /// multitasking. It may safely be blocked on from a synchronous context.
-    pub(crate) async fn new(params: UiTargets) -> Self {
+    pub(crate) async fn new(params: UiTargets) -> Box<Self> {
         let UiTargets {
             viewport_source, ..
         } = &params;
 
+        let empty_box = Box::new_uninit();
         let mut universe = Universe::new();
 
         let mut content_txn = UniverseTransaction::default();
@@ -185,34 +186,37 @@ impl Vui {
         let progress_page =
             pages::new_progress_page(&hud_inputs.hud_blocks.widget_theme, &notif_hub);
 
-        let mut new_self = Self {
-            universe: *universe,
+        let mut new_self = Box::write(
+            empty_box,
+            Self {
+                universe: *universe,
 
-            current_view: listen::Cell::new(Arc::new(UiViewState::default())),
-            current_focus_on_ui: false,
-            state: listen::Cell::new(Arc::new(VuiPageState::Hud)),
+                current_view: listen::Cell::new(Arc::new(UiViewState::default())),
+                current_focus_on_ui: false,
+                state: listen::Cell::new(Arc::new(VuiPageState::Hud)),
 
-            changed_graphics_options,
-            ui_graphics_options,
+                changed_graphics_options,
+                ui_graphics_options,
 
-            changed_viewport,
-            last_ui_size: ui_size,
-            hud_inputs,
+                changed_viewport,
+                last_ui_size: ui_size,
+                hud_inputs,
 
-            hud_page: PageInst::new(hud_page),
-            paused_page: PageInst::new(paused_page),
-            options_page: PageInst::new(options_page),
-            about_page: PageInst::new(about_page),
-            dump_page: PageInst::new(vui::Page::empty()),
-            progress_page: PageInst::new(progress_page),
+                hud_page: PageInst::new(hud_page),
+                paused_page: PageInst::new(paused_page),
+                options_page: PageInst::new(options_page),
+                about_page: PageInst::new(about_page),
+                dump_page: PageInst::new(vui::Page::empty()),
+                progress_page: PageInst::new(progress_page),
 
-            control_channel: control_recv,
-            changed_character: listen::Flag::listening(false, &params.character_source),
-            changed_custom_commands,
-            tooltip_state,
-            cue_channel,
-            notif_hub,
-        };
+                control_channel: control_recv,
+                changed_character: listen::Flag::listening(false, &params.character_source),
+                changed_custom_commands,
+                tooltip_state,
+                cue_channel,
+                notif_hub,
+            },
+        );
         new_self.compute_view_state();
         new_self
     }
@@ -661,7 +665,7 @@ impl fmt::Debug for Command {
 mod tests {
     use super::*;
 
-    async fn new_vui_for_test(paused: bool) -> (Vui, flume::Receiver<ControlMessage>) {
+    async fn new_vui_for_test(paused: bool) -> (Box<Vui>, flume::Receiver<ControlMessage>) {
         let (cctx, ccrx) = flume::bounded(1);
         let vui = Vui::new(UiTargets {
             mouselook_mode: listen::constant(false),

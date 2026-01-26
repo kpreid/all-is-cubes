@@ -916,7 +916,7 @@ impl SessionBuilder {
             })),
 
             shuttle: Some(Box::new(Shuttle {
-                ui,
+                ui: ui.map(|boxed_ui| *boxed_ui),
                 settings,
                 graphics_options_source,
                 game_character,
