@@ -6,7 +6,7 @@
 
 use alloc::vec::Vec;
 
-use crate::math::{Cube, Rgb, lines, lines::Wireframe as _};
+use crate::math::{Cube, Rgb, lines, lines::Wireframe as _, ps64};
 use crate::raycast::Ray;
 use crate::space::PackedLight;
 
@@ -50,7 +50,7 @@ pub struct LightUpdateCubeInfo {
 impl lines::Wireframe for LightUpdateCubeInfo {
     fn wireframe_points<E: Extend<[lines::Vertex; 2]>>(&self, output: &mut E) {
         // Draw output cube
-        self.cube.aab().expand(0.1).wireframe_points(output);
+        self.cube.aab().expand(ps64(0.1)).wireframe_points(output);
         // Draw rays
         for ray_info in self.rays.iter() {
             ray_info.wireframe_points(self.cube, output);
@@ -86,7 +86,7 @@ impl LightUpdateRayInfo {
         let hit_point = self.trigger_cube.center().lerp(self.value_cube.center(), 0.5);
         let ray = Ray::new(lit_cube.center(), hit_point - lit_cube.center());
 
-        self.value_cube.aab().expand(0.01).wireframe_points(output);
+        self.value_cube.aab().expand(ps64(0.01)).wireframe_points(output);
         ray.wireframe_points(&mut lines::colorize(
             output,
             self.light_from_struck_face.with_alpha_one(),

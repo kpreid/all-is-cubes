@@ -7,8 +7,8 @@ use core::ops::{self, Range};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::euclid::{Point3D, Translation3D};
 use all_is_cubes::math::{
-    Aab, Cube, FreeCoordinate, FreePoint, GridCoordinate, Rgba, lines, lines::Wireframe as _,
-    rgba_const,
+    Aab, Cube, FaceMap, FreeCoordinate, FreePoint, GridCoordinate, Rgba, lines,
+    lines::Wireframe as _, rgba_const,
 };
 use all_is_cubes::space::{self, BlockIndex};
 use all_is_cubes_render::camera::Camera;
@@ -335,8 +335,13 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
             aab.wireframe_points(&mut lines::colorize(output, color));
 
             // Additional border that wiggles when updates happen.
-            aab.expand(if self.update_debug { -0.05 } else { -0.02 })
-                .wireframe_points(&mut lines::colorize(output, color))
+            if let Some(shrunk) = aab.expand_or_shrink(FaceMap::splat(if self.update_debug {
+                -0.05
+            } else {
+                -0.02
+            })) {
+                shrunk.wireframe_points(&mut lines::colorize(output, color));
+            }
         }
 
         // Display the applicable `DepthOrdering`.

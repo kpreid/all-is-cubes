@@ -9,9 +9,10 @@ use euclid::Vector3D;
 use manyfmt::Refmt as _;
 use manyfmt::formats::Unquote;
 
+use crate::math::ps64;
 use crate::math::{
     Axis, ConciseDebug, Cube, FreeCoordinate, FreeVector, GridCoordinate, GridPoint, GridRotation,
-    GridVector, Gridgid, Zero, lines,
+    GridVector, Gridgid, PositiveSign, Zero, lines,
 };
 
 /// Identifies a face of a cube or an orthogonal unit vector.
@@ -1189,8 +1190,8 @@ impl lines::Wireframe for CubeFace {
     #[allow(clippy::missing_inline_in_public_items)]
     fn wireframe_points<E: Extend<[lines::Vertex; 2]>>(&self, output: &mut E) {
         // TODO: How much to offset the lines should be a parameter of the wireframe_points process.
-        let expansion = 0.005;
-        let aab = self.cube.aab().expand(expansion);
+        const EXPANSION: PositiveSign<f64> = ps64(0.005);
+        let aab = self.cube.aab().expand(EXPANSION);
         aab.wireframe_points(output);
 
         // Draw an X on the face.
@@ -1205,9 +1206,10 @@ impl lines::Wireframe for CubeFace {
             output.extend(X_POINTS.into_iter().map(|line| {
                 line.map(|point| {
                     lines::Vertex::from(
-                        (face_transform.transform_point(point))
-                            .map(|c| (FreeCoordinate::from(c) - 0.5) * (1. + expansion * 2.) + 0.5)
-                            + self.cube.aab().lower_bounds_v(),
+                        (face_transform.transform_point(point)).map(|c| {
+                            (FreeCoordinate::from(c) - 0.5) * (1. + EXPANSION.into_inner() * 2.)
+                                + 0.5
+                        }) + self.cube.aab().lower_bounds_v(),
                     )
                 })
             }));

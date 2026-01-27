@@ -388,6 +388,7 @@ pub(crate) fn step_one_body(
     #[cfg(feature = "rerun")]
     {
         use crate::content::palette;
+        use crate::math::ps64;
 
         // Log step info as text.
         rerun_destination.log(
@@ -398,10 +399,10 @@ pub(crate) fn step_one_body(
         // Log nearby cubes and whether they are contacts.
         if let Some(space) = colliding_space {
             // TODO: If we make more general use of rerun, this is going to need to be moved from
-            // here to `Space` itbody
+            // here to `Space`.
             let cubes = body
                 .collision_box_abs()
-                .expand(0.875)
+                .expand(ps64(0.875))
                 .round_up_to_grid()
                 .interior_iter()
                 .filter(|cube| {

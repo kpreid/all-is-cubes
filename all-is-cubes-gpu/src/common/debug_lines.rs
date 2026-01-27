@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use all_is_cubes::character::{self, Cursor};
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{Face7, FreePoint, Rgba, lines};
+use all_is_cubes::math::{Face7, FreePoint, Rgba, lines, ps64};
 use all_is_cubes::space;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::MapExtend;
@@ -37,7 +37,11 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
         // This is enabled/disabled inside the lighting algorithm, not as a graphics
         // option.
         for cube in space.last_light_updates() {
-            wireframe_vertices(v, Rgba::new(1.0, 1.0, 0.0, 1.0), &cube.aab().expand(0.005));
+            wireframe_vertices(
+                v,
+                Rgba::new(1.0, 1.0, 0.0, 1.0),
+                &cube.aab().expand(ps64(0.005)),
+            );
         }
 
         // Lighting trace at cursor

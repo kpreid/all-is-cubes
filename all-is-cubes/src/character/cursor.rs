@@ -4,11 +4,12 @@
 
 use core::fmt;
 
+use all_is_cubes_base::math::ps64;
 use euclid::point3;
 
 use crate::block::{Block, EvaluatedBlock, Evoxel};
 use crate::content::palette;
-use crate::math::{Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, lines};
+use crate::math::{Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign, lines};
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
 use crate::universe::{Handle, HandleError, ReadTicket};
@@ -72,7 +73,7 @@ pub fn cursor_raycast(
             face_entered: step.face(),
             face_selected: face_selected.expect("failed to determine face_selected"),
             point_entered: step.intersection_point(ray),
-            distance_to_point: step.t_distance(),
+            distance_to_point: PositiveSign::<FreeCoordinate>::new_clamped(step.t_distance()),
             hit: CubeSnapshot {
                 position: cube,
                 block: space[cube].clone(),
@@ -114,7 +115,7 @@ pub struct Cursor {
     point_entered: FreePoint,
 
     /// Distance from ray origin (viewpoint) to `point_entered`.
-    distance_to_point: FreeCoordinate,
+    distance_to_point: PositiveSign<FreeCoordinate>,
 
     /// Data about the cube the cursor selected/hit.
     hit: CubeSnapshot,
@@ -210,7 +211,8 @@ impl lines::Wireframe for Cursor {
         let evaluated = &self.hit().evaluated;
 
         // Compute an approximate offset that will prevent Z-fighting.
-        let offset_from_surface = 0.001 * self.distance_to_point;
+        let offset_from_surface_ps64 = ps64(0.001) * self.distance_to_point;
+        let offset_from_surface_f64 = offset_from_surface_ps64.into_inner();
 
         // AABB of the block's actual content. We use this rather than the full extent of
         // the cube so that it feels more accurate.
@@ -227,7 +229,7 @@ impl lines::Wireframe for Cursor {
 
         // Add wireframe of the block.
         block_aabb
-            .expand(offset_from_surface)
+            .expand(offset_from_surface_ps64)
             .wireframe_points(&mut lines::colorize(output, palette::CURSOR_OUTLINE));
 
         // Frame the selected face with a square.
@@ -246,10 +248,10 @@ impl lines::Wireframe for Cursor {
             let inset = 1. / 128.;
             output.extend(lines::line_loop(
                 [
-                    point3(inset, inset, -offset_from_surface),
-                    point3(inset, 1. - inset, -offset_from_surface),
-                    point3(1. - inset, 1. - inset, -offset_from_surface),
-                    point3(1. - inset, inset, -offset_from_surface),
+                    point3(inset, inset, -offset_from_surface_f64),
+                    point3(inset, 1. - inset, -offset_from_surface_f64),
+                    point3(1. - inset, 1. - inset, -offset_from_surface_f64),
+                    point3(1. - inset, inset, -offset_from_surface_f64),
                 ]
                 .map(|p| lines::Vertex {
                     position: face_transform_full.transform_point3d(p).unwrap(),
@@ -267,8 +269,9 @@ impl lines::Wireframe for Cursor {
                 [Face7::PX, Face7::PY, Face7::NX, Face7::NY].map(|f| {
                     let tip: FreeVector =
                         face_transform_axes_only.transform_vector3d(f.vector(1.0 / 32.0));
-                    let position =
-                        self.point_entered + self.face_entered.vector(offset_from_surface) + tip;
+                    let position = self.point_entered
+                        + self.face_entered.vector(offset_from_surface_f64)
+                        + tip;
                     lines::Vertex {
                         position,
                         color: Some(palette::CURSOR_OUTLINE),

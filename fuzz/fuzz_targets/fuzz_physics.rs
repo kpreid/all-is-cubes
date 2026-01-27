@@ -2,7 +2,7 @@
 
 use all_is_cubes::character::Character;
 use all_is_cubes::euclid::Vector3D;
-use all_is_cubes::math::{self, FreeCoordinate, NotNan};
+use all_is_cubes::math::{self, FreeCoordinate, NotNan, ps64};
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::universe::{ArbitraryWithUniverse, StrongHandle, Universe};
@@ -22,7 +22,7 @@ fuzz_target!(|input: (
         },
     ) = input;
 
-    let interesting_bounds_aab = space.bounds().to_free().expand(10.0);
+    let interesting_bounds_aab = space.bounds().to_free().expand(ps64(10.0));
 
     // TODO: write a proper Arbitrary impl on a wrapper
     let position: math::FreePoint = position.map(NotNan::into_inner).into();

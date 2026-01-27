@@ -11,8 +11,8 @@ use rand::Rng as _;
 use num_traits::float::FloatCore as _;
 
 use crate::math::{
-    Axis, Cube, Face6, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, Octant,
-    lines,
+    Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate,
+    Octant, PositiveSign, lines,
 };
 
 /// Axis-Aligned Box data type.
@@ -291,37 +291,40 @@ impl Aab {
         Self::from_lower_upper(self.lower_bounds * scalar, self.upper_bounds * scalar)
     }
 
-    /// Enlarges the AAB by moving each face outward by the specified distance (or inward
-    /// if negative).
-    ///
-    /// If this would result in a negative or NaN size, produces a zero size AAB located
-    /// at the center point of `self`.
+    /// Enlarges the AAB by moving each face outward by the specified distance.
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::Aab;
+    /// use all_is_cubes::math::{Aab, ps64};
     ///
     /// assert_eq!(
-    ///     Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(0.25),
+    ///     Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(ps64(0.25)),
     ///     Aab::new(0.75, 2.25, 2.75, 4.25, 4.75, 6.25)
     /// );
     /// ````
     #[must_use]
     #[inline]
-    pub fn expand(self, distance: FreeCoordinate) -> Self {
+    pub fn expand(self, distance: PositiveSign<FreeCoordinate>) -> Self {
         // We could imagine a non-uniform version of this, but the fully general one
         // looks a lot like generally constructing a new Aab.
-        let distance_vec = Vector3D::splat(distance);
-        match Self::checked_from_lower_upper(
+        let distance_vec = Vector3D::splat(distance.into_inner());
+        Self::from_lower_upper(
             self.lower_bounds - distance_vec,
             self.upper_bounds + distance_vec,
-        ) {
-            Some(aab) => aab,
-            None => {
-                let center = self.center();
-                Aab::from_lower_upper(center, center)
-            }
-        }
+        )
+    }
+
+    /// Enlarges or shrinks the AAB by moving each face outward by the specified distance
+    /// (or inward if the distance is negative).
+    ///
+    /// If this would result in a negative or NaN size, returns [`None`].
+    #[must_use]
+    #[inline]
+    pub fn expand_or_shrink(self, distances: FaceMap<FreeCoordinate>) -> Option<Self> {
+        Self::checked_from_lower_upper(
+            self.lower_bounds - distances.negatives(),
+            self.upper_bounds + distances.positives(),
+        )
     }
 
     #[inline]
@@ -444,6 +447,7 @@ impl lines::Wireframe for Aab {
 mod tests {
     use super::*;
     use crate::math::lines::Wireframe as _;
+    use crate::math::ps64;
     use alloc::vec::Vec;
     use euclid::point3;
 
@@ -507,41 +511,46 @@ mod tests {
     }
 
     #[test]
-    fn expand_nan() {
-        let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
-        assert_eq!(
-            aab.expand(FreeCoordinate::NAN),
-            Aab::from_lower_upper(aab.center(), aab.center()),
-        );
-    }
-
-    #[test]
-    fn expand_negative_failure() {
-        let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
-        assert_eq!(
-            aab.expand(-10.0),
-            Aab::from_lower_upper(aab.center(), aab.center()),
-        );
-    }
-
-    #[test]
-    fn expand_negative_success() {
-        let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
-        assert_eq!(
-            aab.expand(-0.25),
-            Aab::new(1.25, 1.75, 3.25, 3.75, 5.25, 5.75),
-        );
-    }
-
-    #[test]
     fn expand_inf() {
         const INF: FreeCoordinate = FreeCoordinate::INFINITY;
         assert_eq!(
-            Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(INF),
+            Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(ps64(INF)),
             Aab::new(-INF, INF, -INF, INF, -INF, INF),
         );
     }
 
+    #[test]
+    fn expand_or_shrink_nan() {
+        let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+        assert_eq!(
+            aab.expand_or_shrink(FaceMap::splat(FreeCoordinate::NAN)),
+            None,
+        );
+    }
+
+    #[test]
+    fn expand_or_shrink_negative_failure() {
+        let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+        assert_eq!(aab.expand_or_shrink(FaceMap::splat(-10.0)), None,);
+    }
+
+    #[test]
+    fn expand_or_shrink_negative_success() {
+        let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+        assert_eq!(
+            aab.expand_or_shrink(FaceMap::splat(-0.25)),
+            Some(Aab::new(1.25, 1.75, 3.25, 3.75, 5.25, 5.75)),
+        );
+    }
+
+    #[test]
+    fn expand_or_shrink_inf() {
+        const INF: FreeCoordinate = FreeCoordinate::INFINITY;
+        assert_eq!(
+            Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(ps64(INF)),
+            Aab::new(-INF, INF, -INF, INF, -INF, INF),
+        );
+    }
     #[test]
     fn wireframe_smoke_test() {
         let aab: Aab = Cube::new(1, 2, 3).aab();

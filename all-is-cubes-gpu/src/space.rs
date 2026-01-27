@@ -17,7 +17,7 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::{
-    Face6, FreeCoordinate, GridCoordinate, GridPoint, GridSize, Rgb, Rgba, ZeroOne,
+    Face6, FreeCoordinate, GridCoordinate, GridPoint, GridSize, PositiveSign, Rgb, Rgba, ZeroOne,
     lines::Wireframe as _,
 };
 #[cfg(feature = "rerun")]
@@ -1028,7 +1028,11 @@ impl ParticleSet {
             Rgb::ONE.with_alpha(
                 ZeroOne::<f32>::try_from(0.9f32.powf(self.age as f32)).unwrap_or(ZeroOne::ZERO),
             ),
-            &self.fluff.position.aab().expand(0.004 * (self.age as f64)),
+            &self
+                .fluff
+                .position
+                .aab()
+                .expand(PositiveSign::<f64>::new_clamped(0.004 * (self.age as f64))),
         );
         tmp.into_iter()
     }

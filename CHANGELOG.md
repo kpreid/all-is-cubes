@@ -9,6 +9,7 @@
       New items `block::Animation` and `block::BlockDef::new_animated()` support this functionality.
     * `block::SetAttribute` is a modifier which overrides a single attribute of a block, instead of all of them.
       It replaces `Modifier::Attributes`.
+    * `math::Aab::expand_or_shrink()`
     * `math::Vol::origin_empty()`, infallible construction of empty volume.
     * `time::Clock::phase()`, returns the clock’s phase, which was previously only obtainable through `Tick`.
     * `time::Tick::{delta_t_f64, delta_t_ps64}()`, convenience for common conversions.
@@ -23,6 +24,8 @@
       They accept `Block` as a specific case, but may be newly ambiguous.
     * `Handle::<BlockDef>::read()` no longer returns a `&BlockDef`, but a separate `Read` type.
     * `chunking::point_to_chunk()` now returns `None` in case of out-of-range input instead of panicking.
+    * `math::Aab::expand()` now takes `PositiveSign<f64>` instead of `f64` and cannot be used to shrink the box.
+      Use `Aab::expand_or_shrink()` instead.
     * `universe::Universe` no longer implements `Default` and `Deserialize`; instead, `Box<Universe>` does.
 
     * Renamed `time::Tick::delta_t()` to `delta_t_duration()`, to make room for other variations.
