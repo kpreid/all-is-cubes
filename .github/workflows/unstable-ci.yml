@@ -92,7 +92,7 @@ jobs:
       # Note: Swatinem/rust-cache will cache these installed binaries, so we don't have to worry
       # about caching the builds of them.
       run: |
-        cargo install --locked wasm-pack@0.13.1 cargo-about@0.8.2
+        cargo install --locked wasm-pack@0.14.0 cargo-about@0.8.2
 
     - name: Set Rust toolchain
       # The rust-toolchain.toml file specifies the targets and components we need,
@@ -183,7 +183,7 @@ jobs:
 
     - name: Install tools
       run: |
-        cargo install --locked wasm-pack@0.13.1
+        cargo install --locked wasm-pack@0.14.0
 
     - name: Set Rust toolchain
       # The rust-toolchain.toml file specifies the targets and components we need,
