@@ -133,7 +133,7 @@ jobs:
       # about caching the builds of them.
       # cargo-mutants and cargo-about are not used in this step but will be cached for later use.
       run: |
-        cargo install --locked wasm-pack@0.13.1 cargo-about@0.8.2 cargo-mutants@25.3.1
+        cargo install --locked wasm-pack@0.14.0 cargo-about@0.8.2 cargo-mutants@25.3.1
 
     - run: df -h .
 
@@ -235,7 +235,7 @@ jobs:
           all-is-cubes-wasm/
 
     # cargo-about should be restored from the cache, but the cache might miss.
-    - run: cargo install --locked wasm-pack@0.13.1 cargo-about@0.8.2
+    - run: cargo install --locked wasm-pack@0.14.0 cargo-about@0.8.2
 
     - run: cargo build --package xtask
     
@@ -307,7 +307,7 @@ jobs:
 
     - name: Install tools
       run: |
-        cargo install --locked wasm-pack@0.13.1
+        cargo install --locked wasm-pack@0.14.0
 
     - run: df -h .
 
@@ -389,7 +389,7 @@ jobs:
     - name: Install tools
       # These should already be installed but we might have a cache miss, so don't fail in that case.
       run: |
-        cargo install --locked wasm-pack@0.13.1 cargo-about@0.8.2
+        cargo install --locked wasm-pack@0.14.0 cargo-about@0.8.2
 
     - run: df -h .
 
@@ -451,7 +451,7 @@ jobs:
     - name: Install tools
       # These should already be installed but we might have a cache miss, so don't fail in that case.
       run: |
-        cargo install --locked wasm-pack@0.13.1 cargo-about@0.8.2
+        cargo install --locked wasm-pack@0.14.0 cargo-about@0.8.2
 
     - run: df -h .
 
