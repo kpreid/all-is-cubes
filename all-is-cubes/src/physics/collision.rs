@@ -57,11 +57,31 @@ pub enum Contact {
 }
 
 impl Contact {
-    /// Returns the cube that was collided with or within.
+    /// Returns the cube that was collided with, or which contains the voxel collided with.
     pub fn cube(&self) -> Cube {
         match *self {
             Contact::Block(CubeFace { cube, .. }) => cube,
             Contact::Voxel { cube, .. } => cube,
+        }
+    }
+
+    /// Returns the bounding box of the cube or voxel that was collided with.
+    pub fn aab(self) -> Aab {
+        match self {
+            Contact::Block(cube_face) => cube_face.cube.aab(),
+            Contact::Voxel {
+                cube,
+                resolution,
+                voxel,
+            } => {
+                // Note: We're always scaling by a power of 2, so this should not introduce any
+                // rounding error that isn't necessarily implied by the distance from the origin.
+                voxel
+                    .cube
+                    .aab()
+                    .scale(resolution.recip_f64())
+                    .translate(cube.lower_bounds().to_vector().to_f64())
+            }
         }
     }
 
@@ -690,6 +710,37 @@ mod tests {
     use crate::universe::Universe;
     use rand::{Rng, SeedableRng as _};
     use std::eprintln;
+
+    #[test]
+    fn contact_block_aab() {
+        assert_eq!(
+            Contact::Block(CubeFace {
+                cube: Cube::new(1, 2, 3),
+                face: Face7::PX
+            })
+            .aab(),
+            Aab::from_lower_upper([1., 2., 3.], [2., 3., 4.]),
+        );
+    }
+
+    #[test]
+    fn contact_voxel_aab() {
+        assert_eq!(
+            Contact::Voxel {
+                cube: Cube::new(1, 2, 3),
+                resolution: R4,
+                voxel: CubeFace {
+                    cube: Cube::new(2, 1, 0),
+                    face: Face7::NZ
+                },
+            }
+            .aab(),
+            Aab::from_lower_upper(
+                [1.5, 2.25, 3.0],
+                [1.75, 2.5, 3.25],
+            ),
+        );
+    }
 
     #[test]
     fn collide_along_ray_with_opaque_block() {
