@@ -35,7 +35,9 @@ use crate::fluff::Fluff;
     reason = "unclear why this warns even though it is needed"
 )]
 use crate::math::Euclid as _;
-use crate::math::{Cube, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign, notnan};
+use crate::math::{
+    Cube, Face6, Face7, FaceMap, FreeCoordinate, FreePoint, FreeVector, PositiveSign, notnan,
+};
 use crate::physics::{Body, BodyStepInfo, ContactSet, POSITION_EPSILON, StopAt, Velocity};
 use crate::raycast::Ray;
 use crate::space::{self, Space};
@@ -535,7 +537,7 @@ where
     let collision = collide_along_ray(
         space,
         movement_ignoring_collision,
-        body.collision_box, // TODO: use occupying
+        body.collision_box, // TODO(crush): use occupying
         collision_callback,
         StopAt::NotAlreadyColliding,
     );
@@ -550,7 +552,7 @@ where
         // But a little bit back from that, to avoid floating point error pushing us
         // into being already colliding next frame.
         let motion_segment = nudge_on_ray(
-            body.collision_box, // TODO: use occupying
+            body.collision_box, // TODO(crush): use occupying
             movement_ignoring_collision.scale_direction(collision.t_distance),
             collision.contact.normal().opposite(),
             collision.contact.resolution(),
@@ -646,7 +648,7 @@ fn attempt_push_out(
         let end = escape_along_ray(
             space,
             ray,
-            body.collision_box, /* TODO: use occupying */
+            body.collision_box, /* TODO(crush): use occupying */
         )?;
 
         let nudged_distance = end.t_distance + POSITION_EPSILON;
@@ -657,18 +659,20 @@ fn attempt_push_out(
     } else {
         let ray = Ray::new(body.position.map(NotNan::into_inner), direction);
         // TODO: upper bound on distance to try
-        'raycast: for ray_step in
-            aab_raycast(body.collision_box /* TODO: use occupying */, ray, true)
-        {
+        'raycast: for ray_step in aab_raycast(
+            body.collision_box, /* TODO(crush): use occupying */
+            ray,
+            true,
+        ) {
             let adjusted_segment = nudge_on_ray(
-                body.collision_box, /* TODO: use occupying */
+                body.collision_box, /* TODO(crush): use occupying */
                 ray.scale_direction(ray_step.t_distance()),
                 ray_step.face(),
                 Resolution::R1,
                 true,
             );
             let step_aab = body
-                .collision_box /* TODO: use occupying */
+                .collision_box /* TODO(crush): use occupying */
                 .translate(adjusted_segment.unit_endpoint().to_vector());
             for cube in step_aab.round_up_to_grid().interior_iter() {
                 // TODO: refactor to combine this with other collision attribute tests
@@ -692,5 +696,87 @@ fn attempt_push_out(
         }
 
         None
+    }
+}
+
+/// If [`Body::occupying`] is intersecting anything, shrink it so it isn’t, if possible.
+//---
+#[allow(
+    dead_code,
+    reason = "TODO(crush): This function is not called, and [`Body::occupying`] is not significantly used."
+)]
+pub(super) fn crush_if_colliding(body: &mut Body, space: &space::Read<'_>) {
+    loop {
+        let mut a_contact: Option<Contact> = None;
+        collide_along_ray(
+            space,
+            Ray::new([0., 0., 0.], [0., 0., 0.]),
+            body.occupying,
+            |contact| {
+                a_contact = Some(contact);
+            },
+            StopAt::Anything,
+        );
+        let Some(a_contact) = a_contact else {
+            // No collision; nothing to do.
+            break;
+        };
+
+        let contact_aab = a_contact.aab();
+
+        // Find the direction which has the least penetration depth,
+        // thus the smallest crush to resolve the collision.
+        let mut least_penetration_depth: Option<(Face6, FreeCoordinate)> = None;
+        for face in Face6::ALL {
+            let this_depth =
+                body.occupying.face_coordinate(face) + contact_aab.face_coordinate(face.opposite());
+            if this_depth >= 0. && least_penetration_depth.is_none_or(|(_, d)| this_depth < d) {
+                least_penetration_depth = Some((face, this_depth));
+            }
+        }
+
+        if let Some((face, depth)) = least_penetration_depth {
+            log::debug!("shrinking {least_penetration_depth:?}");
+            // TODO: stop if we would lose the occupying-contains-position property
+            if let Some(shrunk) =
+                body.occupying.expand_or_shrink(FaceMap::splat(0.0).with(face, -depth))
+            {
+                body.occupying = shrunk;
+            } else {
+                log::debug!("cannot resolve by crushing");
+                return;
+            }
+        } else {
+            panic!("collision but found no penetration");
+        }
+    }
+}
+
+/// Note: Most tests for physics behavior are in [`super::tests`].
+/// These tests are unit tests for individual functions/subsystems.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::content::make_some_blocks;
+    use crate::math::{Aab, GridAab};
+
+    /// Unit test of [`crush_if_colliding()`].
+    #[test]
+    fn crush() {
+        let [block] = make_some_blocks();
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+            .filled_with(block.clone())
+            .build();
+        let mut body = Body::new_minimal([0., 1.25, 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5));
+
+        assert_eq!(
+            body.occupying,
+            Aab::from_lower_upper([-0.5, 0.75, -0.5], [0.5, 1.75, 0.5]),
+        );
+        crush_if_colliding(&mut body, &space.read());
+        assert_eq!(
+            body.occupying,
+            Aab::from_lower_upper([-0.5, 1.0, -0.5], [0.5, 1.75, 0.5]),
+        );
     }
 }

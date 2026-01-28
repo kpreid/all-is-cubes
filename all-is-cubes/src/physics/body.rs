@@ -70,10 +70,15 @@ pub struct Body {
     /// Volume that this body believes it is successfully occupying, in coordinates relative to
     /// the [`Space`] it collides with.
     ///
-    /// In the ideal case, this is always equal to `collision_box.translate(position.to_vector())`.
-    /// In practice, it will differ at least due to rounding errors, and additionally due to
-    /// numerical error during collision resolution, or be shrunk by large distances if the body has
-    /// been squeezed by moving obstacles (TODO: not implemented yet).
+    /// When things are going perfectly, this is always equal to
+    /// `collision_box` translated by `position.to_vector()`.
+    /// In practice, it will differ due to:
+    ///
+    /// * Floating-point rounding in the translation operation.
+    /// * Floating-point rounding during collision resolution causing the body’s position
+    ///   to not be far enough away, in which case this is intentionally shrunk to compensate.
+    ///   (TODO(crush): not implemented yet.)
+    /// * The body being squeezed by by moving obstacles. (TODO(crush): not implemented yet.)
     pub(in crate::physics) occupying: Aab,
 
     /// Is this body not subject to gravity?
