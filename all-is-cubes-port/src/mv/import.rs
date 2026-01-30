@@ -55,6 +55,7 @@ pub(crate) async fn dot_vox_data_to_universe(
 ) -> Result<Box<Universe>, DotVoxConversionError> {
     let dot_vox::DotVoxData {
         version,
+        index_map: _, // used via yoke
         models,
         palette,
         materials,
@@ -62,6 +63,8 @@ pub(crate) async fn dot_vox_data_to_universe(
         layers,
     } = &*data;
     // Use Yoke to make owned field pointers from the Arc
+    let index_map_yoked =
+        yoke::Yoke::<&[u8], _>::attach_to_cart(data.clone(), |data| &data.index_map);
     let models_yoked =
         yoke::Yoke::<&[dot_vox::Model], _>::attach_to_cart(data.clone(), |data| &data.models);
 
@@ -121,6 +124,7 @@ pub(crate) async fn dot_vox_data_to_universe(
         move |model_index| format!("Importing model {model_index}/{model_count}"),
         move |model_index| {
             let mut space = mv::model::to_space(
+                index_map_yoked.get(),
                 &palette,
                 &models_yoked.get()[model_index],
                 mode.treat_models_as_blocks(),

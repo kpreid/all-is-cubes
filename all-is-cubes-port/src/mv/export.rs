@@ -87,7 +87,8 @@ pub(crate) async fn export_to_dot_vox_data(
     // TODO: When more than one model is exported, create a scene including all the models
 
     Ok(dot_vox::DotVoxData {
-        version: 150, // TODO: magic number taken from examples; may not be right
+        version: 150,
+        index_map: (1..=255).collect(),
         models,
         palette,
         scenes: Vec::new(),

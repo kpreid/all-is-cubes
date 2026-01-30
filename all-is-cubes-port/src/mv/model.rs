@@ -28,6 +28,7 @@ use crate::{ExportError, Format};
 /// and the choice of coordinate transform.
 #[cfg(feature = "import")]
 pub(crate) fn to_space(
+    index_map: &[u8],
     palette_blocks: &[Block],
     model: &dot_vox::Model,
     import_as_block: bool,
@@ -66,12 +67,12 @@ pub(crate) fn to_space(
             let converted_cube: Cube = Cube::from(Point3D::new(v.x, v.y, v.z).map(i32::from));
             let transformed_cube = transform.transform_cube(converted_cube);
 
-            let block = palette_blocks.get(v.i as usize).ok_or_else(|| {
-                mv::DotVoxConversionError::PaletteTooShort {
+            let block = palette_blocks
+                .get(usize::from(index_map[usize::from(v.i)] - 1))
+                .ok_or_else(|| mv::DotVoxConversionError::PaletteTooShort {
                     len: palette_blocks.len(),
                     index: v.i,
-                }
-            })?;
+                })?;
 
             m.set(transformed_cube, block).map_err(mv::DotVoxConversionError::SetCube)?;
         }

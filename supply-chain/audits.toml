@@ -66,6 +66,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "0.2.5"
 
+[[audits.dot_vox]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "5.1.1 -> 5.2.0"
+
 [[audits.euclid]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
