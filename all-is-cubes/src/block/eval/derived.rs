@@ -23,8 +23,10 @@ use crate::block::{EvaluatedBlock, Evoxel};
 
 /// Derived properties of an evaluated block.
 ///
-/// All of these properties are calculated using only the `attributes` and `voxels` of
-/// the input; they do not depend on the block’s identity or the evaluation cost.
+/// All of these properties are calculated using only the `voxels` of the input;
+/// they do not depend on the attributes, the [`Block`] value equality, or the evaluation cost.
+/// If we ever want to derive something from the block attributes, that should become a separate
+/// type to allow separate caching.
 ///
 /// TODO: Further restrict field visibility?
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -75,14 +77,7 @@ pub(in crate::block) struct Derived {
 /// from the information in a [`block::MinEval`] or similar,
 /// to enable constructing a [`block::EvaluatedBlock`].
 #[inline(never)] // neither cheap nor going to benefit from per-call optimizations
-pub(in crate::block::eval) fn compute_derived(
-    attributes: &block::BlockAttributes,
-    voxels: &block::Evoxels,
-) -> Derived {
-    // Currently, none of the attributes influence the derived properties,
-    // but this is likely to change.
-    _ = attributes;
-
+pub(in crate::block::eval) fn compute_derived(voxels: &block::Evoxels) -> Derived {
     let resolution = voxels.resolution();
 
     // Optimization for single voxels:
@@ -441,15 +436,12 @@ mod tests {
         )]
         color: Rgba,
     ) {
-        let mut attributes = block::BlockAttributes::default();
-        attributes.display_name = "foo".into();
-
         let voxel = Evoxel::from_color(color);
-        let ev_one = compute_derived(&attributes, &Evoxels::from_one(voxel));
-        let ev_many = compute_derived(
-            &attributes,
-            &Evoxels::from_many(R2, Vol::from_fn(GridAab::for_block(R2), |_| voxel)),
-        );
+        let ev_one = compute_derived(&Evoxels::from_one(voxel));
+        let ev_many = compute_derived(&Evoxels::from_many(
+            R2,
+            Vol::from_fn(GridAab::for_block(R2), |_| voxel),
+        ));
 
         // Check that the derived attributes are all identical (except for the opacity mask),
         assert_eq!(

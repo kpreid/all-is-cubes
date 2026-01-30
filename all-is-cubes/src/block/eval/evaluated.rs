@@ -46,6 +46,7 @@ pub struct EvaluatedBlock {
     /// of those voxels.
     pub(in crate::block) voxels: Evoxels,
 
+    /// Information derived from `self.voxels` (only).
     pub(in crate::block) derived: Derived,
 }
 
@@ -112,7 +113,7 @@ impl EvaluatedBlock {
         cost: Cost,
     ) -> EvaluatedBlock {
         EvaluatedBlock {
-            derived: block::eval::compute_derived(&attributes, &voxels),
+            derived: block::eval::compute_derived(&voxels),
             block: original_block,
             cost,
             attributes,
@@ -416,6 +417,9 @@ const AIR_DERIVED: Derived = Derived {
 pub(crate) struct MinEval {
     attributes: BlockAttributes,
     voxels: Evoxels,
+    /// Information derived from `self.voxels` (only).
+    /// [`None`] if it has not yet been computed, in which case it will be computed when this
+    /// is converted into an [`EvaluatedBlock`].
     derived: Option<Derived>,
 }
 
@@ -479,12 +483,10 @@ impl MinEval {
     }
 
     pub fn attributes_mut(&mut self) -> &mut BlockAttributes {
-        self.derived = None;
         &mut self.attributes
     }
 
     pub(crate) fn set_attributes(&mut self, attributes: BlockAttributes) {
-        self.derived = None;
         self.attributes = attributes;
     }
 
