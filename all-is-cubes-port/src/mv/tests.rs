@@ -34,15 +34,17 @@ fn print_many_transforms() {
 async fn roundtrip(
     export_universe: &Universe,
 ) -> Result<Box<Universe>, Either<ExportError, mv::DotVoxConversionError>> {
-    // TODO: also roundtrip through bytes, for maximum rigor
-    let data = mv::export_to_dot_vox_data(
+    let data_export = mv::export_to_dot_vox_data(
         yield_progress_for_testing(),
         export_universe.read_ticket(),
         ExportSet::all_of_universe(export_universe),
     )
     .await
     .map_err(Either::Left)?;
-    mv::import::dot_vox_data_to_universe(yield_progress_for_testing(), Arc::new(data))
+    let mut bytes = Vec::new();
+    data_export.write_vox(&mut bytes).unwrap();
+    let data_import = dot_vox::load_bytes(&bytes).unwrap();
+    mv::import::dot_vox_data_to_universe(yield_progress_for_testing(), Arc::new(data_import))
         .await
         .map_err(Either::Right)
 }
