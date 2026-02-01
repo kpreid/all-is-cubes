@@ -2,6 +2,8 @@ use core::cmp::Ordering;
 use core::iter::FusedIterator;
 use core::ops::Range;
 
+use euclid::point2;
+
 use crate::math::{Cube, GridAab, GridCoordinate, GridPoint};
 
 /// Iterator produced by [`GridAab::interior_iter()`].
@@ -61,6 +63,11 @@ impl GridIter {
                 }
             }
         }
+    }
+
+    #[inline(always)]
+    fn remaining_elements_form_box(&self) -> bool {
+        self.cube.yz() == point2(self.y_range.start, self.z_range.start)
     }
 }
 
@@ -129,16 +136,17 @@ impl Iterator for GridIter {
 
         // First, if the iterator has already been partly advanced (this is atypical),
         // advance it until the remaining elements form an AAB.
-        #[cold]
-        #[inline(never)]
-        fn cold_next(i: &mut GridIter) -> Option<Cube> {
-            i.next()
-        }
-        while self.cube.y != self.y_range.start || self.cube.z != self.z_range.start {
-            let Some(cube) = cold_next(&mut self) else {
-                return state;
-            };
-            state = f(state, cube);
+        if !self.remaining_elements_form_box() {
+            cold_path();
+            loop {
+                let Some(cube) = self.next() else {
+                    return state;
+                };
+                state = f(state, cube);
+                if self.remaining_elements_form_box() {
+                    break;
+                }
+            }
         }
 
         // Now, we can perform iteration over the numeric ranges independently,
@@ -157,6 +165,12 @@ impl Iterator for GridIter {
 
 impl ExactSizeIterator for GridIter {}
 impl FusedIterator for GridIter {}
+
+// Replace this with `core::hint::cold_path()` when that becomes stable.
+// <https://github.com/rust-lang/rust/pull/151576>
+#[cold]
+#[inline]
+fn cold_path() {}
 
 #[cfg(test)]
 mod tests {
