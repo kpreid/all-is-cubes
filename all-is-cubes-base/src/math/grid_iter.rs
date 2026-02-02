@@ -73,16 +73,31 @@ impl Iterator for GridIter {
             return None;
         }
         let result = self.cube;
-        self.cube.z += 1;
-        if self.cube.z >= self.z_range.end {
+
+        // Optimization note: at least on my aarch64 machine, this code benchmarks faster *with*
+        // overflow checks than without, probably because this pushes the code generation towards
+        // predictable branches instead of conditional moves on all three axes.
+        //
+        // `strict_add()` ensures we will get those overflow checks in all builds.
+        // `wrapping_add()`, `saturating_add()`, and `unchecked_add()` are all worse.
+        //
+        // Ideally, we would get the preferable code generation without also actually performing
+        // overflow checks, but I have not found a way to do that yet.
+        let next_z = self.cube.z.strict_add(1);
+        if next_z < self.z_range.end {
+            self.cube.z = next_z;
+        } else {
             self.cube.z = self.z_range.start;
-            self.cube.y += 1;
-            if self.cube.y >= self.y_range.end {
+            let next_y = self.cube.y.strict_add(1);
+            if next_y < self.y_range.end {
+                self.cube.y = next_y;
+            } else {
                 self.cube.y = self.y_range.start;
-                self.cube.x += 1;
+                self.cube.x = self.cube.x.strict_add(1);
                 // When x becomes out of bounds, that signals the end.
             }
         }
+
         Some(result.into())
     }
 
