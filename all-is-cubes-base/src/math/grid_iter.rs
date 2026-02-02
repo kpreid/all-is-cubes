@@ -184,6 +184,48 @@ mod tests {
     }
 
     #[test]
+    fn correct_at_min() {
+        let b =
+            GridAab::from_lower_upper(GridPoint::splat(i32::MIN), GridPoint::splat(i32::MIN + 2));
+        assert_eq!(b.volume(), Some(8));
+
+        assert_eq!(
+            b.interior_iter().collect::<Vec<Cube>>(),
+            [
+                Cube::new(i32::MIN, i32::MIN, i32::MIN),
+                Cube::new(i32::MIN, i32::MIN, i32::MIN + 1),
+                Cube::new(i32::MIN, i32::MIN + 1, i32::MIN),
+                Cube::new(i32::MIN, i32::MIN + 1, i32::MIN + 1),
+                Cube::new(i32::MIN + 1, i32::MIN, i32::MIN),
+                Cube::new(i32::MIN + 1, i32::MIN, i32::MIN + 1),
+                Cube::new(i32::MIN + 1, i32::MIN + 1, i32::MIN),
+                Cube::new(i32::MIN + 1, i32::MIN + 1, i32::MIN + 1),
+            ]
+        );
+    }
+
+    #[test]
+    fn correct_at_max() {
+        let b =
+            GridAab::from_lower_upper(GridPoint::splat(i32::MAX - 2), GridPoint::splat(i32::MAX));
+        assert_eq!(b.volume(), Some(8));
+
+        assert_eq!(
+            b.interior_iter().collect::<Vec<Cube>>(),
+            [
+                Cube::new(i32::MAX - 2, i32::MAX - 2, i32::MAX - 2),
+                Cube::new(i32::MAX - 2, i32::MAX - 2, i32::MAX - 1),
+                Cube::new(i32::MAX - 2, i32::MAX - 1, i32::MAX - 2),
+                Cube::new(i32::MAX - 2, i32::MAX - 1, i32::MAX - 1),
+                Cube::new(i32::MAX - 1, i32::MAX - 2, i32::MAX - 2),
+                Cube::new(i32::MAX - 1, i32::MAX - 2, i32::MAX - 1),
+                Cube::new(i32::MAX - 1, i32::MAX - 1, i32::MAX - 2),
+                Cube::new(i32::MAX - 1, i32::MAX - 1, i32::MAX - 1),
+            ]
+        );
+    }
+
+    #[test]
     fn next_and_fold_are_equivalent() {
         let b = GridAab::from_lower_size([0, -1, 7], [3, 3, 3]);
         println!("Aab = {b:?}");
