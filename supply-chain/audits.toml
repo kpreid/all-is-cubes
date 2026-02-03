@@ -31,6 +31,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "0.21.2"
 
+[[audits.bytes]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "1.11.0 -> 1.11.1"
+
 [[audits.cassowary]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
