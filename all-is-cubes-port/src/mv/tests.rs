@@ -54,7 +54,7 @@ async fn roundtrip(
 async fn export_import_space() {
     // Irregular and negative dimensions to check that the coordinate transform worked.
     let bounds = GridAab::from_lower_size([-20, -30, -40], [1, 2, 3]);
-    let block1 = Block::builder().color(Rgba::WHITE).display_name("a").build();
+    let block1 = Block::builder().color(Rgba::BLACK).display_name("a").build();
     let block2 = Block::builder().color(Rgba::WHITE).display_name("b").build();
 
     // Construct universe for export.
@@ -96,7 +96,7 @@ async fn export_import_space() {
     );
     assert_eq!(
         s[[0, 1, 0]],
-        Block::builder().color(block1.color()).display_name("1").build()
+        Block::builder().color(block2.color()).display_name("1").build()
     );
     // TODO: make more assertions about the data?
 }
