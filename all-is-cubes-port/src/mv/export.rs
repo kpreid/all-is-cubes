@@ -26,8 +26,10 @@ pub(crate) async fn export_to_dot_vox_data(
     let blocks_to_export = source.contents.extract_type::<all_is_cubes::block::BlockDef>();
     source.reject_unsupported(Format::DotVox)?;
 
-    // TODO: this value is not used except in logging, but will be used with export_space_as_scene()
-    let maximum_resolution_in_all_spaces: (Option<&Handle<Space>>, Resolution) = spaces_to_export
+    let (space_with_maximum_resolution, maximum_resolution_in_all_spaces): (
+        Option<&Handle<Space>>,
+        Resolution,
+    ) = spaces_to_export
         .iter()
         .map(
             |handle| -> Result<(Option<&Handle<Space>>, Resolution), ExportError> {
@@ -40,15 +42,19 @@ pub(crate) async fn export_to_dot_vox_data(
         .process_results(|resolutions| resolutions.max_by_key(|&(_, resolution)| resolution))?
         .unwrap_or((None, Resolution::R1));
 
+    // TODO: this functionality does not yet work as intended, but should be optional when it does
+    let should_export_spaces_as_scenes = false;
+
     log::info!(
         ".vox: given {b} blocks and {s} spaces to export; \
-        maximum resolution in spaces is {resolution}",
+            maximum resolution in spaces is {maximum_resolution_in_all_spaces} \
+            for {space_with_maximum_resolution:?}",
         b = blocks_to_export.len(),
         s = spaces_to_export.len(),
-        resolution = maximum_resolution_in_all_spaces.1,
     );
 
     let mut palette = ExportPalette::new();
+    let mut scenes: Vec<dot_vox::SceneNode> = Vec::new();
     let mut models: Vec<dot_vox::Model> =
         Vec::with_capacity(spaces_to_export.len().saturating_add(blocks_to_export.len()));
     #[expect(clippy::shadow_unrelated)]
@@ -59,12 +65,25 @@ pub(crate) async fn export_to_dot_vox_data(
         .zip(spaces_to_export)
     {
         progress.set_label(format!("Exporting space {}", space_handle.name()));
-        models.push(mv::model::from_space(
-            read_ticket,
-            &space_handle,
-            &mut palette,
-        )?);
-        progress.finish().await
+        if should_export_spaces_as_scenes {
+            export_space_as_scene(
+                progress,
+                read_ticket,
+                &space_handle,
+                maximum_resolution_in_all_spaces,
+                &mut models,
+                &mut palette,
+                &mut scenes,
+            )
+            .await?;
+        } else {
+            models.push(mv::model::from_space(
+                read_ticket,
+                &space_handle,
+                &mut palette,
+            )?);
+            progress.finish().await
+        }
     }
 
     #[expect(clippy::shadow_unrelated)]
@@ -92,7 +111,7 @@ pub(crate) async fn export_to_dot_vox_data(
         index_map: (1..=255).collect(),
         models,
         palette,
-        scenes: Vec::new(),
+        scenes,
         layers: Vec::new(),
         materials,
     })
@@ -100,7 +119,6 @@ pub(crate) async fn export_to_dot_vox_data(
 
 /// Rather than exporting a space as a voxel model, this exports a space as a scene containing
 /// a model per block.
-#[expect(dead_code, reason = "TODO: This is not functional and not used yet.")]
 async fn export_space_as_scene(
     progress: YieldProgress,
     read_ticket: ReadTicket<'_>,
@@ -182,6 +200,11 @@ async fn export_space_as_scene(
                 unreachable!()
             };
             root_children.push(index_of_transform_node); // transform node
+        } else {
+            log::warn!(
+                "no model available for block {block_index} of space {space}",
+                space = space_handle.name()
+            );
         }
     }
     convert_space_progress.finish().await;
