@@ -181,7 +181,8 @@ impl Vui {
             super::hud::new_hud_page(universe.read_ticket(), &hud_inputs, tooltip_state.clone());
 
         let paused_page = pages::new_paused_page(&mut universe, &hud_inputs).unwrap();
-        let options_page = pages::new_options_widget_tree(universe.read_ticket(), &hud_inputs);
+        let options_page =
+            pages::new_settings_page_widget_tree(universe.read_ticket(), &hud_inputs);
         let about_page = pages::new_about_page(&mut universe, &hud_inputs).unwrap();
         let progress_page =
             pages::new_progress_page(&hud_inputs.hud_blocks.widget_theme, &notif_hub);
@@ -277,7 +278,7 @@ impl Vui {
                 }
                 &mut self.paused_page
             }
-            VuiPageState::Options => &mut self.options_page,
+            VuiPageState::Settings => &mut self.options_page,
             VuiPageState::AboutText => &mut self.about_page,
             VuiPageState::Progress => &mut self.progress_page,
 
@@ -512,7 +513,7 @@ impl Vui {
                     self.hud_inputs.app_control_channel.send(ControlMessage::TogglePause).unwrap();
                 }
             }
-            VuiPageState::AboutText | VuiPageState::Options => {
+            VuiPageState::AboutText | VuiPageState::Settings => {
                 // The next step will decide whether we should be paused or unpaused.
                 // TODO: Instead check right now, but in a reusable fashion.
                 self.set_state(VuiPageState::Hud);
@@ -588,7 +589,7 @@ pub(crate) enum VuiPageState {
     Paused,
 
     /// Options/settings/preferences menu.
-    Options,
+    Settings,
 
     /// “About All is Cubes” info.
     AboutText,
@@ -615,7 +616,7 @@ impl VuiPageState {
             VuiPageState::AboutText => true,
             VuiPageState::Progress => true,
 
-            VuiPageState::Options => false,
+            VuiPageState::Settings => false,
             VuiPageState::Dump { .. } => false,
         }
     }

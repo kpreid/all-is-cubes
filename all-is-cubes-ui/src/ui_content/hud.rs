@@ -10,8 +10,8 @@ use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 use crate::apps::ControlMessage;
-use crate::ui_content::options::{OptionsStyle, graphics_options_widgets, pause_toggle_button};
 use crate::ui_content::pages::open_page_button;
+use crate::ui_content::settings::{SettingsStyle, pause_toggle_button, settings_widgets};
 use crate::ui_content::{CueNotifier, UiTargets, VuiMessage, VuiPageState};
 use crate::vui::widgets::{self, TooltipState, WidgetBlocks};
 use crate::vui::{self, LayoutTree, UiBlocks, Widget, WidgetTree};
@@ -86,18 +86,14 @@ pub(crate) fn control_bar(read_ticket: ReadTicket<'_>, hud_inputs: &HudInputs) -
         children: vec![
             Arc::new(LayoutTree::Stack {
                 direction: Face6::NX,
-                children: graphics_options_widgets(
-                    read_ticket,
-                    hud_inputs,
-                    OptionsStyle::CompactRow,
-                ),
+                children: settings_widgets(read_ticket, hud_inputs, SettingsStyle::CompactRow),
             }),
             vui::leaf_widget(open_page_button(
                 hud_inputs,
                 VuiPageState::AboutText,
                 hud_inputs.hud_blocks.ui_blocks[UiBlocks::AboutButtonLabel].clone(),
             )),
-            vui::leaf_widget(pause_toggle_button(hud_inputs, OptionsStyle::CompactRow)),
+            vui::leaf_widget(pause_toggle_button(hud_inputs, SettingsStyle::CompactRow)),
             vui::leaf_widget(save_button(hud_inputs)),
             vui::leaf_widget(widgets::ToggleButton::new(
                 hud_inputs.mouselook_mode.clone(),

@@ -4,8 +4,8 @@
 
 pub(crate) mod hud;
 pub mod notification;
-pub(crate) mod options;
 pub(crate) mod pages;
+pub(crate) mod settings;
 pub(crate) mod vui_manager;
 pub use vui_manager::Command;
 pub(crate) use vui_manager::*;

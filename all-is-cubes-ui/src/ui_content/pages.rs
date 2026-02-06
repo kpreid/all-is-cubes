@@ -13,7 +13,9 @@ use all_is_cubes::universe::{ReadTicket, Universe};
 use crate::logo::logo_text;
 use crate::notification::NotificationContent;
 use crate::ui_content::hud::HudInputs;
-use crate::ui_content::options::{OptionsStyle, graphics_options_widgets, pause_toggle_button};
+use crate::ui_content::settings::{
+    SETTINGS_LABEL, SettingsStyle, pause_toggle_button, settings_widgets,
+};
 use crate::ui_content::{VuiMessage, VuiPageState, notification};
 use crate::vui::widgets::{ButtonLabel, ProgressBarState};
 use crate::vui::{self, InstallVuiError, LayoutTree, UiBlocks, Widget, WidgetTree, parts, widgets};
@@ -39,13 +41,16 @@ pub(super) fn new_paused_page(
         )),
         vui::leaf_widget(open_page_button(
             hud_inputs,
-            VuiPageState::Options,
+            VuiPageState::Settings,
             ButtonLabel {
-                icon: Some(hud_inputs.hud_blocks.ui_blocks[UiBlocks::OptionsButtonLabel].clone()),
-                text: Some(literal!("Options").into()),
+                icon: Some(hud_inputs.hud_blocks.ui_blocks[UiBlocks::SettingsButtonLabel].clone()),
+                text: Some(SETTINGS_LABEL.into()),
             },
         )),
-        vui::leaf_widget(pause_toggle_button(hud_inputs, OptionsStyle::LabeledColumn)),
+        vui::leaf_widget(pause_toggle_button(
+            hud_inputs,
+            SettingsStyle::LabeledColumn,
+        )),
     ];
 
     // TODO: need to make this update on change (by invalidating the page)
@@ -86,7 +91,7 @@ pub(super) fn new_paused_page(
         literal!("Paused"),
         Some(vui::leaf_widget(pause_toggle_button(
             hud_inputs,
-            OptionsStyle::CompactRow,
+            SettingsStyle::CompactRow,
         ))),
         contents,
     ))
@@ -143,7 +148,7 @@ pub(super) fn new_progress_page(
     vui::Page::new_modal_dialog_with_title_widget(theme, title_widget, None, contents)
 }
 
-pub(super) fn new_options_widget_tree(
+pub(super) fn new_settings_page_widget_tree(
     read_ticket: ReadTicket<'_>,
     hud_inputs: &HudInputs,
 ) -> vui::Page {
@@ -151,16 +156,12 @@ pub(super) fn new_options_widget_tree(
         direction: Face6::NY,
         children: vec![Arc::new(LayoutTree::Stack {
             direction: Face6::NY,
-            children: graphics_options_widgets(
-                read_ticket,
-                hud_inputs,
-                OptionsStyle::LabeledColumn,
-            ),
+            children: settings_widgets(read_ticket, hud_inputs, SettingsStyle::LabeledColumn),
         })],
     });
     vui::Page::new_modal_dialog(
         &hud_inputs.hud_blocks.widget_theme,
-        literal!("Options"),
+        SETTINGS_LABEL,
         Some(back_button(hud_inputs)),
         contents,
     )

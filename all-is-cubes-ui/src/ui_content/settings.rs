@@ -13,16 +13,26 @@ use crate::settings;
 use crate::ui_content::hud::HudInputs;
 use crate::vui::{self, LayoutTree, UiBlocks, Widget, WidgetTree, widgets};
 
+// -------------------------------------------------------------------------------------------------
+
+/// Label used in the user interface for editing [`settings::Settings`].
+///
+/// TODO: Kept as “Options” rather than “Settings” for historical reasons.
+/// Decide whether to change it.
+pub(crate) const SETTINGS_LABEL: arcstr::ArcStr = literal!("Options");
+
+/// Specify what shape of widgets [`settings_widgets()`] should produce.
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum OptionsStyle {
+pub(crate) enum SettingsStyle {
     CompactRow,
     LabeledColumn,
 }
 
-pub(crate) fn graphics_options_widgets(
+/// Produce a row or column of widgets to change [`crate::settings`].
+pub(crate) fn settings_widgets(
     read_ticket: ReadTicket<'_>,
     hud_inputs: &HudInputs,
-    style: OptionsStyle,
+    style: SettingsStyle,
 ) -> Vec<WidgetTree> {
     let mut w: Vec<WidgetTree> = Vec::with_capacity(5);
     if let Some(setter) = hud_inputs.set_fullscreen.clone() {
@@ -164,15 +174,15 @@ pub(crate) fn graphics_options_widgets(
 fn arb_toggle_button(
     read_ticket: ReadTicket<'_>,
     hud_inputs: &HudInputs,
-    style: OptionsStyle,
+    style: SettingsStyle,
     icon_key: UiBlocks,
     getter: impl Fn(&settings::Data) -> bool + Clone + Send + Sync + 'static,
     setter: impl Fn(&settings::Settings, bool) + Clone + Send + Sync + 'static,
 ) -> WidgetTree {
     let icon = hud_inputs.hud_blocks.ui_blocks[icon_key].clone();
     let text: Option<widgets::Label> = match style {
-        OptionsStyle::CompactRow => None,
-        OptionsStyle::LabeledColumn => Some(
+        SettingsStyle::CompactRow => None,
+        SettingsStyle::LabeledColumn => Some(
             icon.evaluate(read_ticket) // TODO(read_ticket): we should probably get the label text elsewhere and remove this need for a read ticket
                 .unwrap()
                 .attributes()
@@ -207,14 +217,14 @@ fn arb_toggle_button(
 fn setting_toggle_button(
     read_ticket: ReadTicket<'_>,
     hud_inputs: &HudInputs,
-    style: OptionsStyle,
+    style: SettingsStyle,
     icon_key: UiBlocks,
     key: &'static settings::TypedKey<bool>,
 ) -> WidgetTree {
     let icon = hud_inputs.hud_blocks.ui_blocks[icon_key].clone();
     let text: Option<widgets::Label> = match style {
-        OptionsStyle::CompactRow => None,
-        OptionsStyle::LabeledColumn => Some(
+        SettingsStyle::CompactRow => None,
+        SettingsStyle::LabeledColumn => Some(
             icon.evaluate(read_ticket) // TODO(read_ticket): we should probably get the label text elsewhere and remove this need for a read ticket
                 .unwrap()
                 .attributes()
@@ -242,12 +252,12 @@ fn setting_toggle_button(
     vui::leaf_widget(button)
 }
 
-/// Generate a group of buttons that selects one of an enum of options.
+/// Generate a group of buttons that set a setting to one of a set of values of an enum.
 ///
-/// These buttons do not show up in the compact style.
+/// These buttons do not show up in [`SettingsStyle::CompactRow`].
 fn setting_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'static>(
     hud_inputs: &HudInputs,
-    style: OptionsStyle,
+    style: SettingsStyle,
     label: arcstr::ArcStr,
     key: &'static settings::TypedKey<T>,
     list: impl IntoIterator<Item = T>,
@@ -262,8 +272,8 @@ fn setting_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'static
         },
     ));
     match style {
-        OptionsStyle::CompactRow => LayoutTree::spacer(vui::LayoutRequest::EMPTY),
-        OptionsStyle::LabeledColumn => Arc::new(LayoutTree::Stack {
+        SettingsStyle::CompactRow => LayoutTree::spacer(vui::LayoutRequest::EMPTY),
+        SettingsStyle::LabeledColumn => Arc::new(LayoutTree::Stack {
             direction: Face6::PX,
             children: [label]
                 .into_iter()
@@ -290,15 +300,15 @@ fn setting_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'static
     }
 }
 
-pub(crate) fn pause_toggle_button(hud_inputs: &HudInputs, style: OptionsStyle) -> Arc<dyn Widget> {
+pub(crate) fn pause_toggle_button(hud_inputs: &HudInputs, style: SettingsStyle) -> Arc<dyn Widget> {
     widgets::ToggleButton::new(
         hud_inputs.paused.clone(),
         |&value| value,
         widgets::ButtonLabel {
             icon: Some(hud_inputs.hud_blocks.ui_blocks[UiBlocks::PauseButtonLabel].clone()),
             text: match style {
-                OptionsStyle::CompactRow => None,
-                OptionsStyle::LabeledColumn => Some(literal!("Pause").into()),
+                SettingsStyle::CompactRow => None,
+                SettingsStyle::LabeledColumn => Some(literal!("Pause").into()),
             },
         },
         &hud_inputs.hud_blocks.widget_theme,

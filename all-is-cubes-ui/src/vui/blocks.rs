@@ -27,7 +27,7 @@ pub enum UiBlocks {
     AboutButtonLabel,
     PauseButtonLabel,
     SaveButtonLabel,
-    OptionsButtonLabel,
+    SettingsButtonLabel,
     MouselookButtonLabel,
     FullscreenButtonLabel,
     AntialiasButtonLabel,
@@ -53,7 +53,7 @@ impl fmt::Display for UiBlocks {
             UiBlocks::AboutButtonLabel => write!(f, "about-button"),
             UiBlocks::PauseButtonLabel => write!(f, "pause-button"),
             UiBlocks::SaveButtonLabel => write!(f, "save-button"),
-            UiBlocks::OptionsButtonLabel => write!(f, "options-button"),
+            UiBlocks::SettingsButtonLabel => write!(f, "options-button"),
             UiBlocks::MouselookButtonLabel => write!(f, "mouselook-button"),
             UiBlocks::FullscreenButtonLabel => write!(f, "fullscreen-button"),
             UiBlocks::AntialiasButtonLabel => write!(f, "antialias-button"),
@@ -102,7 +102,7 @@ impl UiBlocks {
                     ButtonIcon::Icon(include_image!("icons/button-save.png")),
                 )?,
 
-                UiBlocks::OptionsButtonLabel => make_button_label_block(
+                UiBlocks::SettingsButtonLabel => make_button_label_block(
                     txn,
                     "Options",
                     ButtonIcon::Icon(include_image!("icons/button-options.png")),
