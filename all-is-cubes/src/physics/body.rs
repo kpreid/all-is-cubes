@@ -206,10 +206,9 @@ impl Body {
 
         self.position = position;
 
-        // This new box might collide with the `Space`, but (TODO: not implemented yet)
+        // This new box might collide with the `Space`, but (TODO(crush): not implemented yet)
         // stepping will recover from that if possible.
-        self.occupying =
-            self.collision_box.translate(self.position.map(NotNan::into_inner).to_vector());
+        self.occupying = self.uncrushed_collision_box_abs();
     }
 
     /// Returns the body’s current velocity.
@@ -271,9 +270,15 @@ impl Body {
     /// assert_eq!(body.collision_box_abs(), Aab::new(-1.0, 1.0, 18.0, 22.0, -3.0, 3.0));
     /// ```
     //---
-    // TODO: After `occupying` is a little more fleshed out, consider renaming this method to that.
+    // TODO(crush): After `occupying` is a little more fleshed out, consider renaming this method to that.
     pub fn collision_box_abs(&self) -> Aab {
         self.occupying
+    }
+
+    /// Returns the body’s collision box as it would be if there were no obstacles to occupying
+    /// its preferred amount of space.
+    pub(in crate::physics) fn uncrushed_collision_box_abs(&self) -> Aab {
+        self.collision_box.translate(self.position.map(NotNan::into_inner).to_vector())
     }
 
     pub(crate) fn look_rotation(&self) -> euclid::Rotation3D<f64, Eye, Cube> {

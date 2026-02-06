@@ -164,6 +164,8 @@ pub struct BodyStepDetails {
     /// Whether movement computation was skipped due to approximately zero velocity.
     quiescent: bool,
 
+    uncrush: UncrushInfo,
+
     /// If the body was pushed out of something it was found to be already colliding with,
     /// then this is the change in its position.
     #[doc(hidden)] // pub for fuzz_physics
@@ -181,12 +183,21 @@ pub struct BodyStepDetails {
 
 impl manyfmt::Fmt<ConciseDebug> for BodyStepDetails {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &ConciseDebug) -> fmt::Result {
+        let BodyStepDetails {
+            quiescent,
+            uncrush,
+            push_out,
+            already_colliding,
+            move_segments,
+            delta_v,
+        } = self;
         fmt.debug_struct("BodyStepDetails")
-            .field("quiescent", &self.quiescent)
-            .field("already_colliding", &self.already_colliding)
-            .field("push_out", &self.push_out.as_ref().map(|v| v.refmt(fopt)))
-            .field("move_segments", &self.move_segments.refmt(fopt))
-            .field("delta_v", &self.delta_v.refmt(fopt))
+            .field("quiescent", quiescent)
+            .field("already_colliding", already_colliding)
+            .field("uncrush", uncrush)
+            .field("push_out", &push_out.as_ref().map(|v| v.refmt(fopt)))
+            .field("move_segments", &move_segments.refmt(fopt))
+            .field("delta_v", &delta_v.refmt(fopt))
             .finish()
     }
 }
@@ -247,6 +258,13 @@ impl Default for MoveSegment {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum UncrushInfo {
+    NotNeeded,
+    NotPossible,
+    Complete,
+}
+
 // -------------------------------------------------------------------------------------------------
 // Non-system functions that implement body physics.
 
@@ -305,6 +323,7 @@ pub(crate) fn step_one_body(
         return BodyStepDetails {
             quiescent: false,
             already_colliding,
+            uncrush: UncrushInfo::NotNeeded,
             push_out: None,
             move_segments,
             delta_v: Vector3D::zero(),
@@ -318,15 +337,19 @@ pub(crate) fn step_one_body(
         body.velocity += space.physics().gravity.cast_unit() * NotNan::from(dt);
     }
 
-    // TODO: attempt to expand `occupying` to fit `collision_box`.
-
+    // Try to move to a good state from a poor one.
+    // Uncrush: increase `body.occupying` to occupy more space if it can.
+    // Push out: move `body.position` away from being inside solid objects.
     #[cfg(feature = "rerun")]
     let position_before_push_out = body.position;
-    let push_out_info = if let Some(space) = colliding_space {
-        push_out(body, space)
-    } else {
-        None
-    };
+    let (uncrush_info, push_out_info): (UncrushInfo, Option<FreeVector>) =
+        if let Some(space) = colliding_space {
+            let uncrush_info = uncrush(body, space);
+            let push_out_info = push_out(body, space);
+            (uncrush_info, push_out_info)
+        } else {
+            (UncrushInfo::NotNeeded, None)
+        };
 
     let velocity_magnitude_squared = body.velocity.square_length();
     if !velocity_magnitude_squared.is_finite() {
@@ -335,6 +358,7 @@ pub(crate) fn step_one_body(
         return BodyStepDetails {
             quiescent: true,
             already_colliding,
+            uncrush: uncrush_info,
             push_out: push_out_info,
             move_segments,
             delta_v: body.velocity - velocity_before_gravity_and_collision,
@@ -382,6 +406,7 @@ pub(crate) fn step_one_body(
     let info = BodyStepDetails {
         quiescent: false,
         already_colliding,
+        uncrush: uncrush_info,
         push_out: push_out_info,
         move_segments,
         delta_v: body.velocity - velocity_before_gravity_and_collision,
@@ -749,6 +774,37 @@ pub(super) fn crush_if_colliding(body: &mut Body, space: &space::Read<'_>) {
         } else {
             panic!("collision but found no penetration");
         }
+    }
+}
+
+/// If [`Body::occupying`] is smaller than [`Body::collision_box`], and there is room to grow it,
+/// then do so. This undoes the effect of [`crush_if_colliding()`], and is performed near the
+/// beginning of each body physics step.
+fn uncrush(body: &mut Body, space: &space::Read<'_>) -> UncrushInfo {
+    let uncrushed = body.uncrushed_collision_box_abs();
+
+    if uncrushed == body.occupying {
+        return UncrushInfo::NotNeeded;
+    }
+
+    // Find what we would collide with if the box were expanded.
+    let mut collided_with_anything = false;
+    collide_along_ray(
+        space,
+        Ray::new([0., 0., 0.], [0., 0., 0.]),
+        uncrushed,
+        |_contact| collided_with_anything = true,
+        StopAt::Anything,
+    );
+
+    if !collided_with_anything {
+        body.occupying = uncrushed;
+        UncrushInfo::Complete
+    } else {
+        // TODO: implement:
+        // * partial uncrushing: expand some but not all of `occupying`'s faces
+        // * integrated push-out: move the body position when there is further space available in a direction
+        UncrushInfo::NotPossible
     }
 }
 
