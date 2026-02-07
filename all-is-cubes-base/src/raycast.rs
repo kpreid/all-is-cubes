@@ -578,6 +578,9 @@ impl State {
         // t_max stores the t-value at which we cross a cube boundary along the
         // X axis, per component. Therefore, choosing the least t_max axis
         // chooses the closest cube boundary.
+        //
+        // Optimization note: replacing these `if` with `core::hint::select_unpredictable()`
+        // is not an improvement.
         let axis: Axis = if self.t_max.x < self.t_max.y {
             if self.t_max.x < self.t_max.z {
                 Axis::X
