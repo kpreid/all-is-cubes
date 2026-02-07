@@ -6,6 +6,7 @@ use all_is_cubes::arcstr::{self, literal};
 use all_is_cubes::block::text;
 use all_is_cubes::math::{Face6, zo32};
 use all_is_cubes::universe::ReadTicket;
+use all_is_cubes::util::ShowStatus;
 use all_is_cubes_render::camera::{self, AntialiasingOption};
 
 use crate::apps::ControlMessage;
@@ -130,6 +131,7 @@ pub(crate) fn settings_widgets(
             UiBlocks::DebugInfoTextButtonLabel,
             settings::DEBUG_INFO_TEXT,
         ),
+        info_text_contents_flags_button(read_ticket, hud_inputs, style),
         setting_toggle_button(
             read_ticket,
             hud_inputs,
@@ -167,6 +169,40 @@ pub(crate) fn settings_widgets(
         ),
     ]);
     w
+}
+
+fn info_text_contents_flags_button(
+    _read_ticket: ReadTicket<'_>,
+    hud_inputs: &HudInputs,
+    style: SettingsStyle,
+) -> Arc<LayoutTree<Arc<dyn Widget>>> {
+    let key = settings::DEBUG_INFO_TEXT_CONTENTS;
+    match style {
+        // hidden entirely
+        SettingsStyle::CompactRow => LayoutTree::spacer(vui::LayoutRequest::EMPTY),
+        // TODO this should be wrapped and also have a label. maybe even its own page
+        SettingsStyle::LabeledColumn => Arc::new(LayoutTree::Stack {
+            direction: Face6::PX,
+            children: ShowStatus::all()
+                .iter_names()
+                .map(|(bit_name, bit_mask)| {
+                    let button = widgets::ToggleButton::new(
+                        hud_inputs.settings.as_source(),
+                        move |options| options.get(key).contains(bit_mask),
+                        arcstr::ArcStr::from(bit_name),
+                        &hud_inputs.hud_blocks.widget_theme,
+                        {
+                            let settings = hud_inputs.settings.clone();
+                            move || {
+                                settings.update(key, |current, _| current ^ bit_mask);
+                            }
+                        },
+                    );
+                    vui::leaf_widget(button)
+                })
+                .collect(),
+        }),
+    }
 }
 
 /// Generate a button that toggles a boolean that is read and written from the settings
