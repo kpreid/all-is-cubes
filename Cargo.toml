@@ -163,7 +163,7 @@ time = { version = "0.3.37", default-features = false }
 # Tokio is used for certain binaries.
 # The library crates do not require Tokio.
 tokio = { version = "1.47.1", default-features = false }
-trycmd = "0.15.4" # keep in sync with `snapbox`
+trycmd = "1.0.0" # keep in sync with `snapbox`
 unicode-segmentation = { version = "1.10.1", default-features = false }
 unicode-width = { version = "0.2", default-features = false }
 visibility = { version = "0.1.1", default-features = false }
