@@ -1,3 +1,5 @@
+#![feature(doc_cfg)]
+
 //! Raytracer and rendering abstractions for the all-is-cubes engine.
 //!
 //! ## Package features

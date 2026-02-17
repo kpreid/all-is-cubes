@@ -1,3 +1,5 @@
+#![feature(doc_cfg)]
+
 //! Components for creating a desktop application that renders interactive [`all_is_cubes`]
 //! content.
 //!
