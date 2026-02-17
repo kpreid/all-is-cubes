@@ -180,6 +180,9 @@ yoke = { version = "0.8.0", default-features = false, features = ["alloc"] }
 
 # Note: Lints are also necessarily redefined in the workspaces other than this one.
 [workspace.lints.rust]
+# rustc lints that are set to allow
+unused_features = "allow" # false positive with doc_cfg <https://github.com/rust-lang/rust/issues/154487> and with macro_attr
+
 # rustc lints that are set to deny
 elided_lifetimes_in_paths = "deny" # Consider replacing this with hidden_lifetimes_in_output_paths when that lint is available.
 unsafe_op_in_unsafe_fn = "deny"
