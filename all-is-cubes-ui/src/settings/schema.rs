@@ -17,12 +17,12 @@ use crate::settings::serialize::{
 use crate::settings::{ParseError, TypedKey};
 
 #[cfg(doc)]
-use crate::settings::Settings;
+use {crate::settings::Settings, all_is_cubes::behavior::Behavior, all_is_cubes::space::Space};
 
 // -------------------------------------------------------------------------------------------------
 
 macro_rules! derive_settings_schema_from_keys {
-    ($(#[$_:meta])* pub enum Key {
+    ($(#[$enum_meta:meta])* pub enum Key {
         $(
             $(#[doc = $field_doc:literal])*
             #[custom(
@@ -34,6 +34,16 @@ macro_rules! derive_settings_schema_from_keys {
             $variant:ident,
         )*
     }) => {
+        $(#[$enum_meta])*
+        pub enum Key {
+        $(
+            $(#[doc = $field_doc])*
+            #[doc = concat!(" * Display name = ", stringify!($display_name), ".")]
+            #[doc = concat!(" * Default value = `", stringify!($default_expr), "`.")]
+            $variant,
+        )*
+    }
+
         impl Key {
             /// Returns the unique string identifier for this setting, which should be used when
             /// serializing it in key-value maps.
@@ -128,10 +138,12 @@ macro_rules! derive_settings_schema_from_keys {
 /// TODO: This will eventually be replaced with a more extensible mechanism, possibly involving
 /// multiple enums.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
-#[expect(missing_docs, reason = "TODO")]
 #[non_exhaustive]
-#[macro_rules_attribute::derive(derive_settings_schema_from_keys!)]
+#[macro_rules_attribute::apply(derive_settings_schema_from_keys!)]
 pub enum Key {
+    /// Overall rendering technique to use.
+    ///
+    /// * Directly sets [`GraphicsOptions::render_method`].
     #[custom(
         key = "graphics/render-method",
         type = camera::RenderMethod,
@@ -140,6 +152,9 @@ pub enum Key {
     )]
     RenderMethod,
 
+    /// Whether and how to draw fog obscuring the view distance limit.
+    ///
+    /// * Directly sets [`GraphicsOptions::fog`].
     #[custom(
         key = "graphics/fog",
         type = camera::FogOption,
@@ -148,6 +163,9 @@ pub enum Key {
     )]
     Fog,
 
+    /// Field of view, in degrees from top to bottom edge of the viewport.
+    ///
+    /// * Directly sets [`GraphicsOptions::fov_y`].
     #[custom(
         key = "graphics/fov-y",
         type = PositiveSign<FreeCoordinate>,
@@ -156,6 +174,9 @@ pub enum Key {
     )]
     FovY,
 
+    /// Method to use to remap colors to fit within the displayable range.
+    ///
+    /// * Directly sets [`GraphicsOptions::tone_mapping`].
     #[custom(
         key = "graphics/tone-mapping",
         type = camera::ToneMappingOperator,
@@ -164,6 +185,9 @@ pub enum Key {
     )]
     ToneMapping,
 
+    /// Maximum value to allow in the output image’s color channels.
+    ///
+    /// * Directly sets [`GraphicsOptions::maximum_intensity`].
     #[custom(
         key = "graphics/maximum-intensity",
         type = PositiveSign<f32>,
@@ -172,6 +196,9 @@ pub enum Key {
     )]
     MaximumIntensity,
 
+    /// Specifies how the exposure (brightness scaling) is determined.
+    ///
+    /// * Indirectly controls [`GraphicsOptions::exposure`].
     #[custom(
         key = "graphics/exposure-mode",
         type = ExposureMode,
@@ -180,6 +207,9 @@ pub enum Key {
     )]
     ExposureMode,
 
+    /// If [`Key::ExposureMode`] is [`ExposureMode::Fixed`], determines the fixed exposure.
+    ///
+    /// * Indirectly controls [`GraphicsOptions::exposure`].
     #[custom(
         key = "graphics/fixed-exposure",
         type = PositiveSign<f32>,
@@ -188,6 +218,10 @@ pub enum Key {
     )]
     Exposure,
 
+    /// Proportion of bloom (blurred image) to mix into the original image.
+    /// 0.0 is no bloom and 1.0 is no original image.
+    ///
+    /// * Directly sets [`GraphicsOptions::bloom_intensity`].
     #[custom(
         key = "graphics/bloom-intensity",
         type = ZeroOne<f32>,
@@ -196,6 +230,9 @@ pub enum Key {
     )]
     BloomIntensity,
 
+    /// Distance, in unit cubes, from the camera to the farthest visible point.
+    ///
+    /// * Directly sets [`GraphicsOptions::view_distance`].
     #[custom(
         key = "graphics/view-distance",
         type = PositiveSign<FreeCoordinate>,
@@ -204,6 +241,10 @@ pub enum Key {
     )]
     ViewDistance,
 
+    /// Style in which to draw the lighting of [`Space`]s.
+    /// This does not affect the *computation* of lighting.
+    ///
+    /// * Directly sets [`GraphicsOptions::lighting_display`].
     #[custom(
         key = "graphics/lighting-display",
         type = camera::LightingOption,
@@ -212,6 +253,9 @@ pub enum Key {
     )]
     LightingDisplay,
 
+    /// Method/fidelity to use for transparency.
+    ///
+    /// * Indirectly controls [`GraphicsOptions::transparency`].
     #[custom(
         key = "graphics/transparency-mode",
         type = TransparencyMode,
@@ -220,6 +264,9 @@ pub enum Key {
     )]
     Transparency,
 
+    /// If [`Key::Transparency`] is [`TransparencyMode::Threshold`], sets the threshold.
+    ///
+    /// * Indirectly controls [`GraphicsOptions::transparency`].
     #[custom(
         key = "graphics/transparency-threshold",
         type = ZeroOne<f32>,
@@ -228,6 +275,11 @@ pub enum Key {
     )]
     TransparencyThreshold,
 
+    /// Whether to show the HUD or other UI elements.
+    ///
+    /// TODO: Currently, this does not affect the actual clickability of the UI.
+    ///
+    /// * Directly sets [`GraphicsOptions::show_ui`].
     #[custom(
         key = "graphics/show-ui",
         type = bool,
@@ -236,6 +288,9 @@ pub enum Key {
     )]
     ShowUi,
 
+    /// Whether to apply antialiasing techniques.
+    ///
+    /// * Directly sets [`GraphicsOptions::antialiasing`].
     #[custom(
         key = "graphics/antialiasing",
         type = camera::AntialiasingOption,
@@ -244,6 +299,9 @@ pub enum Key {
     )]
     Antialiasing,
 
+    /// Draw text overlay showing debug information.
+    ///
+    /// * Directly sets [`GraphicsOptions::debug_info_text`].
     #[custom(
         key = "graphics/debug-info-text",
         type = bool,
@@ -252,6 +310,9 @@ pub enum Key {
     )]
     DebugInfoText,
 
+    /// What information should be displayed by [`Key::DebugInfoText`].
+    ///
+    /// * Directly sets [`GraphicsOptions::debug_info_text_contents`].
     #[custom(
         key = "graphics/debug-info-text-contents",
         type = all_is_cubes::util::ShowStatus,
@@ -260,6 +321,10 @@ pub enum Key {
     )]
     DebugInfoTextContents,
 
+    /// Draw boxes around [`Behavior`]s attached to parts of [`Space`]s.
+    /// This may also eventually include further in-world diagnostic information.
+    ///
+    /// * Directly sets [`GraphicsOptions::debug_behaviors`].
     #[custom(
         key = "graphics/debug-behaviors",
         type = bool,
@@ -268,6 +333,9 @@ pub enum Key {
     )]
     DebugBehaviors,
 
+    /// Draw boxes around chunk borders and some debug info.
+    ///
+    /// * Directly sets [`GraphicsOptions::debug_chunk_boxes`].
     #[custom(
         key = "graphics/debug-chunk-boxes",
         type = bool,
@@ -276,6 +344,9 @@ pub enum Key {
     )]
     DebugChunkBoxes,
 
+    /// Draw collision boxes for some objects.
+    ///
+    /// * Directly sets [`GraphicsOptions::debug_collision_boxes`].
     #[custom(
         key = "graphics/debug-collision-boxes",
         type = bool,
@@ -284,6 +355,9 @@ pub enum Key {
     )]
     DebugCollisionBoxes,
 
+    /// Draw the light rays that contribute to the selected block.
+    ///
+    /// * Directly sets [`GraphicsOptions::debug_light_rays_at_cursor`].
     #[custom(
         key = "graphics/debug-light-rays-at-cursor",
         type = bool,
@@ -292,6 +366,9 @@ pub enum Key {
     )]
     DebugLightRaysAtCursor,
 
+    /// Visualize the cost of rendering each pixel, rather than the color of the scene.
+    ///
+    /// * Directly sets [`GraphicsOptions::debug_pixel_cost`].
     #[custom(
         key = "graphics/debug-pixel-cost",
         type = bool,
@@ -300,6 +377,10 @@ pub enum Key {
     )]
     DebugPixelCost,
 
+    /// Causes [`Camera`][camera::Camera] to compute a falsified view frustum
+    /// which is 1/2 the width and height it should be.
+    ///
+    /// * Directly sets [`GraphicsOptions::debug_reduce_view_frustum`].
     #[custom(
         key = "graphics/debug-reduce-view-frustum",
         type = bool,
