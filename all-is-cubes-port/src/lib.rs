@@ -1,3 +1,5 @@
+#![feature(doc_cfg)]
+
 //! Data import and export between [`all_is_cubes`] types and other data formats.
 //!
 //! Currently supported formats:
