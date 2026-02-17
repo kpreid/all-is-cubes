@@ -1,3 +1,4 @@
+#![feature(doc_cfg)]
 #![feature(large_assignments)]
 #![move_size_limit = "256"]
 #![feature(never_type)]
