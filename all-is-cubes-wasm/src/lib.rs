@@ -3,6 +3,7 @@
 //! If this documentation looks strangely blank, it's because non-wasm builds have
 //! most of the modules excluded from compilation.
 
+#![feature(doc_cfg)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 #![allow(
