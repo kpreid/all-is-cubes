@@ -1,3 +1,5 @@
+#![feature(doc_cfg)]
+
 //! Data structures and algorithms for converting [`all_is_cubes`] voxel data to triangle
 //! meshes for rendering or export.
 //!
