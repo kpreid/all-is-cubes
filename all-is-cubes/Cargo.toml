@@ -149,7 +149,7 @@ once_cell = { workspace = true, features = ["alloc", "race"] }
 ordered-float = { workspace = true }
 paste = { workspace = true }
 png-decoder = { workspace = true }
-rand = { workspace = true, features = ["small_rng"] }
+rand = { workspace = true }
 rand_distr = { workspace = true }
 rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }

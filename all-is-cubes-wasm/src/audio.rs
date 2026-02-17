@@ -7,7 +7,7 @@ use core::fmt;
 use std::collections::HashMap;
 use std::sync::atomic;
 
-use rand::{Rng as _, SeedableRng as _};
+use rand::{RngExt as _, SeedableRng as _};
 use wasm_bindgen::JsValue;
 use web_sys::{AudioBuffer, AudioContext, AudioListener, GainNode};
 

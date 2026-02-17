@@ -1,6 +1,6 @@
 use euclid::vec2;
 use num_traits::Euclid as _;
-use rand::{Rng as _, SeedableRng as _};
+use rand::{RngExt as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
 use crate::block::{self, AIR, Block};

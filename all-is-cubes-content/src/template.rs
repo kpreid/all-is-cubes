@@ -468,7 +468,7 @@ async fn arbitrary_space(
     use all_is_cubes::euclid::Vector3D;
     use all_is_cubes::math::FaceMap;
     use arbitrary::{Arbitrary, Error, Unstructured};
-    use rand::{RngCore, SeedableRng};
+    use rand::{Rng as _, SeedableRng as _};
 
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
     let mut bytes = vec![0u8; 16384];

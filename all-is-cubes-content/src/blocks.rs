@@ -7,7 +7,7 @@ use core::fmt;
 use core::num::NonZeroU16;
 
 use exhaust::Exhaust;
-use rand::{Rng as _, SeedableRng as _};
+use rand::{RngExt as _, SeedableRng as _};
 
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::block::{

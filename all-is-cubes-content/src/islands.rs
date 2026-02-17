@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use rand::{Rng, SeedableRng as _};
+use rand::{RngExt as _, SeedableRng as _};
 
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::character::Spawn;

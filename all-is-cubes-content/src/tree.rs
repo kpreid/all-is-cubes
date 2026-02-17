@@ -3,8 +3,8 @@ use core::fmt;
 
 use itertools::Itertools as _;
 use petgraph::visit::EdgeRef as _;
-use rand::Rng as _;
-use rand::seq::{IndexedRandom as _, SliceRandom};
+use rand::RngExt as _;
+use rand::seq::{IndexedRandom as _, SliceRandom as _};
 
 use all_is_cubes::block::{self, AIR, Block};
 use all_is_cubes::linking::BlockProvider;
@@ -68,7 +68,7 @@ pub(crate) fn make_log(
     blocks: &BlockProvider<LandscapeBlocks>,
     directions: FaceMap<Option<TreeGrowth>>,
     leaves: Option<TreeGrowth>,
-    rng: &mut dyn rand::RngCore,
+    rng: &mut dyn rand::Rng,
 ) -> Block {
     // TODO: this needs to canonicalize rotations so that we don't end up with
     // identical-looking but differently defined blocks.
@@ -112,7 +112,7 @@ pub(crate) fn make_log(
 /// Panics if `root` is not within `bounds`.
 pub(crate) fn make_tree(
     blocks: &BlockProvider<LandscapeBlocks>,
-    rng: &mut dyn rand::RngCore,
+    rng: &mut dyn rand::Rng,
     root: Cube,
     bounds: GridAab,
 ) -> SpaceTransaction {
@@ -315,7 +315,7 @@ mod graph {
         pub fn logs<'a>(
             &'a self,
             blocks: &'a BlockProvider<LandscapeBlocks>,
-            rng: &'a mut dyn rand::RngCore,
+            rng: &'a mut dyn rand::Rng,
         ) -> impl Iterator<Item = (Cube, Block)> + 'a {
             self.bounds().interior_iter().map(|cube| {
                 (

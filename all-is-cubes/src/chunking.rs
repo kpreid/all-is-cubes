@@ -463,7 +463,7 @@ impl FusedIterator for AxisMirrorIter {}
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
-    use rand::{Rng, SeedableRng};
+    use rand::{RngExt as _, SeedableRng as _};
     use std::collections::HashSet;
 
     #[test]

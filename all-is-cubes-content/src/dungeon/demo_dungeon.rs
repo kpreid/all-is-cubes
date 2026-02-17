@@ -2,9 +2,8 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::mem;
 
-use rand::prelude::IndexedRandom as _;
-use rand::seq::IteratorRandom as _;
-use rand::{Rng, SeedableRng};
+use rand::seq::{IndexedRandom as _, IteratorRandom as _};
+use rand::{RngExt as _, SeedableRng as _};
 
 use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, AIR, Block, Resolution::*, text};

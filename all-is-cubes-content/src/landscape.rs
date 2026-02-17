@@ -3,7 +3,7 @@ use core::array;
 use core::fmt;
 
 use exhaust::Exhaust;
-use rand::{Rng as _, SeedableRng as _};
+use rand::{RngExt as _, SeedableRng as _};
 
 use all_is_cubes::arcstr;
 use all_is_cubes::block::{

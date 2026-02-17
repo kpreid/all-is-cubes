@@ -4,7 +4,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::fmt;
 
-use rand::{Rng as _, SeedableRng as _};
+use rand::{RngExt as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
 use all_is_cubes::block::{self, AIR, Block, BlockCollision};

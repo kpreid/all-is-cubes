@@ -4,7 +4,7 @@
 use alloc::{sync::Arc, vec::Vec};
 
 use itertools::Itertools;
-use rand::{Rng, SeedableRng as _};
+use rand::{RngExt as _, SeedableRng as _};
 
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::block::{self, AIR, Resolution::*, text::Font};

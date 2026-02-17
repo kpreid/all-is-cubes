@@ -371,7 +371,7 @@ impl<T: Copy> MVector4<T> {
 mod tests {
     use super::*;
     use euclid::{Transform3D, point3, vec3};
-    use rand::{Rng, SeedableRng as _};
+    use rand::{Rng, RngExt as _, SeedableRng as _};
     use rand_xoshiro::Xoshiro256Plus;
 
     fn random_grid_matrix(mut rng: impl Rng) -> GridMatrix {

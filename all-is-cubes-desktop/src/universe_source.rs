@@ -5,7 +5,7 @@ use std::time::Instant;
 use anyhow::Context as _;
 use futures_channel::oneshot;
 use indicatif::ProgressBar;
-use rand::Rng as _;
+use rand::RngExt as _;
 
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::space;

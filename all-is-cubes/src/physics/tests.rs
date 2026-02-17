@@ -6,7 +6,7 @@ use bevy_ecs::prelude as ecs;
 use euclid::{Vector3D, point3, vec3};
 use ordered_float::NotNan;
 use rand::prelude::IndexedRandom as _;
-use rand::{Rng as _, SeedableRng as _};
+use rand::{RngExt as _, SeedableRng as _};
 
 use crate::block::{
     AIR,

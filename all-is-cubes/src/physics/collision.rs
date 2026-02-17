@@ -708,7 +708,7 @@ mod tests {
     use crate::content::{make_slab, make_some_blocks};
     use crate::space::Space;
     use crate::universe::Universe;
-    use rand::{Rng, SeedableRng as _};
+    use rand::{RngExt as _, SeedableRng as _};
     use std::eprintln;
 
     #[test]

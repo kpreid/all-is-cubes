@@ -3,7 +3,7 @@ use core::fmt;
 use core::iter::FusedIterator;
 
 use euclid::{Point3D, Size3D, Vector3D};
-use rand::Rng as _;
+use rand::RngExt as _;
 
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
@@ -266,7 +266,7 @@ impl Aab {
     /// Returns a random point within this box, using inclusive ranges
     /// (`lower_bounds[axis] ≤ random_point()[axis] ≤ upper_bounds[axis]`).
     #[allow(clippy::missing_inline_in_public_items)]
-    pub fn random_point(self, rng: &mut impl rand::RngCore) -> FreePoint {
+    pub fn random_point(self, rng: &mut impl rand::Rng) -> FreePoint {
         FreePoint::new(
             rng.random_range(self.lower_bounds.x..=self.upper_bounds.x),
             rng.random_range(self.lower_bounds.y..=self.upper_bounds.y),

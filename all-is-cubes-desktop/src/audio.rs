@@ -13,7 +13,7 @@ use kira::listener::ListenerHandle;
 use kira::sound::static_sound::{StaticSoundData, StaticSoundSettings};
 use kira::track::SpatialTrackBuilder;
 use kira::{AudioManager, PlaySoundError};
-use rand::{Rng as _, SeedableRng};
+use rand::{RngExt as _, SeedableRng as _};
 
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::sound::{Band, SoundDef, SpatialAmbient};
