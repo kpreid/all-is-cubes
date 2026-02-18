@@ -12,6 +12,8 @@ use all_is_cubes::linking::{BlockModule, BlockProvider};
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
 
+#[cfg(feature = "session")]
+use crate::settings;
 use crate::vui::widgets::{ButtonIcon, make_button_label_block};
 
 /// Blocks that are used as part of the UI content.
@@ -165,6 +167,35 @@ impl UiBlocks {
         })
         .await
         .unwrap()
+    }
+
+    #[cfg(feature = "session")]
+    /// Returns the icon representing the given setting, if we have one.
+    pub fn icon_for_setting(key: settings::Key) -> Option<Self> {
+        match key {
+            settings::Key::RenderMethod => None,
+            settings::Key::Fog => None,
+            settings::Key::FovY => None,
+            settings::Key::ToneMapping => None,
+            settings::Key::MaximumIntensity => None,
+            settings::Key::ExposureMode => None,
+            settings::Key::Exposure => None,
+            settings::Key::BloomIntensity => None,
+            settings::Key::ViewDistance => None,
+            settings::Key::LightingDisplay => None,
+            settings::Key::Transparency => None,
+            settings::Key::TransparencyThreshold => None,
+            settings::Key::ShowUi => None,
+            settings::Key::Antialiasing => Some(Self::AntialiasButtonLabel),
+            settings::Key::DebugInfoText => Some(Self::DebugInfoTextButtonLabel),
+            settings::Key::DebugInfoTextContents => None,
+            settings::Key::DebugPixelCost => Some(Self::DebugPixelPerformanceButtonLabel),
+            settings::Key::DebugBehaviors => Some(Self::DebugBehaviorsButtonLabel),
+            settings::Key::DebugChunkBoxes => Some(Self::DebugChunkBoxesButtonLabel),
+            settings::Key::DebugCollisionBoxes => Some(Self::DebugCollisionBoxesButtonLabel),
+            settings::Key::DebugLightRaysAtCursor => Some(Self::DebugLightRaysButtonLabel),
+            settings::Key::DebugReduceViewFrustum => None,
+        }
     }
 }
 

@@ -7,7 +7,7 @@ use core::str::FromStr;
 
 use bevy_platform::sync::LazyLock;
 
-use all_is_cubes::arcstr::ArcStr;
+use all_is_cubes::arcstr::{ArcStr, literal};
 use all_is_cubes::math::{FreeCoordinate, PositiveSign, ZeroOne, ps32, zo32};
 use all_is_cubes_render::camera::{self, GraphicsOptions};
 
@@ -54,9 +54,11 @@ macro_rules! derive_settings_schema_from_keys {
             }
 
             /// Returns the name for this setting to show to users.
-            pub fn display_name(&self) -> &str {
+            ///
+            /// The result is a “literal” [`ArcStr`] referring to a static allocation.
+            pub fn display_name(&self) -> ArcStr {
                 match self {
-                    $( Key::$variant => $display_name, )*
+                    $( Key::$variant => literal!($display_name), )*
                 }
             }
 

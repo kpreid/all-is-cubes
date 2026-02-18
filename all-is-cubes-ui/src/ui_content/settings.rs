@@ -4,7 +4,7 @@ use core::fmt;
 use exhaust::Exhaust;
 
 use all_is_cubes::arcstr::{self, literal};
-use all_is_cubes::block::text;
+use all_is_cubes::block::{Block, text};
 use all_is_cubes::math::{Face6, zo32};
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::ShowStatus;
@@ -151,10 +151,8 @@ pub(crate) fn setting_widget(
             },
         )),
         Key::DebugInfoText => Some(setting_toggle_button(
-            read_ticket,
             hud_inputs,
             style,
-            UiBlocks::DebugInfoTextButtonLabel,
             settings::DEBUG_INFO_TEXT,
         )),
         Key::DebugInfoTextContents => Some(info_text_contents_flags_button(
@@ -163,38 +161,28 @@ pub(crate) fn setting_widget(
             style,
         )),
         Key::DebugBehaviors => Some(setting_toggle_button(
-            read_ticket,
             hud_inputs,
             style,
-            UiBlocks::DebugBehaviorsButtonLabel,
             settings::DEBUG_BEHAVIORS,
         )),
         Key::DebugChunkBoxes => Some(setting_toggle_button(
-            read_ticket,
             hud_inputs,
             style,
-            UiBlocks::DebugChunkBoxesButtonLabel,
             settings::DEBUG_CHUNK_BOXES,
         )),
         Key::DebugCollisionBoxes => Some(setting_toggle_button(
-            read_ticket,
             hud_inputs,
             style,
-            UiBlocks::DebugCollisionBoxesButtonLabel,
             settings::DEBUG_COLLISION_BOXES,
         )),
         Key::DebugLightRaysAtCursor => Some(setting_toggle_button(
-            read_ticket,
             hud_inputs,
             style,
-            UiBlocks::DebugLightRaysButtonLabel,
             settings::DEBUG_LIGHT_RAYS_AT_CURSOR,
         )),
         Key::DebugPixelCost => Some(setting_toggle_button(
-            read_ticket,
             hud_inputs,
             style,
-            UiBlocks::DebugPixelPerformanceButtonLabel,
             settings::DEBUG_PIXEL_COST,
         )),
         // Not a user-facing setting but really a debug tool.
@@ -283,32 +271,22 @@ fn arb_toggle_button(
 
 /// Generate a button that toggles a boolean setting.
 fn setting_toggle_button(
-    read_ticket: ReadTicket<'_>,
     hud_inputs: &HudInputs,
     style: SettingsStyle,
-    icon_key: UiBlocks,
     key: &'static settings::TypedKey<bool>,
 ) -> WidgetTree {
-    let icon = hud_inputs.hud_blocks.ui_blocks[icon_key].clone();
     let text: Option<widgets::Label> = match style {
         SettingsStyle::CompactRow => None,
-        SettingsStyle::LabeledColumn => Some(
-            icon.evaluate(read_ticket) // TODO(read_ticket): we should probably get the label text elsewhere and remove this need for a read ticket
-                .unwrap()
-                .attributes()
-                .display_name
-                .clone()
-                .into(),
-        ),
+        SettingsStyle::LabeledColumn => Some(key.key().display_name().into()),
     };
-    let label = widgets::ButtonLabel {
-        icon: Some(icon),
-        text,
-    };
-    let button = widgets::ToggleButton::new(
+
+    let icon: Option<Block> = UiBlocks::icon_for_setting(key.key())
+        .map(|icon_key| hud_inputs.hud_blocks.ui_blocks[icon_key].clone());
+
+    vui::leaf_widget(widgets::ToggleButton::new(
         hud_inputs.settings.as_source(),
         move |data| *data.get(key),
-        label,
+        widgets::ButtonLabel { icon, text },
         &hud_inputs.hud_blocks.widget_theme,
         {
             let settings = hud_inputs.settings.clone();
@@ -316,8 +294,7 @@ fn setting_toggle_button(
                 key.write(&settings, !settings.get().get(key));
             }
         },
-    );
-    vui::leaf_widget(button)
+    ))
 }
 
 /// Generate a group of buttons that set a setting to one of a set of values of an enum.
