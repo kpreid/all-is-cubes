@@ -365,6 +365,7 @@ dependencies = [
  "num-traits",
  "paste",
  "pretty_assertions",
+ "rstest",
  "scopeguard",
  "serde",
  "smol-macros",

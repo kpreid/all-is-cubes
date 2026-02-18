@@ -233,24 +233,32 @@ impl PageLayout {
 #[derive(Clone, Debug)]
 pub(crate) struct PageInst {
     page: Page,
-    space: Option<StrongHandle<Space>>,
+    cached: Option<PageInstCache>,
+}
+#[derive(Clone, Debug)]
+struct PageInstCache {
+    /// The [`Space`] that contains the UI.
+    space: StrongHandle<Space>,
+    /// The `UiSize` that was originally requested.
+    requested_ui_size: UiSize,
+    /// `requested_ui_size` adjusted to meet the requirements of the page.
+    actual_ui_size: UiSize,
 }
 
 impl PageInst {
     pub fn new(page: Page) -> Self {
-        Self { page, space: None }
+        Self { page, cached: None }
     }
 
     pub fn get_or_create_space(
         &mut self,
-        mut size: UiSize,
+        requested_ui_size: UiSize,
         universe: &mut Universe,
     ) -> Handle<Space> {
-        // TODO: We will need to be comparing the entire `UiSize` if it gains other fields
-        if let Some(space) = self.space.as_ref()
-            && space.read(universe.read_ticket()).unwrap().bounds() == size.space_bounds()
+        if let Some(cached) = self.cached.as_ref()
+            && cached.requested_ui_size == requested_ui_size
         {
-            return space.to_weak();
+            return cached.space.to_weak();
         }
 
         // TODO: there will be multiple layouts and the size calculation will depend on the layout
@@ -263,17 +271,32 @@ impl PageInst {
         // TODO: We need overall better handling of this; for example, we should be able to
         // pan ("scroll") the camera over a tall dialog box.
         // Also, this doesn't handle Z size.
-        let fitting_size = size.size.max(drop_depth(self.page.tree.requirements().minimum));
-        if fitting_size != size.size {
-            log::debug!("VUI page had to enlarge proposed size {size:?} to {fitting_size:?}");
-            size.size = fitting_size;
+        let mut actual_ui_size = requested_ui_size;
+        let fitting_size =
+            requested_ui_size.size.max(drop_depth(self.page.tree.requirements().minimum));
+        if fitting_size != requested_ui_size.size {
+            log::debug!(
+                "VUI page had to enlarge proposed size {requested_ui_size:?} to {fitting_size:?}"
+            );
+            actual_ui_size.size = fitting_size;
+        }
+
+        // Check if the actual_ui_size matches even if the requested one doesn’t.
+        if let Some(cached) = self.cached.as_ref()
+            && cached.actual_ui_size == actual_ui_size
+        {
+            return cached.space.to_weak();
         }
 
         // Size didn't match, so recreate the space.
         // TODO: Resize in-place instead, once `Space` supports that.
-        match self.create_space(size, universe) {
+        match self.create_space(actual_ui_size, universe) {
             Ok(space) => {
-                self.space = Some(StrongHandle::new(space.clone()));
+                self.cached = Some(PageInstCache {
+                    space: StrongHandle::new(space.clone()),
+                    requested_ui_size,
+                    actual_ui_size,
+                });
                 space
             }
             Err(error) => {
@@ -375,6 +398,16 @@ mod tests {
     use super::*;
     use alloc::vec::Vec;
 
+    fn make_page_with_size(min_w: GridSizeCoord, min_h: GridSizeCoord) -> Page {
+        Page {
+            tree: Arc::new(LayoutTree::Spacer(LayoutRequest {
+                minimum: GridSize::new(min_w, min_h, 1),
+            })),
+            layout: PageLayout::Hud,
+            focus_on_ui: false,
+        }
+    }
+
     #[test]
     fn ui_size() {
         let cases: Vec<([u32; 2], [u32; 2])> =
@@ -393,5 +426,28 @@ mod tests {
         if failed > 0 {
             panic!("{failed} cases failed");
         }
+    }
+
+    #[rstest::rstest]
+    fn pageinst_caches_with_or_without_enlargement(#[values(5, 6)] height: GridSizeCoord) {
+        let mut universe = Universe::new();
+        let mut inst = PageInst::new(make_page_with_size(5, height));
+        let requested = UiSize { size: size2(5, 5) };
+
+        assert_eq!(
+            inst.get_or_create_space(requested, &mut universe),
+            inst.get_or_create_space(requested, &mut universe)
+        );
+    }
+
+    #[test]
+    fn pageinst_caches_if_actual_size_matchs() {
+        let mut universe = Universe::new();
+        let mut inst = PageInst::new(make_page_with_size(5, 5));
+
+        assert_eq!(
+            inst.get_or_create_space(UiSize { size: size2(1, 2) }, &mut universe),
+            inst.get_or_create_space(UiSize { size: size2(2, 1) }, &mut universe)
+        );
     }
 }
