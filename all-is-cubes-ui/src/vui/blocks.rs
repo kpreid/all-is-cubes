@@ -130,37 +130,37 @@ impl UiBlocks {
 
                 UiBlocks::DebugInfoTextButtonLabel => make_button_label_block(
                     txn,
-                    "Debug: Info Text",
+                    "Debug: Show info text",
                     ButtonIcon::Icon(include_image!("icons/button-debug-info-text.png")),
                 )?,
 
                 UiBlocks::DebugChunkBoxesButtonLabel => make_button_label_block(
                     txn,
-                    "Debug: Chunk Boxes",
+                    "Debug: Show chunk boxes",
                     ButtonIcon::Icon(include_image!("icons/button-debug-chunk-boxes.png")),
                 )?,
 
                 UiBlocks::DebugBehaviorsButtonLabel => make_button_label_block(
                     txn,
-                    "Debug: Behaviors",
+                    "Debug: Show behaviors",
                     ButtonIcon::Icon(include_image!("icons/button-debug-behaviors.png")),
                 )?,
 
                 UiBlocks::DebugCollisionBoxesButtonLabel => make_button_label_block(
                     txn,
-                    "Debug: Collision Boxes",
+                    "Debug: Show collision boxes",
                     ButtonIcon::Icon(include_image!("icons/button-debug-collision-boxes.png")),
                 )?,
 
                 UiBlocks::DebugLightRaysButtonLabel => make_button_label_block(
                     txn,
-                    "Debug: Light Rays at Cursor",
+                    "Debug: Show light rays at cursor",
                     ButtonIcon::Icon(include_image!("icons/button-debug-light-rays.png")),
                 )?,
 
                 UiBlocks::DebugPixelPerformanceButtonLabel => make_button_label_block(
                     txn,
-                    "Debug: Pixel Performance",
+                    "Debug: Show rendering cost",
                     ButtonIcon::Icon(include_image!("icons/button-debug-pixel-performance.png")),
                 )?,
             })
@@ -205,11 +205,23 @@ mod tests {
     use all_is_cubes::util::yield_progress_for_testing;
 
     #[macro_rules_attribute::apply(smol_macros::test)]
-    async fn blocks_smoke_test() {
-        UiBlocks::new(
-            &mut UniverseTransaction::default(),
-            yield_progress_for_testing(),
-        )
-        .await;
+    async fn blocks_smoke_test_and_icon_test() {
+        // Prove that the construction doesn’t panic
+        let mut txn = UniverseTransaction::default();
+        let blocks = UiBlocks::new(&mut txn, yield_progress_for_testing()).await;
+
+        for setting_key in settings::Key::exhaust() {
+            if let Some(block_key) = UiBlocks::icon_for_setting(setting_key) {
+                assert_eq!(
+                    setting_key.display_name(),
+                    blocks[block_key]
+                        .evaluate(txn.read_ticket())
+                        .unwrap()
+                        .attributes()
+                        .display_name,
+                    "name of {setting_key:?} does not match {block_key:?}"
+                );
+            }
+        }
     }
 }
