@@ -321,6 +321,17 @@ pub enum Key {
     )]
     DebugInfoTextContents,
 
+    /// Visualize the cost of rendering each pixel, rather than the color of the scene.
+    ///
+    /// * Directly sets [`GraphicsOptions::debug_pixel_cost`].
+    #[custom(
+        key = "graphics/debug-pixel-cost",
+        type = bool,
+        display_name = "Debug: Show rendering cost",
+        default = GraphicsOptions::default().debug_pixel_cost
+    )]
+    DebugPixelCost,
+
     /// Draw boxes around [`Behavior`]s attached to parts of [`Space`]s.
     /// This may also eventually include further in-world diagnostic information.
     ///
@@ -365,17 +376,6 @@ pub enum Key {
         default = GraphicsOptions::default().debug_light_rays_at_cursor
     )]
     DebugLightRaysAtCursor,
-
-    /// Visualize the cost of rendering each pixel, rather than the color of the scene.
-    ///
-    /// * Directly sets [`GraphicsOptions::debug_pixel_cost`].
-    #[custom(
-        key = "graphics/debug-pixel-cost",
-        type = bool,
-        display_name = "Debug: Show rendering cost",
-        default = GraphicsOptions::default().debug_pixel_cost
-    )]
-    DebugPixelCost,
 
     /// Causes [`Camera`][camera::Camera] to compute a falsified view frustum
     /// which is 1/2 the width and height it should be.

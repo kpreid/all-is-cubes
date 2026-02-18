@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
+use exhaust::Exhaust;
 
 use all_is_cubes::arcstr::{self, literal};
 use all_is_cubes::block::text;
@@ -10,7 +11,7 @@ use all_is_cubes::util::ShowStatus;
 use all_is_cubes_render::camera::{self, AntialiasingOption};
 
 use crate::apps::ControlMessage;
-use crate::settings;
+use crate::settings::{self, Key};
 use crate::ui_content::hud::HudInputs;
 use crate::vui::{self, LayoutTree, UiBlocks, Widget, WidgetTree, widgets};
 
@@ -50,18 +51,37 @@ pub(crate) fn settings_widgets(
             },
         )));
     }
-    // TODO: Find a way to offer the lists of enum values that is closer to the definitions
-    // of the enums, to reduce the chances of unintentional non-exhaustiveness.
-    // TODO: allow setting fov_y, tone_mapping, exposure, view_distance
-    w.extend([
-        setting_enum_button(
+
+    // TODO: add a way of sorting settings for display that isn’t just “the order they are defined”
+    for key in Key::exhaust() {
+        w.extend(setting_widget(read_ticket, hud_inputs, style, key));
+    }
+
+    w
+}
+
+/// Given a setting [`Key`], produce the widget for editing that setting,
+/// or [`None`] if the setting should not be shown in this style.
+///
+/// * `read_ticket` must be a read ticket for the provided `HudBlocks`’s universe.
+pub(crate) fn setting_widget(
+    read_ticket: ReadTicket<'_>,
+    // TODO: accept narrower needed pieces instead of HudInputs
+    hud_inputs: &HudInputs,
+    style: SettingsStyle,
+    key: Key,
+) -> Option<WidgetTree> {
+    // TODO: Make this computed from the settings’ metadata instead of hardcoded.
+
+    match key {
+        Key::RenderMethod => Some(setting_enum_button(
             hud_inputs,
             style,
             literal!("Render Method"),
             settings::RENDER_METHOD,
             [camera::RenderMethod::Mesh, camera::RenderMethod::Reference],
-        ),
-        setting_enum_button(
+        )),
+        Key::Fog => Some(setting_enum_button(
             hud_inputs,
             style,
             literal!("Fog"),
@@ -72,15 +92,22 @@ pub(crate) fn settings_widgets(
                 camera::FogOption::Compromise,
                 camera::FogOption::Physical,
             ],
-        ),
-        setting_enum_button(
+        )),
+        // TODO: allow setting fov_y, tone_mapping, exposure, view_distance
+        Key::FovY => None,
+        Key::ToneMapping => None,
+        Key::MaximumIntensity => None,
+        Key::ExposureMode => None,
+        Key::Exposure => None,
+        Key::BloomIntensity => Some(setting_enum_button(
             hud_inputs,
             style,
             literal!("Bloom"),
             settings::BLOOM_INTENSITY,
             [zo32(0.0), zo32(0.03125), zo32(0.125)],
-        ),
-        setting_enum_button(
+        )),
+        Key::ViewDistance => None, // TODO
+        Key::LightingDisplay => Some(setting_enum_button(
             hud_inputs,
             style,
             literal!("Light"),
@@ -91,8 +118,8 @@ pub(crate) fn settings_widgets(
                 camera::LightingOption::Smooth,
                 camera::LightingOption::Bounce,
             ],
-        ),
-        setting_enum_button(
+        )),
+        Key::Transparency => Some(setting_enum_button(
             hud_inputs,
             style,
             literal!("Transparency"),
@@ -102,11 +129,10 @@ pub(crate) fn settings_widgets(
                 settings::TransparencyMode::Volumetric,
                 settings::TransparencyMode::Threshold,
             ],
-        ),
-        // TODO: this properly should be a graphics_enum_button with 3 states,
-        // but it is currently convenient to have toggleability for testing.
-        // Find a way to support this better.
-        arb_toggle_button(
+        )),
+        Key::TransparencyThreshold => None, // TODO
+        Key::ShowUi => None, // not a user-facing setting until we add something like a “screenshot mode”
+        Key::Antialiasing => Some(arb_toggle_button(
             read_ticket,
             hud_inputs,
             style,
@@ -123,52 +149,58 @@ pub(crate) fn settings_widgets(
                     },
                 );
             },
-        ),
-        setting_toggle_button(
+        )),
+        Key::DebugInfoText => Some(setting_toggle_button(
             read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugInfoTextButtonLabel,
             settings::DEBUG_INFO_TEXT,
-        ),
-        info_text_contents_flags_button(read_ticket, hud_inputs, style),
-        setting_toggle_button(
+        )),
+        Key::DebugInfoTextContents => Some(info_text_contents_flags_button(
             read_ticket,
             hud_inputs,
             style,
-            UiBlocks::DebugPixelPerformanceButtonLabel,
-            settings::DEBUG_PIXEL_COST,
-        ),
-        setting_toggle_button(
+        )),
+        Key::DebugBehaviors => Some(setting_toggle_button(
             read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugBehaviorsButtonLabel,
             settings::DEBUG_BEHAVIORS,
-        ),
-        setting_toggle_button(
+        )),
+        Key::DebugChunkBoxes => Some(setting_toggle_button(
             read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugChunkBoxesButtonLabel,
             settings::DEBUG_CHUNK_BOXES,
-        ),
-        setting_toggle_button(
+        )),
+        Key::DebugCollisionBoxes => Some(setting_toggle_button(
             read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugCollisionBoxesButtonLabel,
             settings::DEBUG_COLLISION_BOXES,
-        ),
-        setting_toggle_button(
+        )),
+        Key::DebugLightRaysAtCursor => Some(setting_toggle_button(
             read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugLightRaysButtonLabel,
             settings::DEBUG_LIGHT_RAYS_AT_CURSOR,
-        ),
-    ]);
-    w
+        )),
+        Key::DebugPixelCost => Some(setting_toggle_button(
+            read_ticket,
+            hud_inputs,
+            style,
+            UiBlocks::DebugPixelPerformanceButtonLabel,
+            settings::DEBUG_PIXEL_COST,
+        )),
+        // Not a user-facing setting but really a debug tool.
+        // TODO: it should be visible in a “really advanced settings” page
+        Key::DebugReduceViewFrustum => None,
+    }
 }
 
 fn info_text_contents_flags_button(
