@@ -77,8 +77,7 @@ pub struct Body {
     /// * Floating-point rounding in the translation operation.
     /// * Floating-point rounding during collision resolution causing the body’s position
     ///   to not be far enough away, in which case this is intentionally shrunk to compensate.
-    ///   (TODO(crush): not implemented yet.)
-    /// * The body being squeezed by by moving obstacles. (TODO(crush): not implemented yet.)
+    /// * The body being squeezed by by moving obstacles.
     pub(in crate::physics) occupying: Aab,
 
     /// Is this body not subject to gravity?
@@ -206,7 +205,7 @@ impl Body {
 
         self.position = position;
 
-        // This new box might collide with the `Space`, but (TODO(crush): not implemented yet)
+        // This new box might collide with the `Space`, but
         // stepping will recover from that if possible.
         self.occupying = self.uncrushed_collision_box_abs();
     }

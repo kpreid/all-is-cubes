@@ -338,14 +338,21 @@ pub(crate) fn step_one_body(
     }
 
     // Try to move to a good state from a poor one.
-    // Uncrush: increase `body.occupying` to occupy more space if it can.
-    // Push out: move `body.position` away from being inside solid objects.
     #[cfg(feature = "rerun")]
     let position_before_push_out = body.position;
     let (uncrush_info, push_out_info): (UncrushInfo, Option<FreeVector>) =
         if let Some(space) = colliding_space {
+            // Uncrush: increase `body.occupying` to occupy its normal amount of space if that space
+            // is available. This undoes the effect of `crush_if_colliding()`.
             let uncrush_info = uncrush(body, space);
+            // Push out: move `body.position` away from being inside solid objects.
             let push_out_info = push_out(body, space);
+            // Crush: If we did not succeed in not being inside any solid objects (either because
+            // push_out found no empty space or because of numerical error), shrink `body.occupying`
+            // to avoid intersections. This way, the upcoming collision tests for movement can
+            // better distinguish surfaces that should stop this body.
+            crush_if_colliding(body, space);
+
             (uncrush_info, push_out_info)
         } else {
             (UncrushInfo::NotNeeded, None)
@@ -725,11 +732,6 @@ fn attempt_push_out(
 }
 
 /// If [`Body::occupying`] is intersecting anything, shrink it so it isn’t, if possible.
-//---
-#[allow(
-    dead_code,
-    reason = "TODO(crush): This function is not called, and [`Body::occupying`] is not significantly used."
-)]
 pub(super) fn crush_if_colliding(body: &mut Body, space: &space::Read<'_>) {
     loop {
         let mut a_contact: Option<Contact> = None;
@@ -761,7 +763,6 @@ pub(super) fn crush_if_colliding(body: &mut Body, space: &space::Read<'_>) {
         }
 
         if let Some((face, depth)) = least_penetration_depth {
-            log::debug!("shrinking {least_penetration_depth:?}");
             // TODO: stop if we would lose the occupying-contains-position property
             if let Some(shrunk) =
                 body.occupying.expand_or_shrink(FaceMap::splat(0.0).with(face, -depth))
