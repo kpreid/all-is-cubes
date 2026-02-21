@@ -609,11 +609,9 @@ where
         // But a little bit back from that, to avoid floating point error pushing us
         // into being already colliding next frame.
         let motion_segment = nudge_on_ray(
-            body.collision_box, // TODO(crush): use occupying (but we can probably get rid of nudge_on_ray entirely)
-            Ray::new(
-                body.position.map(NotNan::into_inner),
-                delta_position * collision.t_distance,
-            ),
+            body.occupying,
+            // Ray origin is zero because body.occupying is in absolute coordinates.
+            Ray::new(FreePoint::zero(), delta_position * collision.t_distance),
             contact.normal().opposite(),
             contact.resolution(),
             true,
