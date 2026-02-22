@@ -258,10 +258,14 @@ impl Default for MoveSegment {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+/// Result of [`uncrush()`].
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum UncrushInfo {
+    /// Body’s `occupying` is already the right size.
     NotNeeded,
+    /// No room for expansion was found.
     NotPossible,
+    /// Body’s `occupying` is now the right size.
     Complete,
 }
 
@@ -836,4 +840,63 @@ mod tests {
             Aab::from_lower_upper([-0.5, 1.0, -0.5], [0.5, 1.75, 0.5]),
         );
     }
+
+    fn test_uncrush(
+        mut body: Body,
+        space: &Space,
+        initial_occupying: Aab,
+        expected_occupying: Aab,
+        expected_info: UncrushInfo,
+    ) {
+        body.occupying = initial_occupying;
+        let info = uncrush(&mut body, &space.read());
+        assert_eq!((info, body.occupying), (expected_info, expected_occupying));
+    }
+
+    #[test]
+    fn uncrush_not_needed() {
+        let body = Body::new_minimal([0., 1.25, 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5));
+        let occupying = body.occupying;
+        test_uncrush(
+            body,
+            &Space::empty_positive(1, 1, 1),
+            occupying,
+            occupying,
+            UncrushInfo::NotNeeded,
+        );
+    }
+
+    #[test]
+    fn uncrush_unobstructed() {
+        let expected_occupying = Aab::from_lower_upper([-0.5, 0.75, -0.5], [0.5, 1.75, 0.5]);
+        test_uncrush(
+            Body::new_minimal([0., 1.25, 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5)),
+            &Space::empty_positive(1, 1, 1),
+            expected_occupying.expand_or_shrink(FaceMap::splat(0.1)).unwrap(),
+            expected_occupying,
+            UncrushInfo::Complete,
+        );
+    }
+
+    /// When colliding with a fully overlapping cube, uncrush shouldn’t do anything.
+    #[test]
+    fn uncrush_impossible_intersecting() {
+        let [block] = make_some_blocks();
+        // pick a shrunk occupying box which should not expand
+        let expected_occupying = Aab::from_lower_upper([0.25, 0.25, 0.25], [0.75, 0.75, 0.75]);
+        test_uncrush(
+            // body that intersects the block
+            Body::new_minimal([0.5, 0.5, 0.5], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5)),
+            // space that has a bvlock
+            &Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+                .filled_with(block.clone())
+                .build(),
+            expected_occupying,
+            expected_occupying,
+            UncrushInfo::NotPossible,
+        );
+    }
+
+    // TODO: partial uncrush implementation and test
+    // TODO: test uncrush when fully enclosed by solid surfaces
 }
