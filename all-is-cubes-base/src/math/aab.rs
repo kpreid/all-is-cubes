@@ -75,9 +75,12 @@ impl Aab {
 
     /// Constructs an [`Aab`] from most-negative and most-positive corner points.
     ///
+    /// # Errors
+    ///
     /// Returns [`None`] if the points are not in the proper order or if they are NaN.
-    // TODO: Make this public but give it an error type?
-    pub(crate) fn checked_from_lower_upper(
+    // TODO: give this a `Result` and error type if it ends up seeing much use
+    #[allow(clippy::missing_inline_in_public_items)]
+    pub fn checked_from_lower_upper(
         lower_bounds: FreePoint,
         upper_bounds: FreePoint,
     ) -> Option<Self> {
