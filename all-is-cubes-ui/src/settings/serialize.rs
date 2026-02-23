@@ -5,6 +5,7 @@ use serde::ser::Impossible;
 
 use all_is_cubes::arcstr::{self, ArcStr, literal};
 use all_is_cubes::math;
+use all_is_cubes::util::ShowStatus;
 use all_is_cubes_render::camera;
 
 // -------------------------------------------------------------------------------------------------
@@ -397,12 +398,29 @@ macro_rules! impl_string_form_via_serde {
 // Note: This list must contain only values that can serialize to a single string, such as
 // fieldless enums. But even then, consider using `impl_string_form_via_from_str_and_display`
 // when possible instead, since that involves less complex generic code than using `serde`.
-impl_string_form_via_serde!(all_is_cubes::util::ShowStatus);
 impl_string_form_via_serde!(camera::AntialiasingOption);
 impl_string_form_via_serde!(camera::FogOption);
 impl_string_form_via_serde!(camera::LightingOption);
 impl_string_form_via_serde!(camera::RenderMethod);
 impl_string_form_via_serde!(camera::ToneMappingOperator);
+
+// -------------------------------------------------------------------------------------------------
+
+// `impl_string_form_via_serde!` doesn't work for bitflags because serde's `IntoDeserializer`
+// doesn't support things that serialize as newtype structs.
+// This isn't a macro implementation because it's only used once so far.
+impl StringForm for ShowStatus {
+    fn serialize(&self) -> ArcStr {
+        arcstr::format!(
+            "{}",
+            fmt::from_fn(|f| { bitflags::parser::to_writer(self, f) })
+        )
+    }
+
+    fn deserialize(value: &str) -> Result<Self, DeserializeError> {
+        bitflags::parser::from_str(value).map_err(|e| DeserializeError(arcstr::format!("{e}")))
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -429,7 +447,7 @@ mod tests {
     }
 
     #[test]
-    fn positive_sign_serialization() {
+    fn positive_sign() {
         assert_round_trip_value(&ps64(1.0), "1");
         assert_round_trip_value(&ps64(1.5), "1.5");
         assert_round_trip_value(&ps64(1e10), "10000000000");
@@ -446,7 +464,7 @@ mod tests {
     }
 
     #[test]
-    fn enum_serialization() {
+    fn enum_serde() {
         #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
         enum TestEnum {
             Foo,
@@ -465,5 +483,16 @@ mod tests {
                 "unknown variant `Baz`, expected `Foo` or `Bar`"
             )))
         );
+    }
+
+    #[test]
+    fn show_status() {
+        assert_round_trip_value(&ShowStatus::BLOCK, "BLOCK");
+        assert_round_trip_value(&ShowStatus::CHARACTER, "CHARACTER");
+        assert_round_trip_value(
+            &(ShowStatus::BLOCK | ShowStatus::CHARACTER),
+            "BLOCK | CHARACTER",
+        );
+        assert_round_trip_value(&ShowStatus::empty(), "");
     }
 }

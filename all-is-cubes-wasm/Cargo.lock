@@ -200,6 +200,7 @@ dependencies = [
  "all-is-cubes-render",
  "async_fn_traits",
  "bevy_platform",
+ "bitflags",
  "displaydoc",
  "exhaust",
  "flume",

@@ -34,6 +34,7 @@ pub fn load_config() -> Result<Settings, anyhow::Error> {
 
     let settings_path = project_dirs.config_dir().join("settings.json");
 
+    // TODO: log when settings have invalid values (there is currently no path to find that out)
     let settings_data =
         read_or_create_default_json_file("settings", &settings_path, settings::Data::default);
 
@@ -41,7 +42,7 @@ pub fn load_config() -> Result<Settings, anyhow::Error> {
         settings_data,
         // TODO: ideally, writes would be performed asynchronously and with rate-limiting
         Arc::new(move |data| {
-            write_json_file("graphics options", &settings_path, &data);
+            write_json_file("settings", &settings_path, &data);
         }),
     ))
 }
