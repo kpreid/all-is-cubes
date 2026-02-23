@@ -14,6 +14,7 @@ version = "0.10.0"
 dependencies = [
  "all-is-cubes-base",
  "arcstr",
+ "arrayvec",
  "base64",
  "bevy_ecs",
  "bevy_platform",

@@ -15,6 +15,7 @@ dependencies = [
  "all-is-cubes-base",
  "arbitrary",
  "arcstr",
+ "arrayvec",
  "base64",
  "bevy_ecs",
  "bevy_platform",

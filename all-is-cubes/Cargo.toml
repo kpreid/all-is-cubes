@@ -122,6 +122,7 @@ _special_testing = ["all-is-cubes-base/_special_testing", "dep:visibility"]
 all-is-cubes-base = { workspace = true }
 arbitrary = { workspace = true, optional = true }
 arcstr = { version = "1.2.0", default-features = false, features = ["serde", "substr"] }
+arrayvec = { workspace = true }
 base64 = { workspace = true, optional = true, features = ["std"] } # used in serialization
 bevy_ecs = { workspace = true }
 bevy_platform = { workspace = true }

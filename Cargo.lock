@@ -48,6 +48,7 @@ dependencies = [
  "allocation-counter",
  "arbitrary",
  "arcstr",
+ "arrayvec",
  "async-io",
  "base64 0.22.1",
  "bevy_ecs",
