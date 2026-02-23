@@ -147,6 +147,22 @@ impl Aab {
         Size3D::from(self.upper_bounds - self.lower_bounds)
     }
 
+    /// Returns the volume of the box.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Aab, ps64};
+    ///
+    /// let aab = Aab::from_lower_upper([1., 1., 1.], [2., 3., 4.]);
+    /// assert_eq!(aab.volume(), ps64(6.0));
+    /// ```
+    #[inline]
+    pub fn volume(&self) -> PositiveSign<FreeCoordinate> {
+        PositiveSign::<FreeCoordinate>::new_strict(self.size().volume())
+    }
+
     /// The center of the enclosed volume.
     ///
     /// ```
@@ -325,6 +341,64 @@ impl Aab {
             self.lower_bounds - distances.negatives(),
             self.upper_bounds + distances.positives(),
         )
+    }
+
+    /// Substitutes the given coordinate range for the coordinates from `self`
+    /// on the axis `axis`.
+    ///
+    /// Returns `None` if it is not the case that `lower <= upper`, including if one is NaN.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Aab, Axis};
+    ///
+    /// let aab1 = Aab::from_lower_upper([1., 2., 3.], [4., 5., 6.]);
+    /// let aab2 = aab1.with_axis_range(Axis::Y, 20., 21.).unwrap();
+    ///
+    /// assert_eq!(aab2, Aab::from_lower_upper([1., 20., 3.], [4., 21., 6.]));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn with_axis_range(
+        mut self,
+        axis: Axis,
+        lower: FreeCoordinate,
+        upper: FreeCoordinate,
+    ) -> Option<Self> {
+        if lower <= upper {
+            self.lower_bounds[axis] = lower;
+            self.upper_bounds[axis] = upper;
+            Some(self)
+        } else {
+            None
+        }
+    }
+
+    /// Substitutes the coordinates from `other` for the coordinates from `self`,
+    /// on the axis `axis` only.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Aab, Axis, Cube};
+    ///
+    /// let aab1 = Cube::new(10, 0, 0).aab();
+    /// let aab2 = Cube::new(0, 10, 0).aab();
+    ///
+    /// assert_eq!(
+    ///     aab1.with_axis_range_from(Axis::Y, aab2),
+    ///     Aab::from_lower_upper([10., 10., 0.], [11., 11., 1.]),
+    /// );
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn with_axis_range_from(mut self, axis: Axis, other: Self) -> Self {
+        self.lower_bounds[axis] = other.lower_bounds[axis];
+        self.upper_bounds[axis] = other.upper_bounds[axis];
+        self
     }
 
     #[inline]
