@@ -208,8 +208,10 @@ mod tests {
     async fn blocks_smoke_test_and_icon_test() {
         // Prove that the construction doesn’t panic
         let mut txn = UniverseTransaction::default();
+        #[cfg_attr(not(feature = "session"), expect(unused_variables))]
         let blocks = UiBlocks::new(&mut txn, yield_progress_for_testing()).await;
 
+        #[cfg(feature = "session")]
         for setting_key in settings::Key::exhaust() {
             if let Some(block_key) = UiBlocks::icon_for_setting(setting_key) {
                 assert_eq!(
