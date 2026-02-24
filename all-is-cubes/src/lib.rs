@@ -4,6 +4,7 @@
 #![feature(const_trait_impl)]
 #![feature(doc_cfg)]
 #![feature(doc_notable_trait)]
+#![feature(final_associated_functions)]
 #![feature(fmt_debug)]
 #![feature(impl_trait_in_assoc_type)]
 #![feature(large_assignments)]
