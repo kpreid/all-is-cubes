@@ -78,7 +78,7 @@ impl<const N: usize> Pipelines<N> {
                         // downsampling pass for the same mip level (except for the last -- TODO)
                         wgpu::BindGroupLayoutEntry {
                             binding,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                             ty: wgpu::BindingType::Texture {
                                 multisampled: false,
                                 view_dimension: wgpu::TextureViewDimension::D2,
@@ -328,8 +328,7 @@ impl<const N: usize> Texture<N> {
                     });
                 encoder.set_pipeline(&pipelines.downsample_pipeline);
                 encoder.set_bind_group(0, &input_bind_group, &[]);
-                // Using the instance ID to communicate which downsample stage this is.
-                encoder.draw(0..3, output_mip..(output_mip + 1));
+                encoder.draw(0..3, pack_instance_index(output_mip, false));
 
                 let pass_label = format!("{label} rep {repetition} downsample {output_mip}");
                 let render_bundle = encoder.finish(&wgpu::RenderBundleDescriptor {
@@ -373,8 +372,7 @@ impl<const N: usize> Texture<N> {
                     });
                 encoder.set_pipeline(&pipelines.upsample_pipeline);
                 encoder.set_bind_group(0, &input_bind_group, &[]);
-                // Using the instance ID to communicate which upsample stage this is.
-                encoder.draw(0..3, output_mip..(output_mip + 1));
+                encoder.draw(0..3, pack_instance_index(output_mip, true));
 
                 let pass_label = format!("{label} rep {repetition} upsample {output_mip}");
                 let render_bundle = encoder.finish(&wgpu::RenderBundleDescriptor {
@@ -479,6 +477,12 @@ fn size_and_mip_levels_for_texture(
     };
 
     (final_size, mip_level_count)
+}
+
+/// We use the instance index as a packed bitfield of information for the vertex shader.
+fn pack_instance_index(output_stage: u32, is_upsampling: bool) -> core::ops::Range<u32> {
+    let index = output_stage << 1 | u32::from(is_upsampling);
+    index..(index + 1)
 }
 
 fn array_map_refs<'a, const N: usize, T, R>(

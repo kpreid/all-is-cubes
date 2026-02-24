@@ -12,8 +12,19 @@
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
+    
     @location(0) texcoord: vec2<f32>,
-    @location(1) @interpolate(flat) output_stage: u32,
+
+    // In the fragment shader, equal to vec2(dpdx(in.texcoord.x), dpdy(in.texcoord.y)),
+    // but without requiring the fragment shader to compute it.
+    //
+    // This is thus the change in `texcoord` corresponding to moving to the adjacent output pixel.
+    @location(1) texcoord_output_step: vec2<f32>,
+    
+    /// Equal to mip level of our color attachment, so value 0 indicates the final upsampling stage,
+    /// value 1 indicates the penultimate upsampling stage or the first downsampling stage,
+    /// and so on.
+    @location(2) @interpolate(flat) output_stage: u32,
 }
 
 fn vertex_position(vertex_index: u32) -> vec4<f32> {
@@ -28,16 +39,29 @@ fn vertex_position(vertex_index: u32) -> vec4<f32> {
 @vertex
 fn full_image_vertex(
     @builtin(vertex_index) in_vertex_index: u32,
+    // instance index is used as an integer bitfield:
+    // `(output_stage << 1) | is_upsampling`
     @builtin(instance_index) in_instance_index: u32,
 ) -> VertexOutput {
     let position = vertex_position(in_vertex_index);
+    let output_stage = in_instance_index >> 1;
+    let is_upsampling = (in_instance_index & 1) != 0;
 
     // scale clip coordinates to 0-1 coordinates and flip Y
     let texcoord: vec2<f32> = position.xy * vec2<f32>(0.5, -0.5) + 0.5;
 
+    var dimensions_of_output: vec2f = vec2f(textureDimensions(higher_stage_input));
+    if !is_upsampling {
+        // If we are downsampling, then the output is one mip level down from
+        // higher_stage_input.
+        dimensions_of_output *= 0.5;
+    }
+
+    let texcoord_output_step = 1.0 / dimensions_of_output;
+
     // instance index is used to signal the output mip level,
     // which corresponds to the stage of processing we are at.
-    return VertexOutput(position, texcoord, in_instance_index);
+    return VertexOutput(position, texcoord, texcoord_output_step, in_instance_index);
 }
 
 // --- General fragment shading helpers ------------------------------------------------------------
@@ -45,12 +69,10 @@ fn full_image_vertex(
 // Fetch from input image (scene texture or previous downsampling stage),
 // with an offset in units of output fragments.
 fn input_pixel(in: VertexOutput, offset: vec2<f32>) -> vec4<f32> {
-    let derivatives = vec2<f32>(dpdx(in.texcoord.x), dpdy(in.texcoord.y));
-
     return textureSampleLevel(
         previous_stage_input,
         input_sampler,
-        in.texcoord + offset * derivatives,
+        in.texcoord + offset * in.texcoord_output_step,
         // The mip level here is always 0 because selecting the actual mip level will be
         // handled by the texture view selection on the CPU side.
         0.0
