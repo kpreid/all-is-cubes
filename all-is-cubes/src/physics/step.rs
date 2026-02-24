@@ -173,6 +173,10 @@ pub struct BodyStepDetails {
     #[doc(hidden)] // pub for fuzz_physics
     pub push_out: Option<FreeVector>,
 
+    /// If the body was crushed by something it was found to be already colliding with,
+    /// this is the amount crushed.
+    initial_crush: CrushInfo,
+
     already_colliding: Option<Contact>,
 
     /// Details on movement and collision. A single frame's movement may have up to three
@@ -189,6 +193,7 @@ impl manyfmt::Fmt<ConciseDebug> for BodyStepDetails {
             quiescent,
             uncrush,
             push_out,
+            initial_crush,
             already_colliding,
             move_segments,
             delta_v,
@@ -198,6 +203,11 @@ impl manyfmt::Fmt<ConciseDebug> for BodyStepDetails {
             .field("already_colliding", already_colliding)
             .field("uncrush", uncrush)
             .field("push_out", &push_out.as_ref().map(|v| v.refmt(fopt)))
+            .field(
+                "initial_crush",
+                // single-line formatting for the FaceMap. TODO: truncate digits too
+                &format_args!("{initial_crush:?}"),
+            )
             .field("move_segments", &move_segments.refmt(fopt))
             .field("delta_v", &delta_v.refmt(fopt))
             .finish()
@@ -232,12 +242,16 @@ pub(crate) struct MoveSegment {
 
 impl manyfmt::Fmt<ConciseDebug> for MoveSegment {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &ConciseDebug) -> fmt::Result {
+        let Self {
+            delta_position,
+            stopped_by,
+        } = *self;
         let mut nonempty = false;
-        if self.delta_position != FreeVector::zero() {
+        if delta_position != FreeVector::zero() {
             nonempty = true;
-            write!(fmt, "move {:?}", self.delta_position.refmt(fopt))?;
+            write!(fmt, "move {:?}", delta_position.refmt(fopt))?;
         }
-        if let Some(stopped_by) = &self.stopped_by {
+        if let Some(stopped_by) = stopped_by {
             if nonempty {
                 write!(fmt, " ")?;
             }
@@ -259,6 +273,9 @@ impl Default for MoveSegment {
         }
     }
 }
+
+/// Result of [`crush_if_colliding()`].
+type CrushInfo = FaceMap<FreeCoordinate>;
 
 /// Result of [`uncrush()`].
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -337,6 +354,7 @@ pub(crate) fn step_one_body(
             already_colliding,
             uncrush: UncrushInfo::NotNeeded,
             push_out: None,
+            initial_crush: CrushInfo::default(),
             move_segments,
             delta_v: Vector3D::zero(),
         };
@@ -352,7 +370,7 @@ pub(crate) fn step_one_body(
     // Try to move to a good state from a poor one.
     #[cfg(feature = "rerun")]
     let position_before_push_out = body.position;
-    let (uncrush_info, push_out_info): (UncrushInfo, Option<FreeVector>) =
+    let (uncrush_info, push_out_info, crush_info): (UncrushInfo, Option<FreeVector>, CrushInfo) =
         if let Some(space) = colliding_space {
             // Uncrush: increase `body.occupying` to occupy its normal amount of space if that space
             // is available. This undoes the effect of `crush_if_colliding()`.
@@ -363,11 +381,11 @@ pub(crate) fn step_one_body(
             // push_out found no empty space or because of numerical error), shrink `body.occupying`
             // to avoid intersections. This way, the upcoming collision tests for movement can
             // better distinguish surfaces that should stop this body.
-            crush_if_colliding(body, space);
+            let crush_info = crush_if_colliding(body, space);
 
-            (uncrush_info, push_out_info)
+            (uncrush_info, push_out_info, crush_info)
         } else {
-            (UncrushInfo::NotNeeded, None)
+            (UncrushInfo::NotNeeded, None, FaceMap::default())
         };
 
     let velocity_magnitude_squared = body.velocity.square_length();
@@ -379,6 +397,7 @@ pub(crate) fn step_one_body(
             already_colliding,
             uncrush: uncrush_info,
             push_out: push_out_info,
+            initial_crush: crush_info,
             move_segments,
             delta_v: body.velocity - velocity_before_gravity_and_collision,
         };
@@ -427,6 +446,7 @@ pub(crate) fn step_one_body(
         already_colliding,
         uncrush: uncrush_info,
         push_out: push_out_info,
+        initial_crush: crush_info,
         move_segments,
         delta_v: body.velocity - velocity_before_gravity_and_collision,
     };
@@ -744,8 +764,15 @@ fn attempt_push_out(
 }
 
 /// If [`Body::occupying`] is intersecting anything, shrink it so it isn’t, if possible.
-pub(super) fn crush_if_colliding(body: &mut Body, space: &space::Read<'_>) {
-    loop {
+///
+/// Returns the distance by which each face moved inward.
+#[must_use] // temp for refactoring
+pub(super) fn crush_if_colliding(
+    body: &mut Body,
+    space: &space::Read<'_>,
+) -> FaceMap<FreeCoordinate> {
+    let original = body.occupying;
+    'crush_step: loop {
         let mut a_contact: Option<Contact> = None;
         collide_along_ray(
             space,
@@ -758,7 +785,7 @@ pub(super) fn crush_if_colliding(body: &mut Body, space: &space::Read<'_>) {
         );
         let Some(a_contact) = a_contact else {
             // No collision; nothing to do.
-            break;
+            break 'crush_step;
         };
 
         let contact_aab = a_contact.aab();
@@ -782,12 +809,13 @@ pub(super) fn crush_if_colliding(body: &mut Body, space: &space::Read<'_>) {
                 body.occupying = shrunk;
             } else {
                 log::debug!("cannot resolve by crushing");
-                return;
+                break 'crush_step;
             }
         } else {
             panic!("collision but found no penetration");
         }
     }
+    FaceMap::from_fn(|face| original.face_coordinate(face) - body.occupying.face_coordinate(face))
 }
 
 /// If [`Body::occupying`] is smaller than [`Body::collision_box`], and there is room to grow it,
@@ -989,7 +1017,7 @@ mod tests {
             body.occupying,
             Aab::from_lower_upper([-0.5, 0.75, -0.5], [0.5, 1.75, 0.5]),
         );
-        crush_if_colliding(&mut body, &space.read());
+        std::dbg!(crush_if_colliding(&mut body, &space.read()));
         assert_eq!(
             body.occupying,
             Aab::from_lower_upper([-0.5, 1.0, -0.5], [0.5, 1.75, 0.5]),
