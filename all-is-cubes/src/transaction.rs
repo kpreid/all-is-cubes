@@ -115,8 +115,7 @@ pub trait Transaction: Merge {
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError>;
 
-    /// Convenience method to execute a transaction in one step. Implementations should not
-    /// need to override this. Equivalent to:
+    /// Convenience method to execute a transaction in one step. Equivalent to:
     ///
     /// ```rust
     /// # use all_is_cubes::transaction::{Transaction, ExecuteError, no_outputs};
@@ -131,7 +130,7 @@ pub trait Transaction: Merge {
     /// ```
     ///
     /// See also: [`Transactional::transact()`], for building a transaction through mutations.
-    fn execute(
+    final fn execute(
         self,
         target: &mut Self::Target,
         context: Self::Context<'_>,
@@ -145,7 +144,7 @@ pub trait Transaction: Merge {
     /// so that it can be combined with other transactions in the same universe.
     ///
     /// This is a convenience wrapper around [`UTransactional::bind`].
-    fn bind(self, target: Handle<Self::Target>) -> UniverseTransaction
+    final fn bind(self, target: Handle<Self::Target>) -> UniverseTransaction
     where
         Self: Sized,
         Self::Target: UTransactional<Transaction = Self>,
@@ -207,8 +206,7 @@ pub trait Merge: Sized {
     /// Combines two transactions into one which has both effects simultaneously, if possible.
     ///
     /// This is a shortcut for calling [`Self::check_merge`] followed by [`Self::commit_merge`].
-    /// It should not be necessary to override the provided implementation.
-    fn merge(mut self, other: Self) -> Result<Self, Self::Conflict> {
+    final fn merge(mut self, other: Self) -> Result<Self, Self::Conflict> {
         self.merge_from(other)?;
         Ok(self)
     }
@@ -218,8 +216,7 @@ pub trait Merge: Sized {
     /// If successful, then `self` now includes `other`. If unsuccessful, `self` is unchanged.
     ///
     /// This is a shortcut for calling [`Self::check_merge`] followed by [`Self::commit_merge`].
-    /// It should not be necessary to override the provided implementation.
-    fn merge_from(&mut self, other: Self) -> Result<(), Self::Conflict> {
+    final fn merge_from(&mut self, other: Self) -> Result<(), Self::Conflict> {
         let check = self.check_merge(&other)?;
         self.commit_merge(other, check);
         Ok(())
