@@ -19,11 +19,10 @@ features = ["session"]
 bench = false
 
 [features]
-# Enable the `apps` and `notification` modules, particularly including the `Session` type,
-# and require `std` support.
+# Enable the `apps`, `notification`, and `settings` modules. Requires `std` support.
 session = [
     "all-is-cubes/std",
-    "all-is-cubes-render/serde", # for settings storage - may be replaced
+    "all-is-cubes-render/serde", # for graphics settings serialization - may be replaced
     "dep:async_fn_traits",
     "dep:flume",
     "dep:futures-core",
