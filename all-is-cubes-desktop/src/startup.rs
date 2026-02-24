@@ -241,7 +241,7 @@ pub fn headless_main_loop(
 /// Ad-hoc struct of arguments to [`inner_main`] that can be constructed before choosing an
 /// event loop type.
 #[derive(Debug)]
-#[expect(clippy::exhaustive_structs)]
+#[allow(clippy::exhaustive_structs)] // not expect() because of <https://github.com/rust-lang/rust-clippy/issues/16627>
 #[allow(missing_docs)] // TODO: give this an API-design pass too
 pub struct InnerMainParams {
     pub application_title: String,
