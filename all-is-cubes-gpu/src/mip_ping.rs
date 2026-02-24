@@ -14,6 +14,9 @@ use crate::queries::{Queries, Query};
 
 // -------------------------------------------------------------------------------------------------
 
+const PREVIOUS_STAGE_BINDING_BASE: u32 = 100;
+const HIGHER_STAGE_BINDING_BASE: u32 = 200;
+
 /// Render pipelines and non-size-dependent resources for a [`mip_ping`](self) effect.
 ///
 /// # Generic parameters
@@ -56,13 +59,22 @@ impl<const N: usize> Pipelines<N> {
     ) -> Arc<Self> {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some(&format!("{label} mip_ping::Pipelines::bind_group_layout")),
-            entries: &(0..N * 2 + 1)
-                .map(|i| {
-                    let binding = u32::try_from(i).unwrap();
-                    if (0..N).contains(&i) {
-                        // Binding for input texture
+            entries: &{
+                let mut entries: Vec<wgpu::BindGroupLayoutEntry> = Vec::with_capacity(N * 2 + 2);
+                entries.extend([
+                    // Binding for sampler
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ]);
+                for i in 0..const { N as u32 } {
+                    entries.extend([
+                        // Binding for texture that is input to this resampling stage.
                         wgpu::BindGroupLayoutEntry {
-                            binding,
+                            binding: PREVIOUS_STAGE_BINDING_BASE + i,
                             visibility: wgpu::ShaderStages::FRAGMENT,
                             ty: wgpu::BindingType::Texture {
                                 multisampled: false,
@@ -70,14 +82,13 @@ impl<const N: usize> Pipelines<N> {
                                 sample_type: wgpu::TextureSampleType::Float { filterable: true },
                             },
                             count: None,
-                        }
-                    } else if (N..N * 2).contains(&i) {
+                        },
                         // Binding for "higher" texture.
                         // When downsampling, this is always the original input texture.
                         // When upsampling, this is what would have been the input to the
                         // downsampling pass for the same mip level (except for the last -- TODO)
                         wgpu::BindGroupLayoutEntry {
-                            binding,
+                            binding: HIGHER_STAGE_BINDING_BASE + i,
                             visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                             ty: wgpu::BindingType::Texture {
                                 multisampled: false,
@@ -85,20 +96,11 @@ impl<const N: usize> Pipelines<N> {
                                 sample_type: wgpu::TextureSampleType::Float { filterable: true },
                             },
                             count: None,
-                        }
-                    } else if i == N * 2 {
-                        // Binding for sampler
-                        wgpu::BindGroupLayoutEntry {
-                            binding,
-                            visibility: wgpu::ShaderStages::FRAGMENT,
-                            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                            count: None,
-                        }
-                    } else {
-                        unreachable!()
-                    }
-                })
-                .collect::<Vec<wgpu::BindGroupLayoutEntry>>(),
+                        },
+                    ])
+                }
+                entries
+            },
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -192,31 +194,26 @@ impl<const N: usize> Pipelines<N> {
         let label = &self.label;
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &self.bind_group_layout,
-            entries: &(0..N * 2 + 1)
-                .map(|i| {
-                    let binding = u32::try_from(i).unwrap();
-                    if (0..N).contains(&i) {
+            entries: &{
+                let mut entries: Vec<wgpu::BindGroupEntry<'_>> = Vec::with_capacity(N * 2 + 2);
+                entries.extend([wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                }]);
+                for (i, b) in (0..N).zip(0..const { N as u32 }) {
+                    entries.extend([
                         wgpu::BindGroupEntry {
-                            binding,
+                            binding: PREVIOUS_STAGE_BINDING_BASE + b,
                             resource: wgpu::BindingResource::TextureView(input_texture_views[i]),
-                        }
-                    } else if (N..N * 2).contains(&i) {
+                        },
                         wgpu::BindGroupEntry {
-                            binding,
-                            resource: wgpu::BindingResource::TextureView(
-                                higher_texture_views[i - N],
-                            ),
-                        }
-                    } else if i == N * 2 {
-                        wgpu::BindGroupEntry {
-                            binding,
-                            resource: wgpu::BindingResource::Sampler(&self.sampler),
-                        }
-                    } else {
-                        unreachable!()
-                    }
-                })
-                .collect::<Vec<wgpu::BindGroupEntry<'_>>>(),
+                            binding: HIGHER_STAGE_BINDING_BASE + b,
+                            resource: wgpu::BindingResource::TextureView(higher_texture_views[i]),
+                        },
+                    ])
+                }
+                entries
+            },
             label: Some(&format!("{label} bind group")),
         })
     }

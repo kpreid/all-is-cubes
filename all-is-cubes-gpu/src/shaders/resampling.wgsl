@@ -4,9 +4,9 @@
 // --- Interface declarations ----------------------------------------------------------------------
 
 // This group is named mip_ping::Pipelines::bind_group_layout in the code.
-@group(0) @binding(0) var previous_stage_input: texture_2d<f32>;
-@group(0) @binding(1) var higher_stage_input: texture_2d<f32>;
-@group(0) @binding(2) var input_sampler: sampler;
+@group(0) @binding(0) var input_sampler: sampler;
+@group(0) @binding(100) var previous_stage_input: texture_2d<f32>;
+@group(0) @binding(200) var higher_stage_input: texture_2d<f32>;
 
 // --- Vertex shader -------------------------------------------------------------------------------
 
