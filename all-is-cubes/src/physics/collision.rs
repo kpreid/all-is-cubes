@@ -11,7 +11,7 @@ use euclid::Vector3D;
 use num_traits::float::FloatCore as _;
 
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
-use crate::math::{Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, GridAab, Vol, lines};
+use crate::math::{Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, GridAab, Octant, Vol, lines};
 use crate::physics::{ContactSet, POSITION_EPSILON};
 use crate::raycast::{Ray, Raycaster};
 use crate::space;
@@ -642,12 +642,12 @@ impl CollisionSpace for Vol<&[Evoxel]> {
 /// exactly on the boundary. The caller must compute an appropriate nudge (using TODO:
 /// provide a function for this) to serve its needs.
 pub(crate) fn aab_raycast(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaster {
-    let leading_corner = aab.leading_corner(if reversed {
+    let leading_corner = aab.corner_point(Octant::from_vector(if reversed {
         -origin_ray.direction
     } else {
         origin_ray.direction
-    });
-    let leading_ray = origin_ray.translate(leading_corner);
+    }));
+    let leading_ray = origin_ray.translate(leading_corner.to_vector());
     leading_ray.cast()
 }
 

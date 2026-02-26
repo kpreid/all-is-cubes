@@ -179,8 +179,22 @@ impl Aab {
 
     /// Returns one of the eight corner points of the box.
     ///
-    /// Note that [`Octant`] is used here only to identify the eight distinct positions and does
-    /// not mean that the corner necessarily lies in that octant of the coordinate space.
+    /// Note that [`Octant`] is used here only to identify the eight distinct positions, and does
+    /// not mean that the returned corner necessarily lies in that octant of the coordinate space.
+    /// Specifically, the corners lie in the corresponding octants if and only if the interior of
+    /// `self` contains the coordinate origin.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::{euclid::point3, math::{Aab, Octant}};
+    ///
+    /// let aab = Aab::from_lower_upper(point3(1., 2., 3.), point3(4., 5., 6.));
+    ///
+    /// assert_eq!(aab.corner_point(Octant::Nnn), point3(1., 2., 3.));
+    /// assert_eq!(aab.corner_point(Octant::Npn), point3(1., 5., 3.));
+    /// ```
     #[inline]
     #[rustfmt::skip]
     pub fn corner_point(&self, corner: Octant) -> FreePoint {
@@ -399,20 +413,6 @@ impl Aab {
         self.lower_bounds[axis] = other.lower_bounds[axis];
         self.upper_bounds[axis] = other.upper_bounds[axis];
         self
-    }
-
-    #[inline]
-    #[doc(hidden)] // Not public because this is an odd interface that primarily helps with collision.
-    pub fn leading_corner(&self, direction: FreeVector) -> FreeVector {
-        let mut leading_corner = Vector3D::zero();
-        for axis in Axis::ALL {
-            if direction[axis] >= 0.0 {
-                leading_corner[axis] = self.upper_bounds[axis];
-            } else {
-                leading_corner[axis] = self.lower_bounds[axis];
-            }
-        }
-        leading_corner
     }
 
     /// Construct the [`GridAab`] containing all cubes this [`Aab`] intersects.
@@ -639,20 +639,14 @@ mod tests {
     }
 
     #[test]
-    fn leading_corner_consistency() {
+    fn corner_point_consistency() {
         let aab = Aab::new(-1.1, 2.2, -3.3, 4.4, -5.5, 6.6);
-        for direction in (-1..=1)
-            .zip(-1..=1)
-            .zip(-1..=1)
-            .map(|((x, y), z)| Vector3D::new(x, y, z).map(FreeCoordinate::from))
-        {
-            let leading_corner = aab.leading_corner(direction);
+        for octant in Octant::ALL {
+            let corner: FreePoint = aab.corner_point(octant);
 
-            for axis in Axis::ALL {
-                // Note that this condition is not true in general, but only if the AAB
-                // contains the origin.
-                assert_eq!(leading_corner[axis].signum(), direction[axis].signum());
-            }
+            // Note that this condition is not true in general, but only if the AAB
+            // contains the origin.
+            assert_eq!(Octant::from_vector(corner.to_vector()), octant);
         }
     }
 
