@@ -172,6 +172,7 @@ dependencies = [
  "clap",
  "directories-next",
  "euclid",
+ "flume",
  "futures-channel",
  "futures-core",
  "gilrs",

@@ -5,7 +5,6 @@
 
 use core::fmt;
 use std::collections::HashMap;
-use std::sync::atomic;
 
 use rand::{RngExt as _, SeedableRng as _};
 use wasm_bindgen::JsValue;
@@ -39,10 +38,10 @@ impl AudioTask {
 
         // Hook up ambient sound to channel
         let ambient_source = session.ambient_sound();
-        ambient_source.listen(UpdateAmbientListener::new(sender.clone()));
+        ambient_source.listen(UpdateAmbientListener(sender.clone()));
         sender.send(AudioCommand::UpdateAmbient).unwrap(); // ensure initial sync
 
-        let (gate, listener) = FluffListener::new(sender).gate();
+        let (gate, listener) = FluffListener(sender).gate();
         session.listen_fluff(listener);
 
         let audio_task_handle = AudioTask {
@@ -243,93 +242,56 @@ fn make_ambient_sound_synthesizer(
 // -------------------------------------------------------------------------------------------------
 
 /// Adapter from [`Listener`] to the audio command channel.
-struct FluffListener {
-    sender: flume::Sender<AudioCommand>,
-    alive: atomic::AtomicBool,
-}
-impl FluffListener {
-    fn new(sender: flume::Sender<AudioCommand>) -> Self {
-        Self {
-            sender,
-            alive: atomic::AtomicBool::new(true),
-        }
-    }
-}
+struct FluffListener(flume::Sender<AudioCommand>);
 
 impl fmt::Debug for FluffListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FluffListener")
-            .field("alive", &self.alive)
+            .field("alive", &!self.0.is_disconnected())
             .finish_non_exhaustive()
     }
 }
-
 impl listen::Listener<SessionFluff> for FluffListener {
     fn receive(&self, fluffs: &[SessionFluff]) -> bool {
-        if !self.alive.load(atomic::Ordering::Relaxed) {
-            return false;
-        }
-        for fluff in fluffs {
-            match self.sender.try_send(AudioCommand::Fluff(fluff.clone())) {
-                Ok(()) => {}
-                Err(flume::TrySendError::Full(_)) => {
-                    // If the channel is full, indicating the audio task is falling behind,
-                    // drop the message.
-                }
-                Err(flume::TrySendError::Disconnected(_)) => {
-                    self.alive.store(false, atomic::Ordering::Relaxed);
-                    return false;
+        if fluffs.is_empty() {
+            !self.0.is_disconnected()
+        } else {
+            for fluff in fluffs {
+                match self.0.try_send(AudioCommand::Fluff(fluff.clone())) {
+                    Ok(()) => {}
+                    Err(flume::TrySendError::Full(_)) => {} // drop message if full
+                    Err(flume::TrySendError::Disconnected(_)) => return false,
                 }
             }
+            true
         }
-        true
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 
 /// Adapter from [`Source`] to the audio command channel.
-struct UpdateAmbientListener {
-    sender: flume::Sender<AudioCommand>,
-    alive: atomic::AtomicBool,
-}
-impl UpdateAmbientListener {
-    fn new(sender: flume::Sender<AudioCommand>) -> Self {
-        Self {
-            sender,
-            alive: atomic::AtomicBool::new(true),
-        }
-    }
-}
+struct UpdateAmbientListener(flume::Sender<AudioCommand>);
 
 impl fmt::Debug for UpdateAmbientListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("UpdateAmbientListener")
-            .field("alive", &self.alive)
+            .field("alive", &!self.0.is_disconnected())
             .finish_non_exhaustive()
     }
 }
 
 impl listen::Listener<()> for UpdateAmbientListener {
     fn receive(&self, messages: &[()]) -> bool {
-        if !self.alive.load(atomic::Ordering::Relaxed) {
-            return false;
+        match messages {
+            [] => !self.0.is_disconnected(),
+            // Coalesce multiple messages into one.
+            [(), ..] => match self.0.try_send(AudioCommand::UpdateAmbient) {
+                Ok(()) => true,
+                Err(flume::TrySendError::Full(_)) => true, // drop message if full
+                Err(flume::TrySendError::Disconnected(_)) => false,
+            },
         }
-        if messages.is_empty() {
-            return true;
-        }
-        match self.sender.try_send(AudioCommand::UpdateAmbient) {
-            Ok(()) => {}
-            Err(flume::TrySendError::Full(_)) => {
-                // If the channel is full, indicating the audio task is falling behind,
-                // drop the message.
-            }
-            Err(flume::TrySendError::Disconnected(_)) => {
-                self.alive.store(false, atomic::Ordering::Relaxed);
-                return false;
-            }
-        }
-        true
     }
 }
 

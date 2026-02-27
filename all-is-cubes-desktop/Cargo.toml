@@ -86,6 +86,7 @@ directories-next = "2.0.0"
 # "serde" feature for TODO: explain
 # "mint" feature for interop with kira
 euclid = { workspace = true, optional = true, features = ["serde", "mint"] }
+flume = { workspace = true }
 futures-channel = { workspace = true }
 futures-core = { workspace = true }
 gilrs = { workspace = true }

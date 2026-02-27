@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::atomic::AtomicU32;
-use std::sync::{Arc, atomic, mpsc};
+use std::sync::{Arc, atomic};
 use std::time::Duration;
 
 use kira::listener::ListenerHandle;
@@ -31,7 +31,7 @@ pub(crate) struct AudioTask {
         dead_code,
         reason = "eventually we're going to need this for volume control etc."
     )]
-    sender: mpsc::SyncSender<AudioCommand>,
+    sender: flume::Sender<AudioCommand>,
     world_spatial_listener: ListenerHandle,
 
     // TODO: having our own separate `StandardCameras` is overkill for audio, but because it
@@ -62,17 +62,17 @@ impl AudioTask {
 
         // Transfers audio events to the audio processing thread.
         // We never block on this channel, but drop things if full.
-        let (sender, receiver) = mpsc::sync_channel(256);
+        let (sender, receiver) = flume::bounded(256);
 
         // Hook up ambient sound to channel
         let ambient_source = session.ambient_sound();
         // TODO: this whole custom listener scheme should be replaced with something more async
         // and less custom-code-per-use-case.
-        ambient_source.listen(UpdateAmbientListener::new(sender.clone()));
+        ambient_source.listen(UpdateAmbientListener(sender.clone()));
         sender.send(AudioCommand::UpdateAmbient).unwrap(); // ensure initial sync
 
         // Hook up fluff to channel
-        session.listen_fluff(FluffListener::new(sender.clone()));
+        session.listen_fluff(FluffListener(sender.clone()));
 
         // The audio processing is done on a thread because `AudioManager` wants `&mut self`
         // to perform operations, so I either need a dedicated thread (actor) or a mutex.
@@ -125,7 +125,7 @@ enum AudioCommand {
 /// This is not a real-time audio thread.
 #[expect(clippy::needless_pass_by_value)]
 fn audio_command_thread(
-    receiver: mpsc::Receiver<AudioCommand>,
+    receiver: flume::Receiver<AudioCommand>,
     mut manager: AudioManager,
     ambient_source: listen::DynSource<SpatialAmbient>,
     spatial_listener_id: kira::listener::ListenerId,
@@ -255,93 +255,62 @@ fn log_playback_result(
 
 // -------------------------------------------------------------------------------------------------
 
-// TODO: De-boilerplate these listener-to-channel adapters
+// TODO: Can we de-boilerplate these listener-to-channel adapters somehow?
+// We have basically identical wasm and non-wasm code, but no clear place for it to live.
+// (`all_is_cubes::util` is a place for adapters, but it doesn't depend on `flume`.)
 
 /// Adapter from [`Listener`] to the audio command channel.
-struct FluffListener {
-    sender: mpsc::SyncSender<AudioCommand>,
-    alive: atomic::AtomicBool,
-}
-impl FluffListener {
-    fn new(sender: mpsc::SyncSender<AudioCommand>) -> Self {
-        Self {
-            sender,
-            alive: atomic::AtomicBool::new(true),
-        }
-    }
-}
+struct FluffListener(flume::Sender<AudioCommand>);
 
 impl fmt::Debug for FluffListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FluffListener")
-            .field("alive", &self.alive)
+            .field("alive", &!self.0.is_disconnected())
             .finish_non_exhaustive()
     }
 }
 
 impl listen::Listener<SessionFluff> for FluffListener {
     fn receive(&self, fluffs: &[SessionFluff]) -> bool {
-        if !self.alive.load(atomic::Ordering::Relaxed) {
-            return false;
-        }
-        for fluff in fluffs {
-            match self.sender.try_send(AudioCommand::Fluff(fluff.clone())) {
-                Ok(()) => {}
-                Err(mpsc::TrySendError::Full(_)) => {
-                    // If the channel is full, indicating the audio thread is falling behind,
-                    // drop the message.
-                }
-                Err(mpsc::TrySendError::Disconnected(_)) => {
-                    self.alive.store(false, atomic::Ordering::Relaxed);
-                    return false;
+        if fluffs.is_empty() {
+            !self.0.is_disconnected()
+        } else {
+            for fluff in fluffs {
+                match self.0.try_send(AudioCommand::Fluff(fluff.clone())) {
+                    Ok(()) => {}
+                    Err(flume::TrySendError::Full(_)) => {} // drop message if full
+                    Err(flume::TrySendError::Disconnected(_)) => return false,
                 }
             }
+            true
         }
-        true
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 
-/// Adapter from [`Source`] to the audio command channel.
-struct UpdateAmbientListener {
-    sender: mpsc::SyncSender<AudioCommand>,
-    alive: atomic::AtomicBool,
-}
-impl UpdateAmbientListener {
-    fn new(sender: mpsc::SyncSender<AudioCommand>) -> Self {
-        Self {
-            sender,
-            alive: atomic::AtomicBool::new(true),
-        }
-    }
-}
+/// Adapter from the `session.ambient_sound()` source to the audio command channel.
+struct UpdateAmbientListener(flume::Sender<AudioCommand>);
 
 impl fmt::Debug for UpdateAmbientListener {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("UpdateAmbientListener")
-            .field("alive", &self.alive)
+            .field("alive", &!self.0.is_disconnected())
             .finish_non_exhaustive()
     }
 }
 
 impl listen::Listener<()> for UpdateAmbientListener {
     fn receive(&self, messages: &[()]) -> bool {
-        if !self.alive.load(atomic::Ordering::Relaxed) {
-            return false;
+        match messages {
+            [] => !self.0.is_disconnected(),
+            // Coalesce multiple messages into one.
+            [(), ..] => match self.0.try_send(AudioCommand::UpdateAmbient) {
+                Ok(()) => true,
+                Err(flume::TrySendError::Full(_)) => true, // drop message if full
+                Err(flume::TrySendError::Disconnected(_)) => false,
+            },
         }
-        if messages.is_empty() {
-            return true;
-        }
-        match self.sender.try_send(AudioCommand::UpdateAmbient) {
-            Ok(()) => {}
-            Err(mpsc::TrySendError::Full(_)) => {}
-            Err(mpsc::TrySendError::Disconnected(_)) => {
-                self.alive.store(false, atomic::Ordering::Relaxed);
-                return false;
-            }
-        }
-        true
     }
 }
 

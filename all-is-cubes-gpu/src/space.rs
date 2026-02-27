@@ -5,11 +5,11 @@ use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::fmt;
 use core::mem;
 use core::ops::Range;
-use core::sync::atomic;
 use core::time::Duration;
-use std::sync::{Mutex, PoisonError, mpsc};
+use std::sync::{Mutex, PoisonError};
 
 use hashbrown::HashSet;
 
@@ -99,7 +99,7 @@ pub(crate) struct SpaceRenderer {
 
     /// Receiver whose sender end is held by a space listener, which feeds new particles into
     /// [`Self::particle_sets`].
-    particle_rx: mpsc::Receiver<ParticleSet>,
+    particle_rx: flume::Receiver<ParticleSet>,
 
     #[cfg(feature = "rerun")]
     rerun_perf_destination: all_is_cubes::rerun_glue::Destination,
@@ -162,7 +162,7 @@ impl SpaceRenderer {
             space_label,
             particle_sets: Vec::new(),
             particle_rx: {
-                let (_, rx) = mpsc::sync_channel(0);
+                let (_, rx) = flume::bounded(0);
                 rx
             },
             #[cfg(feature = "rerun")]
@@ -236,8 +236,8 @@ impl SpaceRenderer {
         }
 
         {
-            let (particle_tx, new_particle_rx) = mpsc::sync_channel(400);
-            space_borrowed.fluff().listen(FluffListener::new(particle_tx));
+            let (particle_tx, new_particle_rx) = flume::bounded(400);
+            space_borrowed.fluff().listen(FluffToParticles(particle_tx));
             particle_sets.clear();
             *particle_rx = new_particle_rx;
         }
@@ -294,7 +294,7 @@ impl SpaceRenderer {
         // detach from space notifier, and also request rebuilding the skybox
         *todo = listen::StoreLock::new(SpaceRendererTodo::EVERYTHING);
         particle_sets.clear();
-        (_, *particle_rx) = mpsc::sync_channel(0);
+        (_, *particle_rx) = flume::bounded(0);
         *csm = None;
     }
 
@@ -1083,46 +1083,31 @@ impl listen::Store<SpaceChange> for SpaceRendererTodo {
     }
 }
 
-#[derive(Debug)]
-struct FluffListener {
-    particle_sender: mpsc::SyncSender<ParticleSet>,
-    // We need this to be able to return false even when given an empty slice
-    // of messages. TODO: Consider weakening receive()'s requirements to avoid that,
-    // or switch to a different channel implementation which lets us query liveness
-    // without sending anything.
-    alive: atomic::AtomicBool,
-}
+struct FluffToParticles(flume::Sender<ParticleSet>);
 
-impl FluffListener {
-    fn new(sender: mpsc::SyncSender<ParticleSet>) -> Self {
-        Self {
-            particle_sender: sender,
-            alive: atomic::AtomicBool::new(true),
-        }
+impl fmt::Debug for FluffToParticles {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FluffToParticles")
+            .field("alive", &!self.0.is_disconnected())
+            .finish_non_exhaustive()
     }
 }
 
-impl Listener<SpaceFluff> for FluffListener {
+impl Listener<SpaceFluff> for FluffToParticles {
     fn receive(&self, fluffs: &[SpaceFluff]) -> bool {
-        if !self.alive.load(atomic::Ordering::Relaxed) {
-            return false;
-        }
+        let mut sent = false;
         for fluff in fluffs {
             let Some(message) = ParticleSet::from_fluff(fluff) else {
                 continue;
             };
-
-            match self.particle_sender.try_send(message) {
+            match self.0.try_send(message) {
                 Ok(()) => {}
-                Err(mpsc::TrySendError::Disconnected(_)) => {
-                    self.alive.store(false, atomic::Ordering::Relaxed);
-                    return false;
-                }
-                Err(mpsc::TrySendError::Full(_)) => {
-                    // discard if we're not keeping upo
-                }
+                Err(flume::TrySendError::Full(_)) => {} // drop message if full
+                Err(flume::TrySendError::Disconnected(_)) => return false,
             }
+            sent = true;
         }
-        true
+        // do liveness check in case we did not send any messages
+        sent || !self.0.is_disconnected()
     }
 }
