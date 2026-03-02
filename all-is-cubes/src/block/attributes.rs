@@ -925,7 +925,7 @@ mod tests {
         fn debug(a: BlockAttributes) -> String {
             format!("{a:?}")
         }
-        assert_eq!(&*debug(BlockAttributes::default()), "BlockAttributes {}",);
+        assert_eq!(&*debug(BlockAttributes::default()), "BlockAttributes {}");
         assert_eq!(
             &*debug(BlockAttributes {
                 display_name: "x".into(),

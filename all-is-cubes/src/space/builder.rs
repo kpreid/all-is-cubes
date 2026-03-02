@@ -473,7 +473,7 @@ mod tests {
         let bounds = GridAab::ORIGIN_CUBE;
         assert_eq!(
             Space::builder(bounds)
-                .palette_and_contents(vec![AIR; 65537], Vol::from_element(2), None,)
+                .palette_and_contents(vec![AIR; 65537], Vol::from_element(2), None)
                 .unwrap_err(),
             PaletteError::PaletteTooLarge { len: 65537 }
         );
@@ -484,7 +484,7 @@ mod tests {
         let bounds = GridAab::ORIGIN_CUBE;
         assert_eq!(
             Space::builder(bounds)
-                .palette_and_contents([AIR], Vol::from_element(2), None,)
+                .palette_and_contents([AIR], Vol::from_element(2), None)
                 .unwrap_err(),
             PaletteError::Index {
                 index: 2,

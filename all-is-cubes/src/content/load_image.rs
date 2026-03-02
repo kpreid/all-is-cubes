@@ -257,7 +257,7 @@ pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DecodedPng {
             header,
             rgba_image_data: data,
         },
-        Err(error) => panic!("Error loading image asset {name:?}: {error:?}",),
+        Err(error) => panic!("Error loading image asset {name:?}: {error:?}"),
     }
 }
 

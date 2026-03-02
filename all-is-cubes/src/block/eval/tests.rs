@@ -58,7 +58,7 @@ fn visible_or_animated() {
         .build()));
     assert!(va(Block::builder()
         .color(Rgba::TRANSPARENT)
-        .animation_hint(AnimationHint::replacement(AnimationChange::Shape,))
+        .animation_hint(AnimationHint::replacement(AnimationChange::Shape))
         .build()));
 }
 
@@ -251,7 +251,7 @@ fn voxels_checked_individually() {
         *e.voxel_opacity_mask(),
         VoxelOpacityMask::new_raw(
             resolution,
-            Vol::repeat(GridAab::for_block(resolution), OpacityCategory::Opaque,)
+            Vol::repeat(GridAab::for_block(resolution), OpacityCategory::Opaque)
         )
     );
     assert_eq!(

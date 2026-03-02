@@ -400,13 +400,13 @@ mod tests {
         // min Z
         assert_eq!(Cube::containing(point3(0., 0., fmin - 0.001)), None);
         assert_eq!(
-            Cube::containing(point3(0., 0., fmin + 0.001,)),
+            Cube::containing(point3(0., 0., fmin + 0.001)),
             Some(Cube::new(0, 0, GridCoordinate::MIN))
         );
 
         // max Z
         assert_eq!(
-            Cube::containing(point3(0., 0., fmax + 0.999,)),
+            Cube::containing(point3(0., 0., fmax + 0.999)),
             Some(Cube::new(0, 0, GridCoordinate::MAX))
         );
         assert_eq!(Cube::containing(point3(0., 0., fmax + 1.001)), None);

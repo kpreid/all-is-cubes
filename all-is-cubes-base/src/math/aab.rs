@@ -605,7 +605,7 @@ mod tests {
     #[test]
     fn expand_or_shrink_negative_failure() {
         let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
-        assert_eq!(aab.expand_or_shrink(FaceMap::splat(-10.0)), None,);
+        assert_eq!(aab.expand_or_shrink(FaceMap::splat(-10.0)), None);
     }
 
     #[test]

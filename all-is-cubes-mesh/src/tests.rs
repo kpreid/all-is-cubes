@@ -384,7 +384,7 @@ fn shrunken_box_has_no_extras() {
             }
         })
         .unwrap()
-        .build_into(&mut u,);
+        .build_into(&mut u);
     let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
     .read_ticket(u.read_ticket())
         .filled_with(less_than_full_block)

@@ -525,7 +525,7 @@ mod tests {
                 destination_buffer.slice(..),
             ))
             .unwrap();
-            assert_eq!(destination_buffer.get_mapped_range(..)[..], source_data,);
+            assert_eq!(destination_buffer.get_mapped_range(..)[..], source_data);
             destination_buffer.unmap();
         }
     }
