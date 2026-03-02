@@ -168,7 +168,7 @@ impl<T: ops::AddAssign> ops::Add for Spectrum<T> {
 }
 impl<T: ops::AddAssign> ops::AddAssign for Spectrum<T> {
     fn add_assign(&mut self, rhs: Self) {
-        for (l, r) in self.0.iter_mut().zip(rhs.0.into_iter()) {
+        for (l, r) in self.0.iter_mut().zip(rhs.0) {
             *l += r;
         }
     }

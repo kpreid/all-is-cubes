@@ -1154,7 +1154,7 @@ impl<T: Fmt<StatusText>> fmt::Display for InfoText<'_, T> {
             if !mem::take(&mut empty) {
                 write!(f, "\n\n")?;
             }
-            write!(f, "{:#?}", self.session.last_step_info.refmt(&fopt),)?;
+            write!(f, "{:#?}", self.session.last_step_info.refmt(&fopt))?;
         }
         if fopt.show.contains(ShowStatus::RENDER) {
             if !mem::take(&mut empty) {

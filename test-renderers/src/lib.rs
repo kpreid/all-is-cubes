@@ -335,7 +335,7 @@ pub fn initialize_logging(args: &HarnessArgs) {
                     &mut lock,
                     time::macros::format_description!("[hour]:[minute]:[second]"),
                 );
-                _ = write!(lock, " [{level}] (", level = record.level(),);
+                _ = write!(lock, " [{level}] (", level = record.level());
                 _ = match test_id {
                     Some(id) => write!(lock, "{id}"),
                     None => write!(lock, "?"),

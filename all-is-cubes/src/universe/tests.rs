@@ -146,8 +146,8 @@ fn insert_anonymous_makes_distinct_names() {
     u.execute_1(&handle_b, BlockDefTransaction::overwrite(block_1)).unwrap();
     assert_ne!(handle_a, handle_b, "not equal");
     assert_ne!(
-        handle_a.read(u.read_ticket(),).unwrap().block(),
-        handle_b.read(u.read_ticket(),).unwrap().block(),
+        handle_a.read(u.read_ticket()).unwrap().block(),
+        handle_b.read(u.read_ticket()).unwrap().block(),
         "different values"
     );
 }
