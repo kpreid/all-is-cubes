@@ -136,9 +136,9 @@ rand = { version = "0.10.0", default-features = false }
 rand_distr = { version = "0.6.0", default-features = false }
 rand_xoshiro = { version = "0.8.0", default-features = false }
 rayon = { version = "1.11.0", default-features = false }
-re_log_types = { version = "0.29.0", default-features = false }
-re_sdk = { version = "0.29.0", default-features = false }
-re_sdk_types = { version = "0.29.0", default-features = false }
+re_log_types = { version = "0.30.0", default-features = false }
+re_sdk = { version = "0.30.0", default-features = false }
+re_sdk_types = { version = "0.30.0", default-features = false }
 rectangle-pack = { version = "0.4.2" } # currently only used in all-is-cubes-port which is currently std only
 rendiff = { version = "0.2.2", default-features = false }
 # We use rstest for parameterized tests where each case can fail or succeed independently.
