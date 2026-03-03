@@ -261,6 +261,16 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.8.1 -> 0.10.0"
 
+[[audits.strum]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.26.3 -> 0.28.0"
+
+[[audits.strum_macros]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.26.3 -> 0.28.0"
+
 [[audits.sync_wrapper]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
