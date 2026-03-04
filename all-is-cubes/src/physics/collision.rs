@@ -10,7 +10,9 @@ use euclid::Vector3D;
 use num_traits::float::FloatCore as _;
 
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
-use crate::math::{Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, GridAab, Octant, Vol};
+use crate::math::{
+    Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, Octant, Vol,
+};
 use crate::physics::{Contact, ContactSet, POSITION_EPSILON};
 use crate::raycast::{Ray, Raycaster};
 use crate::space;
@@ -545,6 +547,10 @@ impl CollisionSpace for Vol<&[Evoxel]> {
 /// resulting new AAB position will have the AAB's forward face land before, after, or
 /// exactly on the boundary. The caller must compute an appropriate nudge (using TODO:
 /// provide a function for this) to serve its needs.
+///
+/// TODO(crush): This function does not give enough information to avoid rounding errors resulting
+/// in disagreement about what cubes the AAB actually touches. Replace all uses of this
+/// with `new_aab_raycast()` to fix that.
 pub(crate) fn aab_raycast(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaster {
     let leading_corner = aab.corner_point(Octant::from_vector(if reversed {
         -origin_ray.direction
@@ -553,6 +559,87 @@ pub(crate) fn aab_raycast(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaste
     }));
     let leading_ray = origin_ray.translate(leading_corner.to_vector());
     leading_ray.cast()
+}
+
+/// Given an AAB in absolute coordinates, and a direction to move it, returns a raycasting
+/// iterator for moving that AAB through a grid and detecting when the forward-facing faces
+/// of the AAB start to intersect cubes they did not previously intersect.
+///
+/// If `reversed` is true, instead find positions where the rear-facing faces of the AAB stop
+/// intersecting cubes they previously intersect.
+///
+/// In either case, it is guaranteed that the relevant face of the produced AAB lies exactly on the
+/// relevant cube face; the other faces may be subject to rounding error, and in particular, the
+/// size of the produced AAB may not be identical to the original AAB’s size.
+/// Thus, this function does the best it can to produce AABs useful for exact collision detection.
+///
+/// The first returned step is always the “zero distance” step.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "TODO(crush): replace aab_raycast() with this")
+)]
+pub(crate) fn new_aab_raycast(
+    absolute_aab: Aab,
+    direction: FreeVector,
+    reversed: bool,
+) -> impl Iterator<Item = AabRaycastStep> {
+    // Find which corner of the AAB is the one adjacent to all of the forward-moving faces
+    // (or the backward-moving faces if `reversed`), because that corner’s raycast steps correspond
+    // to the steps we’re computing for the whole AAB.
+    let leading_corner: Octant = Octant::from_vector(if reversed { -direction } else { direction });
+
+    // Compute the relative position of the opposite corner, which we will use to construct new
+    // AABs for each step.
+    let offset_to_trailing_corner: FreeVector =
+        leading_corner.reflect(-absolute_aab.size().to_vector());
+
+    let leading_corner_ray = Ray {
+        origin: absolute_aab.corner_point(leading_corner),
+        direction,
+    };
+
+    leading_corner_ray.cast().map(move |ray_step| {
+        // Note that `intersection_point()` guarantees that, while the returned point necessarily
+        // has rounding error, it will never be outside of the cube face the raycast crossed.
+        // Therefore, when we use it to construct the AAB, that corner of the AAB will also be
+        // in the right place.
+        let leading_corner_this_step: FreePoint = ray_step.intersection_point(leading_corner_ray);
+
+        let translated_aab = Aab::from_two_points(
+            leading_corner_this_step,
+            // Unlike the leading corner, this corner point has rounding error (specifically, two
+            // roundings, one from the size() calculation and one from this addition).
+            leading_corner_this_step + offset_to_trailing_corner,
+        );
+
+        AabRaycastStep {
+            t_distance: ray_step.t_distance(),
+            aab_face: if reversed {
+                ray_step.face()
+            } else {
+                ray_step.face().opposite()
+            },
+            translated_aab,
+        }
+    })
+}
+
+/// Output of [`new_aab_raycast()`].
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "TODO(crush): replace aab_raycast() with this")
+)]
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct AabRaycastStep {
+    /// The distance traveled so far, in multiples of `direction.length()`.
+    t_distance: FreeCoordinate,
+    /// The input AAB translated to the position described by this step.
+    ///
+    /// The face `self.face` of this [`Aab`] will always be an exact integer.
+    translated_aab: Aab,
+    /// The face of the AAB which is touching a new cube on the grid.
+    /// (This is the opposite of the new cube’s face.)
+    aab_face: Face7,
 }
 
 /// Given an [`Aab`] and a [`Ray`] such that the given face of
@@ -615,6 +702,7 @@ mod tests {
     use crate::space::Space;
     use crate::universe::Universe;
     use rand::{RngExt as _, SeedableRng as _};
+    use rand_distr::Distribution as _;
     use std::eprintln;
 
     #[test]
@@ -1015,6 +1103,38 @@ mod tests {
                 } else {
                     // TODO check the forward cases
                 }
+            }
+        }
+    }
+
+    #[rstest::rstest]
+    fn aab_raycast_aligned_with_grid(#[values(false, true)] reversed: bool) {
+        // not-round-in-base-2 numbers to provoke rounding misbehavior
+        let absolute_aab = Aab::from_lower_upper([0.3, 0.6, 0.9], [1.3, 1.6, 1.9]);
+
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
+        for case_number in 0..1000 {
+            let direction: FreeVector = rand_distr::UnitSphere.sample(&mut rng).into();
+
+            eprintln!("\n#{case_number} with inputs:");
+            eprintln!("  direction: {direction:?}");
+
+            let mut iter = new_aab_raycast(absolute_aab, direction, reversed).take(10);
+
+            let first_step = iter.next().expect("should have at least one step");
+            assert_eq!(first_step.t_distance, 0.0);
+            assert_eq!(first_step.aab_face, Face7::Within);
+            // TODO: This assertion fails, but a similar one with the leading corner only wouldn't.
+            // Should we expose the choice of leading corner so it can be made?
+            if false {
+                assert_eq!(first_step.translated_aab, absolute_aab);
+            }
+
+            for step in iter {
+                std::dbg!(step);
+                let face = Face6::try_from(step.aab_face).expect("should see no more Within");
+                let face_coordinate = step.translated_aab.face_coordinate(face);
+                assert_eq!(face_coordinate, face_coordinate.round());
             }
         }
     }
