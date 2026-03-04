@@ -339,7 +339,7 @@ fn space_mesh_equals_block_mesh() {
         space_rendered.vertices().0.to_vec(),
         block_meshes[0]
             .all_sub_meshes()
-            .flat_map(|sm| sm.vertices.0.clone().into_iter())
+            .flat_map(|sm| sm.vertices.0.clone())
             .collect::<Vec<_>>()
     );
     assert_eq!(tex.count_allocated(), 1); // for striped faces

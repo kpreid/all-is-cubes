@@ -809,7 +809,7 @@ mod arbitrary_handle {
                         .iter_by_type::<T>()
                         .map(|(_name, handle)| handle)
                         .collect();
-                    u.choose_iter(handles.into_iter())
+                    u.choose_iter(handles)
                 })
                 .unwrap_or_else(no_context)?,
             })
