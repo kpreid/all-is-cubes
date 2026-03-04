@@ -168,6 +168,29 @@ impl Octant {
         }
         vector
     }
+
+    /// Returns the octant that is diagonally opposite `self`, i.e. mirrored on all axes.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use all_is_cubes_base::math::Octant;
+    /// assert_eq!(Octant::Pnp.opposite(), Octant::Npn);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn opposite(self) -> Self {
+        match self {
+            Self::Nnn => Self::Ppp,
+            Self::Nnp => Self::Ppn,
+            Self::Npn => Self::Pnp,
+            Self::Npp => Self::Pnn,
+            Self::Pnn => Self::Npp,
+            Self::Pnp => Self::Npn,
+            Self::Ppn => Self::Nnp,
+            Self::Ppp => Self::Nnn,
+        }
+    }
 }
 
 impl fmt::Debug for Octant {
@@ -523,6 +546,19 @@ mod tests {
         assert_eq!(Octant::Pnp.reflect(vec3(1, 2, 3)), vec3(1, -2, 3));
         assert_eq!(Octant::Npp.reflect(vec3(1, 2, 3)), vec3(-1, 2, 3));
         assert_eq!(Octant::Nnn.reflect(vec3(1, 2, 3)), vec3(-1, -2, -3));
+    }
+
+    #[test]
+    fn opposite() {
+        let test_vector = vec3::<i32, ()>(1, 2, 3);
+        for octant in Octant::ALL {
+            assert_eq!(octant.opposite().opposite(), octant, "{octant:?}");
+            assert_eq!(
+                octant.opposite().reflect(-test_vector),
+                octant.reflect(test_vector),
+                "{octant:?}"
+            );
+        }
     }
 
     #[test]

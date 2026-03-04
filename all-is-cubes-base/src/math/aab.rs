@@ -12,7 +12,7 @@ use num_traits::float::FloatCore as _;
 
 use crate::math::{
     Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate,
-    Octant, PositiveSign, lines,
+    Octant, PositiveSign, lines, sort_two,
 };
 
 /// Axis-Aligned Box data type.
@@ -90,6 +90,18 @@ impl Aab {
         } else {
             None
         }
+    }
+
+    /// Constructs an [`Aab`] which encloses the given two points.
+    /// These points will become two opposing corners.
+    ///
+    /// Panics if any given coordinate is NaN.
+    #[inline]
+    pub fn from_two_points(mut a: FreePoint, mut b: FreePoint) -> Self {
+        sort_two(&mut a.x, &mut b.x);
+        sort_two(&mut a.y, &mut b.y);
+        sort_two(&mut a.z, &mut b.z);
+        Self::from_lower_upper(a, b)
     }
 
     /// The most negative corner of the box, as a [`Point3D`].
@@ -553,6 +565,21 @@ mod tests {
     #[should_panic = "invalid AAB points that are misordered or NaN: lower (0.0, 0.0, 0.0) upper (1.0, 1.0, NaN)"]
     fn new_panic_message() {
         Aab::from_lower_upper([0., 0., 0.], [1., 1., f64::NAN]);
+    }
+
+    /// Test that [`Aab::from_two_points()`] can reconstruct an `Aab` from any two opposing corners
+    /// in any order.
+    #[test]
+    fn from_two_points() {
+        let original = Aab::from_lower_upper([-1.0, -2.0, 3.0], [-0.4, 5.0, 6.0]);
+        for corner in Octant::ALL {
+            let reconstructed = Aab::from_two_points(
+                original.corner_point(corner),
+                original.corner_point(corner.opposite()),
+            );
+
+            assert_eq!(reconstructed, original, "{corner:?}");
+        }
     }
 
     #[test]
