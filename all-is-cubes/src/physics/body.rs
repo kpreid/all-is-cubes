@@ -24,15 +24,10 @@ use crate::math::{
     Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, try_into_finite_point,
     try_into_finite_vector,
 };
-use crate::physics::{Velocity, collision::Contact, step::PhysicsOutputs};
+use crate::physics::{Velocity, step::PhysicsOutputs};
 use crate::rerun_glue as rg;
 use crate::transaction::{self, Equal, Transaction};
 use crate::util::{ConciseDebug, Fmt, Refmt as _, StatusText};
-
-// -------------------------------------------------------------------------------------------------
-
-/// Set of [`Contact`]s produced by a collision.
-pub type ContactSet = hashbrown::HashSet<Contact>;
 
 // -------------------------------------------------------------------------------------------------
 

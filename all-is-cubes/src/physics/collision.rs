@@ -1,7 +1,6 @@
 //! Algorithms for collision detection with [`Space`](crate::space::Space)s.
 
 use alloc::vec::Vec;
-use core::fmt;
 
 use euclid::Vector3D;
 
@@ -11,14 +10,15 @@ use euclid::Vector3D;
 use num_traits::float::FloatCore as _;
 
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
-use crate::math::{Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, GridAab, Octant, Vol, lines};
-use crate::physics::{ContactSet, POSITION_EPSILON};
+use crate::math::{Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, GridAab, Octant, Vol};
+use crate::physics::{Contact, ContactSet, POSITION_EPSILON};
 use crate::raycast::{Ray, Raycaster};
 use crate::space;
-use crate::util::{ConciseDebug, MapExtend, Refmt as _};
 
 #[cfg(doc)]
 use crate::{raycast::RaycastStep, space::Space};
+
+// -------------------------------------------------------------------------------------------------
 
 /// Conditional debug prints used for development of `escape_along_ray`.
 /// Hard-disabled by default.
@@ -27,142 +27,6 @@ macro_rules! println_escape_debug {
         // std::eprintln!($($args:tt)*)
         {}
     };
-}
-
-/// An individual collision contact; something in a [`Space`] that a moving [`Aab`]
-/// collided with.
-///
-/// This type is designed to be comparable/hashable to deduplicate contacts.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
-#[expect(
-    clippy::exhaustive_enums,
-    reason = "any change will probably be breaking anyway"
-)]
-pub enum Contact {
-    /// Contact with a fully solid block; the [`CubeFace`] specifies the block position
-    /// and the side of it that was collided with (hence also the contact normal).
-    Block(CubeFace),
-    /// Contact with one voxel of a block with a potentially complex shape.
-    Voxel {
-        /// The “outer” cube in the [`Space`].
-        cube: Cube,
-        /// The voxel resolution of the block; that is, the factor by which voxel
-        /// coordinates are smaller than `cube` coordinates.
-        resolution: Resolution,
-        /// The voxel position in the block (each coordinate lies between `0` and
-        /// `resolution - 1`) and the face of that voxel collided with, which is also
-        /// the contact normal.
-        voxel: CubeFace,
-    },
-}
-
-impl Contact {
-    /// Returns the cube that was collided with, or which contains the voxel collided with.
-    pub fn cube(&self) -> Cube {
-        match *self {
-            Contact::Block(CubeFace { cube, .. }) => cube,
-            Contact::Voxel { cube, .. } => cube,
-        }
-    }
-
-    /// Returns the bounding box of the cube or voxel that was collided with.
-    pub fn aab(self) -> Aab {
-        match self {
-            Contact::Block(cube_face) => cube_face.cube.aab(),
-            Contact::Voxel {
-                cube,
-                resolution,
-                voxel,
-            } => {
-                // Note: We're always scaling by a power of 2, so this should not introduce any
-                // rounding error that isn't necessarily implied by the distance from the origin.
-                voxel
-                    .cube
-                    .aab()
-                    .scale(resolution.recip_f64())
-                    .translate(cube.lower_bounds().to_vector().to_f64())
-            }
-        }
-    }
-
-    /// Returns the contact normal: the direction in which the colliding box should be
-    /// pushed back.
-    ///
-    /// Note that this may be equal to [`Face7::Within`] in case the box was already
-    /// intersecting before any movement.
-    pub fn normal(&self) -> Face7 {
-        match *self {
-            Contact::Block(CubeFace { face, .. }) => face,
-            Contact::Voxel {
-                voxel: CubeFace { face, .. },
-                ..
-            } => face,
-        }
-    }
-
-    /// Returns the scale of the voxel collided with.
-    pub fn resolution(&self) -> Resolution {
-        match *self {
-            Contact::Block(_) => R1,
-            Contact::Voxel { resolution, .. } => resolution,
-        }
-    }
-
-    /// Return a copy where the contact normal is replaced with [`Face7::Within`].
-    fn without_normal(&self) -> Self {
-        let mut result = *self;
-        match result {
-            Contact::Block(CubeFace { ref mut face, .. }) => *face = Face7::Within,
-            Contact::Voxel {
-                voxel: CubeFace { ref mut face, .. },
-                ..
-            } => *face = Face7::Within,
-        }
-        result
-    }
-}
-
-impl fmt::Debug for Contact {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Block(CubeFace { cube, face }) => {
-                write!(f, "{face:?} of {}", cube.refmt(&ConciseDebug))
-            }
-            Self::Voxel {
-                cube,
-                resolution,
-                voxel: CubeFace { cube: voxel, face },
-            } => write!(
-                f,
-                "{:?} of {} {}/{}",
-                face,
-                cube.refmt(&ConciseDebug),
-                voxel.refmt(&ConciseDebug),
-                resolution
-            ),
-        }
-    }
-}
-
-impl lines::Wireframe for Contact {
-    fn wireframe_points<E: Extend<[lines::Vertex; 2]>>(&self, output: &mut E) {
-        match self {
-            Contact::Block(cube_face) => cube_face.wireframe_points(output),
-            Contact::Voxel {
-                cube,
-                resolution,
-                voxel,
-            } => {
-                let resolution: FreeCoordinate = (*resolution).into();
-                voxel.wireframe_points(&mut MapExtend::new(output, |line: [lines::Vertex; 2]| {
-                    line.map(|mut vert| {
-                        vert.position = vert.position / resolution + cube.aab().lower_bounds_v();
-                        vert
-                    })
-                }))
-            }
-        }
-    }
 }
 
 /// Result of [`collide_along_ray`] which specifies a collision point possibly inside the cube.
@@ -197,6 +61,8 @@ impl CollisionRayEnd {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Specifies the ending condition for [`collide_along_ray()`]: what type of situation
 /// it should stop prior to the end of the ray for.
@@ -465,6 +331,8 @@ where
     None
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Returns an iterator over all blocks in `space` which intersect `aab`, accounting for
 /// collision options.
 pub(crate) fn find_colliding_cubes<Sp>(space: &Sp, aab: Aab) -> impl Iterator<Item = Cube> + '_
@@ -496,6 +364,8 @@ where
         collision_box.translate(ray.scale_direction(end.t_distance).unit_endpoint().to_vector());
     find_colliding_cubes(space, proposed_aab).next().is_some()
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Abstraction over voxel arrays that the collision detection algorithm can use,
 /// i.e. [`Space`] and `Vol<Arc<[Evoxel]>>`.
@@ -630,6 +500,8 @@ impl CollisionSpace for Vol<&[Evoxel]> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Given a ray describing movement of the origin of an AAB, perform a raycast to find
 /// the positions where the AAB moves into new cubes. The returned ray steps' `t_distance`
 /// values report how far to move the AAB to meet the edge.
@@ -700,6 +572,8 @@ pub(crate) fn nudge_on_ray(
     segment.scale_direction(1.0 + translation / direction_projection)
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -710,34 +584,6 @@ mod tests {
     use crate::universe::Universe;
     use rand::{RngExt as _, SeedableRng as _};
     use std::eprintln;
-
-    #[test]
-    fn contact_block_aab() {
-        assert_eq!(
-            Contact::Block(CubeFace {
-                cube: Cube::new(1, 2, 3),
-                face: Face7::PX
-            })
-            .aab(),
-            Aab::from_lower_upper([1., 2., 3.], [2., 3., 4.]),
-        );
-    }
-
-    #[test]
-    fn contact_voxel_aab() {
-        assert_eq!(
-            Contact::Voxel {
-                cube: Cube::new(1, 2, 3),
-                resolution: R4,
-                voxel: CubeFace {
-                    cube: Cube::new(2, 1, 0),
-                    face: Face7::NZ
-                },
-            }
-            .aab(),
-            Aab::from_lower_upper([1.5, 2.25, 3.0], [1.75, 2.5, 3.25]),
-        );
-    }
 
     #[test]
     fn collide_along_ray_with_opaque_block() {

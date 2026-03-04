@@ -2,10 +2,16 @@
 
 use crate::math::FreeCoordinate;
 
+// -------------------------------------------------------------------------------------------------
+
 mod body;
 pub use body::*;
+
 mod collision;
-pub use collision::*;
+pub(crate) use collision::StopAt;
+
+mod contact;
+pub use contact::{Contact, ContactSet};
 
 pub(crate) mod step;
 pub(crate) use step::VELOCITY_MAGNITUDE_LIMIT_SQUARED;
@@ -15,6 +21,8 @@ pub use step::{BodyStepDetails, PhysicsOutputs};
 
 #[cfg(test)]
 mod tests;
+
+// -------------------------------------------------------------------------------------------------
 
 /// Close-but-not-intersecting objects are set to this separation.
 pub(crate) const POSITION_EPSILON: FreeCoordinate = 1e-6 * 1e-6;

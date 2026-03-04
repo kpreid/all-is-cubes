@@ -25,7 +25,7 @@ use manyfmt::Refmt as _;
 use ordered_float::NotNan;
 
 use super::collision::{
-    Contact, aab_raycast, collide_along_ray, escape_along_ray, find_colliding_cubes, nudge_on_ray,
+    aab_raycast, collide_along_ray, escape_along_ray, find_colliding_cubes, nudge_on_ray,
 };
 use crate::block::{BlockCollision, Resolution};
 use crate::character::{self, ParentSpace};
@@ -40,7 +40,7 @@ use crate::math::{
     Aab, Axis, Cube, Face6, Face7, FaceMap, FreeCoordinate, FreePoint, FreeVector, PositiveSign,
     notnan,
 };
-use crate::physics::{Body, BodyStepInfo, ContactSet, POSITION_EPSILON, StopAt, Velocity};
+use crate::physics::{Body, BodyStepInfo, Contact, ContactSet, POSITION_EPSILON, StopAt, Velocity};
 use crate::raycast::Ray;
 use crate::space::{self, Space};
 use crate::time::Tick;
