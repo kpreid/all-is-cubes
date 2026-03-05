@@ -17,7 +17,7 @@ No test failures, compilation errors, or warnings should be present.
 If you have added or modified any public items,
 check if their documentation is correct and comprehensible when viewed as `rustdoc` pages.
 (Tip: `cargo xtask lint` also builds the documentation, and
-`cargo xtask doc` will build docs in the same way to avoid unnecessary rebuilds).
+`cargo xtask doc` will build docs in the same way to avoid unnecessary rebuilds.)
 
 Consider running these additional commands when they are relevant:
 
@@ -105,9 +105,10 @@ Each commit message should:
     The summary line may begin with a prefix describing the area or aspect it affects,
     if there is such a single area, such as:
 
-    *   A crate name, with the “`all-is-cubes-`” prefix removed, e.g. “`mesh:`” or
-        “`xtask:`”.
-    *   A module name within `all-is-cubes` itself, e.g. “`transaction:`” or “`raycast:`”.
+    *   A crate name, with the “`all-is-cubes-`” prefix removed,
+        e.g. “`mesh:`” or “`xtask:`”.
+    *   A module name within `all-is-cubes` or occasionally other crates,
+        e.g. “`transaction:`”, “`raycast:`”, or “`vui:`”.
     *   “`Deps:`” for dependency maintenance.
     *   “`CI:`” for CI configuration maintenance.
     *   “`Rerun:`” for changes to Rerun/`re_sdk` integration.
