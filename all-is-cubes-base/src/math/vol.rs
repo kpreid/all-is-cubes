@@ -268,7 +268,11 @@ where
     /// instead.
     #[inline]
     pub fn from_element(value: V) -> Self {
-        Self::from_elements(GridAab::ORIGIN_CUBE, core::iter::once(value).collect::<C>()).unwrap()
+        Vol {
+            bounds: GridAab::ORIGIN_CUBE,
+            ordering: ZMaj,
+            contents: C::from_iter(core::iter::once(value)),
+        }
     }
 
     /// Constructs a [`Vol<Box<[V]>>`] from nested Rust arrays in \[Z\]\[Y\]\[X\] order
@@ -480,7 +484,7 @@ where
         C: DerefMut,
     {
         let s = &mut *self.contents;
-        debug_assert_eq!(s.len(), self.bounds.volume().unwrap());
+        debug_assert_eq!(Some(s.len()), self.bounds.volume());
         s
     }
 }
