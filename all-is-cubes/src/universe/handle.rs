@@ -328,6 +328,7 @@ impl<T: 'static> Handle<T> {
     ///
     /// Returns an error if the handle is invalid or the ticket does not match.
     #[inline(never)]
+    #[expect(clippy::missing_panics_doc, reason = "all panics are bugs")]
     pub fn read<'t>(&self, read_ticket: ReadTicket<'t>) -> Result<T::Read<'t>, HandleError>
     where
         T: UniverseMember,

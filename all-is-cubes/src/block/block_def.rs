@@ -189,6 +189,7 @@ impl BlockDef {
             {
                 // This decrement makes the cost consistent with evaluating a
                 // block with Primitive::Indirect.
+                #[expect(clippy::missing_panics_doc, reason = "infallible")]
                 block::Budget::decrement_components(&filter.budget).unwrap();
 
                 universe::SealedMember::read_from_standalone(self).evaluate_impl(&filter)
@@ -379,6 +380,7 @@ impl Read<'_> {
             {
                 // This decrement makes the cost consistent with evaluating a
                 // block with Primitive::Indirect.
+                #[expect(clippy::missing_panics_doc, reason = "infallible")]
                 block::Budget::decrement_components(&filter.budget).unwrap();
 
                 self.evaluate_impl(&filter)

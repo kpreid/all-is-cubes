@@ -233,6 +233,7 @@ impl RenderTestContext {
         }
 
         // The comparison log will be consulted to determine if the test should be marked failed.
+        #[expect(clippy::missing_panics_doc)]
         self.comparison_log.lock().unwrap().push(outcome);
     }
 

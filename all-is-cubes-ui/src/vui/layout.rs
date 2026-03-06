@@ -40,6 +40,7 @@ pub type WidgetTree = Arc<LayoutTree<Arc<dyn Widget>>>;
 /// # Errors
 ///
 /// See [`InstallVuiError`].
+#[expect(clippy::missing_panics_doc)]
 pub fn install_widgets(
     grant: LayoutGrant,
     tree: &WidgetTree,
@@ -107,6 +108,10 @@ impl LayoutGrant {
     /// be one greater on that axis, and `false` that the position should be rounded down
     /// (asymmetric placement).
     #[must_use]
+    #[expect(
+        clippy::missing_panics_doc,
+        reason = "TODO: numeric overflow considerations"
+    )]
     pub fn shrink_to(self, mut sizes: GridSize, enlarge_for_symmetry: bool) -> Self {
         if enlarge_for_symmetry {
             for axis in Axis::ALL {
@@ -360,8 +365,10 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                     }
 
                     // TODO: remainder computation is inelegant - we want .expand() but single axis
+                    #[expect(clippy::missing_panics_doc)]
                     let child_bounds = bounds.abut(direction.opposite(), -size_on_axis)
                         .unwrap(/* always smaller, can't overflow */);
+                    #[expect(clippy::missing_panics_doc)]
                     let remainder_bounds = bounds.abut(direction, -(available_size - size_on_axis))
                         .unwrap(/* always smaller, can't overflow */);
 
@@ -385,6 +392,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 ref toolbar,
                 ref control_bar,
             } => {
+                #[expect(clippy::missing_panics_doc, reason = "TODO")]
                 let mut crosshair_pos =
                     Cube::containing(grant.bounds.center()).unwrap(/* TODO: not unwrap */);
                 crosshair_pos.z = 0;

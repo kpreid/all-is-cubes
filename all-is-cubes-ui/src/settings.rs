@@ -257,6 +257,7 @@ impl Data {
     /// Returns the current value of this setting, or the default if it is unset or invalid.
     pub fn get<T>(&self, key: &'static TypedKey<T>) -> &T {
         match self.0.map.get(&key.key) {
+            #[allow(clippy::missing_panics_doc, reason = "internal error")]
             Some(StoredValue {
                 unparsed: _,
                 parsed: Some(value),

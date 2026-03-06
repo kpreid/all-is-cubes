@@ -491,6 +491,7 @@ impl Block {
     /// assert_eq!(vec![block], rotated.clone().unspecialize());
     /// ```
     #[must_use]
+    #[allow(clippy::missing_panics_doc, reason = "panics are internal errors")]
     pub fn unspecialize(&self) -> Vec<Block> {
         let mut queue = VecDeque::from([self.clone()]);
         let mut output = Vec::new();

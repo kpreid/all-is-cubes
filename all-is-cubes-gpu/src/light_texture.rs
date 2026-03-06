@@ -281,6 +281,7 @@ impl LightTexture {
                 // Grows the mapped_region along one axis.
                 // Note that once we start these mutations, we *do not* use `intersection` any more,
                 // because it is obsolete and we'd forget to update the corners.
+                #[allow(clippy::missing_panics_doc)]
                 let mut grow = |axis| {
                     let old_range = self.mapped_region.axis_range(axis);
                     let new_range = region.axis_range(axis);

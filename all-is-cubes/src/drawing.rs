@@ -63,6 +63,7 @@ use embedded_graphics::Drawable;
 /// TODO: This function needs a better name
 ///
 /// TODO: Handling zero-area rectangles is not implemented
+#[expect(clippy::missing_panics_doc, reason = "TODO")]
 pub fn rectangle_to_aab(rectangle: Rectangle, transform: Gridgid, max_brush: GridAab) -> GridAab {
     // Note that embedded_graphics uses the convention that coordinates *identify pixels*,
     // not the boundaries between pixels. Thus, a rectangle whose bottom_right corner is

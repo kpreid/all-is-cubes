@@ -291,6 +291,7 @@ impl GltfWriter {
                                 timeline.push((frame_number, false));
                             }
                         }
+                        #[expect(clippy::missing_panics_doc, reason = "sanity check")]
                         Entry::Vacant(e) => {
                             // Node needs to be made invisible *from the start*.
                             // This should always happen on the first frame

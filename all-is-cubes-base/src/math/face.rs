@@ -1007,6 +1007,7 @@ impl<V> FaceMap<V> {
 
     /// Shuffle the values in this map according to the given rotation.
     #[must_use]
+    #[allow(clippy::missing_panics_doc, reason = "infallible unwrap")]
     pub fn rotate(self, rotation: GridRotation) -> Self {
         // TODO: Can we make this cleaner? (If GridRotation had a way to ask it what swaps
         // it corresponds to, that might also be useful for Vol rotations.)

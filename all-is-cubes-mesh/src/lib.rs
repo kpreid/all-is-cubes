@@ -45,6 +45,10 @@
 #![no_std]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![cfg_attr(test, allow(clippy::large_stack_arrays))]
+#![cfg_attr(
+    feature = "_special_testing",
+    allow(missing_docs, clippy::missing_panics_doc)
+)]
 
 extern crate alloc;
 

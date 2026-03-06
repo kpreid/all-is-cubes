@@ -214,6 +214,7 @@ impl Channels {
 /// * If invalid, panic.
 ///
 /// This function may be useful to [`Tile::slice()`] implementors.
+#[expect(clippy::missing_panics_doc, reason = "alternate formatting")]
 #[track_caller]
 pub fn validate_slice(tile_bounds: GridAab, slice_bounds: GridAab) -> Axis {
     assert!(

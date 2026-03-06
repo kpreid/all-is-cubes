@@ -145,6 +145,7 @@ impl UniverseTemplate {
     }
 
     /// Create a new [`Universe`] based on this template's specifications.
+    #[expect(clippy::missing_panics_doc, reason = "infallible unwraps")]
     pub async fn build(
         self,
         p: YieldProgress,

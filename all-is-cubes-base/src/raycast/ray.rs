@@ -284,6 +284,7 @@ impl AaRay {
 
         // Translation vector for the cube of the high-resolution grid that the ray is within
         // according to `sub_origin`.
+        #[expect(clippy::missing_panics_doc)]
         let sub_cube_containing_sub_origin: GridVector =
             Cube::containing(self.sub_origin.to_f64() * FreeCoordinate::from(resolution))
                 .unwrap() // can't fail because it's in the range 0..Resolution::MAX

@@ -346,6 +346,7 @@ impl Session {
     /// Also may update other session state from any incoming events.
     ///
     /// Always returns info for the last step even if multiple steps were taken.
+    #[allow(clippy::missing_panics_doc, reason = "internal failures only")]
     pub fn maybe_step_universe(&mut self) -> Option<UniverseStepInfo> {
         self.process_control_messages_and_stuff();
 
@@ -546,6 +547,7 @@ impl Session {
     /// TODO: bad API; revisit general cursor handling logic.
     /// We'd like to not have too much dependencies on the rendering, but also
     /// not obligate each platform/renderer layer to have too much boilerplate.
+    #[expect(clippy::missing_panics_doc, reason = "internal assertion")]
     pub fn update_cursor(&mut self, cameras: &StandardCameras) {
         let cursor_result = self.input_processor.cursor_ndc_position().and_then(|ndc_pos| {
             cameras

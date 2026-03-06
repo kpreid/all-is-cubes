@@ -75,6 +75,7 @@ pub fn cursor_raycast(
         return Ok(Some(Cursor {
             space: space_handle.clone(),
             face_entered: step.face(),
+            #[expect(clippy::missing_panics_doc, reason = "would be a bug")]
             face_selected: face_selected.expect("failed to determine face_selected"),
             point_entered: step.intersection_point(ray),
             distance_to_point: PositiveSign::<FreeCoordinate>::new_clamped(step.t_distance()),

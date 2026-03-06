@@ -152,7 +152,6 @@ manual_assert = "allow"
 many_single_char_names = "allow"
 match_bool = "allow"
 match_same_arms = "allow"
-missing_panics_doc = "allow" # consider enabling
 must_use_candidate = "allow" # consider enabling
 no_effect_underscore_binding = "allow"
 redundant_closure_for_method_calls = "allow" # consider enabling

@@ -255,11 +255,12 @@ impl RtRenderer<()> {
     /// [`Camera::post_process_color()`] is applied to the pixels.
     ///
     ///  [`Camera::post_process_color()`]: crate::camera::Camera::post_process_color
+    #[expect(clippy::missing_panics_doc)]
     pub fn draw_rgba(&self, info_text_fn: impl FnOnce(&RaytraceInfo) -> String) -> Rendering {
         let camera = self.cameras.cameras().world.clone();
         let size = self.modified_viewport().framebuffer_size;
 
-        let mut data = vec![[0; 4]; area_usize(size).unwrap()];
+        let mut data = vec![[0; 4]; area_usize(size).expect("viewport size must be feasible")];
         let info = self.draw::<ColorBuf, _, [u8; 4], _>(
             info_text_fn,
             |pixel_buf| camera.post_process_color(Rgba::from(pixel_buf)).to_srgb8(),

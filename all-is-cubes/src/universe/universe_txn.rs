@@ -417,6 +417,7 @@ impl UniverseTransaction {
     pub fn insert<T: UniverseMember>(name: Name, value: T) -> (Handle<T>, Self) {
         let mut txn = Self::default();
         // can't fail because the transaction has no conflicting names
+        #[expect(clippy::missing_panics_doc)]
         let handle = txn.insert_mut(name, value).unwrap();
         (handle, txn)
     }

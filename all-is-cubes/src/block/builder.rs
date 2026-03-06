@@ -388,6 +388,7 @@ impl<P: BuildPrimitive> Builder<'_, P, UniverseTransaction> {
         let (block, transaction) = self.build_block_and_txn_internal();
 
         // The transaction is always an insert_anonymous, which cannot fail.
+        #[expect(clippy::missing_panics_doc, reason = "infallible")]
         transaction.execute(universe, (), &mut transaction::no_outputs).unwrap();
 
         block
@@ -397,6 +398,9 @@ impl<P: BuildPrimitive> Builder<'_, P, UniverseTransaction> {
     /// inserting the associated space into the universe the block is to be used in.
     pub fn build_txn(self, transaction: &mut UniverseTransaction) -> Block {
         let (block, txn) = self.build_block_and_txn_internal();
+        // Note that if we add more control over the transaction than "add an anonymous space",
+        // this will need to start returning errors.
+        #[expect(clippy::missing_panics_doc, reason = "infallible")]
         transaction.merge_from(txn).unwrap();
         block
     }

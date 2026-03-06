@@ -166,6 +166,7 @@ impl<H: Host> BehaviorSet<H> {
                  behavior,
              }| QueryItem {
                 attachment,
+                #[allow(clippy::missing_panics_doc)]
                 behavior: <dyn Any>::downcast_ref::<T>(behavior).unwrap(),
             },
         )

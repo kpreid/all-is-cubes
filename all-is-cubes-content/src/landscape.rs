@@ -232,6 +232,7 @@ pub async fn install_landscape_blocks(
     let overhang_noise = array_of_noise(resolution, &noise::Value::new(0), |value| {
         value * 2.5 + f64::from(resolution) * 0.75
     });
+    #[allow(clippy::missing_panics_doc)]
     let blade_noise = array_of_noise(
         // TODO: instead of increasing the resolution, make separately seeded noise fns/arrays
         // for each of the grass blade blocks.

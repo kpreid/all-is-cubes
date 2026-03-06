@@ -197,7 +197,9 @@ impl Evoxels {
     pub fn as_vol_mut(&mut self) -> Vol<&mut [Evoxel]> {
         match self.0 {
             EvoxelsInner::One(ref mut voxel) => Vol::from_element_mut(voxel),
-            EvoxelsInner::Many(_, ref mut voxels) => {
+            EvoxelsInner::Many(_, ref mut voxels) =>
+            {
+                #[expect(clippy::missing_panics_doc)]
                 Vol::from_elements(voxels.bounds(), voxels.make_linear_mut()).unwrap()
             }
         }

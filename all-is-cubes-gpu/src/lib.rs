@@ -16,7 +16,10 @@
 // Increase recursion limit for deeply nested wgpu types
 #![recursion_limit = "256"]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
-// * TODO: warn(missing_docs), eventually.
+#![cfg_attr(
+    feature = "_special_testing",
+    allow(missing_docs, clippy::missing_panics_doc)
+)]
 #![forbid(unsafe_code)]
 
 extern crate alloc;

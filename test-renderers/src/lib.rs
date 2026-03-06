@@ -7,6 +7,7 @@
     clippy::module_name_repetitions,
     clippy::exhaustive_enums,
     clippy::exhaustive_structs,
+    clippy::missing_panics_doc,
     reason = "library for internal use only"
 )]
 #![forbid(unsafe_code)]

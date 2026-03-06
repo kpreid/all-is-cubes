@@ -273,6 +273,7 @@ impl Universe {
     /// Advance time for all members.
     ///
     /// * `deadline` is when to stop computing flexible things such as light transport.
+    #[expect(clippy::missing_panics_doc, reason = "all panics are bugs")]
     pub fn step(&mut self, paused: bool, deadline: time::Deadline) -> UniverseStepInfo {
         let start_time = time::Instant::now();
 
@@ -380,6 +381,7 @@ impl Universe {
     //---
     // TODO: This should logically return `StrongHandle`, but that may be too disruptive.
     // For now, we live with "do something with this handle before the next step".
+    #[expect(clippy::missing_panics_doc, reason = "all panics are bugs")]
     pub fn insert_anonymous<T>(&mut self, value: T) -> Handle<T>
     where
         T: UniverseMember,
@@ -640,6 +642,7 @@ impl Universe {
         function: impl FnOnce(&mut space::Mutation<'_, 'u>) -> Out,
     ) -> Result<Out, HandleError> {
         let entity = handle.as_entity(self.id)?;
+        #[expect(clippy::missing_panics_doc)]
         let Ok(write_query_data) =
             self.queries.write_members.spaces.get_mut(&mut self.world, entity)
         else {

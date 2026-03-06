@@ -126,6 +126,7 @@ impl Tool {
                     ))
                 }
             }
+            #[expect(clippy::missing_panics_doc)]
             Self::RemoveBlock { keep } => {
                 let cursor = input.cursor()?;
                 let mut deletion =

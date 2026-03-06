@@ -143,13 +143,16 @@
 #![no_std]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 // * This crate contains some unsafe code and therefore does not `forbid(unsafe_code)`.
-//   All of it is located in the `universe` module and pertains to ECS extensions.
+//   All of it pertains to ECS extensions.
 #![cfg_attr(
     not(any(test, feature = "arbitrary")),
     warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)
 )]
 #![cfg_attr(not(feature = "std"), allow(clippy::arc_with_non_send_sync))]
-#![cfg_attr(feature = "_special_testing", allow(private_interfaces))]
+#![cfg_attr(
+    feature = "_special_testing",
+    allow(private_interfaces, missing_docs, clippy::missing_panics_doc)
+)]
 
 #[cfg(any(feature = "std", test))]
 #[cfg_attr(test, macro_use)]

@@ -104,6 +104,7 @@ impl GltfDataDestination {
     //
     // ---
     // TODO: Add context (filename) to the IO error
+    #[expect(clippy::missing_panics_doc, reason = "implementation deficiency")]
     pub fn write<F>(
         &self,
         buffer_entity_name: String,

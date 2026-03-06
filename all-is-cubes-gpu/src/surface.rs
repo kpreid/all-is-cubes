@@ -151,6 +151,7 @@ impl SurfaceRenderer {
                     ..RenderInfo::default()
                 });
             }
+            #[allow(clippy::missing_panics_doc)] // TODO: reconfigure/retry on other errors?
             Err(e) => {
                 panic!(
                     "error from wgpu::Surface::get_current_texture(): {e:?}; \
