@@ -36,6 +36,10 @@ pub type WidgetTree = Arc<LayoutTree<Arc<dyn Widget>>>;
 ///
 /// TODO: This function needs a better name and location. Also, it would be nice if it could
 /// help with handling the potential error resulting from executing the transaction.
+///
+/// # Errors
+///
+/// See [`InstallVuiError`].
 pub fn install_widgets(
     grant: LayoutGrant,
     tree: &WidgetTree,
@@ -305,6 +309,7 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
     /// whose leaves are all [`Positioned`].
     ///
     /// TODO: haven't decided whether layout can fail yet, hence the placeholder non-error
+    #[expect(clippy::missing_errors_doc, reason = "TODO")]
     pub fn perform_layout(
         &self,
         grant: LayoutGrant,
@@ -427,6 +432,10 @@ impl LayoutTree<Arc<dyn Widget>> {
     ///
     /// Note that the widgets will not actually appear as blocks until the first time the
     /// space is stepped.
+    ///
+    /// # Errors
+    ///
+    /// See [`InstallVuiError`].
     pub fn to_space<B: space::builder::Bounds>(
         self: &Arc<Self>,
         read_ticket: ReadTicket<'_>,
@@ -457,7 +466,10 @@ impl LayoutTree<Positioned<Arc<dyn Widget>>> {
     ///
     /// The provided `read_ticket` should be for the universe the transaction will be executed in.
     ///
-    /// Returns an error if the widgets conflict with each other.
+    /// # Errors
+    ///
+    /// Returns an error if the widgets overlap each other or are otherwise erroneous.
+    /// See [`InstallVuiError`].
     pub fn installation(
         &self,
         read_ticket: ReadTicket<'_>,

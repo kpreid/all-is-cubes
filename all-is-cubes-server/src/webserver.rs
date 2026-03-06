@@ -6,6 +6,10 @@ use std::net::SocketAddr;
 /// Run the All is Cubes web server on an arbitrary local port.
 ///
 /// Returns the base URL to access it, and [TODO: explain the future, and have a shutdown plan]
+///
+/// # Errors
+///
+/// Returns an error if creating a listening socket fails.
 pub async fn start_server(
     bind_addr: SocketAddr,
     client_source: &crate::client_static::AicClientSource,

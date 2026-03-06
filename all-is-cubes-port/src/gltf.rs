@@ -80,9 +80,9 @@ pub struct MeshInstance {
 /// 2. Call methods to add entities that will be exported.
 /// 3. Call [`GltfWriter::into_root()`] to obtain the main
 ///    [`gltf_json::Root`] value which should be written to the `.gltf` file.
-///
-/// TODO: Split this struct into "root and buffers" (knows glTF generically) and
-/// "scene and animation" (knows how we intend to use it). This will simplify some borrows.
+//---
+// TODO: Split this struct into "root and buffers" (knows glTF generically) and
+// "scene and animation" (knows how we intend to use it). This will simplify some borrows.
 #[derive(Debug)]
 pub struct GltfWriter {
     /// Contains all the glTF entities written so far.
@@ -204,6 +204,10 @@ impl GltfWriter {
 
     /// Finish all scene preparation and return the [`gltf_json::Root`] which is to be
     /// written to a JSON file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing any of the buffer or image data fails.
     pub fn into_root(mut self, frame_pace: Duration) -> io::Result<gltf_json::Root> {
         if !self.texture_allocator.is_empty() {
             let (block_texture_index, _mapping) =

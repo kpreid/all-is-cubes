@@ -85,6 +85,7 @@ pub trait Transaction: Merge {
     ///
     /// If the preconditions are met, returns [`Ok`] containing data to be passed to
     /// [`Transaction::commit()`].
+    #[expect(clippy::missing_errors_doc, reason = "alternate phrasing")]
     fn check(
         &self,
         target: &Self::Target,
@@ -107,6 +108,7 @@ pub trait Transaction: Merge {
     /// to the particular `Target` type). The consequences of doing so may include mutating the
     /// wrong components, signaling an error partway through the transaction, or merely
     /// committing the transaction while its preconditions do not hold.
+    #[expect(clippy::missing_errors_doc, reason = "alternate phrasing")]
     fn commit(
         self,
         target: &mut Self::Target,
@@ -130,6 +132,7 @@ pub trait Transaction: Merge {
     /// ```
     ///
     /// See also: [`Transactional::transact()`], for building a transaction through mutations.
+    #[expect(clippy::missing_errors_doc, reason = "explicitly delegating")]
     fn execute(
         self,
         target: &mut Self::Target,
@@ -193,6 +196,7 @@ pub trait Merge: Sized {
     ///
     /// This is not necessarily the same as either ordering of applying the two
     /// transactions sequentially. See [`Self::commit_merge()`] for more details.
+    #[expect(clippy::missing_errors_doc, reason = "alternate phrasing")]
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict>;
 
     /// Combines `other` into `self` so that it has both effects simultaneously.
@@ -207,6 +211,7 @@ pub trait Merge: Sized {
     ///
     /// This is a shortcut for calling [`Self::check_merge`] followed by [`Self::commit_merge`].
     /// It should not be necessary to override the provided implementation.
+    #[expect(clippy::missing_errors_doc, reason = "alternate phrasing")]
     fn merge(mut self, other: Self) -> Result<Self, Self::Conflict> {
         self.merge_from(other)?;
         Ok(self)
@@ -218,6 +223,7 @@ pub trait Merge: Sized {
     ///
     /// This is a shortcut for calling [`Self::check_merge`] followed by [`Self::commit_merge`].
     /// It should not be necessary to override the provided implementation.
+    #[expect(clippy::missing_errors_doc, reason = "alternate phrasing")]
     fn merge_from(&mut self, other: Self) -> Result<(), Self::Conflict> {
         let check = self.check_merge(&other)?;
         self.commit_merge(other, check);
@@ -432,6 +438,7 @@ pub trait Transactional {
     /// Ideally, we would have an `async` version of this function too, but that
     /// is not possible, because the required borrowing pattern is not currently
     /// expressible when writing the future-returning closure it would require.
+    #[expect(clippy::missing_errors_doc, reason = "alternate phrasing")]
     fn transact<'c, F, O>(&mut self, f: F) -> Result<O, ExecuteError<Self::Transaction>>
     where
         F: FnOnce(

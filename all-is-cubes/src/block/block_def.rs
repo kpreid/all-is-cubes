@@ -175,6 +175,7 @@ impl BlockDef {
     ///
     /// This returns the same success or error as `Block::from(handle_to_self).evaluate()` would,
     /// not the same as `.block().evaluate()` would.
+    #[expect(clippy::missing_errors_doc, reason = "explicitly a delegation")]
     pub fn evaluate(&self) -> Result<block::EvaluatedBlock, EvalBlockError> {
         // Ticket can be stub because we don't actually use it in this case.
         let filter = block::EvalFilter::new(ReadTicket::stub());
@@ -364,6 +365,7 @@ impl Read<'_> {
     ///
     /// This returns the same success or error as `Block::from(handle_to_self).evaluate()` would,
     /// not the same as `.block().evaluate()` would.
+    #[expect(clippy::missing_errors_doc, reason = "explicitly a delegation")]
     pub fn evaluate(&self) -> Result<block::EvaluatedBlock, EvalBlockError> {
         // Ticket can be stub because we don't actually use it in this case.
         let filter = block::EvalFilter::new(ReadTicket::stub());

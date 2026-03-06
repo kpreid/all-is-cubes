@@ -556,6 +556,11 @@ impl Block {
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
     /// information needed for rendering and physics, and does not require [`Handle`] access
     /// to other objects.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `read_ticket` was not sufficient, or if evaluation exceeded the maximum
+    /// permitted computation cost.
     pub fn evaluate(&self, read_ticket: ReadTicket<'_>) -> Result<EvaluatedBlock, EvalBlockError> {
         self.evaluate2(&EvalFilter {
             read_ticket,
@@ -575,6 +580,9 @@ impl Block {
     /// referred to by a [`Primitive::Indirect`].
     ///
     /// # Errors
+    ///
+    /// Returns an error if `read_ticket` was not sufficient, or if evaluation exceeded the maximum
+    /// permitted computation cost.
     ///
     /// If an evaluation error is reported, the [`Listener`] may have been installed
     /// incompletely or not at all. It should not be relied on.
@@ -1184,8 +1192,14 @@ impl BlockChange {
 /// The returned [`Space`] contains each of the blocks; its coordinates will correspond to
 /// those of the input, scaled down by `resolution`.
 ///
-/// Panics if the `Space` cannot be accessed, and returns
-/// [`SetCubeError::TooManyBlocks`] if the space volume is too large.
+/// # Errors
+///
+/// Returns [`SetCubeError::TooManyBlocks`] if the space volume is too large,
+/// resulting in too many distinct blocks.
+///
+/// # Panics
+///
+/// Panics if the `Space` cannot be accessed.
 //---
 // TODO: This is only used once ... is it really a good public API?
 pub fn space_to_blocks(

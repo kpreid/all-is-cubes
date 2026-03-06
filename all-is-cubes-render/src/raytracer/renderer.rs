@@ -82,12 +82,14 @@ where
     ///
     /// On success, returns whether any of the scene actually changed.
     ///
-    /// Returns [`RenderError::Read`] if said sources are in use.
-    /// In that case, the renderer is still functional but will have stale data.
-    ///
     /// This method is equivalent to [`HeadlessRenderer::update()`] except for
     /// fitting the raytracer's needs and capabilities (works with all types;
     /// not `async`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RenderError::Read`] if said data sources are in use.
+    /// In that case, the renderer is still functional but will have stale data.
     pub fn update(
         &mut self,
         read_tickets: Layers<ReadTicket<'_>>,

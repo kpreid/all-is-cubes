@@ -220,6 +220,10 @@ impl<'u, P, Txn> Builder<'u, P, Txn> {
     ///
     /// Note that if the resulting builder is cloned, all clones will share the same
     /// space.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SetCubeError::TooManyBlocks`] if `function` returns too many distinct blocks.
     // TODO: (doc) test for this
     pub fn voxels_fn<'a, F, B>(
         self,

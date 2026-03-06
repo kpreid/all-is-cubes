@@ -591,6 +591,8 @@ impl Session {
     /// Display a notification to the user. Notifications persist until dismissed or the returned
     /// [`Notification`] handle is dropped, and their content may be updated through that handle.
     ///
+    /// # Errors
+    ///
     /// Returns an error if there is no UI to display notifications or if there are too many.
     pub fn show_notification(
         &mut self,
@@ -1274,7 +1276,11 @@ impl MainTaskContext {
         self.with_ref(|shuttle| f(shuttle.read_tickets()))
     }
 
-    /// Executes a transaction on the game universe of this session..
+    /// Executes a transaction on the game universe of this session.
+    ///
+    /// # Errors
+    ///
+    /// See [`transaction::Transaction::execute()`].
     pub fn execute(
         &mut self,
         transaction: UniverseTransaction,
@@ -1410,7 +1416,10 @@ impl MainTaskContext {
     /// Display a notification to the user. Notifications persist until dismissed or the returned
     /// [`Notification`] handle is dropped, and their content may be updated through that handle.
     ///
-    /// Returns an error if there is no UI to display notifications or if there are too many.
+    /// # Errors
+    ///
+    /// Returns an error if there is no UI to display notifications or if there are already
+    /// too many notifications.
     pub fn show_notification(
         &mut self,
         content: impl Into<notification::NotificationContent>,

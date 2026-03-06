@@ -152,6 +152,13 @@ impl Inventory {
     /// Use a tool stored in this inventory.
     ///
     /// `character` must be the character containing the inventory. TODO: Bad API
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// * `read_ticket` is not sufficient to read.
+    /// * The tool is not usable.
     pub fn use_tool(
         &self,
         read_ticket: ReadTicket<'_>,

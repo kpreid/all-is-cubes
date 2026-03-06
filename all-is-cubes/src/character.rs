@@ -223,6 +223,10 @@ impl Character {
 
     /// Constructs a [`Character`] within/looking at the given `space`
     /// with the initial state specified by [`Space::spawn`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `read_ticket` is not sufficient to read `space`.
     pub fn spawn_default(
         read_ticket: ReadTicket<'_>,
         space: Handle<Space>,
@@ -241,6 +245,10 @@ impl Character {
     ///
     /// TODO: This return value should really be a struct, but we are somewhat in the middle of
     /// refactoring how [`Character`] is built and this particular tuple is an interim measure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `read_ticket` is not sufficient to read `self`.
     //---
     // TODO(ecs): this needs a better signature. figure out how to do that without exposing `CharacterEye` publicly unless we want to do that on purpose.
     // TODO: documentation needs updating, and return value should be a struct
@@ -284,9 +292,14 @@ impl Character {
         }
     }
 
-    /// Use this character's selected tool on the given cursor.
+    /// Computes the effect of using this character's selected tool on the given cursor,
+    /// and returns a transaction to apply that effect.
     ///
-    /// Return an error if:
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// * `read_ticket` is not sufficient to read.
     /// * The tool is not usable.
     /// * The cursor does not refer to the same space as this character occupies.
     pub fn click(
@@ -299,7 +312,7 @@ impl Character {
 
         // Check that this is not a cursor into some other space.
         // This shouldn't happen according to game rules but it might due to a UI/session
-        // update glitch, and if it does, we do
+        // update synchronization problem, and if it does, we don’t want to fail hard.
         if let Some(cursor_space) = cursor.map(Cursor::space) {
             let our_space = tb.space();
             if cursor_space != our_space {

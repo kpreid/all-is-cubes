@@ -14,7 +14,7 @@
 #![no_std]
 //
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
-#![allow(clippy::cast_possible_wrap)]
+#![allow(clippy::cast_possible_wrap, clippy::missing_errors_doc)]
 #![allow(
     clippy::shadow_unrelated,
     reason = "https://github.com/rust-lang/rust-clippy/issues/11827"

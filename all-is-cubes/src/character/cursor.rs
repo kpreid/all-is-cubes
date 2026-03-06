@@ -16,6 +16,10 @@ use crate::universe::{Handle, HandleError, ReadTicket};
 
 /// Find the first selectable block the ray strikes and express the result in a [`Cursor`]
 /// value, or [`None`] if nothing was struck within the distance limit.
+///
+/// # Errors
+///
+/// Returns an error if `read_ticket` is not sufficient to read `space_handle`.
 pub fn cursor_raycast(
     read_ticket: ReadTicket<'_>,
     mut ray: Ray,

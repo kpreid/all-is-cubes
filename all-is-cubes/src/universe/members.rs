@@ -721,6 +721,10 @@ impl AnyHandle {
     }
 
     /// Downcast to a specific `Handle<T>` type.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(self)` if the handle is of a different type than `T`.
     pub fn downcast<T: 'static>(self) -> Result<Handle<T>, AnyHandle> {
         // TODO: implement this more efficiently, without the clone
         // (note that `Box`ing to use `Box<dyn Any>` downcasting is *not* more efficient)

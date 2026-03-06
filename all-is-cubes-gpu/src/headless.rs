@@ -32,6 +32,10 @@ pub struct Builder {
 
 impl Builder {
     /// Create a [`Builder`] by obtaining a new [`wgpu::Device`] from the given adapter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if obtaining a device failed, as per [`wgpu::Adapter::request_device()`].
     pub async fn from_adapter(
         label: &str,
         adapter: wgpu::Adapter,

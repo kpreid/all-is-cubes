@@ -38,8 +38,11 @@ pub struct SurfaceRenderer {
 impl SurfaceRenderer {
     /// Constructs a renderer owning and operating on `surface`.
     ///
-    /// This will create a dedicated [`wgpu::Device`] using the provided [`wgpu::Adapter`],
-    /// and return an error if requesting the device fails.
+    /// This will create a dedicated [`wgpu::Device`] using the provided [`wgpu::Adapter`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if obtaining a device failed, as per [`wgpu::Adapter::request_device()`].
     pub async fn new(
         cameras: StandardCameras,
         surface: wgpu::Surface<'static>,
@@ -94,6 +97,13 @@ impl SurfaceRenderer {
 
     /// Renders one frame to the surface, using the current contents of [`Self::cameras()`] and
     /// the given cursor and overlay text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `read_tickets` is not valid for reading the state referenced by the
+    /// previously provided [`StandardCameras`].
+    ///
+    /// Future versions may also return errors on reaching resource limits.
     pub fn render_frame(
         &mut self,
         read_tickets: Layers<ReadTicket<'_>>,

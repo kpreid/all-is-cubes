@@ -101,6 +101,8 @@ where
     ///
     /// On success, returns whether any of the scene actually changed.
     ///
+    /// # Errors
+    ///
     /// Returns an error if reading the [`Space`] fails.
     pub fn update(&mut self, read_ticket: ReadTicket<'_>) -> Result<bool, HandleError> {
         // Deadlock safety note:

@@ -99,6 +99,11 @@ where
     /// This is an async function for the sake of cancellation and optional cooperative
     /// multitasking. It may be blocked on from a synchronous context (but if that is the
     /// only use, consider calling [`Provider::new_sync()`] instead).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `definer` does.
+    /// The error will be annotated with the specific element of `E` for which it failed.
     pub async fn new<F>(progress: YieldProgress, mut definer: F) -> Result<Self, GenError>
     where
         F: FnMut(E) -> Result<V, InGenError>,
@@ -130,6 +135,11 @@ impl<E: BlockModule> Provider<E, Block> {
     /// The module itself is passed to `definer`, which may be used to create
     /// relationships among the blocks (e.g. one having the behavior of turning into another).
     /// Attempting to read those handles will necessarily fail.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `definer` does.
+    /// The error will be annotated with the specific element of `E` for which it failed.
     //---
     // TODO: This has to exist, but is an awkward shape and block-specific.
     // Figure out what the actually good API looks like.
@@ -181,6 +191,10 @@ impl<E: BlockModule> Provider<E, Block> {
     ///
     /// The given `read_ticket` should be sufficient for evaluating the blocks
     /// in `self`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if inserting any of the blocks into `txn` fails.
     pub fn install(
         &self,
         read_ticket: ReadTicket<'_>,
@@ -212,6 +226,8 @@ impl<E: BlockModule> Provider<E, Block> {
     /// Obtain the definitions of `E`'s blocks from `universe`, returning a new
     /// [`BlockProvider`] whose blocks refer to those definitions (via
     /// [`Primitive::Indirect`]).
+    ///
+    /// # Errors
     ///
     /// Returns an error if any of the blocks are not defined in that universe.
     pub fn using(universe: &Universe) -> Result<Self, ProviderError>

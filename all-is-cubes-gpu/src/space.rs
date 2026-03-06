@@ -301,6 +301,12 @@ impl SpaceRenderer {
     /// Update renderer internal state from the given [`Camera`] and referenced [`Space`],
     /// so that the next rendered meshes will be up to date (or as far up to date as the
     /// given [`deadline`] permits).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `read_ticket` is not valid for reading the previously set [`Space`].
+    ///
+    /// Future versions may also return errors on reaching resource limits.
     pub(crate) fn update(
         &mut self,
         deadline: time::Deadline,

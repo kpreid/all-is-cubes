@@ -77,6 +77,8 @@ impl GridAab {
     /// (inclusive) and the occupied volume (from a perspective of continuous
     /// rather than discrete coordinates) spans 5 to 15.
     ///
+    /// # Panics
+    ///
     /// Panics if the sizes are negative or the resulting range would cause
     /// numeric overflow. Use [`GridAab::checked_from_lower_upper`] to avoid panics.
     //---
@@ -97,7 +99,9 @@ impl GridAab {
     /// (inclusive) and the occupied volume (from a perspective of continuous
     /// rather than discrete coordinates) spans 5 to 10.
     ///
-    /// Returns [`Err`] if any of the `upper_bounds` are less than the `lower_bounds`.
+    /// # Errors
+    ///
+    /// Returns an error if any of the `upper_bounds` are less than the `lower_bounds`.
     #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     pub fn checked_from_lower_upper(
         lower_bounds: impl Into<GridPoint>,
@@ -133,6 +137,8 @@ impl GridAab {
     /// (inclusive) and the occupied volume (from a perspective of continuous
     /// rather than discrete coordinates) spans 5 to 10.
     ///
+    /// # Panics
+    ///
     /// Panics if any of the `upper_bounds` are less than the `lower_bounds`.
     #[track_caller]
     #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
@@ -159,7 +165,9 @@ impl GridAab {
 
     /// Constructs a [`GridAab`] from coordinate lower bounds and sizes.
     ///
-    /// Returns [`Err`] if the `size` is negative or adding it to `lower_bounds` overflows.
+    /// # Errors
+    ///
+    /// Returns an error if the `size` is negative or adding it to `lower_bounds` overflows.
     #[track_caller]
     #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     pub fn checked_from_lower_size(
@@ -676,6 +684,8 @@ impl GridAab {
     ///
     /// This introduces a particular linear ordering of the cubes in the volume.
     ///
+    /// # Errors
+    ///
     /// Returns an error if the volume of `self` is greater than [`usize::MAX`].
     #[inline]
     pub fn to_vol<O: Default>(self) -> Result<Vol<(), O>, crate::math::VolLengthError> {
@@ -888,7 +898,13 @@ impl GridAab {
     ///   (so that the returned [`GridAab`] never extends beyond the opposite face of
     ///   `self`).
     ///
-    /// For example, it may be used to construct the walls of a room:
+    /// # Errors
+    ///
+    /// Returns an error if the coordinates of the result would overflow.
+    ///
+    /// # Examples
+    ///
+    /// It may be used to construct the walls of a room:
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;

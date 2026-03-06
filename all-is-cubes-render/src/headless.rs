@@ -17,6 +17,8 @@ pub trait HeadlessRenderer {
     /// Update the renderer's internal copy of the scene from the data sources
     /// (`Handle<Character>` etc.) it is tracking.
     ///
+    /// # Errors
+    ///
     /// Returns [`RenderError::Read`] if said sources are in use or if some other
     /// prohibitive failure occurred. The resulting state of the renderer in such cases
     /// is not specified, but a good implementation should attempt recovery on a future

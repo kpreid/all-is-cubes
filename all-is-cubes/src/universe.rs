@@ -245,11 +245,14 @@ impl Universe {
     /// This equivalent to, but more efficient than, creating a single-member
     /// [`UniverseTransaction`],
     ///
-    /// Returns an error if the transaction's preconditions are not met,
-    /// if the transaction encountered an internal error, if the referent
-    /// was already being read or written (which is expressed as an
-    /// [`ExecuteError::Commit`], because it is a shouldn’t-happen kind of error),
-    /// or if the handle does not belong to this universe.
+    /// # Errors
+    ///
+    /// Returns an error if
+    /// * the transaction's preconditions are not met,
+    /// * the transaction encountered an internal error,
+    /// * the referent was already being read or written (which is expressed as an
+    ///   [`ExecuteError::Commit`], because it is a shouldn’t-happen kind of error),
+    /// * or the handle does not belong to this universe.
     #[inline(never)]
     #[expect(private_bounds, reason = "TransactionOnEcs is internal")]
     pub fn execute_1<T>(
@@ -402,7 +405,10 @@ impl Universe {
 
     /// Inserts a new object with a specific name.
     ///
-    /// Returns an error if the name is already in use.
+    /// # Errors
+    ///
+    /// Returns an error if the name is already in use or if `value` contains handles pointing to
+    /// a different universe.
     pub fn insert<T>(&mut self, name: Name, value: T) -> Result<Handle<T>, InsertError>
     where
         T: UniverseMember,
@@ -623,6 +629,8 @@ impl Universe {
     /// This is useful for efficient bulk mutations and to call operations that cannot be expressed
     /// as transactions, such as [`space::Mutation::fast_evaluate_light()`].
     ///
+    /// # Errors
+    ///
     /// Returns an error if the given [`Handle`] does not belong to this universe.
     #[inline(never)]
     pub fn mutate_space<'u, Out>(
@@ -668,6 +676,10 @@ impl Universe {
     /// Activate logging some member's actions to a Rerun stream.
     ///
     /// What exact information this means depends on the specific member type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the given [`Handle`] does not belong to this universe.
     #[cfg(feature = "rerun")]
     pub fn log_member_to_rerun<T: UniverseMember>(
         &mut self,

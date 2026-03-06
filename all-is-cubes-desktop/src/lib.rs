@@ -11,6 +11,11 @@
 // Increase recursion limit for deeply nested wgpu types
 #![recursion_limit = "256"]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
+#![allow(
+    clippy::missing_panics_doc,
+    clippy::missing_errors_doc,
+    reason = "not currently intended to be a well-designed library"
+)]
 #![forbid(unsafe_code)]
 
 use all_is_cubes::euclid::{Size2D, size2};

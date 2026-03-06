@@ -35,6 +35,8 @@ impl WidgetTheme {
     /// transaction that will be committed to the same universe as the widgets using this theme
     /// are to be installed in.
     ///
+    /// # Errors
+    ///
     /// Returns an error if the universe already contains the items that were to be installed.
     pub async fn new(
         read_ticket: ReadTicket<'_>,

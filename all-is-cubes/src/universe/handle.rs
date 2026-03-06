@@ -324,6 +324,8 @@ impl<T: 'static> Handle<T> {
     /// The caller must supply a [`ReadTicket`] from the [`Universe`] or [`UniverseTransaction`]
     /// the handle belongs to.
     ///
+    /// # Errors
+    ///
     /// Returns an error if the handle is invalid or the ticket does not match.
     #[inline(never)]
     pub fn read<'t>(&self, read_ticket: ReadTicket<'t>) -> Result<T::Read<'t>, HandleError>

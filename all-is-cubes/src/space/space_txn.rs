@@ -311,6 +311,7 @@ impl SpaceTransaction {
 
     /// As [`Transaction::execute()`], but taking a [`Mutation`] instead of a [`Space`].
     // TODO: better name
+    #[expect(clippy::missing_errors_doc, reason = "explicitly delegating")]
     pub fn execute_m(self, target: &mut Mutation<'_, '_>) -> Result<(), ExecuteError<Self>> {
         let check = self
             .check_common(

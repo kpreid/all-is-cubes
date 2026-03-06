@@ -10,6 +10,14 @@ use crate::Format;
 use crate::file;
 
 /// Load a [`Universe`] described by the given file (of guessed format).
+///
+/// # Errors
+///
+/// Returns an error if reading the file fails,
+/// its contents cannot be parsed,
+/// identifying its format fails,
+/// or its format is not supported.
+/// See [`ImportErrorKind`] for details.
 #[cfg_attr(
     not(any(feature = "native", feature = "dot-vox")),
     allow(unreachable_code, unused_variables)

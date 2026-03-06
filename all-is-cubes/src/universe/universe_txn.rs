@@ -431,6 +431,10 @@ impl UniverseTransaction {
     ///
     /// TODO: Give this a better name by renaming `insert()`.
     /// TODO: Is `InsertError` actually desirable, or legacy from before transactions?
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `self` already contains an insertion with the name `name`.
     pub fn insert_mut<T: UniverseMember>(
         &mut self,
         name: Name,
@@ -468,7 +472,9 @@ impl UniverseTransaction {
     ///
     /// This allows the construction of cyclic structures.
     ///
+    /// # Errors
     ///
+    /// Returns an error if `self` already contains an insertion with the name `name`.
     pub fn insert_without_value<T: UniverseMember>(
         &mut self,
         name: Name,

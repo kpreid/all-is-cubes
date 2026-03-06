@@ -92,7 +92,15 @@ impl Tool {
     /// This function has no side effects; for example, it may be safely used to determine
     /// *whether* a tool applies or not.
     ///
-    /// TODO: Return type is inelegant
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// * The read ticket in `input` is not sufficient to read the relevant [`Character`] and
+    ///   [`Space`].
+    /// * The tool is not usable in this situation.
+    //---
+    // TODO: Return type is inelegant
     pub fn use_tool(
         self,
         input: &ToolInput<'_>,
@@ -228,6 +236,15 @@ impl Tool {
     ///
     /// This operation is used for special cases where an action is expressed by a tool
     /// but the tool is not a “game item”.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// * The read ticket in `input` is not sufficient to read the relevant [`Character`] and
+    ///   [`Space`].
+    /// * The tool is not usable in this situation.
+    /// * The tool attempted to modify its own state (so `use_immutable_tool()` is not applicable).
     pub fn use_immutable_tool(
         &self,
         input: &ToolInput<'_>,
@@ -432,15 +449,22 @@ impl<'ticket> ToolInput<'ticket> {
     }
 
     /// Returns a [`Cursor`] indicating what blocks the tool should act on, if it is
-    /// a sort of tool that acts on blocks. If there is no [`Cursor`], because of aim
-    /// or because of being used in a context where there cannot be any aiming, returns
-    /// [`Err(ToolError::NothingSelected)`](ToolError::NothingSelected) for convenient
-    /// propagation.
+    /// a sort of tool that acts on blocks.
+    ///
+    /// # Errors
+    ///
+    /// If there is no [`Cursor`], because of aim or because of being used in a context where there
+    /// cannot be any aiming, returns
+    /// [`Err(ToolError::NothingSelected)`](ToolError::NothingSelected) for convenient propagation.
     pub fn cursor(&self) -> Result<&Cursor, ToolError> {
         self.cursor.as_ref().ok_or(ToolError::NothingSelected)
     }
 
     /// Add the provided items to the inventory from which the tool was used.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there is no inventory.
     pub fn produce_items<S: Into<inv::Slot>, I: IntoIterator<Item = S>>(
         &self,
         items: I,

@@ -94,6 +94,8 @@ impl<O> Vol<(), O> {
 
     /// Attach some data to this dataless `Vol`.
     ///
+    /// # Errors
+    ///
     /// Returns a [`VolLengthError`] if the number of elements does not match
     /// [`bounds.volume()`](GridAab::volume).
     #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
@@ -120,11 +122,13 @@ impl Vol<(), ZMaj> {
     /// Divide `self` into two approximately equal-sized parts which, if they had elements, would
     /// each be contiguous in the linear ordering.
     ///
-    /// Returns [`None`] if `self` does not have at least two cubes.
-    ///
     /// Note that this is one of several `subdivide()` methods for different container types;
     /// it is also implemented for immutable and mutable references.
     /// These are intended to be useful in executing parallel algorithms on volume data.
+    ///
+    /// # Errors
+    ///
+    /// Returns `self` unchanged if `self` does not have at least two cubes.
     #[allow(clippy::missing_inline_in_public_items)]
     pub fn subdivide(self) -> Result<[Self; 2], Self> {
         match find_zmaj_subdivision(self) {
@@ -141,6 +145,8 @@ where
 {
     /// Constructs a `Vol<C>` containing the provided elements, which must be in the
     /// ordering specified by `O`.
+    ///
+    /// # Errors
     ///
     /// Returns a [`VolLengthError`] if the number of elements does not match
     /// [`bounds.volume()`](GridAab::volume).
@@ -504,11 +510,13 @@ impl<'a, V> Vol<&'a [V], ZMaj> {
     /// Divide `self` into two approximately equal-sized parts,
     /// each of which refers to the appropriate sub-slice of elements.
     ///
-    /// Returns [`None`] if `self` does not have at least two cubes.
-    ///
     /// Note that this is one of several `subdivide()` methods for different container types;
     /// it is also implemented for mutable references and `()`.
     /// These are intended to be useful in executing parallel algorithms on volume data.
+    ///
+    /// # Errors
+    ///
+    /// Returns `self` unchanged if `self` does not have at least two cubes.
     #[allow(clippy::missing_inline_in_public_items)]
     pub fn subdivide(self) -> Result<[Self; 2], Self> {
         match find_zmaj_subdivision(self.without_elements()) {
@@ -532,12 +540,14 @@ impl<V> Vol<&mut [V], ZMaj> {
     /// `filter` may be used to reject subdivisions that are too small or otherwise unsuitable;
     /// it is passed the bounds of the two slices that would be returned.
     ///
-    /// Returns [`Err`] containing `self` if `self` does not have at least two cubes,
-    /// or if `filter` returns `false`.
-    ///
     /// Note that this is one of several `subdivide()` methods for different container types;
     /// it is also implemented for immutable references and `()`.
     /// These are intended to be useful in executing parallel algorithms on volume data.
+    ///
+    /// # Errors
+    ///
+    /// Returns `self` unchanged if `self` does not have at least two cubes,
+    /// or if `filter` returns `false`.
     //---
     // Design note: This has the `filter` parameter, where other `subdivide()`s do not,
     // because otherwise the caller may have trouble with conditional returns of mutable borrows

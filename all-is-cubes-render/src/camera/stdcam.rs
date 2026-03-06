@@ -337,6 +337,11 @@ impl StandardCameras {
     ///
     /// Make sure to call [`StandardCameras::update`] first so that the cameras are
     /// up to date with game state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `read_tickets` is not valid for reading the state referenced by this
+    /// [`StandardCameras`].
     pub fn project_cursor(
         &self,
         read_tickets: Layers<ReadTicket<'_>>,

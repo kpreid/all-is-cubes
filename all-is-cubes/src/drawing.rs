@@ -350,6 +350,10 @@ impl<'a> VoxelBrush<'a> {
     ///
     /// Unlike [`Mutation::set()`], it is not considered an error if any of the affected cubes
     /// fall outside of the `Space`'s bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the erors that [`Mutation::set()`] does.
     pub fn paint(&self, m: &mut Mutation<'_, '_>, origin: Cube) -> Result<(), SetCubeError> {
         for &(offset, ref block) in &self.0 {
             ignore_out_of_bounds(m.set(origin + offset, Cow::borrow(block)))?;

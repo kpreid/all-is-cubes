@@ -1318,6 +1318,8 @@ impl<'space> Mutation<'_, 'space> {
     /// already present, and `Err(_)` if the replacement could not be made; see
     /// [`SetCubeError`] for possible errors.
     ///
+    /// # Example
+    ///
     /// ```
     /// use all_is_cubes::block;
     /// use all_is_cubes::math::Rgba;
@@ -1333,6 +1335,7 @@ impl<'space> Mutation<'_, 'space> {
     ///
     /// assert_eq!(space[[0, 0, 0]], a_block);
     /// ```
+    #[expect(clippy::missing_errors_doc, reason = "expressed differently")]
     pub fn set<'block>(
         &mut self,
         position: impl Into<Cube>,
@@ -1346,10 +1349,17 @@ impl<'space> Mutation<'_, 'space> {
     /// The function may return a reference to a block or a block. If it returns [`None`],
     /// the existing block is left unchanged.
     ///
-    /// The operation will stop on the first error, potentially leaving some blocks
+    /// # Errors
+    ///
+    /// * Returns [`SetCubeError::OutOfBounds`] if `region` is not within `self.bounds()`
+    /// * Returns [`SetCubeError::TooManyBlocks`] if `function` returns too many distinct blocks.
+    ///
+    /// The fill operation will stop on the first error, potentially leaving some blocks
     /// replaced. (Exception: If the `region` extends outside of
     /// [`self.bounds()`](Self::bounds), that will always be rejected before any changes
     /// are made.)
+    ///
+    /// # Example
     ///
     /// ```
     /// use all_is_cubes::block;
@@ -1395,6 +1405,7 @@ impl<'space> Mutation<'_, 'space> {
     }
 
     /// As [`Mutation::fill()`], but fills the entire space instead of a specified region.
+    #[expect(clippy::missing_errors_doc, reason = "explicitly delegating")]
     pub fn fill_all<F, B>(&mut self, function: F) -> Result<(), SetCubeError>
     where
         F: FnMut(Cube) -> Option<B>,
@@ -1405,7 +1416,15 @@ impl<'space> Mutation<'_, 'space> {
 
     /// Replace blocks in `region` with the given block.
     ///
-    /// TODO: Document error behavior
+    /// # Errors
+    ///
+    /// * Returns [`SetCubeError::OutOfBounds`] if `region` is not within `self.bounds()`
+    /// * Returns [`SetCubeError::TooManyBlocks`] if the space has no capacity for a new distinct
+    ///   block.
+    ///   Depending on the exact situation, this may occur even if the fill would, when finished
+    ///   fully replace an existing block.
+    ///
+    /// # Example
     ///
     /// ```
     /// use all_is_cubes::block;
@@ -1453,6 +1472,7 @@ impl<'space> Mutation<'_, 'space> {
     }
 
     /// As [`Mutation::fill_uniform()`], but fills the entire space instead of a specified region.
+    #[expect(clippy::missing_errors_doc, reason = "explicitly delegating")]
     pub fn fill_all_uniform(&mut self, block: &Block) -> Result<(), SetCubeError> {
         self.fill_uniform(self.bounds(), block)
     }

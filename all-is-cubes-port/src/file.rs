@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 /// A “file” that we can load things from and which has a name,
 /// without being tied to the current OS file system.
+#[allow(clippy::missing_errors_doc, reason = "TODO")]
 pub trait Fileish: fmt::Debug + Send + Sync {
     /// Path of the file, for display purposes such as in a window title.
     fn document_name(&self) -> String;

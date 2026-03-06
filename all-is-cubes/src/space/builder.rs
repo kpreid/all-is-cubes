@@ -171,20 +171,21 @@ impl Builder<'_, Vol<()>> {
     /// Sets the initial contents of the space using a palette (numbered list of blocks)
     /// and indices into that palette for every in-bounds cube.
     ///
-    /// The input data must meet all of these requirements, or a [`PaletteError`] will be
-    /// returned:
-    ///
-    /// * `palette` must have no more than `BlockIndex::MAX + 1` elements.
-    /// * `contents` must have the same bounds as were set for this space.
-    /// * `contents` must contain no elements that are out of bounds of the `palette`.
-    /// * `light`, if specified, must have the same bounds as were set for this space.
-    ///
     /// The `palette` is allowed to contain duplicate elements, but they will be combined.
     /// In general, the produced [`Space`] will not necessarily have the same indices
     /// as were provided.
     ///
     /// Calling this method will replace any previous specification of the contents,
     /// such as [`filled_with()`](Self::filled_with()).
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`PaletteError`] if the input data does not meet all of these requirements:
+    ///
+    /// * `palette` must have no more than `BlockIndex::MAX + 1` elements.
+    /// * `contents` must have the same bounds as were set for this space.
+    /// * `contents` must contain no elements that are out of bounds of the `palette`.
+    /// * `light`, if specified, must have the same bounds as were set for this space.
     pub fn palette_and_contents<P>(
         self,
         palette: P,
@@ -269,6 +270,8 @@ impl Builder<'_, Vol<()>> {
     /// Construct a [`Space`] with the contents and settings from this builder.
     ///
     /// The builder must have had bounds specified, or it will not be possible to call this method.
+    ///
+    /// # Errors
     ///
     /// Returns an error if insufficient memory is available is available for the [`Space`]’s
     /// data arrays.

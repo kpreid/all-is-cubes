@@ -285,6 +285,13 @@ impl EverythingRenderer {
 
     /// Read current scene content, compute meshes, and send updated resources
     /// to the GPU to prepare for actually drawing it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `read_tickets` is not valid for reading the state referenced by the
+    /// previously provided [`StandardCameras`].
+    ///
+    /// Future versions may also return errors on reaching resource limits.
     pub fn update(
         &mut self,
         read_tickets: Layers<ReadTicket<'_>>,

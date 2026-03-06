@@ -91,6 +91,7 @@ pub trait Widget: Layoutable + Debug + Send + Sync {
 pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     /// Write the initial state of the widget to the space.
     /// This is called at most once.
+    #[expect(clippy::missing_errors_doc, reason = "TODO: error type is too broad")]
     fn initialize(
         &mut self,
         context: &WidgetContext<'_, '_>,
@@ -117,6 +118,11 @@ pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     /// the widget's data sources or user interaction.
     ///
     /// If this is not overridden, it will do nothing and the controller will be dropped.
+    ///
+    /// # Errors
+    ///
+    /// If the widget encounters an unexpected problem, it may return an error instead of panicking
+    /// so that the rest of the system can continue.
     fn step(&mut self, context: &WidgetContext<'_, '_>) -> Result<StepSuccess, StepError> {
         let _ = context;
         Ok((WidgetTransaction::default(), Then::Drop))
