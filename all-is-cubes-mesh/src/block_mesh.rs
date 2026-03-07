@@ -197,8 +197,17 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     ///
     /// Note that a particular occurrence of this mesh in a [`SpaceMesh`] may have a smaller
     /// bounding box due to hidden face culling.
+    //---
+    // Optimization note:
+    // This function is rarely called.
+    // In particular, its primary use case is in constructing single-block [`SpaceMesh`]es
+    // for instancing. Therefore, its implementation has been tweaked to be small, not fast.
     pub fn bounding_box(&self) -> Aabbs {
-        self.all_sub_meshes().map(|sm| sm.bounding_box).reduce(Aabbs::union).unwrap()
+        let mut b = Aabbs::EMPTY;
+        for sm in self.all_sub_meshes() {
+            b = b.union(sm.bounding_box);
+        }
+        b
     }
 
     /// Reports any flaws in this mesh: reasons why using it to create a rendering would
