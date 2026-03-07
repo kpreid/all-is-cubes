@@ -101,6 +101,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
 /// Scale a cube position to obtain the containing chunk and the cube position within it.
 //---
 // Design note: these operations are combined to allow skipping some numeric overflow cases.
+// TODO: It’s possible for this to produce a `ChunkPos` whose `bounds()` overflows. Seems bad.
 pub fn cube_to_chunk<const CHUNK_SIZE: GridCoordinate>(
     cube: Cube,
 ) -> (ChunkPos<CHUNK_SIZE>, Point3D<GridCoordinate, ChunkRelative>) {
@@ -468,8 +469,24 @@ mod tests {
 
     #[test]
     fn chunk_consistency() {
-        // TODO: this is overkill; sampling the edge cases would be sufficient
-        for cube in GridAab::from_lower_size([-1, -1, -1], [32, 32, 32]).interior_iter() {
+        #[rustfmt::skip]
+        let interesting_coordinates = [
+            -0x8000_0000,
+            -17, -16,
+            -1, 0, 1, 2,
+            15, 16,
+            31, 32,
+            // This is the largest cube whose chunk bounds wouldn’t overflow.
+            // TODO: Make chunking logic robust against getting inputs that would overflow.
+            // Maybe by making the highest chunk have smaller bounds?
+            0x7FFF_FFEF,
+        ];
+        for (x, y, z) in itertools::iproduct!(
+            interesting_coordinates,
+            interesting_coordinates,
+            interesting_coordinates
+        ) {
+            let cube = Cube::new(x, y, z);
             let (chunk, rel) = cube_to_chunk::<16>(cube);
             assert!(chunk.bounds().contains_cube(cube));
             assert_eq!(
