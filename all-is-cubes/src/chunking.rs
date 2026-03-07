@@ -72,12 +72,18 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
 
     /// Returns the bounds of this chunk as a [`GridAab`].
     ///
-    /// TODO: specify what happens if the result would overflow.
+    /// Under normal circumstances, the bounds are always a cube of side length `CHUNK_SIZE`.
+    /// If the bounds would overflow the numeric range of [`GridAab`], then they are
+    /// clamped to the closest in-bounds region.
+    /// This means they may be non-cubical or even zero sized.
+    /// They will still agree with the behavior of [`cube_to_chunk()`].
     pub fn bounds(self) -> GridAab {
-        GridAab::from_lower_size(
-            self.0.lower_bounds() * CHUNK_SIZE,
-            GridSize::splat(CHUNK_SIZE.cast_unsigned()),
-        )
+        let lower_bounds = self.0.lower_bounds().map(|coord| coord.saturating_mul(CHUNK_SIZE));
+        let upper_bounds = self
+            .0
+            .lower_bounds()
+            .map(|coord| coord.saturating_add(1).saturating_mul(CHUNK_SIZE));
+        GridAab::from_lower_upper(lower_bounds, upper_bounds)
     }
 
     /// Returns the distance between the two given chunks. See the [`Distance`] for an
@@ -467,26 +473,53 @@ mod tests {
     use rand::{RngExt as _, SeedableRng as _};
     use std::collections::HashSet;
 
+    /// Test exact handling of a [`ChunkPos`] whose bounds exceed the possible [`Cube`] coordinates,
+    /// but only partially.
     #[test]
-    fn chunk_consistency() {
+    fn chunk_bounds_overflow() {
+        assert_eq!(
+            ChunkPos::<0x1_0000>::new(-0x8001, 0, 0).bounds(),
+            GridAab::from_lower_upper([-0x8000_0000, 0, 0], [-0x8000_0000, 0x1_0000, 0x1_0000]),
+            "total overflow, negative (chunk is zero volume)",
+        );
+
+        assert_eq!(
+            ChunkPos::<0x1_0000>::new(-0x8000, 0, 0).bounds(),
+            GridAab::from_lower_upper([-0x8000_0000, 0, 0], [-0x7FFF_0000, 0x1_0000, 0x1_0000]),
+            "lowest negative chunk (still cubical)",
+        );
+
+        assert_eq!(
+            ChunkPos::<0x1_0000>::new(0x7FFF, 0, 0).bounds(),
+            GridAab::from_lower_upper([0x7FFF_0000, 0, 0], [0x7FFF_FFFF, 0x1_0000, 0x1_0000]),
+            "partial overflow, positive (chunk is no longer cubical)",
+        );
+
+        assert_eq!(
+            ChunkPos::<0x1_0000>::new(0x8000, 0, 0).bounds(),
+            GridAab::from_lower_upper([0x7FFF_FFFF, 0, 0], [0x7FFF_FFFF, 0x1_0000, 0x1_0000]),
+            "total overflow, negative (chunk is zero volume)",
+        );
+    }
+
+    #[test]
+    fn conversion_consistency() {
         #[rustfmt::skip]
-        let interesting_coordinates = [
+        let interesting_coordinates: [i32; _] = [
             -0x8000_0000,
             -17, -16,
             -1, 0, 1, 2,
             15, 16,
             31, 32,
             // This is the largest cube whose chunk bounds wouldn’t overflow.
-            // TODO: Make chunking logic robust against getting inputs that would overflow.
-            // Maybe by making the highest chunk have smaller bounds?
             0x7FFF_FFEF,
+            // This is the largest cube which has a chunk at all (i32::MAX - 1).
+            0x7FFF_FFFE,
         ];
-        for (x, y, z) in itertools::iproduct!(
-            interesting_coordinates,
-            interesting_coordinates,
-            interesting_coordinates
-        ) {
-            let cube = Cube::new(x, y, z);
+        for cube in
+            itertools::Itertools::array_combinations::<3>(interesting_coordinates.into_iter())
+                .map(Cube::from)
+        {
             let (chunk, rel) = cube_to_chunk::<16>(cube);
             assert!(chunk.bounds().contains_cube(cube));
             assert_eq!(
