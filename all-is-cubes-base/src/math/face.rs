@@ -774,9 +774,15 @@ impl From<Face6> for re_sdk_types::view_coordinates::SignedAxis3 {
 }
 
 /// Container for values keyed by [`Face6`]s. Always holds exactly six elements.
+///
+/// # Layout
+///
+/// A `FaceMap<V>` is identical in layout to a `[V; 6]`.
+/// This can be taken advantage of using the [`as_array()`][Self::as_array] method.
 #[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Default, Hash, PartialEq, Eq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[repr(C)] // used `unsafe`ly for by-reference conversions
 pub struct FaceMap<V> {
     /// The value whose key is [`Face6::NX`].
     pub nx: V,
@@ -845,40 +851,47 @@ impl<V> FaceMap<V> {
         Vector3D::new(self.px, self.py, self.pz)
     }
 
+    /// Converts/reborrows a reference to `FaceMap<V>` into a reference to `[V; 6]`.
+    #[inline(always)] // type change only, compiles to noop
+    pub fn as_array(&self) -> &[V; 6] {
+        let raw: *const FaceMap<V> = &raw const *self;
+        let raw: *const [V; 6] = raw.cast();
+        // SAFETY: `FaceMap` is `repr(C)` with fixed layout which matches the array type.
+        unsafe { &*raw }
+    }
+
+    /// Converts/reborrows a reference to `FaceMap<V>` into a reference to `[V; 6]`.
+    #[inline(always)] // type change only, compiles to noop
+    pub fn as_array_mut(&mut self) -> &mut [V; 6] {
+        let raw: *mut FaceMap<V> = &raw mut *self;
+        let raw: *mut [V; 6] = raw.cast();
+        // SAFETY: `FaceMap` is `repr(C)` with fixed layout which matches the array type,
+        // and has neither more nor fewer invariants than the array does.
+        unsafe { &mut *raw }
+    }
+
     /// Iterate over the map's key-value pairs by reference, in the same order as [`Face6::ALL`].
-    pub fn iter(&self) -> impl Iterator<Item = (Face6, &V)> {
-        Face6::ALL.iter().copied().map(move |f| (f, &self[f]))
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Face6, &V)> + ExactSizeIterator + Clone {
+        Face6::ALL.into_iter().zip(self.as_array())
     }
 
     /// Iterate over the map's key-value pairs by mutable reference, in the same order as [`Face6::ALL`].
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Face6, &mut V)> {
-        [
-            (Face6::NX, &mut self.nx),
-            (Face6::NY, &mut self.ny),
-            (Face6::NZ, &mut self.nz),
-            (Face6::PX, &mut self.px),
-            (Face6::PY, &mut self.py),
-            (Face6::PZ, &mut self.pz),
-        ]
-        .into_iter()
+    pub fn iter_mut(
+        &mut self,
+    ) -> impl DoubleEndedIterator<Item = (Face6, &mut V)> + ExactSizeIterator {
+        Face6::ALL.into_iter().zip(self.as_array_mut())
     }
 
     /// Iterate over the map values by reference, in the same order as [`Face6::ALL`].
-    pub fn values(&self) -> impl Iterator<Item = &V> + Clone {
-        Face6::ALL.iter().copied().map(move |f| &self[f])
+    #[inline]
+    pub fn values(&self) -> core::slice::Iter<'_, V> {
+        self.as_array().iter()
     }
 
     /// Iterate over the map values by mutable reference, in the same order as [`Face6::ALL`].
-    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut V> {
-        [
-            &mut self.nx,
-            &mut self.ny,
-            &mut self.nz,
-            &mut self.px,
-            &mut self.py,
-            &mut self.pz,
-        ]
-        .into_iter()
+    #[inline]
+    pub fn values_mut(&mut self) -> core::slice::IterMut<'_, V> {
+        self.as_array_mut().iter_mut()
     }
 
     /// Convert to an array, whose elements are arranged in the same order as [`Face6::ALL`].
@@ -887,8 +900,7 @@ impl<V> FaceMap<V> {
     }
 
     /// Convert to an iterator, whose items are arranged in the same order as [`Face6::ALL`].
-    pub fn into_values_iter(self) -> impl Iterator<Item = V> {
-        // TODO: eliminate this as not really useful in Rust 2021
+    pub fn into_values_iter(self) -> core::array::IntoIter<V, 6> {
         self.into_values().into_iter()
     }
 
