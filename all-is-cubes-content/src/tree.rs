@@ -370,8 +370,7 @@ mod graph {
             Box::new(
                 self.neighbor_edges(cube)
                     .map(|face, growth| GrowphEdgeRef::from_face(cube, face, growth))
-                    .into_values()
-                    .into_iter()
+                    .into_values_iter()
                     .filter(|edge| {
                         // Filter out edges that exit the bounds of the graph
                         self.bounds().contains_cube(edge.source())
