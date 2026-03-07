@@ -113,6 +113,21 @@ impl Resolution {
             Self::R128 => const { 128.0f64.recip() },
         }
     }
+
+    /// Returns the square of this resolution, which is also the surface area of a cube face with
+    /// this resolution, as a [`f32`].
+    ///
+    /// This is guaranteed to produce an exact, deterministic result,
+    /// unlike `f32::from(self).powi(2)`.
+    #[inline(never)]
+    pub fn squared_f32(self) -> f32 {
+        // This particular implementation was picked for producing nice machine code on both
+        // x86_64 and aarch64: multiply/shift, shift, and convert, with no masking or overflow
+        // checks.
+        let doubled_log = u32::from(self.log2()).wrapping_mul(2);
+        let squared_int = 1u32.wrapping_shl(doubled_log);
+        squared_int as f32
+    }
 }
 
 impl fmt::Debug for Resolution {
@@ -316,6 +331,14 @@ mod tests {
         for resolution in RS {
             assert_eq!(resolution.recip_f32(), f32::from(resolution).recip());
             assert_eq!(resolution.recip_f64(), f64::from(resolution).recip());
+        }
+    }
+
+    #[test]
+    fn squared() {
+        for resolution in RS {
+            let float = f32::from(resolution);
+            assert_eq!(resolution.squared_f32(), float * float);
         }
     }
 }

@@ -315,11 +315,11 @@ fn transparent_voxels_simple() {
     // the light paths with opaque surfaces.
     assert_eq!(
         e.color(),
-        voxel_color.with_alpha(zo32(1.0 - (alpha / (f32::from(resolution).powi(2) * 3.0))))
+        voxel_color.with_alpha(zo32(1.0 - (alpha / (resolution.squared_f32() * 3.0))))
     );
     // This is the sum of the transparency of one voxel on one of the six faces
     let one_face_transparency =
-        voxel_color.with_alpha(zo32(1.0 - (alpha / f32::from(resolution).powi(2))));
+        voxel_color.with_alpha(zo32(1.0 - (alpha / resolution.squared_f32())));
     assert_eq!(
         e.face_colors(),
         FaceMap {
@@ -404,7 +404,7 @@ fn voxels_full_but_transparent() {
     let e = eval_in(&block, &universe);
     assert_eq!(
         e.color(),
-        Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution).powi(2))
+        Rgba::new(0.0, 0.0, 0.0, resolution.squared_f32().recip())
     );
     assert_eq!(e.resolution(), resolution);
     assert_eq!(e.opaque(), FaceMap::splat(false));

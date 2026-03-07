@@ -4,11 +4,6 @@ use core::{fmt, ops};
 use euclid::Vector3D;
 use itertools::Itertools;
 
-/// Acts as polyfill for float methods
-#[cfg(not(feature = "std"))]
-#[allow(unused_imports)]
-use num_traits::float::FloatCore as _;
-
 use crate::block::{
     self,
     Resolution::{self, R1},
@@ -140,7 +135,7 @@ pub(in crate::block::eval) fn compute_derived(voxels: &block::Evoxels) -> Derive
             });
 
             all_faces_sum += face_sum;
-            face_colors[face] = face_sum.color(f32::from(resolution).powi(2))
+            face_colors[face] = face_sum.color(resolution.squared_f32());
         }
         let surface_area = full_block_bounds.surface_area_f64() as f32;
         (
