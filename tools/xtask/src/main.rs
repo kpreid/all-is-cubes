@@ -191,6 +191,33 @@ fn run_command(
                     .run()?;
             }
         }
+        XtaskCommand::Miri { nextest_args } => {
+            assert!(config.scope.includes_main_workspace());
+
+            for features in [
+                // Test our std-using configuration.
+                "std",
+                // Test our std-avoiding configuration.
+                // `bevy_platform/std` enables use of std syscalls for time to avoid ones that Miri
+                // doesn’t understand.
+                "bevy_platform/std",
+            ] {
+                cmd!(config.sh, "cargo +nightly miri nextest run")
+                    .args(["--features", features])
+                    // All tests in all-is-cubes-base.
+                    .args([
+                        "--package=all-is-cubes-base",
+                        "--filterset=package(all-is-cubes-base)",
+                    ])
+                    // Only `universe::*` tests in all-is-cubes.
+                    .args([
+                        "--package=all-is-cubes",
+                        "--filterset=package(all-is-cubes) and test(/^universe::/)",
+                    ])
+                    .args(&nextest_args)
+                    .run()?;
+            }
+        }
         XtaskCommand::BinSize => {
             measure_binary_sizes(config)?;
         }
