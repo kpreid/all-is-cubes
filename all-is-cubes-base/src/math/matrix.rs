@@ -415,6 +415,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // slow, boring
     fn equivalent_transform() {
         let mut rng = Xoshiro256Plus::seed_from_u64(2897358920346590823);
         for _ in 1..100 {
@@ -432,6 +433,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // slow, boring
     fn equivalent_concat() {
         let mut rng = Xoshiro256Plus::seed_from_u64(5933089223468901296);
         for _ in 1..100 {

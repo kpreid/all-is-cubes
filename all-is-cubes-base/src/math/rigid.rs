@@ -208,6 +208,8 @@ mod tests {
     use rand::{RngExt as _, SeedableRng as _};
     use rand_xoshiro::Xoshiro256Plus;
 
+    const RANDOM_CASES: usize = if cfg!(miri) { 1 } else { 100 };
+
     fn random_gridgid(mut rng: impl rand::Rng) -> Gridgid {
         Gridgid {
             rotation: *GridRotation::ALL.choose(&mut rng).unwrap(),
@@ -221,7 +223,7 @@ mod tests {
     #[test]
     fn equivalent_transform() {
         let mut rng = Xoshiro256Plus::seed_from_u64(2897358920346590823);
-        for _ in 1..100 {
+        for _ in 0..RANDOM_CASES {
             let m = random_gridgid(&mut rng);
             dbg!(m, m.to_matrix());
             assert_eq!(
@@ -234,7 +236,7 @@ mod tests {
     #[test]
     fn equivalent_concat() {
         let mut rng = Xoshiro256Plus::seed_from_u64(5933089223468901296);
-        for _ in 1..100 {
+        for _ in 0..RANDOM_CASES {
             let t1 = random_gridgid(&mut rng);
             let t2 = random_gridgid(&mut rng);
             assert_eq!((t1 * t2).to_matrix(), t1.to_matrix() * t2.to_matrix());
@@ -244,7 +246,7 @@ mod tests {
     #[test]
     fn equivalent_inverse() {
         let mut rng = Xoshiro256Plus::seed_from_u64(5933089223468901296);
-        for _ in 1..100 {
+        for _ in 0..RANDOM_CASES {
             let t = random_gridgid(&mut rng);
             assert_eq!(
                 t.inverse().to_matrix(),

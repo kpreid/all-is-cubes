@@ -1026,6 +1026,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // slow, boring
     fn ps_exhaustive() {
         for f in f32::exhaust() {
             match PositiveSign::<f32>::try_from(f) {
@@ -1113,6 +1114,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // slow, boring
     fn zo_exhaustive() {
         for f in f32::exhaust() {
             match ZeroOne::<f32>::try_from(f) {

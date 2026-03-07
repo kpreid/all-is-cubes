@@ -100,6 +100,7 @@ fn rotate_evaluation() {
 /// Check that [`Block::rotate`]'s pre-composition is consistent with the interpretation
 /// used by evaluating [`Modifier::Rotate`].
 #[test]
+#[cfg(not(miri))] // slow
 fn rotate_rotated_consistency() {
     let mut universe = Universe::new();
     let [block] = make_some_voxel_blocks(&mut universe);

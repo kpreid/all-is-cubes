@@ -824,6 +824,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // slow, unlikely to uncover problems
     fn regenerate_multiplication_table() {
         let mut failed = false;
         println!(indoc::indoc! {

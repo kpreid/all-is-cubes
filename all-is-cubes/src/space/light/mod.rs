@@ -33,4 +33,5 @@ pub use updater::LightUpdatesInfo;
 pub(in crate::space) use updater::{ComputedLight, LightStorage, UpdateCtx};
 
 #[cfg(test)]
+#[cfg(not(miri))] // slow, and light contains no unsafe
 mod tests;

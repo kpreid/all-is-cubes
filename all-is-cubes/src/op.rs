@@ -591,6 +591,7 @@ impl core::error::Error for OperationError {
 }
 
 #[cfg(test)]
+#[cfg(not(miri))] // slow because of many voxel operations
 mod tests {
     use super::*;
     use crate::block::AIR;

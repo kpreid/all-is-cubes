@@ -492,6 +492,7 @@ fn ignore_out_of_bounds(result: Result<bool, SetCubeError>) -> Result<(), SetCub
 }
 
 #[cfg(test)]
+#[cfg(not(miri))] // slow, no unsafe
 mod tests {
     use super::*;
     use crate::block::{self, AIR};

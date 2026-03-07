@@ -659,6 +659,7 @@ mod tests {
         )
     }
     #[test]
+    #[cfg(not(miri))] // depends on sqrt() being well behaved
     fn chunk_chart_radius_break_points() {
         fn assert_count(distance_in_chunks: FreeCoordinate, count: usize) {
             let chart = ChunkChart::<16>::new(distance_in_chunks * 16.);
@@ -700,6 +701,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // slow
     fn chunk_chart_sorting() {
         // Caution: O(n^6) in the chart radius...
         let chart = ChunkChart::<16>::new(4.0 * 16.);
@@ -725,6 +727,7 @@ mod tests {
     /// Test a large chart shrunk, against a small chart enlarged.
     /// They should give the same answer.
     #[test]
+    #[cfg(not(miri))] // slow
     fn chunk_chart_resize() {
         let chart1 = ChunkChart::<16>::new(200.0);
         let mut chart2 = ChunkChart::new(300.0);

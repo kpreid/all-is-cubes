@@ -260,6 +260,7 @@ pub fn apply_transmittance(color: Rgba, thickness: f32) -> (Rgba, f32) {
 // -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
+#[cfg(not(miri))] // Miri adds arbitrary noise even to normally-exact cases of powf()
 mod tests {
     use super::*;
     use crate::math::rgba_const;

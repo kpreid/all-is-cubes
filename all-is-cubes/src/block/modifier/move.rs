@@ -237,6 +237,7 @@ impl universe::VisitHandles for Move {
 }
 
 #[cfg(test)]
+#[cfg(not(miri))] // all these tests involve many bulk voxels, and no unsafe
 mod tests {
     use super::*;
     use crate::block::{Composite, EvaluatedBlock, Resolution::*, VoxelOpacityMask};
