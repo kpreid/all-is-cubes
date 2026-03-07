@@ -73,10 +73,12 @@ fn spawn_look_direction() {
         spawn.set_look_direction(Vector3D::new(1., 1., -1.));
         spawn
     });
-    assert_eq!(character.body.yaw, 45.0);
+
+    // Using round() as rough approximate-eq, which makes this test compatible with Miri
+    // and any platforms that have actually nondeterministic float ops.
     assert_eq!(
-        character.body.pitch,
-        (-1f64).atan2(2.0f64.sqrt()).to_degrees()
+        (character.body.yaw.round(), character.body.pitch.round()),
+        (45.0, (-1f64).atan2(2.0f64.sqrt()).to_degrees().round()),
     );
 }
 
