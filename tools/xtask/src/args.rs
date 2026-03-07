@@ -72,6 +72,15 @@ pub(crate) enum XtaskCommand {
         duration: f64,
     },
 
+    /// Run selected tests under Miri.
+    ///
+    /// This currently requires `cargo-nextest` <https://nexte.st/> to be installed,
+    /// to allow parallel execution and more powerful test filtering.
+    Miri {
+        /// Additional arguments for nextest.
+        nextest_args: Vec<String>,
+    },
+
     /// Build binaries with the release profile and report their size on disk.
     BinSize,
 
