@@ -1231,6 +1231,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // slow, boring
     fn check_const_srgb_table() {
         let generated_table: Vec<f32> =
             (0..=u8::MAX).map(component_from_srgb8_arithmetic).collect();

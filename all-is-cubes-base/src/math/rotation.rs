@@ -705,6 +705,7 @@ mod tests {
     /// Check that the effect of composing two rotations with the `*` operator is equal to
     /// the effect of applying both.
     #[test]
+    #[cfg(not(miri))] // slow, boring
     fn composition_consistency() {
         let mut f = MultiFailure::new();
         for first in GridRotation::ALL {
@@ -722,6 +723,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // slow, boring
     fn is_reflection_consistency() {
         for a in GridRotation::ALL {
             for b in GridRotation::ALL {
