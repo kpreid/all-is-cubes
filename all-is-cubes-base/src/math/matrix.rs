@@ -374,6 +374,8 @@ mod tests {
     use rand::{Rng, RngExt as _, SeedableRng as _};
     use rand_xoshiro::Xoshiro256Plus;
 
+    const RANDOM_CASES: usize = if cfg!(miri) { 1 } else { 100 };
+
     fn random_grid_matrix(mut rng: impl Rng) -> GridMatrix {
         let mut r = || rng.random_range(-100..=100);
         GridMatrix::new(r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r())
@@ -415,10 +417,9 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // slow, boring
     fn equivalent_transform() {
         let mut rng = Xoshiro256Plus::seed_from_u64(2897358920346590823);
-        for _ in 1..100 {
+        for _ in 0..RANDOM_CASES {
             let m = random_grid_matrix(&mut rng);
             dbg!(m, m.to_free());
             assert_eq!(
@@ -433,10 +434,9 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // slow, boring
     fn equivalent_concat() {
         let mut rng = Xoshiro256Plus::seed_from_u64(5933089223468901296);
-        for _ in 1..100 {
+        for _ in 0..RANDOM_CASES {
             let m1 = random_grid_matrix(&mut rng);
             let m2 = random_grid_matrix(&mut rng);
             // our concat() orderingis inherited from cgmath which is opposite of euclid then()
@@ -445,10 +445,11 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(miri))] // needs more cases than reasonable
     fn equivalent_inverse() {
         let mut rng = Xoshiro256Plus::seed_from_u64(0xca9bd0d289b4700e);
         let mut nontrivial = 0;
-        for _ in 1..500 {
+        for _ in 0..500 {
             let m = random_possibly_invertible_matrix(&mut rng);
             let inv = m.inverse_transform();
             if let Some(inv) = inv {
