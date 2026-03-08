@@ -130,7 +130,7 @@ impl RayTreeNode {
     #[allow(dead_code)]
     pub fn traverse_pre_mut(&mut self, f: &mut dyn FnMut(&mut Self)) {
         f(self);
-        for child in self.children.iter_mut().filter_map(|(_, c)| c.as_mut()) {
+        for child in self.children.values_mut().filter_map(|c| c.as_mut()) {
             child.traverse_pre_mut(f)
         }
     }

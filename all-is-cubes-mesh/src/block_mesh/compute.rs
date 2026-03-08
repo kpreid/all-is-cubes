@@ -184,7 +184,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     let scale_to_block: Scale<f32, Cube, crate::MeshRel> = Scale::new(resolution.recip_f32());
     let voxels_array = voxels.as_vol_ref();
 
-    for (_, sub_mesh) in output.face_vertices.iter_mut() {
+    for sub_mesh in output.face_vertices.values_mut() {
         // Start assuming opacity; if we find any transparent pixels we'll set
         // this to false. `Within` is always "transparent" because the algorithm
         // that consumes this structure will say "draw this face if its adjacent

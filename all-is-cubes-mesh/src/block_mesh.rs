@@ -272,7 +272,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
     fn clear(&mut self) {
         fn clear_sub_mesh_map<V: Vertex>(m: &mut FaceMap<SubMesh<V>>) {
-            for (_, sm) in m.iter_mut() {
+            for sm in m.values_mut() {
                 sm.clear();
             }
         }
