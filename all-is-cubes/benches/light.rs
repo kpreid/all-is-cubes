@@ -15,7 +15,7 @@ use all_is_cubes::util::yield_progress_for_testing;
 criterion_main!(benches);
 criterion_group!(benches, evaluate_light_bench, queue_bench);
 
-pub fn evaluate_light_bench(c: &mut Criterion) {
+fn evaluate_light_bench(c: &mut Criterion) {
     enum EvalMode {
         Fast,
         Full,

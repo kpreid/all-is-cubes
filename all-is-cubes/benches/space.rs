@@ -165,7 +165,7 @@ fn space_bulk_mutation(c: &mut Criterion) {
     group.finish();
 }
 
-pub fn grid_aab_bench(c: &mut Criterion) {
+fn grid_aab_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("GridAab");
 
     let aab = GridAab::from_lower_size([0, 0, 0], [256, 256, 256]);

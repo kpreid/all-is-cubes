@@ -88,7 +88,7 @@ impl TestData {
     }
 }
 
-pub fn raytrace_bench(c: &mut Criterion) {
+fn raytrace_bench(c: &mut Criterion) {
     let t = async_io::block_on(TestData::new());
 
     let mut group = c.benchmark_group(if cfg!(feature = "auto-threads") {

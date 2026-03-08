@@ -7,7 +7,7 @@ use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::math::{Face6, Rgba};
 use all_is_cubes::universe::Universe;
 
-pub fn evaluate_bench(c: &mut Criterion) {
+fn evaluate_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("evaluate");
 
     // Evaluate some ordinary atom blocks with no modifiers.
