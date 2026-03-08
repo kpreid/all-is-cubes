@@ -220,23 +220,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
-
     - uses: Swatinem/rust-cache@v2.8.2
+    - run: rustup toolchain install nightly --component miri
+    - uses: taiki-e/install-action@v2
       with:
-        # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
-        prefix-key: "v1-rust-unstablefeatures-ubuntu-locked"
+        tool: nextest@0.9
 
-    - name: Install Rust toolchain
-      run: |
-        rustup toolchain install nightly --component miri
+    - name: Compile xtask
+      run: cargo build --package=xtask
+    - name: Compile tests
+      run: cargo xtask miri -- --no-run
 
-    - name: Run Miri tests, std
-      # `universe` is the only module that contains nontrivial unsafe code,
-      # and the tests in `universe` are those most worth running to exercise it.
-      run: |
-        cargo +nightly miri test --no-default-features -p all-is-cubes universe:: --features std
-    
-    - name: Run Miri tests, no_std
-      # need bevy_platform/std so it doesn't try to call an unsupported intrinsic for time
-      run: |
-        cargo +nightly miri test --no-default-features -p all-is-cubes universe:: --features bevy_platform/std
+    - name: Test
+      run: cargo xtask miri
