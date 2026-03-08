@@ -18,9 +18,8 @@
 
 use std::collections::BTreeSet;
 use std::fs;
-use std::io::Write as _;
-use std::path::Path;
-use std::path::PathBuf;
+use std::io::{self, Write as _};
+use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use anyhow::Context as _;
@@ -93,6 +92,7 @@ fn run_command(
             }
         }
         XtaskCommand::Test { no_run } => {
+            print_revision(config);
             do_for_all_packages(
                 config,
                 if no_run {
@@ -105,6 +105,7 @@ fn run_command(
             )?;
         }
         XtaskCommand::TestMore { no_run } => {
+            print_revision(config);
             exhaustive_test(
                 config,
                 if no_run {
@@ -116,6 +117,7 @@ fn run_command(
             )?;
         }
         XtaskCommand::Lint => {
+            print_revision(config);
             do_for_all_packages(config, TestOrCheck::Lint, Features::Default, time_log)?;
 
             // Build docs to verify that there are no broken doc links.
@@ -126,6 +128,7 @@ fn run_command(
             }
         }
         XtaskCommand::CheckFeatures => {
+            print_revision(config);
             do_for_all_packages(
                 config,
                 // no Clippy for better throughput; pragmatically we care about "does it build"
@@ -193,6 +196,7 @@ fn run_command(
         }
         XtaskCommand::Miri { nextest_args } => {
             assert!(config.scope.includes_main_workspace());
+            print_revision(config);
 
             for features in [
                 // Test our std-using configuration.
@@ -219,6 +223,7 @@ fn run_command(
             }
         }
         XtaskCommand::BinSize => {
+            print_revision(config);
             measure_binary_sizes(config)?;
         }
         XtaskCommand::RunGameServer { server_args } => {
@@ -245,6 +250,8 @@ fn run_command(
             }
         }
         XtaskCommand::BuildWebRelease => {
+            print_revision(config);
+
             // We only generate the license file in release builds, to save time.
             generate_wasm_licenses_file(config, time_log)?;
 
@@ -286,6 +293,7 @@ fn run_command(
             }
         }
         XtaskCommand::CheckDeps => {
+            print_revision(config);
             // Note when changing this command set: .github/workflows/ci.yml performs the same
             // operations but broken out into separate jobs.
             config.do_for_all_workspaces(|ws| {
@@ -327,7 +335,7 @@ fn run_command(
             for manifest_dir in ALL_NONTEST_PACKAGES.into_iter().chain(["."]) {
                 let manifest_path = format!("{manifest_dir}/Cargo.toml");
                 eprint!("Editing {manifest_path}...");
-                let _ = std::io::stderr().flush();
+                let _ = io::stderr().flush();
 
                 let mut manifest: toml_edit::DocumentMut =
                     fs::read_to_string(&manifest_path)?.parse()?;
@@ -372,6 +380,7 @@ fn run_command(
         }
         XtaskCommand::PublishAll { for_real } => {
             assert_eq!(config.scope, Scope::All);
+            print_revision(config);
 
             exhaustive_test(config, TestOrCheck::Test, time_log)?;
 
@@ -916,3 +925,38 @@ static PROJECT_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     path.pop();
     path
 });
+
+/// Print the Git state, as a reminder of what the command was run on, to stderr.
+fn print_revision(_config: &Config<'_>) {
+    // Print branch and commit.
+    match std::process::Command::new("git")
+        .current_dir(&*PROJECT_DIR)
+        .args([
+            "log",
+            "-1",               // only most recent commit
+            "--pretty=oneline", // single-line format
+            "--decorate",       // show branch/tag names
+            "--abbrev-commit",  // abbreviated commit ID
+        ])
+        .stdout(io::stderr()) // redirect stdout to stderr
+        .status()
+    {
+        Err(spawn_error) => eprintln!("[Failed to fetch git log: {spawn_error}]"),
+        Ok(_status) => {
+            // ignore exit status; if it's a failure it will presumably have printed something
+        }
+    }
+
+    // Print uncommitted changes.
+    match std::process::Command::new("git")
+        .current_dir(&*PROJECT_DIR)
+        .args(["status", "--short"])
+        .stdout(io::stderr()) // redirect stdout to stderr
+        .status()
+    {
+        Err(spawn_error) => eprintln!("[Failed to fetch git status: {spawn_error}]"),
+        Ok(_status) => {
+            // ignore exit status; if it's a failure it will presumably have printed something
+        }
+    }
+}
