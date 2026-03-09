@@ -473,10 +473,6 @@ impl<T: 'static> Handle<T> {
 
     /// Returns whether this [`Handle`] does not yet belong to a universe and can start.
     /// doing so. Used by [`UniverseTransaction`].
-    ///
-    /// TODO(ecs): with the new way pending handles work, being always associated with a
-    /// transaction, this check should not be necessary any more, but we do want to keep the
-    /// `visit_handles()` part.
     pub(in crate::universe) fn check_upgrade_pending(
         &self,
         read_ticket_for_self: ReadTicket<'_>,
@@ -485,48 +481,22 @@ impl<T: 'static> Handle<T> {
     where
         T: VisitHandles + UniverseMember,
     {
+        // TODO(ecs): Can this check even fail any more?
         if let Some(existing_id) = self.universe_id()
             && existing_id != future_universe_id
         {
             return Err(InsertError {
                 name: self.name(),
-                kind: InsertErrorKind::AlreadyInserted,
+                kind: InsertErrorKind::CrossUniverse,
             });
         }
 
-        match self.inner.state.lock() {
-            Ok(state_guard) => match &*state_guard {
-                State::Pending => { /* OK */ }
-                State::Member { .. } => {
-                    return Err(InsertError {
-                        name: self.name(),
-                        kind: InsertErrorKind::AlreadyExists,
-                    });
-                }
-                #[cfg(feature = "save")]
-                State::Deserializing { .. } => {
-                    return Err(InsertError {
-                        name: self.name(),
-                        kind: InsertErrorKind::Deserializing,
-                    });
-                }
-                State::Gone { .. } => {
-                    return Err(InsertError {
-                        name: self.name(),
-                        kind: InsertErrorKind::Gone,
-                    });
-                }
-            },
-            Err(_) => {
-                return Err(InsertError {
-                    name: Name::Pending,
-                    kind: InsertErrorKind::Poisoned,
-                });
-            }
-        }
+        // Design note: It is pointless to check the handle’s state because it should always be
+        // State::Pending, it will be checked when the transaction is committed and the state is
+        // swapped, and if there was any way for the state to be wrong, that would also be a way
+        // for there to be a race condition making checking now useless.
 
-        // TODO: get rid of unnecessary into_handle_error() intermediate conversion
-        match read_ticket_for_self.borrow_pending(self).map_err(|e| e.into_handle_error(self)) {
+        match read_ticket_for_self.borrow_pending(self) {
             Ok(data) => {
                 // Check for contained handles belonging to the wrong universe.
                 //
@@ -547,45 +517,23 @@ impl<T: 'static> Handle<T> {
                     });
                 }
             }
-            Err(HandleError {
-                name,
-                handle_universe_id: _,
-                kind,
-            }) => match kind {
-                HandleErrorKind::InUse => {
-                    return Err(InsertError {
-                        name,
-                        kind: InsertErrorKind::InUse,
-                    });
-                }
-                HandleErrorKind::NotReady => {
-                    unreachable!("tried to insert a Handle from deserialization via transaction")
-                }
-                HandleErrorKind::ValueMissing => {
+            Err(read_ticket_error) => match read_ticket_error.into_handle_error(self) {
+                HandleError {
+                    kind: HandleErrorKind::ValueMissing,
+                    name,
+                    ..
+                } => {
                     return Err(InsertError {
                         name,
                         kind: InsertErrorKind::ValueMissing,
                     });
                 }
-                HandleErrorKind::Gone {
-                    reason: GoneReason::CreatedGone {},
-                } => {
-                    return Err(InsertError {
-                        name,
-                        kind: InsertErrorKind::Gone,
-                    });
-                }
-                HandleErrorKind::WrongUniverse { .. } => {
-                    return Err(InsertError {
-                        name,
-                        kind: InsertErrorKind::AlreadyInserted,
-                    });
-                }
-                e @ (HandleErrorKind::NotYetInserted { .. }
-                | HandleErrorKind::InvalidTicket { .. }
-                | HandleErrorKind::Gone { .. }) => {
-                    unreachable!("unexpected handle error while deserializing {name}: {e:?}")
-                }
+                // This is a bug because this function should only be called by a `UniverseTransaction`
+                // providing its own read ticket.
+                e => panic!(
+                    "check_upgrade_pending() given invalid ticket/handle combination: {}",
+                    crate::util::ErrorChain(&e)
+                ),
             },
         }
 
