@@ -815,9 +815,6 @@ pub enum InsertErrorKind {
     /// This can occur when using [`UniverseTransaction::insert_without_value()`].
     ValueMissing,
 
-    /// The provided [`Handle`] was already inserted into some universe.
-    AlreadyInserted,
-
     /// The provided value contains handles to a different universe.
     CrossUniverse,
 }
@@ -835,7 +832,6 @@ impl fmt::Display for InsertError {
                 write!(f, "the name {name} may not be used in an insert operation")
             }
             InsertErrorKind::ValueMissing => write!(f, "value has not been provided for {name}"),
-            InsertErrorKind::AlreadyInserted => write!(f, "the object {name} is already inserted"),
             InsertErrorKind::CrossUniverse => {
                 write!(f, "the object {name} contains handles to another universe")
             }

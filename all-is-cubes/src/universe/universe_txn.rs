@@ -868,11 +868,12 @@ impl MemberTxn {
             ))),
             MemberTxn::Insert(pending) => {
                 {
-                    if pending.handle().name() != *name {
-                        return Err(MemberMismatch::Insert(InsertError {
-                            name: name.clone(),
-                            kind: InsertErrorKind::AlreadyInserted,
-                        }));
+                    let handle_name = pending.handle().name();
+                    if handle_name != *name {
+                        panic!(
+                            "in transaction, pending handle for name {name} \
+                            already has its name set to {handle_name}"
+                        );
                     }
                 }
 
