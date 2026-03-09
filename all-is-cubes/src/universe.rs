@@ -424,15 +424,15 @@ impl Universe {
     pub(crate) fn get_or_insert_deserializing<T>(
         &mut self,
         name: Name,
-    ) -> Result<Handle<T>, InsertError>
+    ) -> Result<Handle<T>, DeserializeHandlesError>
     where
         T: UniverseMember,
     {
         match name {
             Name::Pending => {
-                return Err(InsertError {
+                return Err(DeserializeHandlesError {
                     name,
-                    kind: InsertErrorKind::InvalidName,
+                    kind: DeserializeHandlesErrorKind::InvalidName,
                 });
             }
             Name::Specific(_) | Name::Anonym(_) => {}
@@ -451,15 +451,15 @@ impl Universe {
         &mut self,
         name: Name,
         value: Box<T>,
-    ) -> Result<(), InsertError>
+    ) -> Result<(), DeserializeHandlesError>
     where
         T: UniverseMember,
     {
         self.get_or_insert_deserializing(name.clone())?
             .insert_deserialized_value(self, value)
-            .map_err(|()| InsertError {
+            .map_err(|()| DeserializeHandlesError {
                 name,
-                kind: InsertErrorKind::DeserializeMultipleValues,
+                kind: DeserializeHandlesErrorKind::MultipleValues,
             })
     }
 
@@ -580,7 +580,8 @@ impl Universe {
                     Ok(())
                 } else {
                     Err(DeserializeHandlesError {
-                        to: membership.handle.name(),
+                        name: membership.handle.name(),
+                        kind: DeserializeHandlesErrorKind::MissingValue,
                     })
                 }
             },
@@ -781,6 +782,8 @@ impl Default for Box<Universe> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Errors resulting from attempting to insert an object in a [`Universe`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -878,13 +881,60 @@ impl fmt::Display for InsertError {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
+/// Errors occurring when universe members or handles to them are deserialized.
+///
+/// This error type is not public because, for now, it is only ever type-erased through `serde`
+/// errors.
 #[cfg(feature = "save")]
-#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
-#[displaydoc("data contains a handle to {to} that was not defined")]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub(crate) struct DeserializeHandlesError {
-    /// Name in the bad handle.
-    to: Name,
+    /// The name of the affected member.
+    pub name: Name,
+
+    /// The problem that was detected.
+    pub kind: DeserializeHandlesErrorKind,
 }
+
+/// Details of [`DeserializeHandlesError`].
+#[cfg(feature = "save")]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub(crate) enum DeserializeHandlesErrorKind {
+    /// The proposed name may not be used.
+    InvalidName,
+
+    /// The data being deserialized contained multiple definitions for this name.
+    MultipleValues,
+
+    /// The data being deserialized contained a handle to this name but no definition.
+    MissingValue,
+}
+
+#[cfg(feature = "save")]
+impl core::error::Error for DeserializeHandlesError {}
+
+#[cfg(feature = "save")]
+impl fmt::Display for DeserializeHandlesError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { name, kind } = self;
+        match kind {
+            DeserializeHandlesErrorKind::InvalidName => {
+                write!(f, "the name {name} may not be used in an insert operation")
+            }
+            DeserializeHandlesErrorKind::MultipleValues => {
+                write!(f, "duplicate definition of object {name}")
+            }
+            DeserializeHandlesErrorKind::MissingValue => {
+                write!(f, "data contains a handle to {name} that was not defined")
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Performance data returned by [`Universe::step`].
 ///
