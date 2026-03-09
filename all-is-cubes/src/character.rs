@@ -308,7 +308,7 @@ impl Character {
         cursor: Option<&Cursor>,
         button: usize,
     ) -> Result<UniverseTransaction, inv::ToolError> {
-        let tb = this.read(read_ticket).unwrap();
+        let tb = this.read(read_ticket).map_err(inv::ToolError::CharacterHandle)?;
 
         // Check that this is not a cursor into some other space.
         // This shouldn't happen according to game rules but it might due to a UI/session

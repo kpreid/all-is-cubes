@@ -523,6 +523,8 @@ impl<'ticket> ToolInput<'ticket> {
 }
 
 /// Ways that a tool can fail.
+//---
+// TODO: This is a mix of internal and gameplay errors. We should probably separate them.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 pub enum ToolError {
@@ -541,8 +543,11 @@ pub enum ToolError {
     #[displaydoc("nothing is selected")]
     NothingSelected,
     /// The space to be operated on could not be accessed.
-    #[displaydoc("error accessing space: {0}")]
+    #[displaydoc("error accessing space")]
     SpaceHandle(HandleError),
+    /// The character wielding the tool on could not be accessed.
+    #[displaydoc("error accessing character")]
+    CharacterHandle(HandleError),
     /// An error occurred while executing the effects of the tool.
     /// TODO: Improve this along with [`Transaction`] error types.
     #[displaydoc("unexpected error: {0}")]
@@ -557,6 +562,7 @@ impl core::error::Error for ToolError {
             ToolError::Obstacle => None,
             ToolError::NothingSelected => None,
             ToolError::SpaceHandle(e) => Some(e),
+            ToolError::CharacterHandle(e) => Some(e),
             ToolError::Internal(_) => None,
         }
     }
