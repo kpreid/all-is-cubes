@@ -56,6 +56,8 @@ pub async fn create_instance_for_test_or_exit(allow_noop: bool) -> wgpu::Instanc
 
 /// Create a [`wgpu::Adapter`] controlled by environment variables.
 ///
+/// # Panics
+///
 /// Panics if creation fails.
 /// This should not happen unless the `Instance` was not obtained from
 /// [`create_instance_for_test_or_exit()`], or an adapter becomes unavailable
@@ -156,7 +158,11 @@ fn shortened_adapter_info(info: &wgpu::AdapterInfo) -> String {
 /// Copy the contents of a texture into a [`Rendering`],
 /// assuming that its byte layout is RGBA8.
 ///
-/// Panics if the pixel type or viewport size are incorrect.
+/// # Panics
+///
+/// Panics if the viewport size does not match the texture,
+/// the texture format is not 4 bytes,
+/// or if GPU communication fails.
 #[doc(hidden)]
 pub fn get_image_from_gpu(
     device: &wgpu::Device,
@@ -191,7 +197,10 @@ pub fn get_image_from_gpu(
 /// of `[C; components]` and returning a vector of length
 /// `texture.width() * texture.height() * components`.
 ///
-/// Panics if the provided sizes are incorrect.
+/// # Panics
+///
+/// Panics if the type and number of components does not match the texture,
+/// or if GPU communication fails.
 #[doc(hidden)]
 pub fn get_texels_from_gpu<C>(
     device: &wgpu::Device,

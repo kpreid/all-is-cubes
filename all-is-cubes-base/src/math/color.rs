@@ -379,7 +379,6 @@ impl Rgb01 {
     }
 
     /// Constructs a shade of gray (components all equal) from [relative luminance].
-    /// Panics if any component is NaN. No other range checks are performed.
     ///
     /// [relative luminance]: https://en.wikipedia.org/wiki/Relative_luminance
     #[inline]
@@ -887,7 +886,11 @@ impl Mul<f32> for Rgb {
     type Output = Self;
     /// Multiplies this color value by a scalar.
     ///
-    /// Panics if the scalar is NaN. Returns zero if the scalar is negative.
+    /// Returns zero if the scalar is negative.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the scalar is NaN.
     #[inline]
     fn mul(self, scalar: f32) -> Self {
         Self(self.0 * PositiveSign::<f32>::new_clamped(scalar))

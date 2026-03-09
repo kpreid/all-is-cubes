@@ -60,6 +60,10 @@ impl GltfDataDestination {
     /// base name for data files beside the glTF file. For example, if `file_base_path` is
     /// `foo/bar.gltf`, then buffer files will be written to paths like `foo/bar-buffername.glbin`.
     /// If it is `None`, then buffers may not exceed `maximum_inline_length`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `file_base_path` does not contain a file name.
     pub fn new(file_base_path: Option<PathBuf>, maximum_inline_length: usize) -> Self {
         if let Some(file_base_path) = &file_base_path {
             assert!(

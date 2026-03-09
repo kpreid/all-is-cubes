@@ -122,8 +122,10 @@ pub enum UniverseTemplate {
 }
 
 impl UniverseTemplate {
-    /// Whether the template should be shown to users.
-    /// (This does not control )
+    /// Whether the template should be shown to users in lists of available templates.
+    ///
+    /// (This does not control whether the template can be used;
+    /// it is analogous to `#[doc(hidden)]`.)
     pub fn include_in_lists(&self) -> bool {
         use UniverseTemplate::*;
         match self {

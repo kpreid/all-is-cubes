@@ -28,12 +28,7 @@ Code style
 ----------
 
 *   Public items should follow the
-    [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/),
-    except as otherwise specified.
-
-    *   Function documentation is encouraged to describe the circumstances under which the function
-        may panic, but this information may be presented as “Panics if…” rather than using
-        a “`# Panics`” heading.
+    [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/).
 
 *   Misbehaviors due to internal numeric overflow, or due to other forms of out-of-bounds input,
     are considered bugs.

@@ -78,8 +78,10 @@ impl Kit {
     /// If `pipes` contains multiple elements with the same angle, the one which does not require
     /// rotation will be preferred.
     ///
-    /// Panics if any element of `path` is not adjacent to the previous element.
-    /// Panics if `self` does not contain a pipe shape that is needed.
+    /// # Panics
+    ///
+    /// * Panics if any element of `path` is not adjacent to the previous element.
+    /// * Panics if `self` does not contain a pipe shape that is needed.
     #[track_caller]
     pub fn fit(
         &self,

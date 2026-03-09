@@ -89,6 +89,8 @@ impl GridRotation {
     /// Constructs a rotation from a basis: that is, the returned rotation will
     /// rotate `PX` into `basis[0]`, `PY` into `basis[1]`, and `PZ` into `basis[2]`.
     ///
+    /// # Panics
+    ///
     /// Panics if the three provided axes are not mutually perpendicular.
     #[inline]
     pub fn from_basis(basis: impl Into<[Face6; 3]>) -> Self {
@@ -375,6 +377,8 @@ impl GridRotation {
     }
 
     /// Rotate the vector by this rotation.
+    ///
+    /// # Panics
     ///
     /// May panic or wrap if `vector` has any components equal to [`GridCoordinate::MIN`].
     #[inline]

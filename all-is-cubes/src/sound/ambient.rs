@@ -67,6 +67,8 @@ impl Band {
 
     /// Returns the [`Band`] value corresponding to the given array index.
     ///
+    /// # Panics
+    ///
     /// Panics if `index >= Band::COUNT`.
     #[track_caller]
     pub fn from_index(index: usize) -> Self {

@@ -61,6 +61,8 @@ pub fn to_wgpu_index_range(range: Range<usize>) -> Range<u32> {
 ///
 /// `T` must be a single texel of the appropriate format.
 ///
+/// # Panics
+///
 /// Panics if `region`’s volume does not match the data length.
 pub fn write_texture_by_aab<T: Pod, U>(
     queue: &wgpu::Queue,

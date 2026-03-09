@@ -131,6 +131,10 @@ impl BlockDef {
     /// which it is displayed.
     ///
     /// `frames` may be an [`Animation`] value, but this is neither required nor preferred.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `frames` does not have at least one frame.
     #[track_caller]
     pub fn new_animated(
         read_ticket: ReadTicket<'_>,
@@ -420,6 +424,8 @@ impl Read<'_> {
 
 impl Animation {
     /// Creates an [`Animation`] value.
+    ///
+    /// # Panics
     ///
     /// Panics if `frames` does not contain at least one frame.
     #[track_caller]

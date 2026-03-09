@@ -140,6 +140,11 @@ impl<E: BlockModule> Provider<E, Block> {
     ///
     /// Returns an error if `definer` does.
     /// The error will be annotated with the specific element of `E` for which it failed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `E`’s `BlockModule` implementation misbehaves, such as by returning non-unique
+    /// names.
     //---
     // TODO: This has to exist, but is an awkward shape and block-specific.
     // Figure out what the actually good API looks like.

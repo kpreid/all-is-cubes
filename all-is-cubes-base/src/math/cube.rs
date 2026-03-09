@@ -125,6 +125,8 @@ impl Cube {
 
     /// Returns the corner of this cube with the most positive coordinates.
     ///
+    /// # Panics
+    ///
     /// Panics if `self` has any coordinates equal to [`GridCoordinate::MAX`].
     /// Generally, that should be avoided by checking the cube with
     /// [`GridAab::contains_cube()`] on some existing [`GridAab`] before calling this
@@ -149,6 +151,8 @@ impl Cube {
     }
 
     /// Constructs a [`GridAab`] with a volume of 1, containing this cube.
+    ///
+    /// # Panics
     ///
     /// Panics if `self` has any coordinates equal to [`GridCoordinate::MAX`].
     /// Generally, that should be avoided by checking the cube with

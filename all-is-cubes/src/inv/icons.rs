@@ -70,6 +70,10 @@ impl fmt::Display for Icons {
 impl Icons {
     /// Construct the standard icons, inserting block definitions into the given
     /// [`UniverseTransaction`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the transaction already contains these blocks.
     pub async fn new(txn: &mut UniverseTransaction, p: YieldProgress) -> BlockProvider<Icons> {
         let resolution = R16;
 

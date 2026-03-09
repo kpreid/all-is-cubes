@@ -56,7 +56,9 @@ impl<A> Alloctree<A> {
 
     /// Creates an unallocated space of edge length `2.pow(size_exponent)`.
     ///
-    /// `size_exponent` must be less than [`Alloctree::MAX_SIZE_EXPONENT`].
+    /// # Panics
+    ///
+    /// Panics if `size_exponent` is greater than [`Alloctree::MAX_SIZE_EXPONENT`].
     pub const fn new(size_exponent: u8) -> Self {
         assert!(
             size_exponent <= Self::MAX_SIZE_EXPONENT,
@@ -76,6 +78,8 @@ impl<A> Alloctree<A> {
     /// The returned handle **does not deallocate on drop**, because this tree does not
     /// implement interior mutability; it is the caller's responsibility to provide such
     /// functionality if needed.
+    ///
+    /// # Panics
     ///
     /// Panics if the request has zero volume.
     pub fn allocate(&mut self, request: GridAab) -> Option<AlloctreeHandle<A>> {

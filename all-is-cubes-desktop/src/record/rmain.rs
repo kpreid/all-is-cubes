@@ -62,6 +62,8 @@ pub(super) struct ChannelListener<M> {
     sender: async_channel::Sender<M>,
 }
 impl<M: Send + Clone> ChannelListener<M> {
+    /// # Panics
+    ///
     /// Panics if the channel is not unbounded.
     pub fn new(sender: async_channel::Sender<M>) -> Self {
         assert_eq!(sender.capacity(), None);

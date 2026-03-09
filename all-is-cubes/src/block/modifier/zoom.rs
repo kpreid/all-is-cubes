@@ -32,6 +32,8 @@ impl Zoom {
     /// Construct a [`Zoom`] which enlarges the original block's voxels by `scale` and
     /// selects the region of them whose lower corner is `offset * scale`.
     ///
+    /// # Panics
+    ///
     /// Panics if any of `offset`'s components are out of bounds, i.e. less than 0 or
     /// greater than `scale - 1`.
     #[track_caller]

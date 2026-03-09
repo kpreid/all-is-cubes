@@ -126,6 +126,8 @@ impl RenderTestContext {
     ///
     /// It is valid to overwrite this universe with a different one.
     ///
+    /// # Panics
+    ///
     /// Panics if the test case was configured with a shared universe.
     pub fn universe_mut(&mut self) -> &mut Universe {
         match self.universe {
@@ -143,6 +145,14 @@ impl RenderTestContext {
         Scene::into_cameras(self.universe())
     }
 
+    /// Renders `scene` with a new renderer and compares it against the expected image.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the renderer returns an error.
+    ///
+    /// (Test failures are communicated through the context rather than panicking,
+    /// so that multi-image tests show all comparisons in the report.)
     pub async fn render_comparison_test(
         &mut self,
         allowed_difference: impl Into<Threshold>,
@@ -154,6 +164,14 @@ impl RenderTestContext {
             .await
     }
 
+    /// Asks `renderer` to render an image and compares it against the expected image.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the renderer returns an error.
+    ///
+    /// (Test failures are communicated through the context rather than panicking,
+    /// so that multi-image tests show all comparisons in the report.)
     // TODO: better name
     // #[track_caller] // TODO: should be enabled, but the compiler doesn't support this yet
     pub async fn render_comparison_test_with_renderer(

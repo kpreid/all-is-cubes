@@ -80,6 +80,8 @@ impl Aabb {
 
     /// Expand this box to contain the given point.
     ///
+    /// # Panics
+    /// 
     /// Panics if the point contains NaN.
     #[inline]
     #[track_caller] // in case of NaN
@@ -295,6 +297,8 @@ impl Aabbs {
 
     /// Translate this box by the given offset.
     ///
+    /// # Panics
+    /// 
     /// Panics if the offset contains NaN.
     #[inline]
     #[must_use]

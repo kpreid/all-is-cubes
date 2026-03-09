@@ -107,6 +107,8 @@ pub(crate) fn make_log(
 
 /// Construct a tree whose lowest trunk piece is at `root` and which is contained within
 /// `bounds`.
+/// 
+/// # Panics
 ///
 /// Panics if `root` is not within `bounds`.
 pub(crate) fn make_tree(

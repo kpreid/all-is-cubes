@@ -187,6 +187,10 @@ pub struct TickSchedule {
 
 impl TickSchedule {
     /// Construct a [`TickSchedule`] which specifies `divisor` ticks per second.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `divisor` is zero.
     pub const fn per_second(divisor: u16) -> Self {
         Self {
             base_duration: Duration::from_secs(1),

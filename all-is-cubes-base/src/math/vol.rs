@@ -177,6 +177,8 @@ impl<'a, O, V> Vol<&'a [V], O> {
     /// This constructor is limited so that it is `const` and infallible;
     /// see also [`GridAab::tiny()`] and [`Vol::tiny()`].
     ///
+    /// # Panics
+    ///
     /// Panics if `data`’s length does not match the volume of `size`.
     #[inline]
     pub const fn from_tiny_elements(
@@ -243,6 +245,8 @@ where
 {
     /// Constructs a `Vol<C>` by using the provided function to compute a value
     /// for each point.
+    ///
+    /// # Panics
     ///
     /// Panics if `bounds` has a volume exceeding `usize::MAX`.
     /// (But there will likely be a memory allocation failure well below that point.)
@@ -364,6 +368,8 @@ impl<C, O> Vol<C, O> {
     }
 
     /// Translates the volume without affecting its contents.
+    ///
+    /// # Panics
     ///
     /// Panics if this would cause numeric overflow.
     ///

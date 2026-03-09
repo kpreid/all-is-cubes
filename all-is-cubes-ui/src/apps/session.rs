@@ -233,6 +233,10 @@ impl Session {
 
     /// Set the character which this session is “looking through the eyes of”.
     /// It must be from the universe previously set with `set_universe()`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `character` is from a different universe.
     pub fn set_character(&mut self, character: Option<StrongHandle<Character>>) {
         let shuttle = self.shuttle_mut();
         if let Some(character) = &character {
@@ -1294,6 +1298,8 @@ impl MainTaskContext {
     /// chose to load a new one.
     /// This also resets the character to be the new universe's default character.
     ///
+    /// # Panics
+    ///
     /// Panics if called while the main task is suspended.
     pub fn set_universe(&mut self, universe: Box<Universe>) {
         self.with_mut(|shuttle| {
@@ -1306,6 +1312,8 @@ impl MainTaskContext {
     ///
     /// If possible, the produced future should do its work on a background thread
     /// to minimize impact on the session execution.
+    ///
+    /// # Panics
     ///
     /// Panics if called while the main task is suspended.
     //---
@@ -1381,6 +1389,8 @@ impl MainTaskContext {
     ///
     /// Future versions may allow such commands to be bound to keys or displayed elsewhere.
     ///
+    /// # Panics
+    ///
     /// Panics if called while the main task is suspended.
     //---
     // TODO: make it so that this returns a handle, or rather a "command was invoked" channel
@@ -1402,6 +1412,10 @@ impl MainTaskContext {
     ///
     /// Caution: calling this repeatedly will currently result in stacking up arbitrary
     /// numbers of dialogs. Avoid using it for situations not in response to user action.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called while the main task is suspended.
     //---
     // TODO: Replace this entirely with `show_notification`.
     pub fn show_modal_message(&self, message: ArcStr) {
@@ -1437,6 +1451,8 @@ impl MainTaskContext {
     ///
     /// Calling this in a loop is thus a means of observing the outcome of every step, such as
     /// for a renderer/recorder.
+    ///
+    /// # Panics
     ///
     /// Panics if called while the main task is suspended.
     pub async fn yield_to_step(&self) {

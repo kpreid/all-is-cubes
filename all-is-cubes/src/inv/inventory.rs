@@ -47,7 +47,11 @@ impl Inventory {
 
     /// Construct an [`Inventory`] with the given slots.
     ///
-    /// Ordinary user actions cannot change the number of slots.
+    /// Ordinary player actions cannot change the number of slots, only change what is in them.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `items` has more than [`Ix::MAX`] elements.
     #[track_caller]
     pub fn from_slots(items: impl Into<Box<[Slot]>>) -> Self {
         let slots = items.into();

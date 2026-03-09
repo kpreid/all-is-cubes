@@ -757,8 +757,12 @@ impl Block {
     }
 
     /// Returns the single [`Rgba`] color of this block's [`Primitive::Atom`] or
-    /// [`Primitive::Air`], or panics if it has a different kind of primitive.
+    /// [`Primitive::Air`].
     /// **Intended for use in tests only.**
+    ///
+    /// # Panics
+    ///
+    /// Panics if it has a different kind of primitive.
     pub fn color(&self) -> Rgba {
         match *self.primitive() {
             Primitive::Atom(Atom { color, .. }) => color,

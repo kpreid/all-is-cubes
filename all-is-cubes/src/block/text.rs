@@ -189,6 +189,8 @@ impl Text {
     ///
     /// The transaction has no preconditions.
     ///
+    /// # Panics
+    ///
     /// Panics if `transform` causes coordinate overflow.
     pub fn installation(
         &self,

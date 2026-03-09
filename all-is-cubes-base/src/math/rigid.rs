@@ -73,6 +73,10 @@ impl Gridgid {
     ///
     /// Note that a point is not a unit cube; if the point identifies a cube then use
     /// [`Gridgid::transform_cube()`] instead.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the result overflows.
     #[inline]
     #[track_caller]
     pub fn transform_point(self, point: GridPoint) -> GridPoint {

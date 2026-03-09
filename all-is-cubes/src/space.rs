@@ -340,8 +340,10 @@ impl Space {
     /// Constructs a `Space` that is entirely empty and whose coordinate system
     /// is in the +X+Y+Z octant. This is a shorthand intended mainly for tests.
     ///
-    /// Panics if the volume is greater than [`usize::MAX`], if any dimension is greater than
-    /// [`i32::MAX`].
+    /// # Panics
+    /// 
+    /// Panics if the volume is greater than [`usize::MAX`], 
+    /// or if any dimension is greater than [`i32::MAX`].
     #[track_caller]
     pub fn empty_positive<S>(wx: S, wy: S, wz: S) -> Space
     where
@@ -729,7 +731,9 @@ impl Read<'_> {
 
     /// Copy data out of a portion of the space in a caller-chosen format.
     ///
-    /// The given `bounds` must be fully contained within `self.bounds()`.
+    /// # Panics
+    ///
+    /// Panics if `bounds` is not fully contained within `self.bounds()`.
     pub fn extract<'s, C, V>(
         &'s self,
         bounds: GridAab,

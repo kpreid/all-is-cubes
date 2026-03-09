@@ -82,6 +82,8 @@ impl Builder<'_, NeedsPrimitive, ()> {
 
     /// Returns a [`BlockAttributes`] instead of building a block with those attributes.
     ///
+    /// # Panics
+    ///
     /// Panics if any modifiers were added to the builder.
     #[track_caller]
     pub fn build_attributes(self) -> BlockAttributes {

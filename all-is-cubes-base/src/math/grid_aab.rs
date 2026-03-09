@@ -195,6 +195,8 @@ impl GridAab {
 
     /// Constructs a [`GridAab`] with a volume of 1, containing the specified cube.
     ///
+    /// # Panics
+    ///
     /// Panics if `cube` has any coordinates equal to [`GridCoordinate::MAX`]
     /// since that is not valid, as per [`GridAab::from_lower_size()`].
     ///
@@ -754,7 +756,11 @@ impl GridAab {
     /// For example, this may be used to convert from voxels (subcubes) to blocks or
     /// blocks to chunks.
     ///
+    /// # Panics
+    ///
     /// Panics if the divisor is not positive.
+    ///
+    /// # Examples
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
@@ -798,7 +804,11 @@ impl GridAab {
 
     /// Scales the box up by the given factor.
     ///
+    /// # Panics
+    ///
     /// Panics on numeric overflow.
+    ///
+    /// # Example
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
@@ -819,6 +829,8 @@ impl GridAab {
     /// Moves all bounds outward by the specified distances.
     ///
     /// If the result’s coordinates would overflow, they are as large as possible instead.
+    ///
+    /// # Example
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
@@ -855,6 +867,8 @@ impl GridAab {
     /// Moves all bounds inward by the specified distances.
     ///
     /// Returns `None` if the result would have less than zero size.
+    ///
+    /// # Example
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;

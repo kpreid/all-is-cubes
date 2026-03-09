@@ -137,6 +137,8 @@ impl<'universe> Builder<'universe, ()> {
 
     /// Set the bounds of the space, outside which no blocks may be placed.
     ///
+    /// # Panics
+    ///
     /// Panics if `bounds` has a volume exceeding `usize::MAX`.
     /// (But there will likely be a memory allocation failure well below that point.)
     pub fn bounds(self, bounds: GridAab) -> Builder<'universe, Vol<()>> {
@@ -153,6 +155,8 @@ impl<'universe> Builder<'universe, ()> {
 
 impl Builder<'_, Vol<()>> {
     /// Sets the default spawn location of new characters.
+    ///
+    /// # Panics
     ///
     /// Panics if any of the given coordinates is infinite or NaN.
     #[track_caller]
@@ -258,6 +262,8 @@ impl Builder<'_, Vol<()>> {
     /// Construct a [`Space`] with the contents and settings from this builder.
     ///
     /// The builder must have had bounds specified, or it will not be possible to call this method.
+    ///
+    /// # Panics
     ///
     /// Panics if insufficient memory is available is available for the [`Space`]’s data arrays.
     //---

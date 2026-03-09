@@ -210,6 +210,8 @@ impl AaRay {
     /// Scale and translate this ray’s origin to occupy the given cube;
     /// its prior origin now lies within that cube.
     ///
+    /// # Panics
+    ///
     /// Panics if `self`’s position is outside of the bounds of
     /// [`GridAab::for_block(resolution)`](GridAab::for_block).
     ///

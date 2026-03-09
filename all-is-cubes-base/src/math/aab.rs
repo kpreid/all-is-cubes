@@ -53,6 +53,8 @@ impl Aab {
 
     /// Constructs an [`Aab`] from most-negative and most-positive corner points.
     ///
+    /// # Panics
+    ///
     /// Panics if the points are not in the proper order or if they are NaN.
     #[inline]
     #[track_caller]
@@ -94,6 +96,8 @@ impl Aab {
 
     /// Constructs an [`Aab`] which encloses the given two points.
     /// These points will become two opposing corners.
+    ///
+    /// # Panics
     ///
     /// Panics if any given coordinate is NaN.
     #[inline]

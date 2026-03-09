@@ -138,6 +138,8 @@ impl Evoxels {
 
     /// Construct an [`Evoxels`] storing the given voxels.
     ///
+    /// # Panics
+    ///
     /// Panics if `voxels` contains any data outside the block bounds.
     /// Such data would at best be ignored, and at worst would confuse block
     /// processing algorithms, and is therefore rejected.

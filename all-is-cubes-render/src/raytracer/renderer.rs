@@ -172,6 +172,10 @@ where
     /// with any [`Accumulate`] instead of requiring [`ColorBuf`] and [`Rgba`] output,
     /// is not async, and does not require `&mut self`.
     ///
+    /// # Panics
+    ///
+    /// Panics if `output`’s length is not correct.
+    ///
     /// [`Universe`]: all_is_cubes::universe::Universe
     pub fn draw<P, E, O, IF>(&self, info_text_fn: IF, encoder: E, output: &mut [O]) -> RaytraceInfo
     where
@@ -468,6 +472,8 @@ mod trace_image {
     /// `encoder` may be used to transform the output of the [`Accumulate`] into the stored
     /// representation.
     ///
+    /// # Panics
+    ///
     /// Panics if `output`'s length does not match the area of `camera.framebuffer_size`.
     ///
     /// TODO: Add a mechanism for incrementally rendering (not 100% of pixels) for
@@ -522,6 +528,8 @@ mod trace_image {
     ///
     /// `encoder` may be used to transform the output of the [`Accumulate`] into the stored
     /// representation.
+    ///
+    /// # Panics
     ///
     /// Panics if `output`'s length does not match the area of `camera.framebuffer_size`.
     ///

@@ -136,6 +136,9 @@ impl fmt::Display for WidgetBlocks {
 }
 
 impl WidgetBlocks {
+    /// # Panics
+    ///
+    /// Panics if the transaction already contains these blocks.
     pub async fn new(txn: &mut UniverseTransaction, p: YieldProgress) -> BlockProvider<Self> {
         BlockProvider::new(p, |key| {
             Ok(match key {
