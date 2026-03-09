@@ -811,35 +811,15 @@ pub enum InsertErrorKind {
     /// In particular, a [`Name::Anonym`] may not be inserted explicitly.
     InvalidName,
 
-    /// The provided [`Handle`] was created by [`Handle::new_gone()`] and is intentionally useless.
-    Gone,
-
     /// A value has not been associated with the handle.
     /// This can occur when using [`UniverseTransaction::insert_without_value()`].
     ValueMissing,
 
-    /// The provided [`Handle`]’s value is being mutated and cannot
-    /// be checked.
-    InUse,
-
     /// The provided [`Handle`] was already inserted into some universe.
     AlreadyInserted,
 
-    /// A serialized [`Universe`] contained multiple definitions for this name.
-    DeserializeMultipleValues,
-
     /// The provided value contains handles to a different universe.
     CrossUniverse,
-
-    #[doc(hidden)] // should be unreachable
-    /// The provided [`Handle`] is being used in the deserialization process
-    /// and cannot be inserted otherwise.
-    Deserializing,
-
-    #[doc(hidden)]
-    /// The provided [`Handle`] experienced an error during a previous operation and
-    /// cannot be used.
-    Poisoned,
 }
 
 impl core::error::Error for InsertError {}
@@ -854,28 +834,10 @@ impl fmt::Display for InsertError {
             InsertErrorKind::InvalidName => {
                 write!(f, "the name {name} may not be used in an insert operation")
             }
-            InsertErrorKind::Gone => write!(
-                f,
-                "cannot insert handle {name} created by Handle::new_gone()"
-            ),
             InsertErrorKind::ValueMissing => write!(f, "value has not been provided for {name}"),
-            InsertErrorKind::InUse => write!(
-                f,
-                "the object {name} is being mutated during this insertion attempt"
-            ),
             InsertErrorKind::AlreadyInserted => write!(f, "the object {name} is already inserted"),
-            InsertErrorKind::DeserializeMultipleValues => {
-                write!(f, "duplicate definition of object {name}")
-            }
             InsertErrorKind::CrossUniverse => {
                 write!(f, "the object {name} contains handles to another universe")
-            }
-            InsertErrorKind::Deserializing => write!(
-                f,
-                "the object {name} is already in a universe being deserialized"
-            ),
-            InsertErrorKind::Poisoned => {
-                write!(f, "the object is invalid due to a previous failure")
             }
         }
     }
