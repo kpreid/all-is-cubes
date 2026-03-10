@@ -149,8 +149,11 @@ pub(super) struct PtBasis {
     pub transparent: bool,
 }
 
+/// A vertex in the form processed by [`PlanarTriangulator`] to produce triangles.
+///
+/// TODO: This type should be renamed now that it has broader usage.
+/// It used to be only part of the “frontier” internal state of the triangulator.
 #[derive(Clone, Copy, Debug)]
-// public only for `Viz` to do debug visualization
 pub(crate) struct FrontierVertex {
     /// Originally provided vertex.
     ///
@@ -243,31 +246,30 @@ impl PlanarTriangulator {
         &mut self,
         viz: &mut Viz,
         basis: PtBasis,
-        input: impl Iterator<Item = AnalysisVertex>,
+        input: impl Iterator<Item = FrontierVertex>,
         mut triangle_callback: impl FnMut([u32; 3]),
     ) {
         // Set the basis, and ensure any previous usage of self does not affect the results.
         self.clear_and_set_basis(basis);
 
-        for (input_index_usize, mut input_vertex) in input.enumerate() {
+        for mut input_fv @ FrontierVertex {
+            index: input_index, ..
+        } in input
+        {
             // Forget about hidden voxel faces -- transform “this volume is solid” mask into
             // “this is a visible surface” mask. TODO(planar_new): express this more strongly typed?
-            input_vertex.opaque &= !input_vertex.opaque.shift(self.basis.face.opposite());
+            input_fv.v.opaque &= !input_fv.v.opaque.shift(self.basis.face.opposite());
             // Note: transparent counts as obscuring transparent, in the sense that we don't try
             // to generate faces for it. If we did, not only would we generate way too much
             // geometry, we'd fail assertions because the analysis vertices aren't meant to provide
             // the corners needed for those surfaces.
-            input_vertex.renderable &= !input_vertex.renderable.shift(self.basis.face.opposite());
+            input_fv.v.renderable &= !input_fv.v.renderable.shift(self.basis.face.opposite());
 
-            let input_index = u32::try_from(input_index_usize).unwrap();
-            let input_fv = FrontierVertex {
-                v: input_vertex,
-                index: input_index,
-            };
+            let input_index_usize = usize::try_from(input_index).unwrap();
 
             // Advance sweep line if the new vertex is ahead of the line.
             let new_sweep_position =
-                self.basis.sweep_direction.dot(input_vertex.position.to_vector());
+                self.basis.sweep_direction.dot(input_fv.v.position.to_vector());
             if new_sweep_position != self.sweep_position {
                 self.advance_sweep_position(viz, &mut triangle_callback, new_sweep_position);
             }
@@ -340,8 +342,8 @@ impl PlanarTriangulator {
 
             self.new_frontier.push_back(input_fv);
 
-            if !(self.basis.connectivity(&input_vertex, false, true)
-                || self.basis.connectivity(&input_vertex, false, false))
+            if !(self.basis.connectivity(&input_fv.v, false, true)
+                || self.basis.connectivity(&input_fv.v, false, false))
             {
                 // The new vertex is not connected backwards, so it is
                 // a corner or middle of a region we are just starting to cover.
@@ -359,7 +361,7 @@ impl PlanarTriangulator {
                     // vertex, the new vertex, and its neighbors in the frontier.
                     if self.basis.connectivity(&predecessor_vertex.v, true, false) {
                         assert!(
-                            self.basis.connectivity(&input_vertex, false, false),
+                            self.basis.connectivity(&input_fv.v, false, false),
                             "inconsistent"
                         );
                         self.basis.emit(
@@ -378,7 +380,7 @@ impl PlanarTriangulator {
                     }
                     if self.basis.connectivity(&predecessor_vertex.v, true, true) {
                         assert!(
-                            self.basis.connectivity(&input_vertex, false, true),
+                            self.basis.connectivity(&input_fv.v, false, true),
                             "inconsistent"
                         );
                         self.basis.emit(
@@ -396,8 +398,8 @@ impl PlanarTriangulator {
                     // Consistency means it must be connected to the both of them.
                     assert_eq!(
                         (
-                            self.basis.connectivity(&input_vertex, false, true),
-                            self.basis.connectivity(&input_vertex, false, false)
+                            self.basis.connectivity(&input_fv.v, false, true),
+                            self.basis.connectivity(&input_fv.v, false, false)
                         ),
                         (true, true),
                         "mid-span vertex must be connected backwards both ways"
@@ -700,7 +702,10 @@ mod tests {
         triangulator.triangulate(
             &mut viz,
             test_basis(),
-            vertices.iter().inspect(|vertex| println!("In: {vertex:?}")).copied(),
+            vertices.iter().zip(0u32..).map(|(&v, index)| {
+                println!("In: {v:?}");
+                FrontierVertex { v, index }
+            }),
             |triangle_indices: [u32; 3]| {
                 let triangle_positions =
                     triangle_indices.map(|index| vertices[index as usize].position);
