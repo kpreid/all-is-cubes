@@ -67,27 +67,90 @@ type WrappingVector3D = all_is_cubes::euclid::Vector3D<Wrapping<GridCoordinate>,
 /// TODO: This type should be renamed now that it has broader usage.
 /// It used to be only part of the “frontier” internal state of the triangulator.
 #[derive(Clone, Copy, Debug)]
-#[repr(C)] // forcing this layout seems to improve perf. TODO: revisit
 pub(crate) struct FrontierVertex {
     pub position: GridPoint,
 
-    /// Bitmask of which volumes adjacent to this vertex are occupied by a visible material.
-    pub renderable: OctantMask,
-
-    /// Bitmask of which volumes adjacent to this vertex are occupied by a fully opaque material.
-    pub opaque: OctantMask,
+    /// Bitmask of which areas adjacent to this vertex, in the plane of the triangulation,
+    /// should be covered by triangles.
+    pub connectivity: Mask,
 
     /// Vertex index used in the output of the triangulator.
     pub index: u32,
 }
 
 impl FrontierVertex {
-    pub fn new(basis: &PtBasis, av: AnalysisVertex, index: u32) -> Self {
-        _ = basis; // TODO: will be used in the near future
+    pub fn new(basis: &PtBasis, mut av: AnalysisVertex, index: u32) -> Self {
+        /// Returns whether the vertex borders a part of the polygon that extends in the
+        /// `(sweep_direction, perpendicular_direction)` quadrant,
+        /// or negated as indicated.
+        // TODO(planar_new): better explanation
+        #[inline(always)] // confirmed by benchmark to be faster
+        fn av_connectivity(
+            basis: &PtBasis,
+            vertex: &AnalysisVertex,
+            forward_in_sweep: bool,
+            forward_in_perpendicular: bool,
+        ) -> bool {
+            // Compute the surfaces adjacent to this vertex that this execution should actually render.
+            let should_render = (if basis.transparent {
+                // Find transparent voxels only (neither invisible nor opaque)
+                vertex.renderable & !vertex.opaque
+            } else {
+                vertex.opaque
+            })
+            // Mask off all voxels whose surface would be occluded by opaque surfaces,
+            // and also the voxels that are above rather than below the surface.
+            & (!vertex.opaque).shift(basis.face.opposite());
+
+            // Out of those surfaces, check the single quadrant we are being asked about in this
+            // particular call.
+            //
+            // Shift all the unwanted bits out (by shifting in the opposite direction to the one we
+            // are testing), then check if the wanted one is left.
+            // (This always picks one octant, but in order to express this in terms of a `math::Octant`
+            // we'd have to prove the 3 faces are orthogonal to each other.)
+            should_render
+                .shift(basis.face)
+                .shift(if forward_in_sweep {
+                    -basis.sweep_direction
+                } else {
+                    basis.sweep_direction
+                })
+                .shift(if forward_in_perpendicular {
+                    -basis.perpendicular_direction
+                } else {
+                    basis.perpendicular_direction
+                })
+                != OctantMask::NONE
+        }
+
+        // Forget about hidden voxel faces -- transform “this volume is solid” mask into
+        // “this is a visible surface” mask. TODO(planar_new): express this more strongly typed?
+        av.opaque &= !av.opaque.shift(basis.face.opposite());
+        // Note: transparent counts as obscuring transparent, in the sense that we don't try
+        // to generate faces for it. If we did, not only would we generate way too much
+        // geometry, we'd fail assertions because the analysis vertices aren't meant to provide
+        // the corners needed for those surfaces.
+        av.renderable &= !av.renderable.shift(basis.face.opposite());
+
+        let mut connectivity = Mask::EMPTY;
+
+        if av_connectivity(basis, &av, true, true) {
+            connectivity = connectivity | Mask::FSFP;
+        }
+        if av_connectivity(basis, &av, true, false) {
+            connectivity = connectivity | Mask::FSBP;
+        }
+        if av_connectivity(basis, &av, false, true) {
+            connectivity = connectivity | Mask::BSFP;
+        }
+        if av_connectivity(basis, &av, false, false) {
+            connectivity = connectivity | Mask::BSBP;
+        }
+
         Self {
             position: av.position,
-            renderable: av.renderable,
-            opaque: av.opaque,
+            connectivity,
             index,
         }
     }
@@ -181,6 +244,9 @@ pub(crate) struct PtBasis {
     ///
     /// * `false`: triangulate opaque surfaces; ignore transparent ones.
     /// * `true`: triangulate transparent surfaces; use opaque ones as occlusion only.
+    // TODO: This flag should be moved out of `PtBasis` because the triangulation algorithm itself
+    // no longer needs to care about the idea of transparency, since it stopped operating directly
+    // on `AnalysisVertex`.
     pub transparent: bool,
 }
 
@@ -240,8 +306,7 @@ impl PlanarTriangulator {
         // complicate the algorithm when it is producing triangles connecting to the preceding
         // vertex. TODO(planar_new): Implement that later.
         self.new_frontier.retain(|frontier_vertex| {
-            self.basis.connectivity(frontier_vertex, true, true)
-                || self.basis.connectivity(frontier_vertex, true, false)
+            frontier_vertex.connectivity.contains_any_of(Mask::FSFP | Mask::FSBP)
         });
 
         mem::swap(&mut self.old_frontier, &mut self.new_frontier);
@@ -268,16 +333,7 @@ impl PlanarTriangulator {
         // Set the basis, and ensure any previous usage of self does not affect the results.
         self.clear_and_set_basis(basis);
 
-        for mut input_vertex in input {
-            // Forget about hidden voxel faces -- transform “this volume is solid” mask into
-            // “this is a visible surface” mask. TODO(planar_new): express this more strongly typed?
-            input_vertex.opaque &= !input_vertex.opaque.shift(self.basis.face.opposite());
-            // Note: transparent counts as obscuring transparent, in the sense that we don't try
-            // to generate faces for it. If we did, not only would we generate way too much
-            // geometry, we'd fail assertions because the analysis vertices aren't meant to provide
-            // the corners needed for those surfaces.
-            input_vertex.renderable &= !input_vertex.renderable.shift(self.basis.face.opposite());
-
+        for input_vertex in input {
             let input_index_usize = usize::try_from(input_vertex.index).unwrap();
 
             // Advance sweep line if the new vertex is ahead of the line.
@@ -308,13 +364,13 @@ impl PlanarTriangulator {
             let mut previous_should_connect_forward = self
                 .new_frontier
                 .back()
-                .is_some_and(|v| self.basis.connectivity(v, false, true));
+                .is_some_and(|v| v.connectivity.contains_any_of(Mask::BSFP));
             while let Some(passed_over_fv) = self
                 .old_frontier
                 .pop_front_if(|v| self.basis.compare_perp(v, &input_vertex).is_lt())
             {
                 if previous_should_connect_forward
-                    && self.basis.connectivity(&passed_over_fv, true, true)
+                    && passed_over_fv.connectivity.contains_any_of(Mask::FSFP)
                     && let triangle = [
                         &passed_over_fv,
                         self.new_frontier.back().expect("preceding vertex in new frontier missing"),
@@ -355,9 +411,7 @@ impl PlanarTriangulator {
 
             self.new_frontier.push_back(input_vertex);
 
-            if !(self.basis.connectivity(&input_vertex, false, true)
-                || self.basis.connectivity(&input_vertex, false, false))
-            {
+            if !(input_vertex.connectivity.contains_any_of(Mask::BSFP | Mask::BSBP)) {
                 // The new vertex is not connected backwards, so it is
                 // a corner or middle of a region we are just starting to cover.
                 // In this case, all we need to do is add it to the new frontier;
@@ -372,9 +426,9 @@ impl PlanarTriangulator {
                 {
                     // We must emit one or two triangles that cover the area bounded by the old
                     // vertex, the new vertex, and its neighbors in the frontier.
-                    if self.basis.connectivity(&predecessor_vertex, true, false) {
+                    if predecessor_vertex.connectivity.contains_any_of(Mask::FSBP) {
                         assert!(
-                            self.basis.connectivity(&input_vertex, false, false),
+                            input_vertex.connectivity.contains_any_of(Mask::BSBP),
                             "inconsistent"
                         );
                         self.basis.emit(
@@ -391,9 +445,9 @@ impl PlanarTriangulator {
                             ],
                         );
                     }
-                    if self.basis.connectivity(&predecessor_vertex, true, true) {
+                    if predecessor_vertex.connectivity.contains_any_of(Mask::FSFP) {
                         assert!(
-                            self.basis.connectivity(&input_vertex, false, true),
+                            input_vertex.connectivity.contains_any_of(Mask::BSFP),
                             "inconsistent"
                         );
                         self.basis.emit(
@@ -411,8 +465,8 @@ impl PlanarTriangulator {
                     // Consistency means it must be connected to the both of them.
                     assert_eq!(
                         (
-                            self.basis.connectivity(&input_vertex, false, true),
-                            self.basis.connectivity(&input_vertex, false, false)
+                            input_vertex.connectivity.contains_any_of(Mask::BSFP),
+                            input_vertex.connectivity.contains_any_of(Mask::BSBP),
                         ),
                         (true, true),
                         "mid-span vertex must be connected backwards both ways"
@@ -485,8 +539,8 @@ impl PlanarTriangulator {
                 let last = &self.new_frontier[i + 2];
                 let candidate_triangle = [last, middle, first];
 
-                let connected_back = self.basis.connectivity(middle, true, false);
-                let connected_fwd = self.basis.connectivity(middle, true, true);
+                let connected_back = middle.connectivity.contains_any_of(Mask::FSBP);
+                let connected_fwd = middle.connectivity.contains_any_of(Mask::FSFP);
                 let is_convex = self.basis.is_correct_winding(candidate_triangle);
 
                 viz.set_current_triangulation_vertex(
@@ -578,50 +632,6 @@ impl PtBasis {
         self.perpendicular_vector
             .dot(v1.position.to_vector().map(Wrapping))
             .cmp(&self.perpendicular_vector.dot(v2.position.to_vector().map(Wrapping)))
-    }
-
-    /// Returns whether the vertex borders a part of the polygon that extends in the
-    /// `(self.sweep_direction, self.perpendicular_direction)` quadrant,
-    /// or negated as indicated.
-    // TODO(planar_new): better explanation
-    #[inline(always)] // confirmed by benchmark to be faster
-    fn connectivity(
-        self,
-        vertex: &FrontierVertex,
-        forward_in_sweep: bool,
-        forward_in_perpendicular: bool,
-    ) -> bool {
-        // Compute the surfaces adjacent to this vertex that this execution should actually render.
-        let should_render = (if self.transparent {
-                // Find transparent voxels only (neither invisible nor opaque)
-                vertex.renderable & !vertex.opaque
-            } else {
-                vertex.opaque
-            })
-            // Mask off all voxels whose surface would be occluded by opaque surfaces,
-            // and also the voxels that are above rather than below the surface.
-            & (!vertex.opaque).shift(self.face.opposite());
-
-        // Out of those surfaces, check the single quadrant we are being asked about in this
-        // particular call.
-        //
-        // Shift all the unwanted bits out (by shifting in the opposite direction to the one we
-        // are testing), then check if the wanted one is left.
-        // (This always picks one octant, but in order to express this in terms of a `math::Octant`
-        // we'd have to prove the 3 faces are orthogonal to each other.)
-        should_render
-            .shift(self.face)
-            .shift(if forward_in_sweep {
-                -self.sweep_direction
-            } else {
-                self.sweep_direction
-            })
-            .shift(if forward_in_perpendicular {
-                -self.perpendicular_direction
-            } else {
-                self.perpendicular_direction
-            })
-            != OctantMask::NONE
     }
 
     /// Returns whether the winding order of the triangle is as it should be.
@@ -775,9 +785,10 @@ mod tests {
         triangulator.triangulate(
             &mut viz,
             basis,
-            vertices.iter().zip(0u32..).map(|(&v, index)| {
-                println!("In: {v:?}");
-                FrontierVertex::new(&basis, v, index)
+            vertices.iter().zip(0u32..).map(|(&av, index)| {
+                let fv = FrontierVertex::new(&basis, av, index);
+                println!("In: {av:?} {fv:?}");
+                fv
             }),
             |triangle_indices: [u32; 3]| {
                 let triangle_positions =
