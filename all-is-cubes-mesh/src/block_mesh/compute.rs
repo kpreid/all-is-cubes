@@ -472,7 +472,7 @@ fn get_voxel_with_limit(voxels: Vol<&[Evoxel]>, cube: Cube, options: &MeshOption
 /// * `true`: triangulate transparent surfaces; use opaque ones as occlusion only.
 fn analysis_vertex_to_planar_vertex(
     basis: &planar::PtBasis,
-    mut vertex: AnalysisVertex,
+    vertex: AnalysisVertex,
     index: u32,
     transparent: bool,
 ) -> planar::Vertex {
@@ -480,30 +480,36 @@ fn analysis_vertex_to_planar_vertex(
 
     // Forget about hidden voxel faces -- transform “this volume is solid” mask into
     // “this is a visible surface” mask. TODO(planar_new): express this more strongly typed?
-    vertex.opaque &= !vertex.opaque.shift(basis.face.opposite());
+    let opaque = vertex.opaque & !vertex.opaque.shift(basis.face.opposite());
     // Note: transparent counts as obscuring transparent, in the sense that we don't try
     // to generate faces for it. If we did, not only would we generate way too much
     // geometry, we'd fail assertions because the analysis vertices aren't meant to provide
     // the corners needed for those surfaces.
-    vertex.renderable &= !vertex.renderable.shift(basis.face.opposite());
+    let renderable = vertex.renderable & !vertex.renderable.shift(basis.face.opposite());
+
+    // Compute the surfaces adjacent to this vertex that this execution should actually render.
+    let should_render = (if transparent {
+        // Find transparent voxels only (neither invisible nor opaque)
+        renderable & !opaque
+    } else {
+        opaque
+    })
+    // Mask off all voxels whose surface would be occluded by opaque surfaces,
+    // and also the voxels that are above rather than below the surface.
+    & (!opaque).shift(basis.face.opposite());
 
     // Returns whether the vertex borders a part of the polygon that extends in the
     // `(sweep_direction, perpendicular_direction)` quadrant,
     // or negated as indicated.
     //
     // TODO(planar_new): better explanation
-    let av_connectivity = |forward_in_sweep: bool, forward_in_perpendicular: bool| -> bool {
-        // Compute the surfaces adjacent to this vertex that this execution should actually render.
-        let should_render = (if transparent {
-                // Find transparent voxels only (neither invisible nor opaque)
-                vertex.renderable & !vertex.opaque
-            } else {
-                vertex.opaque
-            })
-            // Mask off all voxels whose surface would be occluded by opaque surfaces,
-            // and also the voxels that are above rather than below the surface.
-            & (!vertex.opaque).shift(basis.face.opposite());
-
+    #[inline(always)]
+    fn av_connectivity(
+        forward_in_sweep: bool,
+        forward_in_perpendicular: bool,
+        basis: &planar::PtBasis,
+        should_render: OctantMask,
+    ) -> bool {
         // Out of those surfaces, check the single quadrant we are being asked about in this
         // particular call.
         //
@@ -512,7 +518,6 @@ fn analysis_vertex_to_planar_vertex(
         // (This always picks one octant, but in order to express this in terms of a `math::Octant`
         // we'd have to prove the 3 faces are orthogonal to each other.)
         should_render
-            .shift(basis.face)
             .shift(if forward_in_sweep {
                 -basis.sweep_direction
             } else {
@@ -524,20 +529,20 @@ fn analysis_vertex_to_planar_vertex(
                 basis.perpendicular_direction
             })
             != OctantMask::NONE
-    };
+    }
 
     let mut connectivity = Mask::EMPTY;
 
-    if av_connectivity(true, true) {
+    if av_connectivity(true, true, basis, should_render) {
         connectivity = connectivity | Mask::FSFP;
     }
-    if av_connectivity(true, false) {
+    if av_connectivity(true, false, basis, should_render) {
         connectivity = connectivity | Mask::FSBP;
     }
-    if av_connectivity(false, true) {
+    if av_connectivity(false, true, basis, should_render) {
         connectivity = connectivity | Mask::BSFP;
     }
-    if av_connectivity(false, false) {
+    if av_connectivity(false, false, basis, should_render) {
         connectivity = connectivity | Mask::BSBP;
     }
 
