@@ -17,7 +17,11 @@
 //!
 //! [`BlockMesh`] and [`SpaceMesh`] are the key types; everything else supports their
 //! creation and usage. For real-time dynamically modified meshes, use
-//! [`dynamic::ChunkedSpaceMesh`].
+#![cfg_attr(feature = "dynamic", doc = " [`dynamic::ChunkedSpaceMesh`].")]
+#![cfg_attr(
+    not(feature = "dynamic"),
+    doc = " `dynamic::ChunkedSpaceMesh` (feature is disabled in this build)."
+)]
 //!
 //! To support a new API/format, you will need to create suitable implementations of the
 //! [`Vertex`] and [`texture::Allocator`] traits, then implement [`MeshTypes`] to bundle them
@@ -29,7 +33,9 @@
 //!
 //! * `"auto-threads"`:
 //!   Enables implicit use of threads for parallel and background processing, including via
-//!   [`rayon`]’s global thread pool.
+#![cfg_attr(feature = "auto-threads", doc = "   [`rayon`]’s")]
+#![cfg_attr(not(feature = "auto-threads"), doc = "   `rayon`’s")]
+//!   global thread pool.
 //! * `"dynamic"`:
 //!   Enable the `dynamic` module.
 //!   Incompatible with `no_std` platforms.
