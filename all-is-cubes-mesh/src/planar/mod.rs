@@ -136,7 +136,7 @@ pub(super) struct Triangulator {
 }
 
 /// Defines the coordinate system of the input to a [`Triangulator`].
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct Basis {
     /// Orientation of the face/plane being processed.
     face: Face6,
