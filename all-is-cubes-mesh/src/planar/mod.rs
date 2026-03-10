@@ -139,17 +139,17 @@ pub(super) struct Triangulator {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Basis {
     /// Orientation of the face/plane being processed.
-    pub face: Face6,
+    face: Face6,
 
     /// Direction along the plane in which we are receiving input vertices.
     /// Input vertices must be sorted by `sweep_direction.dot(vertex.position)`.
-    pub sweep_direction: Face6,
+    sweep_direction: Face6,
 
     /// A direction perpendicular to `self.face` and `self.sweep_direction`.
     ///
     /// Input vertices must be sorted by `perpendicular_direction.dot(vertex.position)`
     /// as a secondary key after `sweep_direction`.
-    pub perpendicular_direction: Face6,
+    perpendicular_direction: Face6,
 
     /// `perpendicular_direction` as a unit vector.
     /// Wrapping arithmetic helps `compare_perp()` compile to simple code.
@@ -162,7 +162,7 @@ pub(crate) struct Basis {
     ///
     /// If the coordinate system established by the sweep is mirrored (which it is, half the time),
     /// then this is true to tell us to flip the winding order.
-    pub left_handed: bool,
+    left_handed: bool,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -541,6 +541,24 @@ impl Basis {
             perpendicular_vector: perpendicular_direction.normal_vector(),
             left_handed,
         }
+    }
+
+    /// Returns the `face` direction this was constructed with.
+    #[inline(always)]
+    pub fn face(&self) -> Face6 {
+        self.face
+    }
+
+    /// Returns the `sweep_direction` this was constructed with.
+    #[inline(always)]
+    pub fn sweep_direction(&self) -> Face6 {
+        self.sweep_direction
+    }
+
+    /// Returns the `perpendicular_direction` this was constructed with.
+    #[inline(always)]
+    pub fn perpendicular_direction(&self) -> Face6 {
+        self.perpendicular_direction
     }
 
     /// Compare two vertices’ positions along the direction perpendicular to the sweep.

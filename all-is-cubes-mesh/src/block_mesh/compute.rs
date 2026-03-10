@@ -480,12 +480,12 @@ fn analysis_vertex_to_planar_vertex(
 
     // Forget about hidden voxel faces -- transform “this volume is solid” mask into
     // “this is a visible surface” mask. TODO(planar_new): express this more strongly typed?
-    let opaque = vertex.opaque & !vertex.opaque.shift(basis.face.opposite());
+    let opaque = vertex.opaque & !vertex.opaque.shift(basis.face().opposite());
     // Note: transparent counts as obscuring transparent, in the sense that we don't try
     // to generate faces for it. If we did, not only would we generate way too much
     // geometry, we'd fail assertions because the analysis vertices aren't meant to provide
     // the corners needed for those surfaces.
-    let renderable = vertex.renderable & !vertex.renderable.shift(basis.face.opposite());
+    let renderable = vertex.renderable & !vertex.renderable.shift(basis.face().opposite());
 
     // Compute the surfaces adjacent to this vertex that this execution should actually render.
     let should_render = (if transparent {
@@ -496,7 +496,7 @@ fn analysis_vertex_to_planar_vertex(
     })
     // Mask off all voxels whose surface would be occluded by opaque surfaces,
     // and also the voxels that are above rather than below the surface.
-    & (!opaque).shift(basis.face.opposite());
+    & (!opaque).shift(basis.face().opposite());
 
     // Returns whether the vertex borders a part of the polygon that extends in the
     // `(sweep_direction, perpendicular_direction)` quadrant,
@@ -519,14 +519,14 @@ fn analysis_vertex_to_planar_vertex(
         // we'd have to prove the 3 faces are orthogonal to each other.)
         should_render
             .shift(if forward_in_sweep {
-                -basis.sweep_direction
+                -basis.sweep_direction()
             } else {
-                basis.sweep_direction
+                basis.sweep_direction()
             })
             .shift(if forward_in_perpendicular {
-                -basis.perpendicular_direction
+                -basis.perpendicular_direction()
             } else {
-                basis.perpendicular_direction
+                basis.perpendicular_direction()
             })
             != OctantMask::NONE
     }
