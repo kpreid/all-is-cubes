@@ -67,6 +67,7 @@ pub use depth_sorting::{DepthOrdering, DepthSortInfo, DepthSortResult};
 pub mod dynamic;
 mod index_vec;
 pub use index_vec::*;
+mod planar;
 mod space_mesh;
 pub use space_mesh::*;
 #[doc(hidden)]

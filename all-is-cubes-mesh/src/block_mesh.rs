@@ -12,7 +12,7 @@ use all_is_cubes::space;
 use all_is_cubes_render::Flaws;
 
 use crate::texture::{self, Tile as _};
-use crate::{Aabbs, IndexVec, MeshOptions, MeshTypes, Vertex};
+use crate::{Aabbs, IndexVec, MeshOptions, MeshTypes, Vertex, planar};
 
 #[cfg(doc)]
 use {crate::SpaceMesh, all_is_cubes::space::Space};
@@ -22,7 +22,6 @@ use {crate::SpaceMesh, all_is_cubes::space::Space};
 mod analyze;
 mod compute;
 mod extend;
-mod planar;
 mod viz;
 #[cfg_attr(feature = "_special_testing", visibility::make(pub))]
 pub(crate) use viz::Viz;
