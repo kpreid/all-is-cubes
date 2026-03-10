@@ -601,3 +601,9 @@ impl Basis {
         triangle_callback(triangle.map(|v| v.index));
     }
 }
+
+impl Default for Triangulator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
