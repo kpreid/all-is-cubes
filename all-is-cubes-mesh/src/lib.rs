@@ -27,6 +27,8 @@
 //! [`Vertex`] and [`texture::Allocator`] traits, then implement [`MeshTypes`] to bundle them
 //! together.
 //!
+//! You can also do 2D triangulation of shapes not derived from voxels using the [`planar`] module.
+//!
 //! ## Package features
 //!
 //! This package defines the following feature flags:
@@ -73,7 +75,7 @@ pub use depth_sorting::{DepthOrdering, DepthSortInfo, DepthSortResult};
 pub mod dynamic;
 mod index_vec;
 pub use index_vec::*;
-mod planar;
+pub mod planar;
 mod space_mesh;
 pub use space_mesh::*;
 #[doc(hidden)]

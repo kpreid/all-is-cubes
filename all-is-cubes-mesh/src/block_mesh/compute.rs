@@ -407,7 +407,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
 
                 // Compute triangles and append their indices to SubMesh.
                 let indices_before_this_pass = pass_indices.len();
-                triangulator.triangulate(
+                triangulator.triangulate_with_viz(
                     viz,
                     triangulator_basis,
                     vertex_subset.iter().zip(0u32..).map(|(&v, index)| {

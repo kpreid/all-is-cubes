@@ -18,7 +18,6 @@ fn test_basis() -> planar::Basis {
 #[inline(never)]
 #[track_caller]
 fn check(vertices: &[planar::Vertex], expected_triangles: &[&[u8; 3]]) {
-    let mut viz = crate::Viz::Disabled;
     let mut actual_triangles = Vec::new();
     let mut triangulator = planar::Triangulator::new();
     let basis = test_basis();
@@ -26,7 +25,6 @@ fn check(vertices: &[planar::Vertex], expected_triangles: &[&[u8; 3]]) {
     eprintln!("Initial state: {triangulator:#?}");
 
     triangulator.triangulate(
-        &mut viz,
         basis,
         vertices.iter().copied().inspect(|planar_vertex| {
             println!("In: {planar_vertex:?}");

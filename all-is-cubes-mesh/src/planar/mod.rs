@@ -1,6 +1,12 @@
 //! Algorithm for taking arbitrary [orthogonal polygons] that form the surfaces of voxel shapes
 //! and triangulating them.
 //!
+//! This algorithm is primarily for internal use by [`BlockMesh`][crate::BlockMesh],
+//! and you do not need to use any items in this module to build block meshes.
+//! However, it has been made available for separate use if desired.
+//!
+//! # Details
+//!
 //! This is a [sweep line algorithm] which requires the input vertices to be sorted, and to know
 //! what sort ordering was used.
 // Internal note: Such an order is what [`super::analyze`] provides them in.
@@ -77,7 +83,7 @@ use crate::Viz;
 // -------------------------------------------------------------------------------------------------
 
 mod mask;
-pub(crate) use mask::Mask;
+pub use mask::Mask;
 
 #[cfg(test)]
 mod tests;
@@ -91,7 +97,11 @@ type WrappingVector3D = all_is_cubes::euclid::Vector3D<Wrapping<GridCoordinate>,
 ///
 /// (Refer to this type as `planar::Vertex` to avoid ambiguity.)
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct Vertex {
+#[allow(
+    clippy::exhaustive_structs,
+    reason = "each field is required input data"
+)]
+pub struct Vertex {
     /// Position of the vertex.
     pub position: GridPoint,
 
@@ -103,13 +113,13 @@ pub(crate) struct Vertex {
     pub index: u32,
 }
 
-/// Temporary buffer for the state of the triangulation algorithm.
+/// Temporary buffer for the state of the 2D triangulation algorithm.
 ///
 /// Used by calling [`Triangulator::triangulate()`].
 /// May be used more than once to reuse previous memory allocations
 /// (it does not preserve any state from previous uses).
 #[derive(Debug)]
-pub(super) struct Triangulator {
+pub struct Triangulator {
     basis: Basis,
 
     /// Position of the line in the plane perpendicular to `sweep_direction` which we are currently
@@ -156,7 +166,7 @@ pub(super) struct Triangulator {
 
 /// Defines the coordinate system of the input to a [`Triangulator`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct Basis {
+pub struct Basis {
     /// Orientation of the face/plane being processed.
     face: Face6,
 
@@ -269,6 +279,17 @@ impl Triangulator {
     /// The output is in the form of indices, in the GPU graphics sense; each index is
     /// the value of the [`index`][Vertex::index] field of some [`Vertex`].
     pub fn triangulate(
+        &mut self,
+        basis: Basis,
+        input: impl Iterator<Item = Vertex>,
+        triangle_callback: impl FnMut([u32; 3]),
+    ) {
+        self.triangulate_with_viz(&mut Viz::Disabled, basis, input, triangle_callback)
+    }
+
+    /// Same as [`Self::triangulate()`] but allows passing [`Viz`].
+    #[cfg_attr(feature = "_special_testing", visibility::make(pub))]
+    pub(crate) fn triangulate_with_viz(
         &mut self,
         viz: &mut Viz,
         basis: Basis,
