@@ -1,18 +1,35 @@
-//! Algorithm for taking arbitrary orthogonal polygons that form the surfaces of voxel shapes
+//! Algorithm for taking arbitrary [orthogonal polygons] that form the surfaces of voxel shapes
 //! and triangulating them.
 //!
-//! This is a [sweep line algorithm] which processes vertices in the order which [`super::analyze`]
-//! provides them. It does not introduce any additional vertices, which ensures that the resulting
-//! mesh will not contain any “T-junctions” (places where a triangle edge meets a vertex rather than
-//! another edge).
+//! This is a [sweep line algorithm] which requires the input vertices to be sorted, and to know
+//! what sort ordering was used.
+// Internal note: Such an order is what [`super::analyze`] provides them in.
+//!
+//! It does not introduce any additional vertices, and always uses every vertex supplied, which
+//! ensures that the resulting mesh will not contain any “T-junctions” (places where a triangle
+//! edge meets a vertex, rather than another edge whose endpoints are identical)
+//! that cause single-pixel gaps in rendering.
+//!
+//! In order to use this algorithm, create a [`Basis`] and [`Triangulator`], then
+//! call [`Triangulator::triangulate()`] with an iterator of [`Vertex`]es.
 //!
 //! # Background and alternatives
 //!
-//! Many voxel games use the so-called “greedy meshing” algorithm. This algorithm is fast and
-//! efficient in number of triangles created; however, it creates T-junctions, which lead to
-//! random single-pixel gaps in the rendered mesh. All is Cubes is designed to favor correctness.
+//! Many voxel renderers use the so-called “greedy meshing” algorithm, which takes a bitmap shape
+//! as input and covers the shape with quads without any further considerations.
+//! This algorithm is fast and efficient in number of triangles created;
+//! however, it creates T-junctions.
+//! All is Cubes is designed to favor correctness and therefore avoids this algorithm.
 //!
 //! Still, there are other ways we could solve this problem:
+//!
+//! * We could generate two triangles per voxel always.
+//!   This is a plausible option for many voxel renderers, and allows many simplifications,
+//!   but it is not an option for All is Cubes because we allow individual blocks to have complex
+//!   voxel models and those blocks to then be repeated many times; whether the blocks are
+//!   copied into chunks or rendered using instanced drawing, either way, it is necessary to
+//!   keep these block models efficient in triangle count to avoid getting into billions
+//!   of triangles.
 //!
 //! * We could take greedy meshing’s output of quads (not yet converted to triangles), then find
 //!   each T-junction between these quads’ edges and corners, and mark it as a place to introduce
@@ -26,21 +43,23 @@
 //!   * algorithms not designed exclusively for [orthogonal polygons] would require us
 //!     to preprocess the vertices into separate loops and identify holes, and might do more
 //!     work than necessary to handle diagonal lines that won’t ever occur;
-//!   * with an internal algorithm we can tweak it for performance based on benchmarks of our
-//!     own situation;
-//!   * and writing a new algorithm was more fun;
+//!   * with an algorithm dedicated solely to voxel shapes we can optimize it for this use case,
+//!   * and writing a new algorithm was more fun.
 //!
-//!   but this option is still worth further investigation.
 //!   Searching for libraries that currently exist on crates.io which
-//!   claim to triangulate polygons with holes turned up [`earcut`](https://crates.io/crates/earcut)
-//!   which looks promising. Other libraries which looked less promising include:
+//!   claim to triangulate polygons with holes turned up the following:
 //!
+//!   * [`earcut`](https://crates.io/crates/earcut) — looks promising overall, but contains
+//!     unsafe indexing code without safety comments
 //!   * [`earcutr`](https://crates.io/crates/earcutr) — another port of the same algorithm as
 //!     `earcut`, but is not `no_std` and does not allow avoiding reallocations
 //!   * [`i_triangle`](https://crates.io/crates/i_triangle) — large API with little documentation
 //!   * [`poly2tri-rs`](https://crates.io/crates/poly2tri-rs) — not `no_std` (includes things like
 //!     file loading functions), not efficient in allocations, little documentation
-//!   * [`triangulate`](https://crates.io/crates/triangulate) — heavy deps (rand, backtrace)
+//!   * [`triangulate`](https://crates.io/crates/triangulate) — heavy required deps
+//!     (`rand`, `backtrace`)
+//!
+//!   TODO: We should test and benchmark at least some of the above list of alternatives.
 //!
 //! [sweep line algorithm]: https://en.wikipedia.org/wiki/Sweep_line_algorithm
 //! [orthogonal polygons]: https://en.wikipedia.org/wiki/Rectilinear_polygon
