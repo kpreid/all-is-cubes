@@ -221,7 +221,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
         let interior_mesh = &mut output.interior_vertices[face];
         let interior_side_octant_mask = OctantMask::ALL.shift(-face);
 
-        let mut triangulator_basis = planar::PtBasis::new(
+        let triangulator_basis = planar::PtBasis::new(
             face,
             /* sweep_direction: */
             match face {
@@ -241,9 +241,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                 Face6::PY => Face6::PZ,
                 Face6::PZ => Face6::PY,
             },
-            // Note: transparent will get toggled later. TODO: express this more cleanly?
-            /* transparent: */
-            false,
         );
 
         // Check the case where the block's voxels don't meet its front face.
@@ -410,12 +407,16 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
 
                 // Compute triangles and append their indices to SubMesh.
                 let indices_before_this_pass = pass_indices.len();
-                triangulator_basis.transparent = pass_is_transparent;
                 triangulator.triangulate(
                     viz,
                     triangulator_basis,
                     vertex_subset.iter().zip(0u32..).map(|(&v, index)| {
-                        analysis_vertex_to_planar_vertex(&triangulator_basis, v, index)
+                        analysis_vertex_to_planar_vertex(
+                            &triangulator_basis,
+                            v,
+                            index,
+                            pass_is_transparent,
+                        )
                     }),
                     |triangle_indices| {
                         pass_indices
@@ -464,26 +465,36 @@ fn get_voxel_with_limit(voxels: Vol<&[Evoxel]>, cube: Cube, options: &MeshOption
 
 /// Converts an [`analyze::AnalysisVertex`] to a [`planar::Vertex`] accepted by
 /// [`planar::Triangulator`].
+///
+/// The `transparent` parameter selects between two modes:
+///
+/// * `false`: triangulate opaque surfaces; ignore transparent ones.
+/// * `true`: triangulate transparent surfaces; use opaque ones as occlusion only.
 fn analysis_vertex_to_planar_vertex(
     basis: &planar::PtBasis,
-    mut av: AnalysisVertex,
+    mut vertex: AnalysisVertex,
     index: u32,
+    transparent: bool,
 ) -> planar::Vertex {
     use planar::Mask;
 
-    /// Returns whether the vertex borders a part of the polygon that extends in the
-    /// `(sweep_direction, perpendicular_direction)` quadrant,
-    /// or negated as indicated.
+    // Forget about hidden voxel faces -- transform “this volume is solid” mask into
+    // “this is a visible surface” mask. TODO(planar_new): express this more strongly typed?
+    vertex.opaque &= !vertex.opaque.shift(basis.face.opposite());
+    // Note: transparent counts as obscuring transparent, in the sense that we don't try
+    // to generate faces for it. If we did, not only would we generate way too much
+    // geometry, we'd fail assertions because the analysis vertices aren't meant to provide
+    // the corners needed for those surfaces.
+    vertex.renderable &= !vertex.renderable.shift(basis.face.opposite());
+
+    // Returns whether the vertex borders a part of the polygon that extends in the
+    // `(sweep_direction, perpendicular_direction)` quadrant,
+    // or negated as indicated.
+    //
     // TODO(planar_new): better explanation
-    #[inline(always)] // confirmed by benchmark to be faster
-    fn av_connectivity(
-        basis: &planar::PtBasis,
-        vertex: &AnalysisVertex,
-        forward_in_sweep: bool,
-        forward_in_perpendicular: bool,
-    ) -> bool {
+    let av_connectivity = |forward_in_sweep: bool, forward_in_perpendicular: bool| -> bool {
         // Compute the surfaces adjacent to this vertex that this execution should actually render.
-        let should_render = (if basis.transparent {
+        let should_render = (if transparent {
                 // Find transparent voxels only (neither invisible nor opaque)
                 vertex.renderable & !vertex.opaque
             } else {
@@ -513,34 +524,25 @@ fn analysis_vertex_to_planar_vertex(
                 basis.perpendicular_direction
             })
             != OctantMask::NONE
-    }
-
-    // Forget about hidden voxel faces -- transform “this volume is solid” mask into
-    // “this is a visible surface” mask. TODO(planar_new): express this more strongly typed?
-    av.opaque &= !av.opaque.shift(basis.face.opposite());
-    // Note: transparent counts as obscuring transparent, in the sense that we don't try
-    // to generate faces for it. If we did, not only would we generate way too much
-    // geometry, we'd fail assertions because the analysis vertices aren't meant to provide
-    // the corners needed for those surfaces.
-    av.renderable &= !av.renderable.shift(basis.face.opposite());
+    };
 
     let mut connectivity = Mask::EMPTY;
 
-    if av_connectivity(basis, &av, true, true) {
+    if av_connectivity(true, true) {
         connectivity = connectivity | Mask::FSFP;
     }
-    if av_connectivity(basis, &av, true, false) {
+    if av_connectivity(true, false) {
         connectivity = connectivity | Mask::FSBP;
     }
-    if av_connectivity(basis, &av, false, true) {
+    if av_connectivity(false, true) {
         connectivity = connectivity | Mask::BSFP;
     }
-    if av_connectivity(basis, &av, false, false) {
+    if av_connectivity(false, false) {
         connectivity = connectivity | Mask::BSBP;
     }
 
     planar::Vertex {
-        position: av.position,
+        position: vertex.position,
         connectivity,
         index,
     }

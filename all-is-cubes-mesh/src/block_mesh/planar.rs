@@ -160,15 +160,6 @@ pub(crate) struct PtBasis {
     /// If the coordinate system established by the sweep is mirrored (which it is, half the time),
     /// then this is true to tell us to flip the winding order.
     pub left_handed: bool,
-
-    /// Selects mode between:
-    ///
-    /// * `false`: triangulate opaque surfaces; ignore transparent ones.
-    /// * `true`: triangulate transparent surfaces; use opaque ones as occlusion only.
-    // TODO: This flag should be moved out of `PtBasis` because the triangulation algorithm itself
-    // no longer needs to care about the idea of transparency, since it stopped operating directly
-    // on `AnalysisVertex`.
-    pub transparent: bool,
 }
 
 impl PlanarTriangulator {
@@ -271,15 +262,9 @@ impl PlanarTriangulator {
 
             viz.set_current_triangulation_vertex(
                 &input_vertex,
-                format_args!(
-                    "{face:?} {transparency} #{input_index_usize}",
-                    face = basis.face,
-                    transparency = if basis.transparent {
-                        "transparent"
-                    } else {
-                        "opaque"
-                    }
-                ),
+                // TODO: this used to mention transparency, but that knowledge is no longer
+                // passed in; take a “pass name” string or something?
+                format_args!("{face:?} #{input_index_usize}", face = basis.face),
             );
             viz.completed_step();
 
@@ -525,15 +510,9 @@ impl PtBasis {
         perpendicular_direction: Face6::PX,
         perpendicular_vector: WrappingVector3D::new(Wrapping(0), Wrapping(0), Wrapping(0)),
         left_handed: false,
-        transparent: false,
     };
 
-    pub fn new(
-        face: Face6,
-        sweep_direction: Face6,
-        perpendicular_direction: Face6,
-        transparent: bool,
-    ) -> Self {
+    pub fn new(face: Face6, sweep_direction: Face6, perpendicular_direction: Face6) -> Self {
         let left_handed =
             GridRotation::try_from_basis_const([face, sweep_direction, perpendicular_direction])
                 .expect("directions provided to PtBasis must be orthogonal")
@@ -545,7 +524,6 @@ impl PtBasis {
             perpendicular_direction,
             perpendicular_vector: perpendicular_direction.normal_vector(),
             left_handed,
-            transparent,
         }
     }
 
@@ -690,7 +668,7 @@ mod tests {
     use alloc::vec::Vec;
 
     fn test_basis() -> PtBasis {
-        let b = PtBasis::new(Face6::PZ, Face6::PX, Face6::PY, false);
+        let b = PtBasis::new(Face6::PZ, Face6::PX, Face6::PY);
         assert!(!b.left_handed); // TODO: could use tests that *are* left-handed
         b
     }
