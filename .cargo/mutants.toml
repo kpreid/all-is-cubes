@@ -1,5 +1,9 @@
 # Cannot specify a package list here
 
+# We need to enable this because we have multiple `target` directories
+# and cargo-mutants only filters the root one by default.
+gitignore = true
+
 exclude_globs = [
     "tests.rs",
     "all-is-cubes/src/content.rs", # TODO: maybe un-exclude content once we are out of more important things (it's hard to test thoroughly)
