@@ -73,20 +73,22 @@ type WrappingVector3D = all_is_cubes::euclid::Vector3D<Wrapping<GridCoordinate>,
 /// (Refer to this type as `planar::Vertex` to avoid ambiguity.)
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Vertex {
+    /// Position of the vertex.
     pub position: GridPoint,
 
     /// Bitmask of which areas adjacent to this vertex, in the plane of the triangulation,
     /// should be covered by triangles.
     pub connectivity: Mask,
 
-    /// Vertex index used in the output of the triangulator.
+    /// Value used to refer to this vertex in the output of triangulation.
     pub index: u32,
 }
 
-/// Polygon triangulation algorithm state.
+/// Temporary buffer for the state of the triangulation algorithm.
 ///
-/// Used by calling [`Triangulator::triangulate()`];
-/// may be reused to minimize memory allocation.
+/// Used by calling [`Triangulator::triangulate()`].
+/// May be used more than once to reuse previous memory allocations
+/// (it does not preserve any state from previous uses).
 #[derive(Debug)]
 pub(super) struct Triangulator {
     basis: Basis,
@@ -166,6 +168,10 @@ pub(crate) struct Basis {
 // -------------------------------------------------------------------------------------------------
 
 impl Triangulator {
+    /// Constructs a [`Triangulator`].
+    ///
+    /// It can be used for multiple triangulation operations in order to reuse previous memory
+    /// allocations.
     pub fn new() -> Self {
         Self {
             basis: Basis::DUMMY,
@@ -515,6 +521,13 @@ impl Basis {
         left_handed: false,
     };
 
+    /// Constructs a [`Basis`].
+    ///
+    /// * `face` is the normal of the plane in which the polygon to be triangulated lies.
+    /// * `sweep_direction` is a direction which must be the primary sort key of
+    ///   the input vertices, and must be perpendicular to `face`.
+    /// * `perpendicular_direction` is a direction which must be the secondary sort key of
+    ///   the input vertices, and must be perpendicular to both `face` and `sweep_direction`.
     pub fn new(face: Face6, sweep_direction: Face6, perpendicular_direction: Face6) -> Self {
         let left_handed =
             GridRotation::try_from_basis_const([face, sweep_direction, perpendicular_direction])

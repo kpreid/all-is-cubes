@@ -1,7 +1,25 @@
 use core::ops;
 
-/// A bit-mask of quadrants, which, in the context of the triangulator,
-/// refers to which of the four quadrants around a vertex should be covered by triangles.
+#[cfg(doc)]
+use crate::planar::Vertex;
+
+/// A bit-mask identifying which of the four quadrants around a [`Vertex`] should be covered by
+/// triangles.
+///
+/// The orientation/identification of these quadrants is defined relative to
+/// [`Basis`][super::Basis], rather than in any fixed relationship to the vertex coordinates.
+///
+/// <pre style="line-height: 1.0em">↑ perpendicular direction
+/// ┆
+/// ┆    ↖↑           ┆           ↑↗
+/// ┆    ← Mask::BSFP ┃ Mask::FSFP →
+/// ┆                 ┃
+/// ┆ ···━━━━━━━━━━━━━╋━━━━━━━━━━━━━···
+/// ┆                 ┃
+/// ┆    ← Mask::BSBP ┃ Mask::FSBP →
+/// ┆    ↙↓           ┆           ↓↘
+/// ┆
+/// └┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄→ sweep direction</pre>
 // TODO: custom Debug
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Mask {
@@ -14,10 +32,19 @@ pub struct Mask {
 }
 
 impl Mask {
+    /// No quadrants.
     pub const EMPTY: Self = Self { flags: 0 };
+    /// The quadrant which is forward of the vertex in the sweep direction,
+    /// and forward of the vertex in the perpendicular direction.
     pub const FSFP: Self = Self { flags: 1 };
+    /// The quadrant which is forward of the vertex in the sweep direction,
+    /// and backward of the vertex in the perpendicular direction.
     pub const FSBP: Self = Self { flags: 2 };
+    /// The quadrant which is backward of the vertex in the sweep direction,
+    /// and forward of the vertex in the perpendicular direction.
     pub const BSFP: Self = Self { flags: 4 };
+    /// The quadrant which is backward of the vertex in the sweep direction,
+    /// and backward of the vertex in the perpendicular direction.
     pub const BSBP: Self = Self { flags: 8 };
 
     #[inline]
