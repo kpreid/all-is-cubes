@@ -11,7 +11,7 @@ use all_is_cubes::math::{Face6, GridCoordinate, GridPoint, Rgba, Vol};
 
 use crate::Position;
 use crate::block_mesh::analyze::Analysis;
-use crate::block_mesh::planar::FrontierVertex;
+use crate::block_mesh::planar::Vertex;
 
 #[cfg(feature = "rerun")]
 use {
@@ -254,8 +254,8 @@ impl Viz {
 
     pub(crate) fn set_frontier(
         &mut self,
-        #[allow(unused)] old_frontier: &VecDeque<FrontierVertex>,
-        #[allow(unused)] new_frontier: &VecDeque<FrontierVertex>,
+        #[allow(unused)] old_frontier: &VecDeque<Vertex>,
+        #[allow(unused)] new_frontier: &VecDeque<Vertex>,
     ) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
@@ -278,7 +278,7 @@ impl Viz {
 
     pub(crate) fn set_current_triangulation_vertex(
         &mut self,
-        #[allow(unused)] vertex: &FrontierVertex,
+        #[allow(unused)] vertex: &Vertex,
         #[allow(unused)] label: core::fmt::Arguments<'_>,
     ) {
         #[cfg(feature = "rerun")]
@@ -481,7 +481,7 @@ fn convert_vertices(vertices: &[AnalysisVertex], box_half_size: f32) -> rg::arch
 
 #[cfg(feature = "rerun")]
 fn convert_frontier_vertices(
-    vertices: &mut dyn ExactSizeIterator<Item = &FrontierVertex>,
+    vertices: &mut dyn ExactSizeIterator<Item = &Vertex>,
     color: rg::components::Color,
 ) -> rg::archetypes::Ellipsoids3D {
     #[allow(
@@ -493,7 +493,7 @@ fn convert_frontier_vertices(
     // try to visualize their octants; just add markers for them
     let radius = 0.45; // needs to be bigger than the solid octant boxes from convert_vertices()
     rg::archetypes::Ellipsoids3D::from_centers_and_radii(
-        vertices.map(|fv| rg::convert_vec(fv.position.to_vector())),
+        vertices.map(|v| rg::convert_vec(v.position.to_vector())),
         if empty {
             None // avoids a quirk where we get one placed at the origin
         } else {

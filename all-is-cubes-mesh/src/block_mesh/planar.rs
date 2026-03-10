@@ -62,12 +62,13 @@ use crate::{Viz, block_mesh::analyze::AnalysisVertex};
 /// Wrapping arithmetic helps `compare_perp()` be simple
 type WrappingVector3D = all_is_cubes::euclid::Vector3D<Wrapping<GridCoordinate>, Cube>;
 
+// -------------------------------------------------------------------------------------------------
+
 /// A vertex in the form processed by [`PlanarTriangulator`] to produce triangles.
 ///
-/// TODO: This type should be renamed now that it has broader usage.
-/// It used to be only part of the “frontier” internal state of the triangulator.
+/// (Refer to this type as `planar::Vertex` to avoid ambiguity.)
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct FrontierVertex {
+pub(crate) struct Vertex {
     pub position: GridPoint,
 
     /// Bitmask of which areas adjacent to this vertex, in the plane of the triangulation,
@@ -78,7 +79,7 @@ pub(crate) struct FrontierVertex {
     pub index: u32,
 }
 
-impl FrontierVertex {
+impl Vertex {
     pub fn new(basis: &PtBasis, mut av: AnalysisVertex, index: u32) -> Self {
         /// Returns whether the vertex borders a part of the polygon that extends in the
         /// `(sweep_direction, perpendicular_direction)` quadrant,
@@ -185,13 +186,13 @@ pub(super) struct PlanarTriangulator {
     /// and their projections onto the sweep line is yet to be covered by triangles.
     ///
     /// The contents of this are consumed as they are moved to `new_frontier`.
-    old_frontier: VecDeque<FrontierVertex>,
+    old_frontier: VecDeque<Vertex>,
 
     /// Partial list of vertices that will be swapped into `old_frontier` when the sweep advances.
     /// This is made up of vertices that are all ≤ in `perpendicular_direction` than the most
     /// recently consumed input vertex, and may be copies of `old_frontier`’s vertices or may be
     /// newly obtained.
-    new_frontier: VecDeque<FrontierVertex>,
+    new_frontier: VecDeque<Vertex>,
 
     /// End position (exclusive) of the slice of `old_frontier` which has been copied/transformed
     /// into `new_frontier`.
@@ -319,15 +320,20 @@ impl PlanarTriangulator {
 
     /// Perform triangulation.
     ///
-    /// Requires as input an iterator of [`AnalysisVertex`]es that lie in a common plane as input;
-    /// produces a triangulation of that polygon that does not add any new vertices.
+    /// The required input is:
     ///
-    /// The output is in the form of indices into the input.
+    /// * an iterator of [`Vertex`]es that lie in a common plane as input, and
+    /// * a [`PtBasis`] which describes that plane.
+    ///
+    /// The output, produced by calling `triangle_callback,` is a triangulation of that polygon
+    /// (a set of triangles that exactly covers the polygon).
+    /// The output is in the form of indices, in the GPU graphics sense; each index is
+    /// the value of the [`index`][Vertex::index] field of some [`Vertex`].
     pub fn triangulate(
         &mut self,
         viz: &mut Viz,
         basis: PtBasis,
-        input: impl Iterator<Item = FrontierVertex>,
+        input: impl Iterator<Item = Vertex>,
         mut triangle_callback: impl FnMut([u32; 3]),
     ) {
         // Set the basis, and ensure any previous usage of self does not affect the results.
@@ -365,14 +371,14 @@ impl PlanarTriangulator {
                 .new_frontier
                 .back()
                 .is_some_and(|v| v.connectivity.contains_any_of(Mask::BSFP));
-            while let Some(passed_over_fv) = self
+            while let Some(passed_over_vertex) = self
                 .old_frontier
                 .pop_front_if(|v| self.basis.compare_perp(v, &input_vertex).is_lt())
             {
                 if previous_should_connect_forward
-                    && passed_over_fv.connectivity.contains_any_of(Mask::FSFP)
+                    && passed_over_vertex.connectivity.contains_any_of(Mask::FSFP)
                     && let triangle = [
-                        &passed_over_fv,
+                        &passed_over_vertex,
                         self.new_frontier.back().expect("preceding vertex in new frontier missing"),
                         self.old_frontier
                             .front()
@@ -396,7 +402,7 @@ impl PlanarTriangulator {
                     previous_should_connect_forward = false;
 
                     // Not connected -- therefore the old vertex stays in the frontier.
-                    self.new_frontier.push_back(passed_over_fv);
+                    self.new_frontier.push_back(passed_over_vertex);
                     moved_any_vertices = true;
                 }
             }
@@ -422,7 +428,7 @@ impl PlanarTriangulator {
                 // If so, remove that old vertex from the old frontier so it can be replaced.
                 if let Some(predecessor_vertex) = self
                     .old_frontier
-                    .pop_front_if(|old_fv| self.basis.compare_perp(old_fv, &input_vertex).is_eq())
+                    .pop_front_if(|old| self.basis.compare_perp(old, &input_vertex).is_eq())
                 {
                     // We must emit one or two triangles that cover the area bounded by the old
                     // vertex, the new vertex, and its neighbors in the frontier.
@@ -625,7 +631,7 @@ impl PtBasis {
 
     /// Compare two vertices’ positions along the direction perpendicular to the sweep.
     #[inline(always)]
-    fn compare_perp(self, v1: &FrontierVertex, v2: &FrontierVertex) -> Ordering {
+    fn compare_perp(self, v1: &Vertex, v2: &Vertex) -> Ordering {
         // Wrapping arithmetic helps `compare_perp()` compile to simple code.
         // (We do not need to worry about actual wrapping because vertices are always in u8 range
         // anyway.)
@@ -640,7 +646,7 @@ impl PtBasis {
     /// and thus cover no area).
     ///
     /// TODO: the naming of things may be backwards somewhere; this was tweaked to work empirically
-    fn is_correct_winding(self, triangle: [&FrontierVertex; 3]) -> bool {
+    fn is_correct_winding(self, triangle: [&Vertex; 3]) -> bool {
         // depending on handedness this might be negated
         let triangle_normal_by_cross_product = (triangle[1].position - triangle[0].position)
             .cross(triangle[2].position - triangle[0].position);
@@ -667,7 +673,7 @@ impl PtBasis {
         self,
         viz: &mut Viz,
         triangle_callback: &mut impl FnMut([u32; 3]),
-        mut triangle: [&FrontierVertex; 3],
+        mut triangle: [&Vertex; 3],
     ) {
         debug_assert!(
             self.is_correct_winding(triangle),
@@ -785,10 +791,10 @@ mod tests {
         triangulator.triangulate(
             &mut viz,
             basis,
-            vertices.iter().zip(0u32..).map(|(&av, index)| {
-                let fv = FrontierVertex::new(&basis, av, index);
-                println!("In: {av:?} {fv:?}");
-                fv
+            vertices.iter().zip(0u32..).map(|(&analysis_vertex, index)| {
+                let planar_vertex = Vertex::new(&basis, analysis_vertex, index);
+                println!("In: {analysis_vertex:?} {planar_vertex:?}");
+                planar_vertex
             }),
             |triangle_indices: [u32; 3]| {
                 let triangle_positions =
