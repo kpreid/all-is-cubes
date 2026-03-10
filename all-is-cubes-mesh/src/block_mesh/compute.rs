@@ -412,10 +412,9 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                 triangulator.triangulate(
                     viz,
                     triangulator_basis,
-                    vertex_subset
-                        .iter()
-                        .zip(0u32..)
-                        .map(|(&v, index)| planar::FrontierVertex { v, index }),
+                    vertex_subset.iter().zip(0u32..).map(|(&v, index)| {
+                        planar::FrontierVertex::new(&triangulator_basis, v, index)
+                    }),
                     |triangle_indices| {
                         pass_indices
                             .extend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);

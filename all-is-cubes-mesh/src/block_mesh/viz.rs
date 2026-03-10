@@ -493,7 +493,7 @@ fn convert_frontier_vertices(
     // try to visualize their octants; just add markers for them
     let radius = 0.45; // needs to be bigger than the solid octant boxes from convert_vertices()
     rg::archetypes::Ellipsoids3D::from_centers_and_radii(
-        vertices.map(|fv| rg::convert_vec(fv.v.position.to_vector())),
+        vertices.map(|fv| rg::convert_vec(fv.position.to_vector())),
         if empty {
             None // avoids a quirk where we get one placed at the origin
         } else {
