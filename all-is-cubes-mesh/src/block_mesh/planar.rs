@@ -51,11 +51,9 @@ use core::format_args;
 use core::mem;
 use core::num::Wrapping;
 
-use all_is_cubes::math::{
-    Cube, Face6, GridCoordinate, GridPoint, GridRotation, OctantMask, rgba_const,
-};
+use all_is_cubes::math::{Cube, Face6, GridCoordinate, GridPoint, GridRotation, rgba_const};
 
-use crate::{Viz, block_mesh::analyze::AnalysisVertex};
+use crate::Viz;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -77,84 +75,6 @@ pub(crate) struct Vertex {
 
     /// Vertex index used in the output of the triangulator.
     pub index: u32,
-}
-
-impl Vertex {
-    pub fn new(basis: &PtBasis, mut av: AnalysisVertex, index: u32) -> Self {
-        /// Returns whether the vertex borders a part of the polygon that extends in the
-        /// `(sweep_direction, perpendicular_direction)` quadrant,
-        /// or negated as indicated.
-        // TODO(planar_new): better explanation
-        #[inline(always)] // confirmed by benchmark to be faster
-        fn av_connectivity(
-            basis: &PtBasis,
-            vertex: &AnalysisVertex,
-            forward_in_sweep: bool,
-            forward_in_perpendicular: bool,
-        ) -> bool {
-            // Compute the surfaces adjacent to this vertex that this execution should actually render.
-            let should_render = (if basis.transparent {
-                // Find transparent voxels only (neither invisible nor opaque)
-                vertex.renderable & !vertex.opaque
-            } else {
-                vertex.opaque
-            })
-            // Mask off all voxels whose surface would be occluded by opaque surfaces,
-            // and also the voxels that are above rather than below the surface.
-            & (!vertex.opaque).shift(basis.face.opposite());
-
-            // Out of those surfaces, check the single quadrant we are being asked about in this
-            // particular call.
-            //
-            // Shift all the unwanted bits out (by shifting in the opposite direction to the one we
-            // are testing), then check if the wanted one is left.
-            // (This always picks one octant, but in order to express this in terms of a `math::Octant`
-            // we'd have to prove the 3 faces are orthogonal to each other.)
-            should_render
-                .shift(basis.face)
-                .shift(if forward_in_sweep {
-                    -basis.sweep_direction
-                } else {
-                    basis.sweep_direction
-                })
-                .shift(if forward_in_perpendicular {
-                    -basis.perpendicular_direction
-                } else {
-                    basis.perpendicular_direction
-                })
-                != OctantMask::NONE
-        }
-
-        // Forget about hidden voxel faces -- transform “this volume is solid” mask into
-        // “this is a visible surface” mask. TODO(planar_new): express this more strongly typed?
-        av.opaque &= !av.opaque.shift(basis.face.opposite());
-        // Note: transparent counts as obscuring transparent, in the sense that we don't try
-        // to generate faces for it. If we did, not only would we generate way too much
-        // geometry, we'd fail assertions because the analysis vertices aren't meant to provide
-        // the corners needed for those surfaces.
-        av.renderable &= !av.renderable.shift(basis.face.opposite());
-
-        let mut connectivity = Mask::EMPTY;
-
-        if av_connectivity(basis, &av, true, true) {
-            connectivity = connectivity | Mask::FSFP;
-        }
-        if av_connectivity(basis, &av, true, false) {
-            connectivity = connectivity | Mask::FSBP;
-        }
-        if av_connectivity(basis, &av, false, true) {
-            connectivity = connectivity | Mask::BSFP;
-        }
-        if av_connectivity(basis, &av, false, false) {
-            connectivity = connectivity | Mask::BSBP;
-        }
-
-        Self {
-            position: av.position,
-            connectivity,
-            index,
-        }
-    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -703,7 +623,7 @@ impl PtBasis {
 
 // -------------------------------------------------------------------------------------------------
 
-use mask::Mask;
+pub(crate) use mask::Mask;
 mod mask {
     use core::ops;
 

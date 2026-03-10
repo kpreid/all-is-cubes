@@ -20,6 +20,8 @@ use crate::block_mesh::planar;
 use crate::texture::{self, Plane as _, Tile as _};
 use crate::{BlockMesh, IndexSlice, MeshOptions, MeshTypes, SubMesh, Viz, vertex};
 
+// -------------------------------------------------------------------------------------------------
+
 /// Generate the [`BlockMesh`] data for the given [`EvaluatedBlock`], writing it into `output`.
 ///
 /// This private function is called by [`BlockMesh`]'s public functions.
@@ -412,10 +414,9 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                 triangulator.triangulate(
                     viz,
                     triangulator_basis,
-                    vertex_subset
-                        .iter()
-                        .zip(0u32..)
-                        .map(|(&v, index)| planar::Vertex::new(&triangulator_basis, v, index)),
+                    vertex_subset.iter().zip(0u32..).map(|(&v, index)| {
+                        analysis_vertex_to_planar_vertex(&triangulator_basis, v, index)
+                    }),
                     |triangle_indices| {
                         pass_indices
                             .extend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);
@@ -441,6 +442,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     };
 }
 
+// -------------------------------------------------------------------------------------------------
+
 fn get_voxel_with_limit(voxels: Vol<&[Evoxel]>, cube: Cube, options: &MeshOptions) -> Evoxel {
     let mut evoxel = *voxels.get(cube).unwrap_or(&Evoxel::AIR);
     // TODO: this is clunky and might get out of sync
@@ -457,4 +460,88 @@ fn get_voxel_with_limit(voxels: Vol<&[Evoxel]>, cube: Cube, options: &MeshOption
         }
     };
     evoxel
+}
+
+/// Converts an [`analyze::AnalysisVertex`] to a [`planar::Vertex`] accepted by
+/// [`planar::Triangulator`].
+fn analysis_vertex_to_planar_vertex(
+    basis: &planar::PtBasis,
+    mut av: AnalysisVertex,
+    index: u32,
+) -> planar::Vertex {
+    use planar::Mask;
+
+    /// Returns whether the vertex borders a part of the polygon that extends in the
+    /// `(sweep_direction, perpendicular_direction)` quadrant,
+    /// or negated as indicated.
+    // TODO(planar_new): better explanation
+    #[inline(always)] // confirmed by benchmark to be faster
+    fn av_connectivity(
+        basis: &planar::PtBasis,
+        vertex: &AnalysisVertex,
+        forward_in_sweep: bool,
+        forward_in_perpendicular: bool,
+    ) -> bool {
+        // Compute the surfaces adjacent to this vertex that this execution should actually render.
+        let should_render = (if basis.transparent {
+                // Find transparent voxels only (neither invisible nor opaque)
+                vertex.renderable & !vertex.opaque
+            } else {
+                vertex.opaque
+            })
+            // Mask off all voxels whose surface would be occluded by opaque surfaces,
+            // and also the voxels that are above rather than below the surface.
+            & (!vertex.opaque).shift(basis.face.opposite());
+
+        // Out of those surfaces, check the single quadrant we are being asked about in this
+        // particular call.
+        //
+        // Shift all the unwanted bits out (by shifting in the opposite direction to the one we
+        // are testing), then check if the wanted one is left.
+        // (This always picks one octant, but in order to express this in terms of a `math::Octant`
+        // we'd have to prove the 3 faces are orthogonal to each other.)
+        should_render
+            .shift(basis.face)
+            .shift(if forward_in_sweep {
+                -basis.sweep_direction
+            } else {
+                basis.sweep_direction
+            })
+            .shift(if forward_in_perpendicular {
+                -basis.perpendicular_direction
+            } else {
+                basis.perpendicular_direction
+            })
+            != OctantMask::NONE
+    }
+
+    // Forget about hidden voxel faces -- transform “this volume is solid” mask into
+    // “this is a visible surface” mask. TODO(planar_new): express this more strongly typed?
+    av.opaque &= !av.opaque.shift(basis.face.opposite());
+    // Note: transparent counts as obscuring transparent, in the sense that we don't try
+    // to generate faces for it. If we did, not only would we generate way too much
+    // geometry, we'd fail assertions because the analysis vertices aren't meant to provide
+    // the corners needed for those surfaces.
+    av.renderable &= !av.renderable.shift(basis.face.opposite());
+
+    let mut connectivity = Mask::EMPTY;
+
+    if av_connectivity(basis, &av, true, true) {
+        connectivity = connectivity | Mask::FSFP;
+    }
+    if av_connectivity(basis, &av, true, false) {
+        connectivity = connectivity | Mask::FSBP;
+    }
+    if av_connectivity(basis, &av, false, true) {
+        connectivity = connectivity | Mask::BSFP;
+    }
+    if av_connectivity(basis, &av, false, false) {
+        connectivity = connectivity | Mask::BSBP;
+    }
+
+    planar::Vertex {
+        position: av.position,
+        connectivity,
+        index,
+    }
 }
