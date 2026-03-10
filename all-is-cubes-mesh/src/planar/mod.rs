@@ -68,7 +68,7 @@ mod tests;
 /// Wrapping arithmetic helps `compare_perp()` be simple
 type WrappingVector3D = all_is_cubes::euclid::Vector3D<Wrapping<GridCoordinate>, Cube>;
 
-/// A vertex in the form processed by [`PlanarTriangulator`] to produce triangles.
+/// A vertex in the form processed by [`Triangulator`] to produce triangles.
 ///
 /// (Refer to this type as `planar::Vertex` to avoid ambiguity.)
 #[derive(Clone, Copy, Debug)]
@@ -85,11 +85,11 @@ pub(crate) struct Vertex {
 
 /// Polygon triangulation algorithm state.
 ///
-/// Used by calling [`PlanarTriangulator::triangulate()`];
+/// Used by calling [`Triangulator::triangulate()`];
 /// may be reused to minimize memory allocation.
 #[derive(Debug)]
-pub(super) struct PlanarTriangulator {
-    basis: PtBasis,
+pub(super) struct Triangulator {
+    basis: Basis,
 
     /// Position of the line in the plane perpendicular to `sweep_direction` which we are currently
     /// processing.
@@ -133,12 +133,9 @@ pub(super) struct PlanarTriangulator {
     needs_ears_fixed: bool,
 }
 
-/// Portion of [`PlanarTriangulator`] that determines the coordinate system and is not mutated.
-///
-/// Design note: These three orthogonal axes could be denoted more compactly by a [`GridRotation`].
-/// That might or might not be wise, but for now, it would make the code less clear.
+/// Defines the coordinate system of the input to a [`Triangulator`].
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct PtBasis {
+pub(crate) struct Basis {
     /// Orientation of the face/plane being processed.
     pub face: Face6,
 
@@ -168,10 +165,10 @@ pub(crate) struct PtBasis {
 
 // -------------------------------------------------------------------------------------------------
 
-impl PlanarTriangulator {
+impl Triangulator {
     pub fn new() -> Self {
         Self {
-            basis: PtBasis::DUMMY,
+            basis: Basis::DUMMY,
             sweep_position: GridCoordinate::MIN,
             old_frontier: VecDeque::new(),
             new_frontier: VecDeque::new(),
@@ -184,7 +181,7 @@ impl PlanarTriangulator {
     /// except for reusing memory allocations.
     ///
     /// This function does not need to be called externally; it is automatically called when needed.
-    fn clear_and_set_basis(&mut self, new_basis: PtBasis) {
+    fn clear_and_set_basis(&mut self, new_basis: Basis) {
         let Self {
             basis,
             sweep_position,
@@ -239,8 +236,8 @@ impl PlanarTriangulator {
     ///
     /// The required input is:
     ///
-    /// * an iterator of [`Vertex`]es that lie in a common plane as input, and
-    /// * a [`PtBasis`] which describes that plane.
+    /// * an iterator of sorted [`Vertex`]es that lie in a common plane as input, and
+    /// * a [`Basis`] which describes that plane and the sort order of the vertices.
     ///
     /// The output, produced by calling `triangle_callback,` is a triangulation of that polygon
     /// (a set of triangles that exactly covers the polygon).
@@ -249,7 +246,7 @@ impl PlanarTriangulator {
     pub fn triangulate(
         &mut self,
         viz: &mut Viz,
-        basis: PtBasis,
+        basis: Basis,
         input: impl Iterator<Item = Vertex>,
         mut triangle_callback: impl FnMut([u32; 3]),
     ) {
@@ -507,8 +504,8 @@ impl PlanarTriangulator {
     }
 }
 
-impl PtBasis {
-    /// Value used as a placeholder in [`PlanarTriangulator`]s that are not currently in use.
+impl Basis {
+    /// Value used as a placeholder in [`Triangulator`]s that are not currently in use.
     /// Its data is nonsense and it is never actually used.
     const DUMMY: Self = Self {
         face: Face6::PX,
@@ -521,7 +518,7 @@ impl PtBasis {
     pub fn new(face: Face6, sweep_direction: Face6, perpendicular_direction: Face6) -> Self {
         let left_handed =
             GridRotation::try_from_basis_const([face, sweep_direction, perpendicular_direction])
-                .expect("directions provided to PtBasis must be orthogonal")
+                .expect("directions provided to Basis must be orthogonal")
                 .is_reflection();
 
         Self {

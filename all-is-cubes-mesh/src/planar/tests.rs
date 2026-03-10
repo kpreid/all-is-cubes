@@ -3,20 +3,20 @@ use all_is_cubes::euclid::point3;
 use all_is_cubes::math::GridPoint;
 use alloc::vec::Vec;
 
-fn test_basis() -> PtBasis {
-    let b = PtBasis::new(Face6::PZ, Face6::PX, Face6::PY);
+fn test_basis() -> Basis {
+    let b = Basis::new(Face6::PZ, Face6::PX, Face6::PY);
     assert!(!b.left_handed); // TODO: could use tests that *are* left-handed
     b
 }
 
-/// `PlanarTriangulator::triangulate()` parameterized for simplicity
+/// `Triangulator::triangulate()` parameterized for simplicity
 /// (for tests that aren't trying to exercise rotatability)
 #[inline(never)]
 #[track_caller]
 fn check(vertices: &[(GridPoint, Mask)], expected_triangles: &[[GridPoint; 3]]) {
     let mut viz = Viz::Disabled;
     let mut actual_triangles = Vec::new();
-    let mut triangulator = PlanarTriangulator::new();
+    let mut triangulator = Triangulator::new();
     let basis = test_basis();
 
     eprintln!("Initial state: {triangulator:#?}");

@@ -207,7 +207,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
 
     // Triangulator contains allocations that we reuse for all planes of the block.
     // TODO: Allow reusing them across multiple blocks, if that is faster.
-    let mut triangulator = planar::PlanarTriangulator::new();
+    let mut triangulator = planar::Triangulator::new();
 
     let mut vertex_subset: Vec<AnalysisVertex> = Vec::with_capacity(analysis.vertices.len() / 2);
 
@@ -221,7 +221,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
         let interior_mesh = &mut output.interior_vertices[face];
         let interior_side_octant_mask = OctantMask::ALL.shift(-face);
 
-        let triangulator_basis = planar::PtBasis::new(
+        let triangulator_basis = planar::Basis::new(
             face,
             /* sweep_direction: */
             match face {
@@ -471,7 +471,7 @@ fn get_voxel_with_limit(voxels: Vol<&[Evoxel]>, cube: Cube, options: &MeshOption
 /// * `false`: triangulate opaque surfaces; ignore transparent ones.
 /// * `true`: triangulate transparent surfaces; use opaque ones as occlusion only.
 fn analysis_vertex_to_planar_vertex(
-    basis: &planar::PtBasis,
+    basis: &planar::Basis,
     vertex: AnalysisVertex,
     index: u32,
     transparent: bool,
@@ -507,7 +507,7 @@ fn analysis_vertex_to_planar_vertex(
     fn av_connectivity(
         forward_in_sweep: bool,
         forward_in_perpendicular: bool,
-        basis: &planar::PtBasis,
+        basis: &planar::Basis,
         should_render: OctantMask,
     ) -> bool {
         // Out of those surfaces, check the single quadrant we are being asked about in this
