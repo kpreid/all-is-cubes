@@ -114,16 +114,16 @@ fn vertices_from_ascii_art<const W: usize, const H: usize>(
                             let mut mask = Mask::EMPTY;
                             // note Y flip
                             if is_interior(1, -1) {
-                                mask = mask | Mask::FSFP;
+                                mask |= Mask::FSFP;
                             }
                             if is_interior(1, 1) {
-                                mask = mask | Mask::FSBP;
+                                mask |= Mask::FSBP;
                             }
                             if is_interior(-1, -1) {
-                                mask = mask | Mask::BSFP;
+                                mask |= Mask::BSFP;
                             }
                             if is_interior(-1, 1) {
-                                mask = mask | Mask::BSBP;
+                                mask |= Mask::BSBP;
                             }
                             mask
                         },

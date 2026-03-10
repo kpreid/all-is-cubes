@@ -115,15 +115,6 @@ impl fmt::Debug for Mask {
     }
 }
 
-impl ops::BitOr for Mask {
-    type Output = Self;
-    #[inline]
-    fn bitor(self, rhs: Self) -> Self::Output {
-        Self {
-            flags: self.flags | rhs.flags,
-        }
-    }
-}
 impl ops::BitAnd for Mask {
     type Output = Self;
     #[inline]
@@ -133,6 +124,25 @@ impl ops::BitAnd for Mask {
         }
     }
 }
+impl ops::BitOr for Mask {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self {
+            flags: self.flags | rhs.flags,
+        }
+    }
+}
+impl ops::BitXor for Mask {
+    type Output = Self;
+    #[inline]
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Self {
+            flags: self.flags ^ rhs.flags,
+        }
+    }
+}
+
 impl ops::Not for Mask {
     type Output = Self;
     #[inline]
@@ -141,10 +151,35 @@ impl ops::Not for Mask {
     }
 }
 
+impl ops::BitAndAssign for Mask {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.flags &= rhs.flags;
+    }
+}
+impl ops::BitOrAssign for Mask {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.flags |= rhs.flags;
+    }
+}
+impl ops::BitXorAssign for Mask {
+    #[inline]
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.flags ^= rhs.flags;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::string::String;
+
+    fn all_masks() -> impl Iterator<Item = Mask> {
+        // We could have `Mask` implement `Exhaust` instead, but I can’t think of a reason why
+        // having that in the public API would ever be useful for anything.
+        (0..=0b1111).map(|flags| Mask { flags })
+    }
 
     #[test]
     fn debug() {
@@ -160,5 +195,32 @@ mod tests {
             f(Mask::FSFP | Mask::BSBP),
             "FSFP | BSBP (▞) (▞) FSFP | BSBP"
         );
+    }
+
+    #[test]
+    fn bitwise_ops_equivalence() {
+        for a in all_masks() {
+            assert_eq!((!a).flags, (!a.flags));
+            for b in all_masks() {
+                assert_eq!((a & b).flags, (a.flags & b.flags));
+                assert_eq!((a | b).flags, (a.flags | b.flags));
+                assert_eq!((a ^ b).flags, (a.flags ^ b.flags));
+                {
+                    let mut mut_a = a;
+                    mut_a &= b;
+                    assert_eq!(mut_a, a & b);
+                }
+                {
+                    let mut mut_a = a;
+                    mut_a |= b;
+                    assert_eq!(mut_a, a | b);
+                }
+                {
+                    let mut mut_a = a;
+                    mut_a ^= b;
+                    assert_eq!(mut_a, a ^ b);
+                }
+            }
+        }
     }
 }
