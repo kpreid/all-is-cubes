@@ -1,10 +1,14 @@
-use super::*;
-use all_is_cubes::euclid::point3;
-use all_is_cubes::math::GridPoint;
 use alloc::vec::Vec;
 
-fn test_basis() -> Basis {
-    let b = Basis::new(Face6::PZ, Face6::PX, Face6::PY);
+use all_is_cubes::euclid::point3;
+use all_is_cubes::math::{Face6, GridPoint};
+
+use crate::planar::{self, Mask};
+
+// -------------------------------------------------------------------------------------------------
+
+fn test_basis() -> planar::Basis {
+    let b = planar::Basis::new(Face6::PZ, Face6::PX, Face6::PY);
     assert!(!b.left_handed); // TODO: could use tests that *are* left-handed
     b
 }
@@ -13,10 +17,10 @@ fn test_basis() -> Basis {
 /// (for tests that aren't trying to exercise rotatability)
 #[inline(never)]
 #[track_caller]
-fn check(vertices: &[(GridPoint, Mask)], expected_triangles: &[[GridPoint; 3]]) {
-    let mut viz = Viz::Disabled;
+fn check(vertices: &[planar::Vertex], expected_triangles: &[&[u8; 3]]) {
+    let mut viz = crate::Viz::Disabled;
     let mut actual_triangles = Vec::new();
-    let mut triangulator = Triangulator::new();
+    let mut triangulator = planar::Triangulator::new();
     let basis = test_basis();
 
     eprintln!("Initial state: {triangulator:#?}");
@@ -24,37 +28,118 @@ fn check(vertices: &[(GridPoint, Mask)], expected_triangles: &[[GridPoint; 3]]) 
     triangulator.triangulate(
         &mut viz,
         basis,
-        vertices.iter().zip(0u32..).map(|(&(position, connectivity), index)| {
-            let planar_vertex = Vertex {
-                position,
-                connectivity,
-                index,
-            };
+        vertices.iter().copied().inspect(|planar_vertex| {
             println!("In: {planar_vertex:?}");
-            planar_vertex
         }),
         |triangle_indices: [u32; 3]| {
-            let triangle_positions: [GridPoint; 3] =
-                triangle_indices.map(|index| vertices[index as usize].0);
+            let triangle_positions: [GridPoint; 3] = triangle_indices.map(|index| {
+                vertices
+                    .iter()
+                    .find(|v| v.index == index)
+                    .expect("triangulator returned bad index")
+                    .position
+            });
             // Print as we go, so if there is a panic we can still see some results.
             println!("Out: {triangle_indices:?} = {triangle_positions:?}");
-            actual_triangles.push(triangle_positions);
+            actual_triangles
+                .push(triangle_indices.map(|i| u8::try_from(i).expect("index out of range")));
 
             // println!("State: {triangulator:#?}"); // TODO: make it possible to grab the state for debugging
         },
     );
 
     eprintln!("Final state: {triangulator:#?}");
+
+    // convert to &str for helpful printing
     pretty_assertions::assert_eq!(
-        expected_triangles,
-        actual_triangles.as_slice(),
-        "triangles not as expected"
+        actual_triangles
+            .iter()
+            .map(|byte_arr| str::from_utf8(byte_arr).unwrap())
+            .collect::<Vec<&str>>(),
+        expected_triangles
+            .iter()
+            .map(|&byte_arr| str::from_utf8(byte_arr).unwrap())
+            .collect::<Vec<&str>>(),
+        "actual triangles != expected triangles"
     );
 }
 
-fn vert(x: i32, y: i32, z: i32, mask: Mask) -> (GridPoint, Mask) {
-    (point3(x, y, z), mask)
+fn vert(x: i32, y: i32, z: i32, connectivity: Mask, index: u8) -> planar::Vertex {
+    planar::Vertex {
+        position: point3(x, y, z),
+        connectivity,
+        index: u32::from(index),
+    }
 }
+
+/// Given a byte aray of ASCII art polygons drawn using letters for vertices, `-` and `|` for edges,
+/// and `.` for interior fill,
+/// produce triangulator input vertices compatible with [`test_basis()`].
+/// The `-` and `|` are not currently used or validated; only `.` vs ` ` near vertices determines
+/// connectivity and thus whether an area is interior.
+///
+/// Graphical test cases are easier and more fun to write correctly than writing each vertex
+/// by hand.
+fn vertices_from_ascii_art<const W: usize, const H: usize>(
+    ascii_art: [&[u8; W]; H],
+) -> Vec<planar::Vertex> {
+    let mut output = Vec::new();
+    for x in 0..W {
+        for y in (0..H).rev() {
+            let get = |dx, dy| {
+                let neighbor_x = x.wrapping_add_signed(dx);
+                let neighbor_y = y.wrapping_add_signed(dy);
+                if neighbor_x >= W || neighbor_y >= H {
+                    b' '
+                } else {
+                    ascii_art[neighbor_y][neighbor_x]
+                }
+            };
+            let is_interior = |dx, dy| match get(dx, dy) {
+                b' ' => false,
+                b'.' => true,
+                ch => panic!(
+                    "neighbor of {x},{y} should be '.' or ' ', not {:?}",
+                    ch as char
+                ),
+            };
+
+            match get(0, 0) {
+                ch @ (b'A'..=b'Z' | b'a'..=b'z') => {
+                    #[allow(clippy::cast_possible_wrap)]
+                    output.push(planar::Vertex {
+                        index: u32::from(ch),
+                        position: point3(x as i32, (H - y - 1) as i32, 0),
+                        connectivity: {
+                            let mut mask = Mask::EMPTY;
+                            // note Y flip
+                            if is_interior(1, -1) {
+                                mask = mask | Mask::FSFP;
+                            }
+                            if is_interior(1, 1) {
+                                mask = mask | Mask::FSBP;
+                            }
+                            if is_interior(-1, -1) {
+                                mask = mask | Mask::BSFP;
+                            }
+                            if is_interior(-1, 1) {
+                                mask = mask | Mask::BSBP;
+                            }
+                            mask
+                        },
+                    });
+                }
+                b' ' | b'|' | b'.' | b'-' => {
+                    // do nothing on neighbor-describing characters
+                }
+                ch => panic!("invalid ascii art character {:?}", ch as char),
+            }
+        }
+    }
+    output
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[test]
 fn empty() {
@@ -63,40 +148,37 @@ fn empty() {
 
 #[test]
 fn one_quad() {
-    check(
-        &[
-            vert(0, 0, 0, Mask::FSFP),
-            vert(0, 3, 0, Mask::FSBP),
-            vert(2, 0, 0, Mask::BSFP),
-            vert(2, 3, 0, Mask::BSBP),
-        ],
-        &[
-            [point3(0, 0, 0), point3(2, 0, 0), point3(0, 3, 0)],
-            [point3(2, 3, 0), point3(0, 3, 0), point3(2, 0, 0)],
-        ],
+    let vertices = vertices_from_ascii_art([
+        b"B--D", //
+        b"|..|", //
+        b"A--C", //
+    ]);
+
+    // Meta-test of vertices_from_ascii_art()
+    assert_eq!(
+        vertices,
+        [
+            vert(0, 0, 0, Mask::FSFP, b'A'),
+            vert(0, 2, 0, Mask::FSBP, b'B'),
+            vert(3, 0, 0, Mask::BSFP, b'C'),
+            vert(3, 2, 0, Mask::BSBP, b'D'),
+        ]
     );
+
+    check(&vertices, &[b"ACB", b"DBC"]);
 }
 
 #[test]
 fn two_consecutive_quads() {
     check(
+        &vertices_from_ascii_art([
+            b"B-D b-d", //
+            b"|.| |.|", //
+            b"A-C a-c", //
+        ]),
         &[
-            // first quad
-            vert(0, 0, 0, Mask::FSFP),
-            vert(0, 1, 0, Mask::FSBP),
-            vert(1, 0, 0, Mask::BSFP),
-            vert(1, 1, 0, Mask::BSBP),
-            // second quad
-            vert(2, 0, 0, Mask::FSFP),
-            vert(2, 1, 0, Mask::FSBP),
-            vert(3, 0, 0, Mask::BSFP),
-            vert(3, 1, 0, Mask::BSBP),
-        ],
-        &[
-            [point3(0, 0, 0), point3(1, 0, 0), point3(0, 1, 0)],
-            [point3(1, 1, 0), point3(0, 1, 0), point3(1, 0, 0)],
-            [point3(2, 0, 0), point3(3, 0, 0), point3(2, 1, 0)],
-            [point3(3, 1, 0), point3(2, 1, 0), point3(3, 0, 0)],
+            b"ACB", b"DBC", // first quad
+            b"acb", b"dbc", // second quad
         ],
     );
 }
@@ -104,21 +186,95 @@ fn two_consecutive_quads() {
 #[test]
 fn quad_with_extra_vertex_back() {
     check(
+        &vertices_from_ascii_art([
+            b"B-D", //
+            b"|.|", //
+            b"X.|", //
+            b"|.|", //
+            b"A-C", //
+        ]),
         &[
-            vert(0, 0, 0, Mask::FSFP),
-            vert(0, 1, 0, Mask::FSFP | Mask::FSBP), // extra vertex
-            vert(0, 2, 0, Mask::FSBP),
-            vert(1, 0, 0, Mask::BSFP),
-            vert(1, 2, 0, Mask::BSBP),
-        ],
-        &[
-            [point3(0, 0, 0), point3(1, 0, 0), point3(0, 1, 0)], // bottom left triangle
-            [point3(0, 1, 0), point3(1, 0, 0), point3(0, 2, 0)], // middle triangle
-            [point3(1, 2, 0), point3(0, 2, 0), point3(1, 0, 0)], // top right triangle
+            b"ACX", // bottom left triangle
+            b"XCB", // middle triangle
+            b"DBC", // top right triangle
         ],
     );
 }
-// TODO(planar_new): add 3 more tests for extra vertices on all 4 edges
 
-// TODO(planar_new): add tests of polygon with holes and other complex cases
-// TODO(planar_new): add tests of obscured faces not being generated
+#[test]
+fn quad_with_extra_vertex_front() {
+    check(
+        &vertices_from_ascii_art([
+            b"B-D", //
+            b"|.|", //
+            b"|.X", //
+            b"|.|", //
+            b"A-C", //
+        ]),
+        &[
+            b"ACB", // bottom left triangle
+            b"CXB", // middle triangle
+            b"DBX", // top right triangle
+        ],
+    );
+}
+
+#[test]
+fn quad_with_extra_vertex_perp_front() {
+    check(
+        &vertices_from_ascii_art([
+            b"B-X-D", //
+            b"|...|", //
+            b"A---C", //
+        ]),
+        &[
+            b"XBA", // top left triangle
+            b"ACX", // middle triangle for bottom edge
+            b"DXC", // top right triangle
+        ],
+    );
+}
+
+#[test]
+fn quad_with_extra_vertex_perp_back() {
+    check(
+        &vertices_from_ascii_art([
+            b"B---D", //
+            b"|...|", //
+            b"A-X-C", //
+        ]),
+        &[
+            b"AXB", // bottom left triangle
+            b"XCB", // middle triangle with right half of bottom edge
+            b"DBC", // bottom right triangle
+        ],
+    );
+}
+
+#[test]
+fn hole() {
+    check(
+        &vertices_from_ascii_art([
+            b"B-----D", //
+            b"|.....|", //
+            b"|.b-d.|", //
+            b"|.| |.|", //
+            b"|.a-c.|", //
+            b"|.....|", //
+            b"A-----C", //
+        ]),
+        &[
+            b"AaB", // outer  left  edge & a
+            b"abB", // inner  left  edge & B
+            b"caA", // inner bottom edge & A
+            b"bdB", // inner  top   edge & B
+            b"ACc", // outer  top   edge & c
+            b"cCd", // inner right  edge & C
+            b"DBd", // outer  top   edge & d
+            b"DdC", // outer right  edge & d
+        ],
+    );
+}
+
+// TODO(planar_new): add tests of further complex cases, such as the ones that require
+// the ear-clipping step

@@ -71,7 +71,7 @@ type WrappingVector3D = all_is_cubes::euclid::Vector3D<Wrapping<GridCoordinate>,
 /// A vertex in the form processed by [`Triangulator`] to produce triangles.
 ///
 /// (Refer to this type as `planar::Vertex` to avoid ambiguity.)
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct Vertex {
     /// Position of the vertex.
     pub position: GridPoint,
