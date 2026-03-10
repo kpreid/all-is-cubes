@@ -767,7 +767,6 @@ mod tests {
     use super::*;
     use all_is_cubes::euclid::point3;
     use all_is_cubes::math::GridPoint;
-    use all_is_cubes::math::Octant::{self, Nnn, Npn, Pnn, Ppn};
     use alloc::vec::Vec;
 
     fn test_basis() -> PtBasis {
@@ -776,11 +775,11 @@ mod tests {
         b
     }
 
-    /// `PlanarTriangulator::new()` parameterized for simplicity
+    /// `PlanarTriangulator::triangulate()` parameterized for simplicity
     /// (for tests that aren't trying to exercise rotatability)
     #[inline(never)]
     #[track_caller]
-    fn check(vertices: &[AnalysisVertex], expected_triangles: &[[GridPoint; 3]]) {
+    fn check(vertices: &[(GridPoint, Mask)], expected_triangles: &[[GridPoint; 3]]) {
         let mut viz = Viz::Disabled;
         let mut actual_triangles = Vec::new();
         let mut triangulator = PlanarTriangulator::new();
@@ -791,14 +790,18 @@ mod tests {
         triangulator.triangulate(
             &mut viz,
             basis,
-            vertices.iter().zip(0u32..).map(|(&analysis_vertex, index)| {
-                let planar_vertex = Vertex::new(&basis, analysis_vertex, index);
-                println!("In: {analysis_vertex:?} {planar_vertex:?}");
+            vertices.iter().zip(0u32..).map(|(&(position, connectivity), index)| {
+                let planar_vertex = Vertex {
+                    position,
+                    connectivity,
+                    index,
+                };
+                println!("In: {planar_vertex:?}");
                 planar_vertex
             }),
             |triangle_indices: [u32; 3]| {
-                let triangle_positions =
-                    triangle_indices.map(|index| vertices[index as usize].position);
+                let triangle_positions: [GridPoint; 3] =
+                    triangle_indices.map(|index| vertices[index as usize].0);
                 // Print as we go, so if there is a panic we can still see some results.
                 println!("Out: {triangle_indices:?} = {triangle_positions:?}");
                 actual_triangles.push(triangle_positions);
@@ -815,13 +818,8 @@ mod tests {
         );
     }
 
-    fn vert(x: i32, y: i32, z: i32, mask: &[Octant]) -> AnalysisVertex {
-        let mask = OctantMask::from_iter(mask.iter().copied());
-        AnalysisVertex {
-            position: point3(x, y, z),
-            renderable: mask,
-            opaque: mask,
-        }
+    fn vert(x: i32, y: i32, z: i32, mask: Mask) -> (GridPoint, Mask) {
+        (point3(x, y, z), mask)
     }
 
     #[test]
@@ -833,10 +831,10 @@ mod tests {
     fn one_quad() {
         check(
             &[
-                vert(0, 0, 0, &[Ppn]),
-                vert(0, 3, 0, &[Pnn]),
-                vert(2, 0, 0, &[Npn]),
-                vert(2, 3, 0, &[Nnn]),
+                vert(0, 0, 0, Mask::FSFP),
+                vert(0, 3, 0, Mask::FSBP),
+                vert(2, 0, 0, Mask::BSFP),
+                vert(2, 3, 0, Mask::BSBP),
             ],
             &[
                 [point3(0, 0, 0), point3(2, 0, 0), point3(0, 3, 0)],
@@ -850,15 +848,15 @@ mod tests {
         check(
             &[
                 // first quad
-                vert(0, 0, 0, &[Ppn]),
-                vert(0, 1, 0, &[Pnn]),
-                vert(1, 0, 0, &[Npn]),
-                vert(1, 1, 0, &[Nnn]),
+                vert(0, 0, 0, Mask::FSFP),
+                vert(0, 1, 0, Mask::FSBP),
+                vert(1, 0, 0, Mask::BSFP),
+                vert(1, 1, 0, Mask::BSBP),
                 // second quad
-                vert(2, 0, 0, &[Ppn]),
-                vert(2, 1, 0, &[Pnn]),
-                vert(3, 0, 0, &[Npn]),
-                vert(3, 1, 0, &[Nnn]),
+                vert(2, 0, 0, Mask::FSFP),
+                vert(2, 1, 0, Mask::FSBP),
+                vert(3, 0, 0, Mask::BSFP),
+                vert(3, 1, 0, Mask::BSBP),
             ],
             &[
                 [point3(0, 0, 0), point3(1, 0, 0), point3(0, 1, 0)],
@@ -873,11 +871,11 @@ mod tests {
     fn quad_with_extra_vertex_back() {
         check(
             &[
-                vert(0, 0, 0, &[Ppn]),
-                vert(0, 1, 0, &[Ppn, Pnn]), // extra vertex
-                vert(0, 2, 0, &[Pnn]),
-                vert(1, 0, 0, &[Npn]),
-                vert(1, 2, 0, &[Nnn]),
+                vert(0, 0, 0, Mask::FSFP),
+                vert(0, 1, 0, Mask::FSFP | Mask::FSBP), // extra vertex
+                vert(0, 2, 0, Mask::FSBP),
+                vert(1, 0, 0, Mask::BSFP),
+                vert(1, 2, 0, Mask::BSBP),
             ],
             &[
                 [point3(0, 0, 0), point3(1, 0, 0), point3(0, 1, 0)], // bottom left triangle
