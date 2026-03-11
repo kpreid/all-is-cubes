@@ -24,29 +24,37 @@ fn run(vertices: &[planar::Vertex]) -> Vec<[u8; 3]> {
 
     eprintln!("Initial state: {triangulator:#?}");
 
-    triangulator.triangulate(
-        basis,
-        vertices.iter().copied().inspect(|planar_vertex| {
-            println!("In: {planar_vertex:?}");
-        }),
-        |triangle_indices: [u32; 3]| {
-            let triangle_positions: [GridPoint; 3] = triangle_indices.map(|index| {
-                vertices
-                    .iter()
-                    .find(|v| v.index == index)
-                    .expect("triangulator returned bad index")
-                    .position
-            });
-            // Print as we go, so if there is a panic we can still see some results.
-            println!("Out: {triangle_indices:?} = {triangle_positions:?}");
-            actual_triangles
-                .push(triangle_indices.map(|i| u8::try_from(i).expect("index out of range")));
+    let maybe_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        triangulator.triangulate(
+            basis,
+            vertices.iter().copied().inspect(|planar_vertex| {
+                println!("In: {planar_vertex:?}");
+            }),
+            |triangle_indices: [u32; 3]| {
+                let triangle_positions: [GridPoint; 3] = triangle_indices.map(|index| {
+                    vertices
+                        .iter()
+                        .find(|v| v.index == index)
+                        .expect("triangulator returned bad index")
+                        .position
+                });
+                // Print as we go, so if there is a panic we can still see some results.
+                println!("Out: {triangle_indices:?} = {triangle_positions:?}");
+                actual_triangles
+                    .push(triangle_indices.map(|i| u8::try_from(i).expect("index out of range")));
 
-            // println!("State: {triangulator:#?}"); // TODO: make it possible to grab the state for debugging
-        },
-    );
+                // println!("State: {triangulator:#?}"); // TODO: make it possible to grab the state for debugging
+            },
+        )
+    }));
 
     eprintln!("Final state: {triangulator:#?}");
+
+    if let Err(payload) = maybe_panic {
+        eprintln!("Unwinding; triangles before panic: {actual_triangles:#?}");
+
+        std::panic::resume_unwind(payload);
+    }
 
     actual_triangles
 }
