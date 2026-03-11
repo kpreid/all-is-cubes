@@ -161,6 +161,9 @@ sync_wrapper = { version = "1.0.2", default-features = false }
 tempfile = { version = "3.23.0", default-features = false }
 thiserror = { version = "2.0.17", default-features = false }
 time = { version = "0.3.37", default-features = false }
+# Used for HTML templating and escaping.
+# We choose it mainly because it is already in our deps via `criterion`.
+tinytemplate = { version = "1.2.1" }
 # Tokio is used for certain binaries.
 # The library crates do not require Tokio.
 tokio = { version = "1.47.1", default-features = false }

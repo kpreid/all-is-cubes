@@ -1,0 +1,62 @@
+<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' xmlns:h='http://www.w3.org/1999/xhtml' width='600px' height='360px' viewBox='-1 -11 20 12'>
+<style type='text/css'>#vertex, .triangle {}#vertex {fill: yellow;stroke: #770;stroke-width: 0.03;}.vertex text {text-anchor: middle;dominant-baseline: central;font-size: 0.45px;}.triangle {fill: #AAF;stroke: #55F;stroke-width: 0.05;stroke-linejoin: round;}svg:hover .vertex {visibility:hidden;}</style>
+<defs><circle id='vertex' r='0.27'/></defs>
+<polygon class='triangle' points='0,0 2,0 0,-8'/>
+<polygon class='triangle' points='2,0 2,-4 0,-8'/>
+<polygon class='triangle' points='2,-4 2,-6 0,-8'/>
+<polygon class='triangle' points='2,-8 0,-8 2,-6'/>
+<polygon class='triangle' points='2,-4 4,-4 2,-6'/>
+<polygon class='triangle' points='4,-6 2,-6 4,-4'/>
+<polygon class='triangle' points='2,-8 4,-8 2,-10'/>
+<polygon class='triangle' points='4,-10 2,-10 4,-8'/>
+<polygon class='triangle' points='4,0 6,0 4,-4'/>
+<polygon class='triangle' points='4,-4 6,0 4,-6'/>
+<polygon class='triangle' points='4,-6 6,0 4,-8'/>
+<polygon class='triangle' points='6,-8 4,-8 6,0'/>
+<polygon class='triangle' points='8,0 10,0 8,-10'/>
+<polygon class='triangle' points='10,-10 8,-10 10,0'/>
+<polygon class='triangle' points='12,0 14,-2 12,-6'/>
+<polygon class='triangle' points='12,-6 14,-2 12,-10'/>
+<polygon class='triangle' points='14,-2 14,-8 12,-10'/>
+<polygon class='triangle' points='12,0 16,0 14,-2'/>
+<polygon class='triangle' points='16,-2 14,-2 16,0'/>
+<polygon class='triangle' points='14,-8 16,-8 12,-10'/>
+<polygon class='triangle' points='16,-10 12,-10 16,-8'/>
+<polygon class='triangle' points='16,-2 18,-2 16,-4'/>
+<polygon class='triangle' points='18,-4 16,-4 18,-2'/>
+<polygon class='triangle' points='16,-6 18,-6 16,-8'/>
+<polygon class='triangle' points='18,-8 16,-8 18,-6'/>
+<g class='vertex' transform='translate(0,0)'><use xlink:href='#vertex'/><text>0</text></g>
+<g class='vertex' transform='translate(0,-8)'><use xlink:href='#vertex'/><text>1</text></g>
+<g class='vertex' transform='translate(2,0)'><use xlink:href='#vertex'/><text>2</text></g>
+<g class='vertex' transform='translate(2,-4)'><use xlink:href='#vertex'/><text>3</text></g>
+<g class='vertex' transform='translate(2,-6)'><use xlink:href='#vertex'/><text>4</text></g>
+<g class='vertex' transform='translate(2,-8)'><use xlink:href='#vertex'/><text>5</text></g>
+<g class='vertex' transform='translate(2,-10)'><use xlink:href='#vertex'/><text>6</text></g>
+<g class='vertex' transform='translate(4,0)'><use xlink:href='#vertex'/><text>7</text></g>
+<g class='vertex' transform='translate(4,-4)'><use xlink:href='#vertex'/><text>8</text></g>
+<g class='vertex' transform='translate(4,-6)'><use xlink:href='#vertex'/><text>9</text></g>
+<g class='vertex' transform='translate(4,-8)'><use xlink:href='#vertex'/><text>10</text></g>
+<g class='vertex' transform='translate(4,-10)'><use xlink:href='#vertex'/><text>11</text></g>
+<g class='vertex' transform='translate(6,0)'><use xlink:href='#vertex'/><text>12</text></g>
+<g class='vertex' transform='translate(6,-8)'><use xlink:href='#vertex'/><text>13</text></g>
+<g class='vertex' transform='translate(8,0)'><use xlink:href='#vertex'/><text>14</text></g>
+<g class='vertex' transform='translate(8,-10)'><use xlink:href='#vertex'/><text>15</text></g>
+<g class='vertex' transform='translate(10,0)'><use xlink:href='#vertex'/><text>16</text></g>
+<g class='vertex' transform='translate(10,-10)'><use xlink:href='#vertex'/><text>17</text></g>
+<g class='vertex' transform='translate(12,0)'><use xlink:href='#vertex'/><text>18</text></g>
+<g class='vertex' transform='translate(12,-6)'><use xlink:href='#vertex'/><text>19</text></g>
+<g class='vertex' transform='translate(12,-10)'><use xlink:href='#vertex'/><text>20</text></g>
+<g class='vertex' transform='translate(14,-2)'><use xlink:href='#vertex'/><text>21</text></g>
+<g class='vertex' transform='translate(14,-8)'><use xlink:href='#vertex'/><text>22</text></g>
+<g class='vertex' transform='translate(16,0)'><use xlink:href='#vertex'/><text>23</text></g>
+<g class='vertex' transform='translate(16,-2)'><use xlink:href='#vertex'/><text>24</text></g>
+<g class='vertex' transform='translate(16,-4)'><use xlink:href='#vertex'/><text>25</text></g>
+<g class='vertex' transform='translate(16,-6)'><use xlink:href='#vertex'/><text>26</text></g>
+<g class='vertex' transform='translate(16,-8)'><use xlink:href='#vertex'/><text>27</text></g>
+<g class='vertex' transform='translate(16,-10)'><use xlink:href='#vertex'/><text>28</text></g>
+<g class='vertex' transform='translate(18,-2)'><use xlink:href='#vertex'/><text>29</text></g>
+<g class='vertex' transform='translate(18,-4)'><use xlink:href='#vertex'/><text>30</text></g>
+<g class='vertex' transform='translate(18,-6)'><use xlink:href='#vertex'/><text>31</text></g>
+<g class='vertex' transform='translate(18,-8)'><use xlink:href='#vertex'/><text>32</text></g>
+</svg>

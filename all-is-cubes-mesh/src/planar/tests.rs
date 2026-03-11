@@ -50,6 +50,20 @@ fn run(vertices: &[planar::Vertex]) -> Vec<[u8; 3]> {
 
     eprintln!("Final state: {triangulator:#?}");
 
+    println!(
+        "\n{}\n",
+        planar::svg::WriteSvg {
+            vertices,
+            triangles: &actual_triangles
+                .iter()
+                .map(|byte_arr| byte_arr.map(u32::from))
+                .collect::<Vec<[u32; 3]>>(),
+            scale: 20.0,
+            show_vertices: true,
+            standalone_xml: true,
+        }
+    );
+
     if let Err(payload) = maybe_panic {
         eprintln!("Unwinding; triangles before panic: {actual_triangles:#?}");
 
@@ -86,14 +100,18 @@ fn vert(x: i32, y: i32, z: i32, connectivity: Mask, index: u8) -> planar::Vertex
     }
 }
 
-/// Given a byte aray of ASCII art polygons drawn using letters for vertices, `-` and `|` for edges,
-/// and `.` for interior fill,
+/// Given a byte array of ASCII art polygons drawn using:
+///
+/// * letters or '*' for vertices,
+/// * `-` and `|` for edges,
+/// * and `.` for interior fill,
+///
 /// produce triangulator input vertices compatible with [`test_basis()`].
+///
 /// The `-` and `|` are not currently used or validated; only `.` vs ` ` near vertices determines
 /// connectivity and thus whether an area is interior.
 ///
-/// Graphical test cases are easier and more fun to write correctly than writing each vertex
-/// by hand.
+/// `*` vertices are automatically assigned indices.
 fn vertices_from_ascii_art<const W: usize, const H: usize>(
     ascii_art: [&[u8; W]; H],
 ) -> Vec<planar::Vertex> {
@@ -119,7 +137,7 @@ fn vertices_from_ascii_art<const W: usize, const H: usize>(
             };
 
             match get(0, 0) {
-                ch @ (b'A'..=b'Z' | b'a'..=b'z') => {
+                ch @ (b'*' | b'A'..=b'Z' | b'a'..=b'z') => {
                     #[allow(clippy::cast_possible_wrap)]
                     output.push(planar::Vertex {
                         index: u32::from(ch),
@@ -150,6 +168,24 @@ fn vertices_from_ascii_art<const W: usize, const H: usize>(
             }
         }
     }
+
+    // Assign unique indices to all `*` vertices.
+    let mut next_index: u32 = 0;
+    for vertex in output.iter_mut() {
+        if vertex.index == u32::from(b'*') {
+            vertex.index = next_index;
+
+            // Don’t assign letters.
+            next_index += 1;
+            if next_index == u32::from(b'A') {
+                next_index = u32::from(b'Z' + 1);
+            }
+            if next_index == u32::from(b'a') {
+                next_index = u32::from(b'z' + 1);
+            }
+        }
+    }
+
     output
 }
 
@@ -414,6 +450,47 @@ fn missing_vertices_3() {
 
 // TODO(planar_new): add tests of further complex cases, such as the ones that require
 // the ear-clipping step
+
+// -------------------------------------------------------------------------------------------------
+
+/// Regenerates the image embedded in the [`crate::planar`] documentation.
+#[test]
+fn doc_example_svg_test() {
+    let vertices = &vertices_from_ascii_art([
+        b"  *-*   *-* *---*  ", //
+        b"  |.|   |.| |...|  ", //
+        b"*-*-*-* |.| |.*-*-*", //
+        b"|.| |.| |.| |.| |.|", //
+        b"|.*-*.| |.| *.| *-*", //
+        b"|.....| |.| |.|    ", //
+        b"|.*-*.| |.| |.| *-*", //
+        b"|.| |.| |.| |.| |.|", //
+        b"|.| |.| |.| |.*-*-*", //
+        b"|.| |.| |.| |...|  ", //
+        b"*-* *-* *-* *---*  ", //
+    ]);
+
+    let mut triangles = Vec::new();
+    planar::Triangulator::new().triangulate(test_basis(), vertices.iter().copied(), |triangle| {
+        triangles.push(triangle)
+    });
+
+    let svg = format!(
+        "{}",
+        planar::svg::WriteSvg {
+            vertices,
+            triangles: &triangles,
+            scale: 30.0,
+            show_vertices: true,
+            standalone_xml: false,
+        }
+    );
+
+    // Clean, unquoted copy to paste into the file when it needs updating.
+    println!("{svg}");
+
+    pretty_assertions::assert_eq!(svg, include_str!("example.svg"));
+}
 
 // -------------------------------------------------------------------------------------------------
 // Tests of internals that are harder to test as part of the larger algorithm.

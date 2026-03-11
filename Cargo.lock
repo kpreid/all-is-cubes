@@ -259,6 +259,7 @@ dependencies = [
  "rayon",
  "rstest",
  "smallvec",
+ "tinytemplate",
  "visibility",
 ]
 

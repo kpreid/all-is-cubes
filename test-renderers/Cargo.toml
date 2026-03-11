@@ -87,9 +87,7 @@ serde_json = { workspace = true }
 simplelog = { workspace = true }
 tempfile = { workspace = true }
 time = { workspace = true }
-# tinytemplate is already in the workspace's dependency tree via criterion,
-# so let's use it for our output report template.
-tinytemplate = "1.2.1"
+tinytemplate = { workspace = true }
 # Using tokio for async test-running.
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync", "time"] }
 # In addition to depending on wgpu directly, we also need to enable backends for the tests to

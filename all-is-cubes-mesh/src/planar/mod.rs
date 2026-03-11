@@ -16,6 +16,17 @@
 //! edge meets a vertex, rather than another edge whose endpoints are identical)
 //! that cause single-pixel gaps in rendering.
 //!
+//! For example, in the following image, the vertical strokes of the “A” could each be covered by
+//! triangles that bypass vertices 3, 4, 8 and 9, but that would create T-junctions, so instead
+//! they are broken into multiple triangles.
+//! Vertex 19 seems unnecessary, but it may belong to surfaces on perpendicular planes.
+//! (You can also see that the algorithm does not attempt to optimize the produced geometry for
+//! shorter edges.)
+//!
+//! <figure style="text-align:center;">
+#![doc = include_str!("example.svg")]
+//! </figure>
+//!
 //! In order to use this algorithm, create a [`Basis`] and [`Triangulator`], then
 //! call [`Triangulator::triangulate()`] with an iterator of [`Vertex`]es.
 //!
@@ -84,6 +95,9 @@ use crate::Viz;
 
 mod mask;
 pub use mask::Mask;
+
+#[cfg(test)]
+mod svg;
 
 #[cfg(test)]
 mod tests;
