@@ -312,3 +312,58 @@ fn hole_requiring_ear_clipping() {
 
 // TODO(planar_new): add tests of further complex cases, such as the ones that require
 // the ear-clipping step
+
+// -------------------------------------------------------------------------------------------------
+// Tests of internals that are harder to test as part of the larger algorithm.
+
+#[test]
+fn winding() {
+    // Set up right-handed and left-handed in the sense that matters here,
+    // which is *not* which way the plane normal is pointing but
+    let xy_rh_basis = planar::Basis::new(Face6::PZ, Face6::PX, Face6::PY);
+    let xy_lh_basis = planar::Basis::new(Face6::NZ, Face6::PX, Face6::PY);
+    let yx_rh_basis = planar::Basis::new(Face6::NZ, Face6::PY, Face6::PX);
+    let yx_lh_basis = planar::Basis::new(Face6::PZ, Face6::PY, Face6::PX);
+    assert_eq!(xy_rh_basis.left_handed, false, "xy_rh_basis");
+    assert_eq!(xy_lh_basis.left_handed, true, "xy_lh_basis");
+    assert_eq!(yx_rh_basis.left_handed, false, "yx_rh_basis");
+    assert_eq!(yx_lh_basis.left_handed, true, "yx_lh_basis");
+
+    let try_all = |triangle: [&planar::Vertex; 3]| -> [bool; 4] {
+        [
+            xy_rh_basis.is_correct_winding(triangle),
+            xy_lh_basis.is_correct_winding(triangle),
+            yx_rh_basis.is_correct_winding(triangle),
+            yx_lh_basis.is_correct_winding(triangle),
+        ]
+    };
+
+    // Some vertices to make both degenerate and non-degenerate triangles
+    let vertices = vertices_from_ascii_art([
+        b"b  ", //
+        b"   ", //
+        b" c ", //
+        b"   ", //
+        b"a d", //
+    ]);
+    dbg!(&vertices);
+    let [a, b, c, d] = &*vertices else {
+        unreachable!()
+    };
+
+    assert_eq!(
+        try_all([a, b, c]),
+        [false, false, true, true],
+        "clockwise in +x+y"
+    );
+    assert_eq!(
+        try_all([a, c, b]),
+        [true, true, false, false],
+        "counterclockwise in +x+y"
+    );
+    assert_eq!(
+        try_all([b, c, d]),
+        [false, false, false, false],
+        "degenerate"
+    );
+}

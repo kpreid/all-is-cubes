@@ -573,12 +573,23 @@ impl Basis {
             .cmp(&self.perpendicular_vector.dot(v2.position.to_vector().map(Wrapping)))
     }
 
-    /// Returns whether the winding order of the triangle is as it should be.
+    /// Returns whether the winding order of the triangle is as it should be, *before* the
+    /// [`Basis::emit()`] stage.
     ///
     /// Always returns `false` for degenerate triangles (ones where all vertices lie on one line
     /// and thus cover no area).
     ///
-    /// TODO: the naming of things may be backwards somewhere; this was tweaked to work empirically
+    /// # Explanation
+    ///
+    /// “Correct” always means counterclockwise wound in the (sweep right, perpendicular up)
+    /// coordinate system, regardless of the 3D handedness of the [`Basis`] we were given.
+    /// Doing things this way allows us to avoid making each case of triangle emission in the
+    /// algorithm handedness-aware; instead, if the desired output is left-handed, [`Basis::emit()`]
+    /// reverses *all* triangles.
+    ///
+    /// Within the algorithm, `is_correct_winding()` is not used to make windings consistent, but
+    /// rather to test for triangles that are inside-out because they are covering areas they should
+    /// be avoiding.
     fn is_correct_winding(self, triangle: [&Vertex; 3]) -> bool {
         // depending on handedness this might be negated
         let triangle_normal_by_cross_product = (triangle[1].position - triangle[0].position)
