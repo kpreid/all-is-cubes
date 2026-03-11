@@ -276,5 +276,39 @@ fn hole() {
     );
 }
 
+/// With extra vertices X and Y, correctly processing holes starts to require careful avoidance of
+/// reversed triangles spanning gaps, which then need to invoke the ear clipping sub-algorithm
+/// to fill in the avoided areas.
+#[test]
+fn hole_requiring_ear_clipping() {
+    check(
+        &vertices_from_ascii_art([
+            b"B-----D", //
+            b"|.....|", //
+            b"Y.....|", //
+            b"|.....|", //
+            b"|.b-d.|", //
+            b"|.| |.|", //
+            b"|.a-c.|", //
+            b"|.....|", //
+            b"X.....|", //
+            b"|.....|", //
+            b"A-----C", //
+        ]),
+        &[
+            b"XaY", // outer left edge middle segment
+            b"abY", // inner left edge
+            b"caX", // inner bottom edge
+            b"bdY", // inner top edge
+            b"ACX", // inner bottom edge
+            b"XCc", // bottom interior area
+            b"cCd", // inner right edge
+            b"DBY", // outer top edge & outer left edge, top segment
+            b"DYd", // top interior interior
+            b"DdC", // outer right edge
+        ],
+    );
+}
+
 // TODO(planar_new): add tests of further complex cases, such as the ones that require
 // the ear-clipping step

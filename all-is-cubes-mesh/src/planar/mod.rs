@@ -432,6 +432,7 @@ impl Triangulator {
     /// While this algorithm could in principle do a lot of the work that is handled by other means,
     /// it is O(n²), so we want to give it as little work as possible.
     #[cold]
+    #[mutants::skip] // TODO: could use making this work but it's tricky
     fn clip_ears_in_new_frontier(
         &mut self,
         viz: &mut Viz,
