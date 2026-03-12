@@ -668,7 +668,7 @@ impl SpaceRenderer {
         // (Currently, we don't ever try to instance transparent meshes, to avoid sorting issues.)
         let start_opaque_instance_draw_time = time::Instant::now();
         for (block_index, cubes) in block_instances.iter() {
-            // Set buffers for the mesh
+            // Set buffers for the particular block mesh we are drawing.
             let Some(dynamic::InstanceMesh {
                 meta,
                 render_data: Some(buffers),
@@ -680,6 +680,7 @@ impl SpaceRenderer {
             };
             set_buffers(render_pass, buffers);
 
+            // Send positions of each instance to the instance_buffer_writer.
             let Ok(first_instance_index) = u32::try_from(instance_buffer_writer.len()) else {
                 if !flaws.contains(Flaws::UNFINISHED) {
                     flaws |= Flaws::UNFINISHED;
@@ -703,22 +704,27 @@ impl SpaceRenderer {
                     break;
                 }
             }
+
             // Record draw command for all instances using this mesh
             let instance_range = first_instance_index..(first_instance_index + count);
             blocks_drawn += instance_range.len();
             triangles_drawn += (meta.opaque_range().len() / 3) * instance_range.len();
-            render_pass.draw_indexed(to_wgpu_index_range(meta.opaque_range()), 0, instance_range);
+            render_pass.draw_indexed(
+                to_wgpu_index_range(meta.opaque_range()),
+                0,
+                instance_range.clone(),
+            );
 
             // If we are doing overdraw visualization, run the depthless overdraw visualization.
             // We do this here so that we can take advantage of the state in this loop, even though
             // it forces a lot of pipeline switches, because `debug_pixel_cost` isn't about
-            // *measuring performance* but about *cost*.
+            // measuring *throughput* but about *counting operations*.
             if camera.options().debug_pixel_cost {
                 render_pass.set_pipeline(&pipelines.depthless_overdraw_render_pipeline);
                 render_pass.draw_indexed(
                     to_wgpu_index_range(meta.opaque_range()),
                     0,
-                    first_instance_index..(first_instance_index + count),
+                    instance_range,
                 );
                 // Restore previous pipeline
                 render_pass.set_pipeline(pipeline_for_opaque);
