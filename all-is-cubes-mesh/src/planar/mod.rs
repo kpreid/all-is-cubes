@@ -208,7 +208,7 @@ impl Triangulator {
     /// It can be used for multiple triangulation operations in order to reuse previous memory
     /// allocations.
     #[inline(never)]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             basis: Basis::DUMMY,
             sweep_position: GridCoordinate::MIN,
@@ -587,7 +587,7 @@ impl Basis {
     ///
     /// Panics if the three provided directions are not perpendicular.
     #[track_caller]
-    pub fn new(face: Face6, sweep_direction: Face6, perpendicular_direction: Face6) -> Self {
+    pub const fn new(face: Face6, sweep_direction: Face6, perpendicular_direction: Face6) -> Self {
         let left_handed = match GridRotation::try_from_basis_const([
             face,
             sweep_direction,
@@ -601,7 +601,11 @@ impl Basis {
             face,
             sweep_direction,
             perpendicular_direction,
-            perpendicular_vector: perpendicular_direction.normal_vector(),
+            perpendicular_vector: perpendicular_direction.vector_const(
+                Wrapping(-1),
+                Wrapping(0),
+                Wrapping(1),
+            ),
             left_handed,
         }
     }

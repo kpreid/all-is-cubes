@@ -249,6 +249,30 @@ impl Face6 {
         }
     }
 
+    /// Returns an vector whose projection normal to this face is either `positive` or `negative`
+    /// as matches `self` and whose other components are `zero`.
+    ///
+    /// This is a messy substitute for `Self::vector()` which is able to be executed in a
+    /// `const fn`.
+    #[inline]
+    #[must_use]
+    #[doc(hidden)]
+    pub const fn vector_const<S: Copy, U>(
+        self,
+        negative: S,
+        zero: S,
+        positive: S,
+    ) -> Vector3D<S, U> {
+        match self {
+            Face6::NX => Vector3D::new(negative, zero, zero),
+            Face6::NY => Vector3D::new(zero, negative, zero),
+            Face6::NZ => Vector3D::new(zero, zero, negative),
+            Face6::PX => Vector3D::new(positive, zero, zero),
+            Face6::PY => Vector3D::new(zero, positive, zero),
+            Face6::PZ => Vector3D::new(zero, zero, positive),
+        }
+    }
+
     /// Dot product of this face as a unit vector and the given vector,
     /// implemented by selecting the relevant component.
     ///
