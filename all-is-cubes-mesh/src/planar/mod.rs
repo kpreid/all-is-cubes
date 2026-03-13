@@ -280,7 +280,7 @@ impl Triangulator {
     ///
     /// The required input is:
     ///
-    /// * an iterator of sorted [`Vertex`]es that lie in a common plane as input, and
+    /// * an iterator of sorted [`Vertex`]es that form an orthogonal polygon in some plane, and
     /// * a [`Basis`] which describes that plane and the sort order of the vertices.
     ///
     /// The output, produced by calling `triangle_callback,` is a triangulation of that polygon
@@ -290,7 +290,13 @@ impl Triangulator {
     ///
     /// # Panics
     ///
-    /// Panics if `input` is inconsistent (has vertices missing the other ends of their edges).
+    /// If `input` is inconsistent
+    /// (has vertices missing the other ends of their edges, or multiple vertices with the same
+    /// position),
+    /// then this function may panic or return an inconsistent set of triangles.
+    /// Additional checking is done when [debug asssertions] are enabled.
+    ///
+    /// [debug asssertions]: https://doc.rust-lang.org/cargo/reference/profiles.html#debug-assertions
     pub fn triangulate(
         &mut self,
         basis: Basis,
@@ -421,7 +427,8 @@ impl Triangulator {
                     if predecessor_vertex.connectivity.contains_any_of(Mask::FSFP) {
                         assert!(
                             input_vertex.connectivity.contains_any_of(Mask::BSFP),
-                            "inconsistent"
+                            "input vertices erroneous or triangulator has a bug; \
+                            inconsistent connectivity of {input_vertex:?}"
                         );
                         self.basis.emit(
                             viz,
@@ -429,7 +436,10 @@ impl Triangulator {
                             [
                                 &predecessor_vertex,
                                 &input_vertex,
-                                self.old_frontier.front().unwrap(),
+                                self.old_frontier.front().expect(
+                                    "input vertices erroneous or triangulator has a bug; \
+                                    old frontier empty",
+                                ),
                             ],
                         );
                     }
@@ -442,7 +452,8 @@ impl Triangulator {
                             input_vertex.connectivity.contains_any_of(Mask::BSBP),
                         ),
                         (true, true),
-                        "mid-span vertex must be connected backwards both ways"
+                        "input vertices erroneous or triangulator has a bug; \
+                        mid-span vertex must be connected backwards both ways"
                     );
 
                     self.basis.emit(
@@ -689,7 +700,8 @@ impl Basis {
     ) {
         debug_assert!(
             self.is_correct_winding(triangle),
-            "incorrect winding order passed to emit(): {triangle:?}"
+            "input vertices erroneous or triangulator has a bug; \
+            incorrect winding order passed to emit(): {triangle:?}"
         );
 
         // Flip the triangle based on our basis's handedness, so that the final output is always

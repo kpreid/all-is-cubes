@@ -14,10 +14,10 @@ fn test_basis() -> planar::Basis {
 }
 
 /// `Triangulator::triangulate()` parameterized for simplicity
-/// (for tests that aren't trying to exercise rotatability)
+/// (for tests that aren't trying to exercise rotatability).
 #[inline(never)]
 #[track_caller]
-fn check(vertices: &[planar::Vertex], expected_triangles: &[&[u8; 3]]) {
+fn run(vertices: &[planar::Vertex]) -> Vec<[u8; 3]> {
     let mut actual_triangles = Vec::new();
     let mut triangulator = planar::Triangulator::new();
     let basis = test_basis();
@@ -47,6 +47,14 @@ fn check(vertices: &[planar::Vertex], expected_triangles: &[&[u8; 3]]) {
     );
 
     eprintln!("Final state: {triangulator:#?}");
+
+    actual_triangles
+}
+
+#[inline(never)]
+#[track_caller]
+fn check(vertices: &[planar::Vertex], expected_triangles: &[&[u8; 3]]) {
+    let actual_triangles = run(vertices);
 
     // convert to &str for helpful printing
     pretty_assertions::assert_eq!(
@@ -306,6 +314,94 @@ fn hole_requiring_ear_clipping() {
             b"DdC", // outer right edge
         ],
     );
+}
+
+#[test]
+#[should_panic = "input vertices erroneous or triangulator has a bug;"]
+fn duplicate_vertices_0() {
+    run(&[
+        vert(0, 0, 0, Mask::FSFP, b'A'),
+        vert(0, 0, 0, Mask::FSFP, b'X'), // spurious
+        vert(0, 2, 0, Mask::FSBP, b'B'),
+        vert(3, 0, 0, Mask::BSFP, b'C'),
+        vert(3, 2, 0, Mask::BSBP, b'D'),
+    ]);
+}
+
+#[test]
+#[should_panic = "input vertices erroneous or triangulator has a bug;"]
+fn duplicate_vertices_1() {
+    run(&[
+        vert(0, 0, 0, Mask::FSFP, b'A'),
+        vert(0, 2, 0, Mask::FSBP, b'B'),
+        vert(0, 2, 0, Mask::FSFP, b'X'), // spurious
+        vert(3, 0, 0, Mask::BSFP, b'C'),
+        vert(3, 2, 0, Mask::BSBP, b'D'),
+    ]);
+}
+
+#[test]
+#[should_panic = "input vertices erroneous or triangulator has a bug;"]
+fn duplicate_vertices_2() {
+    run(&[
+        vert(0, 0, 0, Mask::FSFP, b'A'),
+        vert(0, 2, 0, Mask::FSBP, b'B'),
+        vert(3, 0, 0, Mask::BSFP, b'C'),
+        vert(3, 0, 0, Mask::FSFP, b'X'), // spurious
+        vert(3, 2, 0, Mask::BSBP, b'D'),
+    ]);
+}
+
+#[test]
+#[should_panic = "input vertices erroneous or triangulator has a bug;"]
+fn duplicate_vertices_3() {
+    run(&[
+        vert(0, 0, 0, Mask::FSFP, b'A'),
+        vert(0, 2, 0, Mask::FSBP, b'B'),
+        vert(3, 0, 0, Mask::BSFP, b'C'),
+        vert(3, 2, 0, Mask::BSBP, b'D'),
+        vert(3, 2, 0, Mask::FSFP, b'X'), // spurious
+    ]);
+}
+
+#[test]
+#[should_panic = "input vertices erroneous or triangulator has a bug;"]
+fn missing_vertices_0() {
+    run(&[
+        vert(0, 2, 0, Mask::FSBP, b'B'),
+        vert(3, 0, 0, Mask::BSFP, b'C'),
+        vert(3, 2, 0, Mask::BSBP, b'D'),
+    ]);
+}
+
+#[test]
+#[should_panic = "input vertices erroneous or triangulator has a bug;"]
+fn missing_vertices_1() {
+    run(&[
+        vert(0, 0, 0, Mask::FSFP, b'A'),
+        vert(3, 0, 0, Mask::BSFP, b'C'),
+        vert(3, 2, 0, Mask::BSBP, b'D'),
+    ]);
+}
+
+#[test]
+#[should_panic = "input vertices erroneous or triangulator has a bug;"]
+fn missing_vertices_2() {
+    run(&[
+        vert(0, 0, 0, Mask::FSFP, b'A'),
+        vert(0, 2, 0, Mask::FSBP, b'B'),
+        vert(3, 2, 0, Mask::BSBP, b'D'),
+    ]);
+}
+
+#[test]
+#[should_panic = "input vertices erroneous or triangulator has a bug;"]
+fn missing_vertices_3() {
+    run(&[
+        vert(0, 0, 0, Mask::FSFP, b'A'),
+        vert(0, 2, 0, Mask::FSBP, b'B'),
+        vert(3, 0, 0, Mask::BSFP, b'C'),
+    ]);
 }
 
 // TODO(planar_new): add tests of further complex cases, such as the ones that require
