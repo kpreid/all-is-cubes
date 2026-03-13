@@ -28,6 +28,8 @@ all-is-cubes-mesh = { workspace = true, features = ["dynamic"] }
 all-is-cubes-render = { workspace = true }
 criterion = { workspace = true }
 pollster = { workspace = true }
+rand = { workspace = true }
+rand_xoshiro = { workspace = true }
 
 [lints]
 workspace = true

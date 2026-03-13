@@ -6265,6 +6265,8 @@ dependencies = [
  "all-is-cubes-render",
  "criterion",
  "pollster",
+ "rand 0.10.0",
+ "rand_xoshiro",
 ]
 
 [[package]]

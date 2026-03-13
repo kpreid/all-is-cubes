@@ -1,10 +1,13 @@
 #![allow(missing_docs)]
 
 use criterion::{BatchSize, Criterion, criterion_main};
+use rand::RngExt as _;
+use rand::SeedableRng as _;
 
 use all_is_cubes::block::{self, AIR, Block, Resolution::R16};
+use all_is_cubes::euclid::point3;
 use all_is_cubes::linking::BlockProvider;
-use all_is_cubes::math::{GridAab, GridCoordinate, Rgba};
+use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridPoint, Rgba};
 use all_is_cubes::space::Space;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::{self, Universe};
@@ -14,7 +17,7 @@ use all_is_cubes_render::camera::GraphicsOptions;
 
 use all_is_cubes_mesh as mesh;
 use all_is_cubes_mesh::testing::{Allocator, TextureMt as Mt};
-use all_is_cubes_mesh::{BlockMesh, BlockMeshes, MeshOptions, SpaceMesh};
+use all_is_cubes_mesh::{BlockMesh, BlockMeshes, MeshOptions, SpaceMesh, planar};
 
 criterion_main!(benches);
 fn benches() {
@@ -24,6 +27,7 @@ fn benches() {
     slow_mesh_benches(&mut c);
     #[cfg(feature = "dynamic")]
     dynamic_benches(&mut c);
+    planar_benches(&mut c);
 }
 
 fn block_mesh_benches(c: &mut Criterion) {
@@ -400,6 +404,88 @@ fn dynamic_benches(c: &mut Criterion) {
         });
     }
     // TODO: Add a test for updates past the initial one
+}
+
+/// Benchmarks of the [`planar`] algorithm module by itself.
+///
+/// These benchmarks don’t see overall performance since they do not involve the `analyze` phase
+/// or building a `BlockMesh`, but are more sensitive to changes to the `planar` algorithm.
+fn planar_benches(c: &mut Criterion) {
+    let mut g = c.benchmark_group("planar");
+
+    let extra_vertex_count: u32 = 10000;
+    g.throughput(criterion::Throughput::Elements(extra_vertex_count.into()));
+
+    // Generates a square with randomly distributed extra interior vertices.
+    // This is an unrealistic benchmark but it's easy to make valid input.
+    // TODO: Do randomly-generated holes (corresponding to blocks on a plane) instead.
+    g.bench_function("random-solid", |b| {
+        let mut triangulator = planar::Triangulator::new();
+        let basis = planar::Basis::new(Face6::PZ, Face6::PX, Face6::PY);
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3887829);
+        let rectangle_size = 1000;
+        let full_connectivity =
+            planar::Mask::FSBP | planar::Mask::FSFP | planar::Mask::BSFP | planar::Mask::BSBP;
+
+        b.iter_batched_ref(
+            || {
+                let mut vertices = Vec::with_capacity(extra_vertex_count as usize + 4);
+                vertices.extend([
+                    planar::Vertex {
+                        position: point3(0, 0, 0),
+                        connectivity: planar::Mask::FSFP,
+                        index: 0,
+                    },
+                    planar::Vertex {
+                        position: point3(0, rectangle_size, 0),
+                        connectivity: planar::Mask::FSBP,
+                        index: 1,
+                    },
+                    planar::Vertex {
+                        position: point3(rectangle_size, 0, 0),
+                        connectivity: planar::Mask::BSFP,
+                        index: 2,
+                    },
+                    planar::Vertex {
+                        position: point3(rectangle_size, rectangle_size, 0),
+                        connectivity: planar::Mask::BSBP,
+                        index: 3,
+                    },
+                ]);
+                vertices.extend((0..extra_vertex_count).map(|i| {
+                    // Generate a random point on the plane whose coordinates are at least 1 and at
+                    // most rectangle_size - 1, that is, not on the border.
+                    let position: GridPoint = GridPoint::new(
+                        rng.random_range(1i32..rectangle_size),
+                        rng.random_range(1i32..rectangle_size),
+                        0,
+                    );
+
+                    planar::Vertex {
+                        position,
+                        connectivity: full_connectivity,
+                        index: 10 + i,
+                    }
+                }));
+                vertices.sort_by_key(|vertex| <[i32; 3]>::from(vertex.position));
+                vertices.dedup_by_key(|vertex| vertex.position);
+
+                // Allocate a vector for the triangles so that we are realistically putting
+                // the data in memory rather than discarding it, but pre-allocate so we are
+                // not measuring allocator behavior. The size in practice varies around
+                (
+                    vertices,
+                    Vec::with_capacity(extra_vertex_count as usize * 3),
+                )
+            },
+            |(vertices, output)| {
+                triangulator.triangulate(basis, vertices.drain(..), |triangle| {
+                    output.push(triangle);
+                });
+            },
+            BatchSize::LargeInput,
+        );
+    });
 }
 
 // -------------------------------------------------------------------------------------------------
