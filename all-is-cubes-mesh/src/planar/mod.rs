@@ -93,6 +93,12 @@ mod tests;
 /// Wrapping arithmetic helps `compare_perp()` be simple
 type WrappingVector3D = all_is_cubes::euclid::Vector3D<Wrapping<GridCoordinate>, Cube>;
 
+/// Type of a vertex index.
+///
+/// TODO: Should this live in `crate::index_vec` next to other code to do with the maximum index
+/// integer width we allow?
+type Index = u32;
+
 /// A vertex in the form processed by [`Triangulator`] to produce triangles.
 ///
 /// (Refer to this type as `planar::Vertex` to avoid ambiguity.)
@@ -110,7 +116,7 @@ pub struct Vertex {
     pub connectivity: Mask,
 
     /// Value used to refer to this vertex in the output of triangulation.
-    pub index: u32,
+    pub index: Index,
 }
 
 /// Temporary buffer for the state of the 2D triangulation algorithm.
@@ -236,7 +242,7 @@ impl Triangulator {
     fn advance_sweep_position(
         &mut self,
         viz: &mut Viz,
-        triangle_callback: &mut impl FnMut([u32; 3]),
+        triangle_callback: &mut impl FnMut([Index; 3]),
         new_sweep_position: GridCoordinate,
     ) {
         assert!(
@@ -286,7 +292,7 @@ impl Triangulator {
         &mut self,
         basis: Basis,
         input: impl Iterator<Item = Vertex>,
-        triangle_callback: impl FnMut([u32; 3]),
+        triangle_callback: impl FnMut([Index; 3]),
     ) {
         self.triangulate_with_viz(&mut Viz::Disabled, basis, input, triangle_callback)
     }
@@ -298,7 +304,7 @@ impl Triangulator {
         viz: &mut Viz,
         basis: Basis,
         input: impl Iterator<Item = Vertex>,
-        mut triangle_callback: impl FnMut([u32; 3]),
+        mut triangle_callback: impl FnMut([Index; 3]),
     ) {
         // Set the basis, and ensure any previous usage of self does not affect the results.
         self.clear_and_set_basis(basis);
@@ -480,7 +486,7 @@ impl Triangulator {
     fn clip_ears_in_new_frontier(
         &mut self,
         viz: &mut Viz,
-        triangle_callback: &mut impl FnMut([u32; 3]),
+        triangle_callback: &mut impl FnMut([Index; 3]),
     ) {
         #![allow(clippy::reversed_empty_ranges)]
 
@@ -502,7 +508,7 @@ impl Triangulator {
                 let first = &self.new_frontier[i];
                 let middle = &self.new_frontier[i + 1];
                 let last = &self.new_frontier[i + 2];
-                let candidate_triangle = [last, middle, first];
+                let candidate_triangle: [&Vertex; 3] = [last, middle, first];
 
                 let connected_back = middle.connectivity.contains_any_of(Mask::FSBP);
                 let connected_fwd = middle.connectivity.contains_any_of(Mask::FSFP);
@@ -669,7 +675,7 @@ impl Basis {
     fn emit(
         self,
         viz: &mut Viz,
-        triangle_callback: &mut impl FnMut([u32; 3]),
+        triangle_callback: &mut impl FnMut([Index; 3]),
         mut triangle: [&Vertex; 3],
     ) {
         debug_assert!(
