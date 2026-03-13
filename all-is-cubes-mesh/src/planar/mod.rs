@@ -278,6 +278,10 @@ impl Triangulator {
     /// (a set of triangles that exactly covers the polygon).
     /// The output is in the form of indices, in the GPU graphics sense; each index is
     /// the value of the [`index`][Vertex::index] field of some [`Vertex`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `input` is inconsistent (has vertices missing the other ends of their edges).
     pub fn triangulate(
         &mut self,
         basis: Basis,
@@ -569,11 +573,20 @@ impl Basis {
     ///   the input vertices, and must be perpendicular to `face`.
     /// * `perpendicular_direction` is a direction which must be the secondary sort key of
     ///   the input vertices, and must be perpendicular to both `face` and `sweep_direction`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the three provided directions are not perpendicular.
+    #[track_caller]
     pub fn new(face: Face6, sweep_direction: Face6, perpendicular_direction: Face6) -> Self {
-        let left_handed =
-            GridRotation::try_from_basis_const([face, sweep_direction, perpendicular_direction])
-                .expect("directions provided to Basis must be orthogonal")
-                .is_reflection();
+        let left_handed = match GridRotation::try_from_basis_const([
+            face,
+            sweep_direction,
+            perpendicular_direction,
+        ]) {
+            Some(rot) => rot.is_reflection(),
+            None => panic!("directions provided to Basis must be orthogonal"),
+        };
 
         Self {
             face,
