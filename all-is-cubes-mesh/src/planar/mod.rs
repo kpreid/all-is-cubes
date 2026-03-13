@@ -207,6 +207,7 @@ impl Triangulator {
     ///
     /// It can be used for multiple triangulation operations in order to reuse previous memory
     /// allocations.
+    #[inline(never)]
     pub fn new() -> Self {
         Self {
             basis: Basis::DUMMY,
@@ -222,6 +223,7 @@ impl Triangulator {
     /// except for reusing memory allocations.
     ///
     /// This function does not need to be called externally; it is automatically called when needed.
+    #[inline] // used only once
     fn clear_and_set_basis(&mut self, new_basis: Basis) {
         let Self {
             basis,
@@ -239,6 +241,7 @@ impl Triangulator {
         *needs_ears_fixed = false;
     }
 
+    #[inline(never)] // no performance difference; smaller wasm binary
     fn advance_sweep_position(
         &mut self,
         viz: &mut Viz,
@@ -649,6 +652,7 @@ impl Basis {
     /// Within the algorithm, `is_correct_winding()` is not used to make windings consistent, but
     /// rather to test for triangles that are inside-out because they are covering areas they should
     /// be avoiding.
+    #[inline(always)]
     fn is_correct_winding(self, triangle: [&Vertex; 3]) -> bool {
         // depending on handedness this might be negated
         let triangle_normal_by_cross_product = (triangle[1].position - triangle[0].position)
@@ -672,6 +676,7 @@ impl Basis {
     /// The triangle should be counterclockwise wound in the coordinate frame where
     /// `self.sweep_direction` is right and `self.perpendicular_direction` is up.
     #[cfg_attr(debug_assertions, track_caller)]
+    #[inline(always)]
     fn emit(
         self,
         viz: &mut Viz,
