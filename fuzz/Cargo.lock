@@ -671,19 +671,19 @@ dependencies = [
 
 [[package]]
 name = "exhaust"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30b727ccdc10d28c68e775e7167048866fadcc1c39a31d489922cf9dc496becc"
+checksum = "55753e2354c477cf7cb0089316c526e72be8610c330358c93d6f12f8d1fad756"
 dependencies = [
  "exhaust-macros",
- "mutants 0.0.3",
+ "mutants 0.0.4",
 ]
 
 [[package]]
 name = "exhaust-macros"
-version = "0.2.4"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d9bba791cce787703541f40494aa1e0627394c6382b980850bb521a76ab1b80"
+checksum = "de248793548b04e7d29117107315b9cb6410c0b37dbb85038452eccfb489cda3"
 dependencies = [
  "itertools",
  "proc-macro2",
