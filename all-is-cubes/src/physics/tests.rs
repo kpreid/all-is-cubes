@@ -14,7 +14,7 @@ use crate::block::{
 };
 use crate::character::ParentSpace;
 use crate::content::{make_slab, make_some_blocks};
-use crate::math::{Aab, Cube, CubeFace, Face7, FreeCoordinate, GridAab, chebyshev_length};
+use crate::math::{Aab, Cube, CubeFace, Face7, FreeCoordinate, GridAab, chebyshev_length, ps64};
 use crate::physics::step::PhysicsOutputs;
 use crate::physics::{
     Body, BodyStepDetails, Contact, ContactSet, POSITION_EPSILON, Velocity,
@@ -78,7 +78,7 @@ impl BodyTester {
 // -------------------------------------------------------------------------------------------------
 
 fn test_body() -> Body {
-    Body::new_minimal([0., 2., 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5))
+    Body::new_minimal([0., 2., 0.], Aab::from_radius(ps64(0.5)))
 }
 
 #[rstest::rstest]
@@ -303,7 +303,7 @@ fn no_passing_through_blocks() {
     let one_test = |velocity: Vector3D<FreeCoordinate, Velocity>| {
         print!("Velocity {velocity:?}... ");
         let start = point3(0.5, 0.5, 0.5);
-        let box_radius = 0.375; // use an exact float to minimize complications
+        let box_radius = ps64(0.375); // use an exact float to minimize complications
 
         let mut tester = BodyTester::new(
             Space::builder(GridAab::from_lower_size([-1, -1, -1], [3, 3, 3]))
@@ -314,17 +314,7 @@ fn no_passing_through_blocks() {
                 })
                 .unwrap(),
             {
-                let mut body = Body::new_minimal(
-                    start,
-                    Aab::new(
-                        -box_radius,
-                        box_radius,
-                        -box_radius,
-                        box_radius,
-                        -box_radius,
-                        box_radius,
-                    ),
-                );
+                let mut body = Body::new_minimal(start, Aab::from_radius(box_radius));
                 body.flying = true;
                 body
             },

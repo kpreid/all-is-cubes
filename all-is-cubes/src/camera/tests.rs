@@ -162,10 +162,8 @@ fn look_at_identity() {
 fn look_at_direction_consistency() {
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(253789);
     for _ in 0..100 {
-        let Some(direction) = Aab::new(-1., 1., -1., 1., -1., 1.)
-            .random_point(&mut rng)
-            .to_vector()
-            .try_normalize()
+        let Some(direction) =
+            Aab::from_radius(ps64(1.)).random_point(&mut rng).to_vector().try_normalize()
         else {
             continue;
         };

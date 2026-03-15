@@ -1,8 +1,10 @@
-use super::*;
-use crate::math::{Aab, FaceMap};
 use alloc::vec::Vec;
+
 use euclid::{Point3D, point3, vec3};
 use rand::SeedableRng as _;
+
+use super::*;
+use crate::math::{Aab, FaceMap, ps64};
 
 /// Alternative to [`RaycastStep`] which contains optional data so partial assertions
 /// can be written, and contains 'final' values rather than ones used for calculation.
@@ -464,7 +466,7 @@ fn intersection_point_random_test() {
     for case in 0..1000 {
         let ray = Ray::new(
             ray_origins.random_point(&mut rng),
-            Aab::new(-1., 1., -1., 1., -1., 1.).random_point(&mut rng).to_vector(),
+            Aab::from_radius(ps64(1.)).random_point(&mut rng).to_vector(),
         );
         let steps: Vec<RaycastStep> = ray.cast().within(bounds, true).collect();
         match steps.len() {

@@ -548,6 +548,7 @@ impl fmt::Display for BodyConflict {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math::ps64;
     use crate::transaction::{PredicateRes, TransactionTester};
     use euclid::{point3, vec3};
 
@@ -555,7 +556,7 @@ mod tests {
         Body {
             flying: false,
             noclip: false,
-            ..Body::new_minimal([0., 2., 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5))
+            ..Body::new_minimal([0., 2., 0.], Aab::from_radius(ps64(0.5)))
         }
     }
 

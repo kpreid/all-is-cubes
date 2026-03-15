@@ -516,9 +516,9 @@ pub(crate) fn nudge_on_ray(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::Resolution::*;
-    use crate::block::{AIR, Block};
+    use crate::block::{AIR, Block, Resolution::*};
     use crate::content::{make_slab, make_some_blocks};
+    use crate::math::ps64;
     use crate::space::Space;
     use crate::universe::Universe;
     use rand::{RngExt as _, SeedableRng as _};
@@ -703,8 +703,8 @@ mod tests {
         for case_number in 0..1000 {
             // Prepare test data
             let ray = Ray::new(
-                Aab::new(-2., 2., -2., 2., -2., 2.).random_point(&mut rng),
-                Aab::new(-1., 1., -1., 1., -1., 1.).random_point(&mut rng).to_vector(),
+                Aab::from_radius(ps64(2.)).random_point(&mut rng),
+                Aab::from_radius(ps64(1.)).random_point(&mut rng).to_vector(),
             );
             let step = aab_raycast(moving_aab, ray, false).nth(rng.random_range(1..10)).unwrap();
             let axis = step.face().axis().expect("should have an axis");

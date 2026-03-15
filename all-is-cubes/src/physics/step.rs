@@ -973,7 +973,7 @@ fn uncrush(body: &mut Body, space: &space::Read<'_>) -> UncrushInfo {
 mod tests {
     use super::*;
     use crate::content::make_some_blocks;
-    use crate::math::{Aab, GridAab};
+    use crate::math::{Aab, GridAab, ps64};
 
     /// Unit test of [`crush_if_colliding()`].
     #[test]
@@ -982,7 +982,7 @@ mod tests {
         let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
             .filled_with(block.clone())
             .build();
-        let mut body = Body::new_minimal([0., 1.25, 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5));
+        let mut body = Body::new_minimal([0., 1.25, 0.], Aab::from_radius(ps64(0.5)));
 
         assert_eq!(
             body.occupying,
@@ -1009,7 +1009,7 @@ mod tests {
 
     #[test]
     fn uncrush_not_needed() {
-        let body = Body::new_minimal([0., 1.25, 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5));
+        let body = Body::new_minimal([0., 1.25, 0.], Aab::from_radius(ps64(0.5)));
         let occupying = body.occupying;
         test_uncrush(
             body,
@@ -1024,7 +1024,7 @@ mod tests {
     fn uncrush_unobstructed() {
         let expected_occupying = Aab::from_lower_upper([-0.5, 0.75, -0.5], [0.5, 1.75, 0.5]);
         test_uncrush(
-            Body::new_minimal([0., 1.25, 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5)),
+            Body::new_minimal([0., 1.25, 0.], Aab::from_radius(ps64(0.5))),
             &Space::empty_positive(1, 1, 1),
             expected_occupying.expand_or_shrink(FaceMap::splat(0.1)).unwrap(),
             expected_occupying,
@@ -1040,7 +1040,7 @@ mod tests {
         let expected_occupying = Aab::from_lower_upper([0.25, 0.25, 0.25], [0.75, 0.75, 0.75]);
         test_uncrush(
             // body that intersects the block
-            Body::new_minimal([0.5, 0.5, 0.5], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5)),
+            Body::new_minimal([0.5, 0.5, 0.5], Aab::from_radius(ps64(0.5))),
             // space that has a block
             &Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
                 .filled_with(block.clone())
@@ -1056,7 +1056,7 @@ mod tests {
         let [block] = make_some_blocks();
         test_uncrush(
             // body whose lower 0.25 intersects the block
-            Body::new_minimal([0.5, 1.25, 0.5], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5)),
+            Body::new_minimal([0.5, 1.25, 0.5], Aab::from_radius(ps64(0.5))),
             // space that has a block
             &Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
                 .filled_with(block.clone())

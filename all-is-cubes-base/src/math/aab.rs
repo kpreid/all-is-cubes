@@ -108,6 +108,31 @@ impl Aab {
         Self::from_lower_upper(a, b)
     }
 
+    /// Constructs an [`Aab`] centered on the origin,
+    /// with equal distances from the origin to each face.
+    ///
+    /// ```rust
+    /// # use all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Aab, ps64};
+    ///
+    /// assert_eq!(
+    ///     Aab::from_radius(ps64(3.)),
+    ///     Aab::from_lower_upper([-3., -3., -3.], [3., 3., 3.]),
+    /// );
+    /// ```
+    #[inline] // should compile to just 1 negation and copies
+    pub const fn from_radius(radius: PositiveSign<FreeCoordinate>) -> Self {
+        // The PositiveSign's job is just to prohibit negative and NaN input so that our
+        // construction will always have lower <= upper.
+        let upper: FreeCoordinate = radius.into_inner();
+        let lower: FreeCoordinate = -upper;
+
+        Self {
+            lower_bounds: FreePoint::new(lower, lower, lower),
+            upper_bounds: FreePoint::new(upper, upper, upper),
+        }
+    }
+
     /// The most negative corner of the box, as a [`Point3D`].
     #[inline]
     pub const fn lower_bounds_p(&self) -> FreePoint {
@@ -620,7 +645,7 @@ mod tests {
         const INF: FreeCoordinate = FreeCoordinate::INFINITY;
         assert_eq!(
             Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(ps64(INF)),
-            Aab::new(-INF, INF, -INF, INF, -INF, INF),
+            Aab::from_radius(ps64(INF)),
         );
     }
 
@@ -653,7 +678,7 @@ mod tests {
         const INF: FreeCoordinate = FreeCoordinate::INFINITY;
         assert_eq!(
             Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(ps64(INF)),
-            Aab::new(-INF, INF, -INF, INF, -INF, INF),
+            Aab::from_radius(ps64(INF)),
         );
     }
     #[test]

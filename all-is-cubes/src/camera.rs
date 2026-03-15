@@ -665,7 +665,7 @@ impl Default for FrustumPoints {
             rbn: Point3D::origin(),
             ltn: Point3D::origin(),
             rtn: Point3D::origin(),
-            bounds: Aab::new(0., 0., 0., 0., 0., 0.),
+            bounds: Aab::ZERO,
         }
     }
 }
