@@ -187,7 +187,7 @@ impl Character {
 
         // TODO: This should be configurable, possibly in some more 'template' way
         // than per-spawn?
-        let collision_box = Aab::new(-0.35, 0.35, -1.75, 0.15, -0.35, 0.35);
+        let collision_box = Aab::from_lower_upper([-0.35, -1.75, -0.35], [0.35, 0.15, 0.35]);
 
         // Choose position.
         // TODO: Should also check if the chosen position is intersecting with the contents

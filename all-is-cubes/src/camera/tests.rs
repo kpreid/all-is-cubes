@@ -99,7 +99,7 @@ fn view_frustum() {
             ltf: point3(-x_far, y_far, z_far),
             rbf: point3(x_far, -y_far, z_far),
             rtf: point3(x_far, y_far, z_far),
-            bounds: Aab::new(-x_far, x_far, -y_far, y_far, z_far, z_near),
+            bounds: Aab::from_lower_upper([-x_far, -y_far, z_far], [x_far, y_far, z_near]),
         }
     );
 }

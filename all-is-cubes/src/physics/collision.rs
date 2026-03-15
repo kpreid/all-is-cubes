@@ -698,7 +698,7 @@ mod tests {
 
     #[test]
     fn nudge_random_test() {
-        let moving_aab = Aab::new(-0.345, 0.489, -0.118, 0.0325, -0.319, 0.2252);
+        let moving_aab = Aab::from_lower_upper([-0.345, -0.118, -0.319], [0.489, 0.0325, 0.2252]);
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for case_number in 0..1000 {
             // Prepare test data

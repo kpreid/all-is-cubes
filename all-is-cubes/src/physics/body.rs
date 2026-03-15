@@ -241,9 +241,12 @@ impl Body {
     ///
     /// let body = Body::new_minimal(
     ///     (0.0, 20.0, 0.0),
-    ///     Aab::new(-1.0, 1.0, -2.0, 2.0, -3.0, 3.0)
+    ///     Aab::from_lower_upper([-1.0, -2.0, -3.0], [1.0, 2.0, 3.0]),
     /// );
-    /// assert_eq!(body.collision_box_abs(), Aab::new(-1.0, 1.0, 18.0, 22.0, -3.0, 3.0));
+    /// assert_eq!(
+    ///     body.collision_box_abs(),
+    ///     Aab::from_lower_upper([-1.0, 18.0, -3.0], [1.0, 22.0, 3.0]),
+    /// );
     /// ```
     pub fn collision_box_rel(&self) -> Aab {
         self.collision_box
@@ -259,9 +262,12 @@ impl Body {
     ///
     /// let body = Body::new_minimal(
     ///     (0.0, 20.0, 0.0),
-    ///     Aab::new(-1.0, 1.0, -2.0, 2.0, -3.0, 3.0)
+    ///     Aab::from_lower_upper([-1.0, -2.0, -3.0], [1.0, 2.0, 3.0]),
     /// );
-    /// assert_eq!(body.collision_box_abs(), Aab::new(-1.0, 1.0, 18.0, 22.0, -3.0, 3.0));
+    /// assert_eq!(
+    ///     body.collision_box_abs(),
+    ///     Aab::from_lower_upper([-1.0, 18.0, -3.0], [1.0, 22.0, 3.0]),
+    /// );
     /// ```
     //---
     // TODO(crush): After `occupying` is a little more fleshed out, consider renaming this method to that.

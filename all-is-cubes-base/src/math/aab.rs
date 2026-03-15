@@ -37,20 +37,6 @@ impl Aab {
         upper_bounds: Point3D::new(0., 0., 0.),
     };
 
-    /// Constructs an [`Aab`] from individual coordinates.
-    #[inline]
-    #[track_caller]
-    pub fn new(
-        lx: FreeCoordinate,
-        hx: FreeCoordinate,
-        ly: FreeCoordinate,
-        hy: FreeCoordinate,
-        lz: FreeCoordinate,
-        hz: FreeCoordinate,
-    ) -> Self {
-        Self::from_lower_upper(Point3D::new(lx, ly, lz), Point3D::new(hx, hy, hz))
-    }
-
     /// Constructs an [`Aab`] from most-negative and most-positive corner points.
     ///
     /// # Panics
@@ -213,8 +199,8 @@ impl Aab {
     /// # extern crate all_is_cubes_base as all_is_cubes;
     /// use all_is_cubes::math::{Aab, FreePoint};
     ///
-    /// let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
-    /// assert_eq!(aab.center(), FreePoint::new(1.5, 3.5, 5.5));
+    /// let aab = Aab::from_lower_upper([1.0, 2.0, 3.0], [4.0, 5.0, 6.0]);
+    /// assert_eq!(aab.center(), FreePoint::new(2.5, 3.5, 4.5));
     /// ```
     #[inline]
     pub fn center(&self) -> FreePoint {
@@ -372,8 +358,8 @@ impl Aab {
     /// use all_is_cubes::math::{Aab, ps64};
     ///
     /// assert_eq!(
-    ///     Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(ps64(0.25)),
-    ///     Aab::new(0.75, 2.25, 2.75, 4.25, 4.75, 6.25)
+    ///     Aab::from_lower_upper([1.0, 2.0, 3.0], [4.0, 5.0, 6.0]).expand(ps64(0.25)),
+    ///     Aab::from_lower_upper([0.75, 1.75, 2.75], [4.25, 5.25, 6.25]),
     /// );
     /// ````
     #[must_use]
@@ -618,18 +604,18 @@ mod tests {
     /// Test `Debug` formatting. Note this should be similar to the [`GridAab`]
     /// formatting.
     fn debug() {
-        let aab = Aab::new(1.0000001, 2.0, 3.0, 4.0, 5.0, 6.0);
+        let aab = Aab::from_lower_upper([1.0000001, 2.0, 3.0], [4.0, 5.0, 6.0]);
         assert_eq!(
             format!("{aab:?}"),
-            "Aab(1.0000001..=2.0, 3.0..=4.0, 5.0..=6.0)"
+            "Aab(1.0000001..=4.0, 2.0..=5.0, 3.0..=6.0)"
         );
         assert_eq!(
             format!("{aab:#?}\n"),
             indoc::indoc! {"
                 Aab(
-                    1.0000001..=2.0,
-                    3.0..=4.0,
-                    5.0..=6.0,
+                    1.0000001..=4.0,
+                    2.0..=5.0,
+                    3.0..=6.0,
                 )
             "}
         );
@@ -647,14 +633,26 @@ mod tests {
     fn expand_inf() {
         const INF: FreeCoordinate = FreeCoordinate::INFINITY;
         assert_eq!(
-            Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(ps64(INF)),
+            Aab::from_lower_upper([1.0, 2.0, 3.0], [4.0, 5.0, 6.0]).expand(ps64(INF)),
             Aab::from_radius(ps64(INF)),
         );
     }
 
     #[test]
+    fn expand_or_shrink_positive() {
+        let aab = Aab::from_lower_upper([1.0, 2.0, 3.0], [4.0, 5.0, 6.0]);
+        assert_eq!(
+            aab.expand_or_shrink(FaceMap::splat(0.25)),
+            Some(Aab::from_lower_upper(
+                [0.75, 1.75, 2.75],
+                [4.25, 5.25, 6.25]
+            )),
+        );
+    }
+
+    #[test]
     fn expand_or_shrink_nan() {
-        let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+        let aab = Aab::from_lower_upper([1.0, 2.0, 3.0], [4.0, 5.0, 6.0]);
         assert_eq!(
             aab.expand_or_shrink(FaceMap::splat(FreeCoordinate::NAN)),
             None,
@@ -663,16 +661,19 @@ mod tests {
 
     #[test]
     fn expand_or_shrink_negative_failure() {
-        let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+        let aab = Aab::from_lower_upper([1.0, 2.0, 3.0], [4.0, 5.0, 6.0]);
         assert_eq!(aab.expand_or_shrink(FaceMap::splat(-10.0)), None);
     }
 
     #[test]
     fn expand_or_shrink_negative_success() {
-        let aab = Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+        let aab = Aab::from_lower_upper([1.0, 2.0, 3.0], [4.0, 5.0, 6.0]);
         assert_eq!(
             aab.expand_or_shrink(FaceMap::splat(-0.25)),
-            Some(Aab::new(1.25, 1.75, 3.25, 3.75, 5.25, 5.75)),
+            Some(Aab::from_lower_upper(
+                [1.25, 2.25, 3.25],
+                [3.75, 4.75, 5.75]
+            )),
         );
     }
 
@@ -680,7 +681,7 @@ mod tests {
     fn expand_or_shrink_inf() {
         const INF: FreeCoordinate = FreeCoordinate::INFINITY;
         assert_eq!(
-            Aab::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0).expand(ps64(INF)),
+            Aab::from_lower_upper([1.0, 2.0, 3.0], [4.0, 5.0, 6.0]).expand(ps64(INF)),
             Aab::from_radius(ps64(INF)),
         );
     }
@@ -699,7 +700,7 @@ mod tests {
 
     #[test]
     fn corner_point_consistency() {
-        let aab = Aab::new(-1.1, 2.2, -3.3, 4.4, -5.5, 6.6);
+        let aab = Aab::from_lower_upper([-1.1, -2.2, -3.3], [4.4, 5.5, 6.6]);
         for octant in Octant::ALL {
             let corner: FreePoint = aab.corner_point(octant);
 
