@@ -1,6 +1,8 @@
-# .gltf files appearing in the repository are test data which should be preserved as bitwise
-# identical for comparisons, rather than getting CRLF on Windows.
+# .gltf and .svg files appearing in the repository are test data, or tested data, which should be
+# preserved as bitwise identical for comparisons, rather than getting CRLF on Windows.
 *.gltf text eol=lf
+*.svg text eol=lf
 
+*.glb binary
 *.png binary
 *.vox binary
