@@ -157,13 +157,13 @@ impl AicDesktopArgs {
     /// Construct [`RecordOptions`].
     ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if options were inconsistent with each other.
     ///
     /// Returns `Ok(None)` if recording was not requested (`output_file_and_format` not set).
     ///
     /// # Panics
-    /// 
+    ///
     /// Panics if `output_path` is not validated (this should have been checked at parse time).
     #[cfg(feature = "record")]
     #[allow(clippy::unnecessary_wraps, reason = "*currently* no error can happen")]

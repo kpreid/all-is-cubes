@@ -39,7 +39,7 @@ impl TextRayImage {
     /// Get a patch (rectangular group of ray results) from the image.
     ///
     /// # Panics
-    /// 
+    ///
     /// Panics if the array size doesn't match `patch_size()`.
     pub fn get_patch<const W: usize, const H: usize>(
         &self,

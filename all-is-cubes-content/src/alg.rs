@@ -138,7 +138,7 @@ pub(crate) fn voronoi_pattern<'a>(
 /// Given a room's exterior bounding box, compute the locations of its four 1-cube-thick walls.
 ///
 /// # Panics
-/// 
+///
 /// Panics if the box’s size in the X or Z axes is less than 2.
 ///
 /// TODO: Consider if all uses of this can be replaced by the less ad-hoc `BoxStyle`/`BoxPart`.
@@ -250,7 +250,7 @@ pub(crate) fn scale_color(mut block: Block, scalar: f64, quantization: f64) -> B
 /// which the value falls into.
 ///
 /// # Panics
-/// 
+///
 /// Panics if `gradient.len() == 0`.
 pub(crate) fn gradient_lookup(gradient: &[Block], value: f32) -> &Block {
     &gradient[((value * gradient.len() as f32) as usize).clamp(0, gradient.len() - 1)]

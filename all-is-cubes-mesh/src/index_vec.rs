@@ -81,7 +81,7 @@ impl IndexVec {
     /// Use this for all read operations.
     ///
     /// # Panics
-    /// 
+    ///
     /// Panics if the given range exceeds the length of `self`.
     #[inline]
     pub fn as_slice<R>(&self, range: R) -> IndexSlice<'_>

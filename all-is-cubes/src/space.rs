@@ -341,8 +341,8 @@ impl Space {
     /// is in the +X+Y+Z octant. This is a shorthand intended mainly for tests.
     ///
     /// # Panics
-    /// 
-    /// Panics if the volume is greater than [`usize::MAX`], 
+    ///
+    /// Panics if the volume is greater than [`usize::MAX`],
     /// or if any dimension is greater than [`i32::MAX`].
     #[track_caller]
     pub fn empty_positive<S>(wx: S, wy: S, wz: S) -> Space
