@@ -312,9 +312,10 @@ impl EvaluatedBlock {
     }
 
     /// Check that the derived properties are consistent with the fundamental ones.
+    #[cfg(any(test, feature = "_special_testing"))]
     #[cfg_attr(feature = "_special_testing", visibility::make(pub))] // used by fuzz_block_eval
     #[track_caller]
-    pub fn consistency_check(&self) {
+    pub(crate) fn consistency_check(&self) {
         let regenerated = EvaluatedBlock::from_voxels(
             self.block.clone(),
             self.attributes.clone(),

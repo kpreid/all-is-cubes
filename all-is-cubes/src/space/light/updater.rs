@@ -591,7 +591,7 @@ impl LightStorage {
     }
 
     #[cfg(test)]
-    pub fn consistency_check(&self) {
+    pub(crate) fn consistency_check(&self) {
         if self.physics == LightPhysics::None {
             assert_eq!(self.contents.volume(), 0);
         }
