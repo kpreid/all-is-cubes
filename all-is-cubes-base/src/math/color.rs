@@ -188,14 +188,15 @@ impl Rgb {
 
     /// Constructs a color from components.
     ///
-    /// Panics if any component is NaN.
-    /// Clamps any component that is negative.
+    /// # Panics
+    ///
+    /// Panics if any component is NaN or negative.
     #[inline]
     #[track_caller]
     pub const fn new(r: f32, g: f32, b: f32) -> Self {
         match Self::try_new(vec3(r, g, b)) {
             Ok(color) => color,
-            Err(_) => panic!("color component out of range"),
+            Err(_) => panic!("Rgb component out of range"),
         }
     }
 
@@ -347,7 +348,11 @@ impl Rgb01 {
     /// (That turns out to be 100% blue, `#0000FF`.)
     pub const UNIFORM_LUMINANCE_BLUE: Self = Rgb01::from_srgb8([0x00, 0x00, 0xFF]);
 
-    /// Constructs a color from components. Panics if any component is NaN, below 0, or above 1.
+    /// Constructs a color from components.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any component is NaN, below 0, or above 1.
     #[inline]
     #[track_caller]
     pub const fn new(r: f32, g: f32, b: f32) -> Self {
@@ -507,12 +512,19 @@ impl Rgba {
     /// White; identical to `Rgba::new(1.0, 1.0, 1.0, 1.0)` except for being a constant.
     pub const WHITE: Rgba = Rgb::ONE.with_alpha_one();
 
-    /// Constructs a color from components. Panics if any component is NaN or negative.
+    /// Constructs a color from components.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any component is NaN or negative.
     /// No other range checks are performed.
     #[inline]
     #[track_caller]
     pub const fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Rgb::new(r, g, b).with_alpha(ZeroOne::<f32>::new_strict(a))
+        Rgb::new(r, g, b).with_alpha(match ZeroOne::<f32>::try_new(a) {
+            Ok(a) => a,
+            Err(_e) => panic!("alpha out of range"), // can't format value in const
+        })
     }
 
     /// Constructs a color from components that have already been checked for not being
@@ -1163,7 +1175,55 @@ mod tests {
     use exhaust::Exhaust as _;
     use itertools::Itertools as _;
 
-    // TODO: Add tests of the color not-NaN mechanisms.
+    // TODO: Add more tests of the color not-NaN mechanisms in other cases than new().
+
+    #[test]
+    #[should_panic = "Rgb component out of range"]
+    fn rgb_new_negative() {
+        _ = Rgb::new(0.0, 0.0, -1.0);
+    }
+
+    #[test]
+    #[should_panic = "Rgb component out of range"]
+    fn rgb_new_nan() {
+        _ = Rgb::new(0.0, 0.0, f32::NAN);
+    }
+
+    #[test]
+    #[should_panic = "Rgb01 component out of range"]
+    fn rgb01_new_negative() {
+        _ = Rgb01::new(0.0, 0.0, -1.0);
+    }
+
+    #[test]
+    #[should_panic = "Rgb01 component out of range"]
+    fn rgb01_new_nan() {
+        _ = Rgb01::new(0.0, 0.0, f32::NAN);
+    }
+
+    #[test]
+    #[should_panic = "Rgb component out of range"]
+    fn rgba_new_negative_color() {
+        _ = Rgba::new(0.0, 0.0, -1.0, 1.0);
+    }
+
+    #[test]
+    #[should_panic = "alpha out of range"]
+    fn rgba_new_negative_alpha() {
+        _ = Rgba::new(0.0, 0.0, 0.0, -1.0);
+    }
+
+    #[test]
+    #[should_panic = "Rgb component out of range"]
+    fn rgba_new_nan_color() {
+        _ = Rgba::new(0.0, 0.0, f32::NAN, 1.0);
+    }
+
+    #[test]
+    #[should_panic = "alpha out of range"]
+    fn rgba_new_nan_alpha() {
+        _ = Rgba::new(0.0, 0.0, 0.0, f32::NAN);
+    }
 
     #[test]
     fn rgba_to_srgb8() {
