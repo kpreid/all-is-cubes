@@ -201,7 +201,7 @@ impl<A> Alloctree<A> {
     ///
     /// This operation is intended only for tests of the allocator.
     ///
-    /// TODO: This doesn’t currently check that the tree actualy reserves every handle.
+    /// TODO: This doesn’t currently check that the tree actually reserves every handle.
     #[cfg(any(test, feature = "_special_testing"))]
     pub fn consistency_check(&self, handles: &[AlloctreeHandle<A>]) {
         for (i, h1) in handles.iter().enumerate() {

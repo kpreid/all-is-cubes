@@ -204,7 +204,7 @@ impl DefaultProvision<Block> for LandscapeBlocks {
 /// This is an async function for the sake of cancellation and optional cooperative
 /// multitasking. It may be blocked on from a synchronous context.
 //---
-// TODO: Apply the "make the inner function non-async" pattern, like we did for instalL_demo_blocks,
+// TODO: Apply the "make the inner function non-async" pattern, like we did for install_demo_blocks,
 // but we need to make `voronoi_pattern()` owning to achieve that.
 pub async fn install_landscape_blocks(
     txn: &mut UniverseTransaction,
@@ -233,7 +233,8 @@ pub async fn install_landscape_blocks(
         value * 2.5 + f64::from(resolution) * 0.75
     });
     let blade_noise = array_of_noise(
-        // TODO: not very well sized for the job — we just want a different chunk for each height
+        // TODO: instead of increasing the resolution, make separately seeded noise fns/arrays
+        // for each of the grass blade blocks.
         resolution.double().unwrap(),
         &noise::ScalePoint::new(noise::OpenSimplex::new(0x7af8c181)).set_y_scale(0.1),
         |value| value * (f64::from(resolution) * 1.7) + (f64::from(resolution) * -0.4),
