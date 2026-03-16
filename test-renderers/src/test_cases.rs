@@ -95,11 +95,10 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         "light",
         &u("light", light_test_universe()),
         light,
-        [
-            LightingOption::None,
-            LightingOption::Flat,
-            LightingOption::Smooth,
-        ],
+        LightingOption::exhaust().filter(|value| {
+            // still experimental, and so noisy that a useful test image isn't possible
+            *value != LightingOption::Bounce
+        }),
     );
     c.insert("no_update", None, no_update);
     c.insert_variants("sky", &None, sky, Face6::exhaust());

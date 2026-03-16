@@ -112,12 +112,7 @@ pub(crate) fn setting_widget(
             style,
             literal!("Light"),
             settings::LIGHTING_DISPLAY,
-            [
-                camera::LightingOption::None,
-                camera::LightingOption::Flat,
-                camera::LightingOption::Smooth,
-                camera::LightingOption::Bounce,
-            ],
+            camera::LightingOption::exhaust(),
         )),
         Key::Transparency => Some(setting_enum_button(
             hud_inputs,

@@ -431,7 +431,7 @@ impl Default for ExposureOption {
 #[doc = include_str!("../save/serde-warning.md")]
 ///
 /// [`Space`]: crate::space::Space
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(
     feature = "_serde_math_and_graphics_options",
     derive(serde::Serialize, serde::Deserialize)
