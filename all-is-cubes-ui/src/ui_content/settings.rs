@@ -5,10 +5,10 @@ use exhaust::Exhaust;
 
 use all_is_cubes::arcstr::{self, literal};
 use all_is_cubes::block::{Block, text};
-use all_is_cubes::math::{Face6, zo32};
+use all_is_cubes::math::Face6;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::ShowStatus;
-use all_is_cubes_render::camera::{self, AntialiasingOption};
+use all_is_cubes_render::camera::AntialiasingOption;
 
 use crate::apps::ControlMessage;
 use crate::settings::{self, Key};
@@ -79,19 +79,12 @@ pub(crate) fn setting_widget(
             style,
             literal!("Render Method"),
             settings::RENDER_METHOD,
-            [camera::RenderMethod::Mesh, camera::RenderMethod::Reference],
         )),
         Key::Fog => Some(setting_enum_button(
             hud_inputs,
             style,
             literal!("Fog"),
             settings::FOG,
-            [
-                camera::FogOption::None,
-                camera::FogOption::Abrupt,
-                camera::FogOption::Compromise,
-                camera::FogOption::Physical,
-            ],
         )),
         // TODO: allow setting fov_y, tone_mapping, exposure, view_distance
         Key::FovY => None,
@@ -104,7 +97,6 @@ pub(crate) fn setting_widget(
             style,
             literal!("Bloom"),
             settings::BLOOM_INTENSITY,
-            [zo32(0.0), zo32(0.03125), zo32(0.125)],
         )),
         Key::ViewDistance => None, // TODO
         Key::LightingDisplay => Some(setting_enum_button(
@@ -112,18 +104,12 @@ pub(crate) fn setting_widget(
             style,
             literal!("Light"),
             settings::LIGHTING_DISPLAY,
-            camera::LightingOption::exhaust(),
         )),
         Key::Transparency => Some(setting_enum_button(
             hud_inputs,
             style,
             literal!("Transparency"),
             settings::TRANSPARENCY,
-            [
-                settings::TransparencyMode::Surface,
-                settings::TransparencyMode::Volumetric,
-                settings::TransparencyMode::Threshold,
-            ],
         )),
         Key::TransparencyThreshold => None, // TODO
         Key::ShowUi => None, // not a user-facing setting until we add something like a “screenshot mode”
@@ -300,8 +286,13 @@ fn setting_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'static
     style: SettingsStyle,
     label: arcstr::ArcStr,
     key: &'static settings::TypedKey<T>,
-    list: impl IntoIterator<Item = T>,
 ) -> WidgetTree {
+    let value_list = key.offered_value_list();
+    assert!(
+        !value_list.is_empty(),
+        "cannot use `setting_enum_button()` on setting without offered_value_list {key:?}"
+    );
+
     let label = vui::leaf_widget(widgets::Label::with_font(
         label,
         text::Font::System16,
@@ -311,13 +302,15 @@ fn setting_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'static
             z: text::PositioningZ::Back,
         },
     ));
+
     match style {
         SettingsStyle::CompactRow => LayoutTree::spacer(vui::LayoutRequest::EMPTY),
         SettingsStyle::LabeledColumn => Arc::new(LayoutTree::Stack {
             direction: Face6::PX,
             children: [label]
                 .into_iter()
-                .chain(list.into_iter().map(|value| {
+                .chain(value_list.iter().map(|value_ref| {
+                    let value = value_ref.clone();
                     let button = widgets::ToggleButton::new(
                         hud_inputs.settings.as_source(),
                         {
