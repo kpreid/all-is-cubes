@@ -6,11 +6,13 @@
 use alloc::borrow::Cow;
 use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::any::Any;
 use core::fmt;
 use core::str::FromStr;
 
 use bevy_platform::sync::LazyLock;
+use exhaust::Exhaust;
 
 use all_is_cubes::arcstr::{ArcStr, literal};
 use all_is_cubes::math::{FreeCoordinate, PositiveSign, ZeroOne, ps32, zo32};
@@ -36,7 +38,8 @@ macro_rules! derive_settings_schema_from_keys {
                     key = $key_string:literal,
                     type = $value_type:ty,
                     display_name = $display_name:literal,
-                    default = $default_expr:expr $(,)?
+                    default = $default_expr:expr,
+                    offered_value_list = $offered_value_list_expr:expr $(,)?
                 )]
                 $variant:ident,
             )*
@@ -133,6 +136,9 @@ macro_rules! derive_settings_schema_from_keys {
                     serialize: <$value_type as StringForm>::serialize,
                     deserialize: <$value_type as StringForm>::deserialize,
                     default: LazyLock::new(|| { $default_expr }),
+                    offered_value_list: LazyLock::new(|| {
+                        Vec::from_iter($offered_value_list_expr)
+                    }),
                 };
 
                 #[doc = concat!(
@@ -160,7 +166,10 @@ pub enum Key {
         key = "graphics/render-method",
         type = camera::RenderMethod,
         display_name = "Render method",
-        default = GraphicsOptions::default().render_method
+        default = GraphicsOptions::default().render_method,
+        // TODO: options for this should depend on whether each renderer is even available,
+        // and fall back to Preferred when unknown or as an "unset" choice
+        offered_value_list = [camera::RenderMethod::Mesh, camera::RenderMethod::Reference],
     )]
     RenderMethod,
 
@@ -171,7 +180,8 @@ pub enum Key {
         key = "graphics/fog",
         type = camera::FogOption,
         display_name = "Fog",
-        default = GraphicsOptions::default().fog
+        default = GraphicsOptions::default().fog,
+        offered_value_list = Exhaust::exhaust(),
     )]
     Fog,
 
@@ -182,7 +192,8 @@ pub enum Key {
         key = "graphics/fov-y",
         type = PositiveSign<FreeCoordinate>,
         display_name = "FOV",
-        default = GraphicsOptions::default().fov_y
+        default = GraphicsOptions::default().fov_y,
+        offered_value_list = [],
     )]
     FovY,
 
@@ -193,7 +204,8 @@ pub enum Key {
         key = "graphics/tone-mapping",
         type = camera::ToneMappingOperator,
         display_name = "Tone mapping",
-        default = GraphicsOptions::default().tone_mapping
+        default = GraphicsOptions::default().tone_mapping,
+        offered_value_list = [], // TODO
     )]
     ToneMapping,
 
@@ -204,7 +216,8 @@ pub enum Key {
         key = "graphics/maximum-intensity",
         type = PositiveSign<f32>,
         display_name = "Maximum intensity",
-        default = GraphicsOptions::default().maximum_intensity
+        default = GraphicsOptions::default().maximum_intensity,
+        offered_value_list = [],
     )]
     MaximumIntensity,
 
@@ -215,7 +228,8 @@ pub enum Key {
         key = "graphics/exposure-mode",
         type = ExposureMode,
         display_name = "Auto exposure",
-        default = ExposureMode::default()
+        default = ExposureMode::default(),
+        offered_value_list = Exhaust::exhaust(),
     )]
     ExposureMode,
 
@@ -226,7 +240,8 @@ pub enum Key {
         key = "graphics/fixed-exposure",
         type = PositiveSign<f32>,
         display_name = "Exposure",
-        default = ps32(1.0)
+        default = ps32(1.0),
+        offered_value_list = [], // TODO continuous slider
     )]
     Exposure,
 
@@ -238,7 +253,8 @@ pub enum Key {
         key = "graphics/bloom-intensity",
         type = ZeroOne<f32>,
         display_name = "Bloom",
-        default = GraphicsOptions::default().bloom_intensity
+        default = GraphicsOptions::default().bloom_intensity,
+        offered_value_list = [zo32(0.0), zo32(0.03125), zo32(0.125)], // TODO continuous slider
     )]
     BloomIntensity,
 
@@ -249,7 +265,8 @@ pub enum Key {
         key = "graphics/view-distance",
         type = PositiveSign<FreeCoordinate>,
         display_name = "View distance (blocks)",
-        default = GraphicsOptions::default().view_distance
+        default = GraphicsOptions::default().view_distance,
+        offered_value_list = [], // TODO continuous slider
     )]
     ViewDistance,
 
@@ -261,7 +278,8 @@ pub enum Key {
         key = "graphics/lighting-display",
         type = camera::LightingOption,
         display_name = "Lighting",
-        default = GraphicsOptions::default().lighting_display
+        default = GraphicsOptions::default().lighting_display,
+        offered_value_list = Exhaust::exhaust(),
     )]
     LightingDisplay,
 
@@ -272,7 +290,8 @@ pub enum Key {
         key = "graphics/transparency-mode",
         type = TransparencyMode,
         display_name = "Transparency",
-        default = TransparencyMode::default()
+        default = TransparencyMode::default(),
+        offered_value_list = Exhaust::exhaust(),
     )]
     Transparency,
 
@@ -283,7 +302,8 @@ pub enum Key {
         key = "graphics/transparency-threshold",
         type = ZeroOne<f32>,
         display_name = "Transparency Threshold",
-        default = zo32(0.5)
+        default = zo32(0.5),
+        offered_value_list = [], // TODO: continuous slider
     )]
     TransparencyThreshold,
 
@@ -296,7 +316,8 @@ pub enum Key {
         key = "graphics/show-ui",
         type = bool,
         display_name = "Show UI",
-        default = GraphicsOptions::default().show_ui
+        default = GraphicsOptions::default().show_ui,
+        offered_value_list = Exhaust::exhaust(),
     )]
     ShowUi,
 
@@ -307,7 +328,8 @@ pub enum Key {
         key = "graphics/antialiasing",
         type = camera::AntialiasingOption,
         display_name = "Antialiasing",
-        default = GraphicsOptions::default().antialiasing
+        default = GraphicsOptions::default().antialiasing,
+        offered_value_list = Exhaust::exhaust(),
     )]
     Antialiasing,
 
@@ -318,7 +340,8 @@ pub enum Key {
         key = "graphics/debug-info-text",
         type = bool,
         display_name = "Debug: Show info text",
-        default = GraphicsOptions::default().debug_info_text
+        default = GraphicsOptions::default().debug_info_text,
+        offered_value_list = Exhaust::exhaust(),
     )]
     DebugInfoText,
 
@@ -329,7 +352,8 @@ pub enum Key {
         key = "graphics/debug-info-text-contents",
         type = all_is_cubes::util::ShowStatus,
         display_name = "Debug: Info text contents",
-        default = GraphicsOptions::default().debug_info_text_contents
+        default = GraphicsOptions::default().debug_info_text_contents,
+        offered_value_list = [], // TODO: needs individual toggles
     )]
     DebugInfoTextContents,
 
@@ -340,7 +364,8 @@ pub enum Key {
         key = "graphics/debug-pixel-cost",
         type = bool,
         display_name = "Debug: Show rendering cost",
-        default = GraphicsOptions::default().debug_pixel_cost
+        default = GraphicsOptions::default().debug_pixel_cost,
+        offered_value_list = Exhaust::exhaust(),
     )]
     DebugPixelCost,
 
@@ -352,7 +377,8 @@ pub enum Key {
         key = "graphics/debug-behaviors",
         type = bool,
         display_name = "Debug: Show behaviors",
-        default = GraphicsOptions::default().debug_behaviors
+        default = GraphicsOptions::default().debug_behaviors,
+        offered_value_list = Exhaust::exhaust(),
     )]
     DebugBehaviors,
 
@@ -363,7 +389,8 @@ pub enum Key {
         key = "graphics/debug-chunk-boxes",
         type = bool,
         display_name = "Debug: Show chunk boxes",
-        default = GraphicsOptions::default().debug_chunk_boxes
+        default = GraphicsOptions::default().debug_chunk_boxes,
+        offered_value_list = Exhaust::exhaust(),
     )]
     DebugChunkBoxes,
 
@@ -374,7 +401,8 @@ pub enum Key {
         key = "graphics/debug-collision-boxes",
         type = bool,
         display_name = "Debug: Show collision boxes",
-        default = GraphicsOptions::default().debug_collision_boxes
+        default = GraphicsOptions::default().debug_collision_boxes,
+        offered_value_list = Exhaust::exhaust(),
     )]
     DebugCollisionBoxes,
 
@@ -385,7 +413,8 @@ pub enum Key {
         key = "graphics/debug-light-rays-at-cursor",
         type = bool,
         display_name = "Debug: Show light rays at cursor",
-        default = GraphicsOptions::default().debug_light_rays_at_cursor
+        default = GraphicsOptions::default().debug_light_rays_at_cursor,
+        offered_value_list = Exhaust::exhaust(),
     )]
     DebugLightRaysAtCursor,
 
@@ -397,7 +426,8 @@ pub enum Key {
         key = "graphics/debug-reduce-view-frustum",
         type = bool,
         display_name = "Debug: Increase frustum culling",
-        default = GraphicsOptions::default().debug_reduce_view_frustum
+        default = GraphicsOptions::default().debug_reduce_view_frustum,
+        offered_value_list = Exhaust::exhaust(),
     )]
     DebugReduceViewFrustum,
 }
@@ -419,7 +449,9 @@ impl<'de> serde::Deserialize<'de> for Key {
 ///
 /// Differs from [`camera::ExposureOption`] in that it is a value-less enum; the fixed exposure is
 /// stored separately.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, strum::Display, strum::EnumString)]
+#[derive(
+    Clone, Copy, Debug, Default, Eq, PartialEq, strum::Display, strum::EnumString, Exhaust,
+)]
 #[non_exhaustive]
 pub enum ExposureMode {
     /// Constant exposure; light values in the scene are multiplied by this value
@@ -435,7 +467,9 @@ impl_string_form_via_from_str_and_display!(ExposureMode);
 ///
 /// Differs from [`camera::TransparencyOption`] in that it is a value-less enum; the threshold is
 /// stored separately.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, strum::Display, strum::EnumString)]
+#[derive(
+    Clone, Copy, Debug, Default, Eq, PartialEq, strum::Display, strum::EnumString, Exhaust,
+)]
 #[non_exhaustive]
 pub enum TransparencyMode {
     /// Conventional transparent surfaces.

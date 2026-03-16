@@ -317,7 +317,7 @@ pub enum RenderMethod {
 /// Choices for [`GraphicsOptions::fog`].
 ///
 #[doc = include_str!("../save/serde-warning.md")]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(
     feature = "_serde_math_and_graphics_options",
     derive(serde::Serialize, serde::Deserialize)
@@ -530,7 +530,7 @@ impl TransparencyOption {
 /// Choices for [`GraphicsOptions::antialiasing`].
 ///
 #[doc = include_str!("../save/serde-warning.md")]
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(
     feature = "_serde_math_and_graphics_options",

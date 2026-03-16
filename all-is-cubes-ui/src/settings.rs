@@ -3,6 +3,7 @@
 //! [`Settings`] is the primary type of this module.
 
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::any::Any;
 use core::fmt;
 
@@ -362,6 +363,7 @@ pub struct TypedKey<T> {
     serialize: fn(&T) -> ArcStr,
     deserialize: fn(&str) -> Result<T, serialize::DeserializeError>,
     default: LazyLock<T>,
+    offered_value_list: LazyLock<Vec<T>>,
 }
 
 impl<T: Send + Sync + 'static> TypedKey<T> {
@@ -380,6 +382,18 @@ impl<T: Send + Sync + 'static> TypedKey<T> {
     // TODO: remove by inlining
     pub fn write(&'static self, settings: &Settings, value: T) {
         settings.set(self, value)
+    }
+
+    /// Returns values for this setting that should be offered to the user as a list.
+    ///
+    /// If an empty slice is returned, then a static list is not an appropriate user interface for
+    /// this setting.
+    //--
+    // TODO: In the long run, we want to allow options’ availability to depend on context such as
+    // “do we have a GPU available?”, which might mean a parameter to this function, or each item
+    // in the list coming with its own filter.
+    pub fn offered_value_list(&self) -> &[T] {
+        Vec::as_slice(&self.offered_value_list)
     }
 }
 
