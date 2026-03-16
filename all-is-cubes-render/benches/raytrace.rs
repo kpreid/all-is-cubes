@@ -105,18 +105,18 @@ fn raytrace_bench(c: &mut Criterion) {
         });
     });
 
-    group.bench_function("smooth-surface", |b| {
+    group.bench_function("linear-surface", |b| {
         t.bench(b, |o| {
-            o.lighting_display = LightingOption::Smooth;
+            o.lighting_display = LightingOption::Linear;
             o.transparency = TransparencyOption::Surface;
         });
     });
 
     // TODO: this bench probably isn't hitting enough transparent pixels to be meaningful.
     if false {
-        group.bench_function("smooth-volumetric", |b| {
+        group.bench_function("linear-volumetric", |b| {
             t.bench(b, |o| {
-                o.lighting_display = LightingOption::Flat;
+                o.lighting_display = LightingOption::Linear;
                 o.transparency = TransparencyOption::Volumetric;
             });
         });

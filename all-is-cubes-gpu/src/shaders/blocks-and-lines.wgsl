@@ -276,7 +276,7 @@ fn partial_scale_to_integer_step(s_in: f32, ds_in: f32) -> f32 {
 // LightStatus::NoRays = -1
 // LightStatus::Visible = 1
 // 
-// This encoding allows use of the 0-1 range for smooth lighting's blending
+// This encoding allows use of the 0-1 range for interpolated lighting's blending
 // excluding opaque blocks, while the -1 value indicates values that should be
 // truly ignored.
 fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {
@@ -337,7 +337,7 @@ fn ao_fudge(light_value: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(light_value.rgb, f32(status > -0.5) * max(status, fudge));
 }
 
-// Compute the interpolated ('smooth') light for the surface from light_texture.
+// Compute the interpolated light for the surface from light_texture.
 // This implementation is duplicated in Rust at all-is-cubes/src/raytracer.rs
 fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
     // About half the size of the smallest permissible voxel.
@@ -363,13 +363,18 @@ fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
         mix_2 = 1.0 - mix_2;
     }
 
-    // Modify interpolation by smoothstep to change the visual impression towards
-    // "blurred blocks" and away from the diamond-shaped gradients of linear interpolation
-    // which, being so familiar, can give an unfortunate impression of "here is 
-    // a closeup of a really low-resolution texture".
-    // TODO: disabled because current wgpu doesn't implement smoothstep
-    // mix_1 = smoothstep(0.0, 1.0, mix_1);
-    // mix_2 = smoothstep(0.0, 1.0, mix_2);
+    switch camera.light_option {
+        // LightingOption::Smoothstep
+        case 3: {
+            mix_1 = smoothstep(0.0, 1.0, mix_1);
+            mix_2 = smoothstep(0.0, 1.0, mix_2);
+        }
+
+        // LightingOption::Linear or erroneous
+        default: {
+            // do nothing
+        }
+    }
 
     // Retrieve texels, again using the half-cube-offset grid (this way we won't have edge artifacts).
     let lin_lo = -0.5;
@@ -418,8 +423,8 @@ fn lighting(in: BlockFragmentInput) -> vec3<f32> {
             return light_texture_fetch(origin).rgb;
         }
 
-        // LightingOption::Smooth
-        case 2 {
+        // LightingOption::Linear | LightingOption::Smoothstep
+        case 2, 3 {
             return interpolated_space_light(in);
         }
     }

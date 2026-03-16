@@ -165,14 +165,19 @@ impl<D: RtBlockData> Surface<'_, D> {
             (LightingOption::None, _) => (Rgb::ONE, RaytraceInfo::default()),
 
             // Note that if we've exceeded our bounce budget (which is always 1) we use Flat.
-            // We don't combine Bounce and Smooth because the improvement of Smooth is negligible.
+            // We don't combine Bounce and interpolation because the improvement is negligible.
             (LightingOption::Flat | LightingOption::Bounce, _) => {
                 let light = rt.get_packed_light(self.cube + self.normal.normal_vector()).value();
                 (light, RaytraceInfo::default())
             }
 
-            (LightingOption::Smooth, _) => {
-                let light = rt.get_interpolated_light(self.intersection_point, self.normal);
+            (LightingOption::Linear, _) => {
+                let light =
+                    rt.get_interpolated_light::<false>(self.intersection_point, self.normal);
+                (light, RaytraceInfo::default())
+            }
+            (LightingOption::Smoothstep, _) => {
+                let light = rt.get_interpolated_light::<true>(self.intersection_point, self.normal);
                 (light, RaytraceInfo::default())
             }
 

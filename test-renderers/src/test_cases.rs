@@ -234,7 +234,7 @@ async fn cursor_basic(mut context: RenderTestContext) {
     let cameras = StandardCameras::from_constant_for_test(
         {
             let mut options = GraphicsOptions::UNALTERED_COLORS;
-            options.lighting_display = LightingOption::Smooth;
+            options.lighting_display = LightingOption::Linear;
             options
         },
         COMMON_VIEWPORT,
@@ -474,7 +474,7 @@ async fn error_character_unavailable(mut context: RenderTestContext) {
 
 async fn fog(mut context: RenderTestContext, fog: FogOption) {
     let mut options = GraphicsOptions::UNALTERED_COLORS;
-    options.lighting_display = LightingOption::Smooth;
+    options.lighting_display = LightingOption::Linear;
     options.view_distance = 50u8.into();
     options.fog = fog;
     let scene =
@@ -547,7 +547,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
 
     // Two sets of graphics options with various differences
     let mut options_1 = GraphicsOptions::UNALTERED_COLORS;
-    options_1.lighting_display = LightingOption::Smooth;
+    options_1.lighting_display = LightingOption::Linear;
     options_1.fov_y = 90u8.into();
     let mut options_2 = options_1.clone();
     options_2.fov_y = 70u8.into();
@@ -986,7 +986,7 @@ async fn sky(mut context: RenderTestContext, face: Face6) {
 
     // Enable lighting so that we can see the "reflected" sky light.
     let mut options = GraphicsOptions::UNALTERED_COLORS;
-    options.lighting_display = LightingOption::Smooth;
+    options.lighting_display = LightingOption::Linear;
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
 
@@ -1388,7 +1388,7 @@ async fn light_test_universe() -> Arc<Universe> {
 /// Options to go with [`light_test_universe`].
 fn light_test_options() -> GraphicsOptions {
     let mut options = GraphicsOptions::UNALTERED_COLORS;
-    options.lighting_display = LightingOption::Smooth;
+    options.lighting_display = LightingOption::Linear;
     options.fov_y = 45u8.into();
     options
 }
@@ -1495,7 +1495,7 @@ fn tone_mapping_test_options() -> GraphicsOptions {
     let mut options = GraphicsOptions::UNALTERED_COLORS;
     // Must set the maximum intensity in order to get any tone mapping.
     options.maximum_intensity = ps32(1.0);
-    // Smooth lighting is a complicating factor increasing the number of small errors,
+    // Interpolated lighting is a complicating factor increasing the number of small errors,
     // and also makes it harder to visually judge overexposure, so use flat.
     options.lighting_display = LightingOption::Flat;
     // TODO: We want to see how bloom looks along with the tone mapping, but raytracer doesn't

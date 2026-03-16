@@ -127,7 +127,7 @@ fn exposure_automatic_active() {
     let mut camera = Camera::new(
         GraphicsOptions {
             exposure: ExposureOption::Automatic,
-            lighting_display: LightingOption::Smooth,
+            lighting_display: LightingOption::Linear,
             ..GraphicsOptions::default()
         },
         Viewport::ARBITRARY,

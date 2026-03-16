@@ -265,7 +265,7 @@ impl Default for GraphicsOptions {
             exposure: ExposureOption::default(),
             bloom_intensity: zo32(0.125),
             view_distance: ps64(200.),
-            lighting_display: LightingOption::Smooth,
+            lighting_display: LightingOption::Linear,
             transparency: TransparencyOption::Volumetric,
             show_ui: true,
             antialiasing: AntialiasingOption::default(),
@@ -444,15 +444,37 @@ pub enum LightingOption {
 
     /// Light is taken from the volume immediately above a cube face.
     /// Edges between cubes are visible.
+    ///
+    /// (This option is named after [flat shading], rather than “flat” as opposed to curved or
+    /// rough.)
+    ///
+    /// [flat shading]: https://en.wikipedia.org/w/index.php?title=Shading&oldid=1337938191#Flat_shading
     Flat,
 
-    /// Light is interpolated across surfaces, between adjacent cubes.
-    Smooth,
+    /// Light data is linearly interpolated across surfaces, between adjacent cubes.
+    Linear,
+
+    /// Light is interpolated using the [smoothstep] function, which makes things slightly
+    /// blockier than [`Linear`][Self::Linear].
+    ///
+    /// [smoothstep]: https://en.wikipedia.org/wiki/Smoothstep
+    //--
+    // TODO: This option hasn't given us the kind of results we want.
+    //
+    // It was originally motivated by wanting to steer away from the diamond-shaped gradients and
+    // peaks of linear interpolation, avoiding the unfortunate impression of "here is a closeup of
+    // a really low-resolution texture", but instead its most noticeable result is adding ripple
+    // to light that would be smooth if linearly interpolated.
+    //
+    // Squeezing the smoothstep to a narrower range produces an interesting blocky-but-not-harsh
+    // look, but makes the issue with light on slabs worse. We should consider replacing this
+    // with something else.
+    Smoothstep,
 
     /// Compute per-pixel rather than per-block illumination.
     ///
     /// This option has the most physical accuracy, but may be very slow or unsupported.
-    /// If unsupported, the renderer should substitute [`Smooth`][Self::Smooth].
+    /// If unsupported, the renderer should substitute [`Linear`][Self::Linear].
     Bounce,
 }
 
@@ -605,7 +627,7 @@ mod tests {
                     exposure: Fixed(1),
                     bloom_intensity: 0.125,
                     view_distance: 200.0,
-                    lighting_display: Smooth,
+                    lighting_display: Linear,
                     transparency: Volumetric,
                     show_ui: true,
                     antialiasing: None,

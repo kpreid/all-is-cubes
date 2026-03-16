@@ -1021,7 +1021,7 @@ impl Fmt<StatusText> for LightUpdatesInfo {
 /// A special definition of opacity for the lighting algorithm:
 /// we want to treat opaque light-emitting blocks similarly to transparent blocks
 /// *when deciding to compute light for them*, because this produces better results
-/// for smooth (interpolated) lighting.
+/// for interpolated lighting.
 ///
 /// This function is fairly straightforward; it exists for purposes of *documenting
 /// the places that care about this* rather than for code reduction.

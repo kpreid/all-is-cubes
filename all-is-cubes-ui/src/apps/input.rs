@@ -355,8 +355,9 @@ impl InputProcessor {
                         settings.update(settings::LIGHTING_DISPLAY, |setting, others| {
                             match setting {
                                 LightingOption::None => LightingOption::Flat,
-                                LightingOption::Flat => LightingOption::Smooth,
-                                LightingOption::Smooth => {
+                                LightingOption::Flat => LightingOption::Linear,
+                                LightingOption::Linear => LightingOption::Smoothstep,
+                                LightingOption::Smoothstep => {
                                     // TODO: the question we actually want to ask is,
                                     // what does the *current renderer* support?
                                     if others.to_graphics_options().render_method

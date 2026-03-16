@@ -250,7 +250,11 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         }
     }
 
-    pub(crate) fn get_interpolated_light(&self, point: FreePoint, face: Face7) -> Rgb {
+    pub(crate) fn get_interpolated_light<const SMOOTHSTEP: bool>(
+        &self,
+        point: FreePoint,
+        face: Face7,
+    ) -> Rgb {
         // This implementation is duplicated in WGSL in interpolated_space_light()
         // in all-is-cubes-gpu/src/in_wgpu/shaders/blocks-and-lines.wgsl.
 
@@ -286,12 +290,10 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let dir_1 = flip_mix(&mut mix_1, reference_frame_x);
         let dir_2 = flip_mix(&mut mix_2, reference_frame_y);
 
-        // Modify interpolation by smoothstep to change the visual impression towards
-        // "blurred blocks" and away from the diamond-shaped gradients of linear interpolation
-        // which, being so familiar, can give an unfortunate impression of "here is
-        // a closeup of a really low-resolution texture".
-        let mix_1 = smoothstep(mix_1);
-        let mix_2 = smoothstep(mix_2);
+        if SMOOTHSTEP {
+            mix_1 = smoothstep(mix_1);
+            mix_2 = smoothstep(mix_2);
+        }
 
         // Retrieve light data, again using the half-cube-offset grid (this way we won't have edge artifacts).
         let get_light = |p: FreeVector| match Cube::containing(origin.to_point() + p) {

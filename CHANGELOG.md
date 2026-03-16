@@ -32,6 +32,9 @@
 
     * Renamed `time::Tick::delta_t()` to `delta_t_duration()`, to make room for other variations.
 
+* `all-is-cubes-render` library:
+    * Split `camera::LightingOption::Smooth` to two variants `Linear` and `Smoothstep`, which precisely select the behaviors that used to vary depending on renderer.
+
 ### Removed
 
 * `all-is-cubes` library:
