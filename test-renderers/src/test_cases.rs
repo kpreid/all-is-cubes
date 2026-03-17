@@ -20,7 +20,7 @@ use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::transaction::{self, Merge, Transaction as _};
 use all_is_cubes::universe::{Handle, ReadTicket, StrongHandle, Universe, UniverseTransaction};
 use all_is_cubes::util::yield_progress_for_testing;
-use all_is_cubes_content::{UniverseTemplate, make_some_voxel_blocks, palette};
+use all_is_cubes_content::{self as content, UniverseTemplate, make_some_voxel_blocks, palette};
 use all_is_cubes_render::camera::{
     AntialiasingOption, ExposureOption, FogOption, GraphicsOptions, Layers, LightingOption,
     StandardCameras, ToneMappingOperator, TransparencyOption, UiViewState, ViewTransform, Viewport,
@@ -35,6 +35,12 @@ use crate::{
 /// Function to be called by the custom test harness to find all tests.
 pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     let fog_test_universe = &u("fog", fog_test_universe());
+    let tested_lighting_options = || {
+        LightingOption::exhaust().filter(|value| {
+            // still experimental, and so noisy that a useful test image isn't possible
+            *value != LightingOption::Bounce
+        })
+    };
 
     if false {
         c.insert("dummy_failing_test", None, |_| async {
@@ -92,13 +98,16 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("layers_none_but_text", None, layers_none_but_text);
     c.insert("layers_ui_only", None, layers_ui_only);
     c.insert_variants(
-        "light",
-        &u("light", light_test_universe()),
+        "light_spread",
+        &u("light_spread", light_spread_test_universe()),
         light,
-        LightingOption::exhaust().filter(|value| {
-            // still experimental, and so noisy that a useful test image isn't possible
-            *value != LightingOption::Bounce
-        }),
+        tested_lighting_options(),
+    );
+    c.insert_variants(
+        "light_on_slab",
+        &u("light_on_slab", light_on_slab_test_universe()),
+        light,
+        tested_lighting_options(),
     );
     c.insert("no_update", None, no_update);
     c.insert_variants("sky", &None, sky, Face6::exhaust());
@@ -916,6 +925,8 @@ async fn layers_ui_only(mut context: RenderTestContext) {
         .await;
 }
 
+/// Note: This test function is used with different test universes, which have in common
+/// that they want lighting enabled.
 async fn light(mut context: RenderTestContext, option: LightingOption) {
     let mut options = light_test_options();
     options.lighting_display = option;
@@ -1347,8 +1358,8 @@ async fn fog_test_universe() -> Arc<Universe> {
     Arc::from(universe)
 }
 
-// Test scene for lighting from emissive blocks.
-async fn light_test_universe() -> Arc<Universe> {
+// Test scene for rendering emissive blocks and how their light spreads onto surfaces.
+async fn light_spread_test_universe() -> Arc<Universe> {
     let bounds = GridAab::from_lower_size([-10, -10, -1], [20, 20, 5]);
     let space = Space::builder(bounds)
         .spawn_position(point3(0., 0., 8.))
@@ -1385,12 +1396,60 @@ async fn light_test_universe() -> Arc<Universe> {
     Arc::from(universe)
 }
 
-/// Options to go with [`light_test_universe`].
+/// Options to go with [`light_spread_test_universe`].
 fn light_test_options() -> GraphicsOptions {
     let mut options = GraphicsOptions::UNALTERED_COLORS;
-    options.lighting_display = LightingOption::Linear;
+    options.lighting_display = LightingOption::Linear; // will be overwritten
     options.fov_y = 45u8.into();
     options
+}
+
+/// Test scene for how light falling on a surface not aligned with any cube face is rendered.
+async fn light_on_slab_test_universe() -> Arc<Universe> {
+    let bounds = GridAab::from_lower_size([-10, -10, -1], [20, 20, 5]);
+    let mut universe = Universe::new();
+
+    let slabs = (1i32..=16)
+        .map(|height| {
+            let position = height - 1;
+            let cube = Cube::new(
+                -3 + position.rem_euclid(4) * 2,
+                -3 + position.div_euclid(4) * 2,
+                0,
+            );
+            let slab = content::make_slab(&mut universe, height, R16).rotate(GridRotation::RXZy);
+            (cube, slab)
+        })
+        .collect::<Vec<_>>();
+
+    let space = Space::builder(bounds)
+        .spawn({
+            let mut spawn = Spawn::default_for_new_space(bounds);
+            spawn.set_eye_position(point3(0.5, -6., 6.));
+            spawn.set_look_direction(vec3(0.0, 1.0, -1.0));
+            spawn
+        })
+        .read_ticket(universe.read_ticket())
+        .build_and_mutate(|m| {
+            // Back wall
+            m.fill_uniform(
+                bounds.abut(Face6::NZ, -1).unwrap(),
+                &block::from_color!(0.5, 0.5, 0.5, 1.0),
+            )
+            .unwrap();
+
+            for (cube, slab) in slabs {
+                m.set(cube, slab).unwrap();
+            }
+
+            m.fast_evaluate_light();
+            m.evaluate_light(1, drop);
+            Ok(())
+        })
+        .unwrap();
+
+    finish_universe_from_space(&mut universe, space);
+    Arc::from(universe)
 }
 
 // Test scene for tone mapping, in particular showing how over-1 values are remapped.
