@@ -285,13 +285,6 @@ pub async fn install_landscape_blocks(
                 height_index.div_euclid(4).rem_euclid(2),
             ) * GridCoordinate::from(resolution);
 
-            // Increase the brightness of the blade color to compensate for the way the
-            // voxel blade shape is darkened by its own opacity.
-            // This is essentially “baked ambient occlusion” but backwards:
-            // faking the highlights that the algorithm does not comprehend.
-            // TODO: Ideally this would be handled by some kind of lighting hints instead.
-            let ao_fudge = 1.0 + f64::from(height as u8) * 0.15;
-
             Ok(Block::builder()
                 .attributes(attributes_from(&grass_blade_atom)?)
                 .ambient_sound(grass_sound.clone())
@@ -301,11 +294,7 @@ pub async fn install_landscape_blocks(
                     cube_for_lookup.y = 0;
                     cube_for_lookup += noise_section;
                     if f64::from(cube.y - height_index) < blade_noise[cube_for_lookup] {
-                        scale_color(
-                            grass_blade_atom.clone(),
-                            blade_color_noise(cube) * ao_fudge,
-                            0.02,
-                        )
+                        scale_color(grass_blade_atom.clone(), blade_color_noise(cube), 0.02)
                     } else {
                         AIR
                     }
