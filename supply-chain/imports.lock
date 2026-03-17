@@ -204,162 +204,148 @@ user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
 
 [[publisher.re_arrow_util]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_build_info]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_build_tools]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_byte_size]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_case]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_chunk]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_error]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_format]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_grpc_client]]
-version = "0.29.2"
-when = "2026-02-12"
-user-id = 197939
-user-login = "rerunio"
-user-name = "rerun.io"
-
-[[publisher.re_grpc_server]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_log]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_log_encoding]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_log_types]]
-version = "0.29.2"
-when = "2026-02-12"
-user-id = 197939
-user-login = "rerunio"
-user-name = "rerun.io"
-
-[[publisher.re_memory]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_protos]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_sdk]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_sorbet]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_span]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_string_interner]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_tracing]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_tuid]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_types_core]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_uri]]
-version = "0.29.2"
-when = "2026-02-12"
+version = "0.30.0"
+when = "2026-02-25"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
@@ -737,6 +723,12 @@ criteria = "safe-to-deploy"
 version = "0.1.6"
 notes = "Contains no unsafe code, no IO, no build.rs."
 
+[[audits.bytecode-alliance.audits.async-task]]
+who = "Chris Fallin <chris@cfallin.org>"
+criteria = "safe-to-deploy"
+version = "4.7.1"
+notes = "Fairly significant chunk of unsafe code in the async executor core, but seems isolated to well-understood patterns, e.g. a manual vtable and some manual layout code."
+
 [[audits.bytecode-alliance.audits.bitflags]]
 who = "Jamey Sharp <jsharp@fastly.com>"
 criteria = "safe-to-deploy"
@@ -1034,6 +1026,12 @@ who = "Alex Crichton <alex@alexcrichton.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.3 -> 1.1.0"
 notes = "Minor updates, refactors, Rust updates, portability, etc. Some minor `unsafe` code changes, but nothing out of the ordinary for mio."
+
+[[audits.bytecode-alliance.audits.parking]]
+who = "Chris Fallin <chris@cfallin.org>"
+criteria = "safe-to-deploy"
+version = "2.2.1"
+notes = "forbid-unsafe crate with straightforward imports."
 
 [[audits.bytecode-alliance.audits.percent-encoding]]
 who = "Alex Crichton <alex@alexcrichton.com>"
@@ -2922,6 +2920,16 @@ who = "David Cook <dcook@divviup.org>"
 criteria = "safe-to-deploy"
 delta = "1.0.3 -> 1.0.4"
 
+[[audits.isrg.audits.chacha20]]
+who = "David Cook <dcook@divviup.org>"
+criteria = "safe-to-deploy"
+version = "0.10.0"
+
+[[audits.isrg.audits.cpufeatures]]
+who = "David Cook <dcook@divviup.org>"
+criteria = "safe-to-deploy"
+delta = "0.2.17 -> 0.3.0"
+
 [[audits.isrg.audits.criterion]]
 who = "Tim Geoghegan <timg@divviup.org>"
 criteria = "safe-to-run"
@@ -2974,6 +2982,11 @@ who = "Tim Geoghegan <timg@divviup.org>"
 criteria = "safe-to-deploy"
 delta = "0.9.1 -> 0.9.2"
 
+[[audits.isrg.audits.rand]]
+who = "David Cook <dcook@divviup.org>"
+criteria = "safe-to-deploy"
+delta = "0.9.2 -> 0.10.0"
+
 [[audits.isrg.audits.rand_chacha]]
 who = "David Cook <dcook@divviup.org>"
 criteria = "safe-to-deploy"
@@ -2984,10 +2997,25 @@ who = "David Cook <dcook@divviup.org>"
 criteria = "safe-to-deploy"
 delta = "0.6.4 -> 0.9.3"
 
+[[audits.isrg.audits.rand_core]]
+who = "J.C. Jones <jc@divviup.org>"
+criteria = "safe-to-deploy"
+delta = "0.9.3 -> 0.9.5"
+
+[[audits.isrg.audits.rand_core]]
+who = "David Cook <dcook@divviup.org>"
+criteria = "safe-to-deploy"
+delta = "0.9.5 -> 0.10.0"
+
 [[audits.isrg.audits.rand_distr]]
 who = "David Cook <dcook@divviup.org>"
 criteria = "safe-to-deploy"
 delta = "0.4.3 -> 0.5.1"
+
+[[audits.isrg.audits.rand_distr]]
+who = "David Cook <dcook@divviup.org>"
+criteria = "safe-to-deploy"
+delta = "0.5.1 -> 0.6.0"
 
 [[audits.isrg.audits.rayon]]
 who = "Brandon Pitman <bran@bran.land>"
@@ -4099,6 +4127,13 @@ side-effectful std functions, etc.
 """
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
+[[audits.mozilla.audits.num-conv]]
+who = "Lars Eggert <lars@eggert.org>"
+criteria = "safe-to-deploy"
+delta = "0.1.0 -> 0.2.0"
+notes = "Revision only removes code"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
 [[audits.mozilla.audits.num-derive]]
 who = "Josh Stone <jistone@redhat.com>"
 criteria = "safe-to-deploy"
@@ -4450,6 +4485,13 @@ criteria = "safe-to-deploy"
 delta = "0.1.2 -> 0.1.4"
 aggregated-from = "https://raw.githubusercontent.com/mozilla/glean/main/supply-chain/audits.toml"
 
+[[audits.mozilla.audits.time-core]]
+who = "Lars Eggert <lars@eggert.org>"
+criteria = "safe-to-deploy"
+delta = "0.1.4 -> 0.1.8"
+notes = "No unsafe code"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
 [[audits.mozilla.audits.time-macros]]
 who = "Kershaw Chang <kershaw@mozilla.com>"
 criteria = "safe-to-deploy"
@@ -4472,6 +4514,13 @@ aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-ch
 who = "Lars Eggert <lars@eggert.org>"
 criteria = "safe-to-deploy"
 delta = "0.2.18 -> 0.2.22"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.time-macros]]
+who = "Lars Eggert <lars@eggert.org>"
+criteria = "safe-to-deploy"
+delta = "0.2.22 -> 0.2.27"
+notes = "Refactors some unsafe code, nothing new"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.tinystr]]
