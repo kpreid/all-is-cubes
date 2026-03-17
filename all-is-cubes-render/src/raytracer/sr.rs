@@ -252,7 +252,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
     pub(crate) fn get_interpolated_light<const SMOOTHSTEP: bool>(
         &self,
-        point: FreePoint,
+        cube: Cube,
+        surface_point: FreePoint,
         face: Face7,
     ) -> Rgb {
         // This implementation is duplicated in WGSL in interpolated_space_light()
@@ -260,9 +261,6 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
         // About half the size of the smallest permissible voxel.
         let above_surface_epsilon = 0.5 / 256.0;
-
-        // The position we should start with for light lookup and interpolation.
-        let origin = point + face.vector(above_surface_epsilon);
 
         // Find linear interpolation coefficients based on where we are relative to
         // a half-cube-offset grid.
@@ -275,8 +273,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let reference_frame_y: FreeVector =
             reference_frame.transform_vector(vec3(0, 1, 0)).to_f64();
 
-        let mut mix_1 = (origin.to_vector().dot(reference_frame_x) - 0.5).rem_euclid(1.0);
-        let mut mix_2 = (origin.to_vector().dot(reference_frame_y) - 0.5).rem_euclid(1.0);
+        let mut mix_1 = (surface_point.to_vector().dot(reference_frame_x) - 0.5).rem_euclid(1.0);
+        let mut mix_2 = (surface_point.to_vector().dot(reference_frame_y) - 0.5).rem_euclid(1.0);
 
         // Ensure that mix <= 0.5, i.e. the 'near' side below is the side we are on
         fn flip_mix(mix: &mut FreeCoordinate, dir: FreeVector) -> FreeVector {
@@ -295,39 +293,74 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             mix_2 = smoothstep(mix_2);
         }
 
-        // Retrieve light data, again using the half-cube-offset grid (this way we won't have edge artifacts).
-        let get_light = |p: FreePoint| match Cube::containing(p) {
-            Some(cube) => self.get_packed_light(cube),
-            // Numerical overflow case -- shouldn't be terribly relevant.
-            None => self.block_sky.mean(),
-        };
+        // Choose sample positions, again using the half-cube-offset grid (this way we won't have edge artifacts).
         let lin_lo = -0.5;
         let lin_hi = 0.5;
-        let near12 = get_light(origin + dir_1 * lin_lo + dir_2 * lin_lo);
-        let near1far2 = get_light(origin + dir_1 * lin_lo + dir_2 * lin_hi);
-        let near2far1 = get_light(origin + dir_1 * lin_hi + dir_2 * lin_lo);
-        let mut far12 = get_light(origin + dir_1 * lin_hi + dir_2 * lin_hi);
+        let sample_offset_near12 = dir_1 * lin_lo + dir_2 * lin_lo;
+        let sample_offset_near1far2 = dir_1 * lin_lo + dir_2 * lin_hi;
+        let sample_offset_near2far1 = dir_1 * lin_hi + dir_2 * lin_lo;
+        let sample_offset_far12 = dir_1 * lin_hi + dir_2 * lin_hi;
 
-        if !near1far2.valid() && !near2far1.valid() {
-            // The far corner is on the other side of a diagonal wall, so should be
-            // ignored to prevent light leaks.
-            far12 = near12;
-        }
+        // Up until now, we have been computing the parameters for interpolation in the tangent plane,
+        // parallel to the surface normal. Now, we compute the parameters for interpolation
+        // in the axis of the surface normal, and actually fetch the 8 texels involved.
 
-        // Apply ambient occlusion.
-        let near12 = near12.value_with_ambient_occlusion();
-        let near1far2 = near1far2.value_with_ambient_occlusion();
-        let near2far1 = near2far1.value_with_ambient_occlusion();
-        let far12 = far12.value_with_ambient_occlusion();
+        // position of the surface where 0.0 is the deepest possible and 1.0 is at the face of the cube
+        let height_in_cube: f64 =
+            face.dot(surface_point.to_vector()) - face.dot(cube.center().to_vector()) + 0.5;
 
-        // Perform bilinear interpolation.
-        // TODO: most of the prior math for the mix values should be f32 already
-        let [r, g, b, final_weight] = mix4(
-            mix4(near12, near1far2, mix_2 as f32),
-            mix4(near2far1, far12, mix_2 as f32),
-            mix_1 as f32,
-        );
+        let fetch_and_interpolate_light_2d = |origin_2d| {
+            let get_light = |p: FreePoint| match Cube::containing(p) {
+                Some(fetched_cube) => self.get_packed_light(fetched_cube),
+                // Numerical overflow case -- shouldn't be terribly relevant.
+                None => self.block_sky.mean(),
+            };
+            let near12 = get_light(origin_2d + sample_offset_near12);
+            let near1far2 = get_light(origin_2d + sample_offset_near1far2);
+            let near2far1 = get_light(origin_2d + sample_offset_near2far1);
+            let mut far12 = get_light(origin_2d + sample_offset_far12);
+
+            if !near1far2.valid() && !near2far1.valid() {
+                // The far corner is on the other side of a diagonal wall, so should be
+                // ignored to prevent light leaks.
+                far12 = near12;
+            }
+
+            // Apply ambient occlusion.
+            let near12 = near12.value_with_ambient_occlusion();
+            let near1far2 = near1far2.value_with_ambient_occlusion();
+            let near2far1 = near2far1.value_with_ambient_occlusion();
+            let far12 = far12.value_with_ambient_occlusion();
+
+            // Perform bilinear interpolation.
+            // TODO: most of the prior math for the mix values should be f32 already
+            mix4(
+                mix4(near12, near1far2, mix_2 as f32),
+                mix4(near2far1, far12, mix_2 as f32),
+                mix_1 as f32,
+            )
+        };
+
+        let normal = face.normal_vector();
+        let light_in_cube_in_front =
+            fetch_and_interpolate_light_2d(surface_point + normal * (1.0 - above_surface_epsilon));
+
+        let final_mix = if height_in_cube > (1.0 - above_surface_epsilon) {
+            // Don’t need second round of data fetching and 3D interpolation
+            light_in_cube_in_front
+        } else {
+            // 3D interpolation needed
+            let light_in_same_cube =
+                fetch_and_interpolate_light_2d(surface_point + normal * above_surface_epsilon);
+            mix4(
+                light_in_same_cube,
+                light_in_cube_in_front,
+                height_in_cube as f32,
+            )
+        };
+
         // Apply weight
+        let [r, g, b, final_weight] = final_mix;
         Rgb::try_from(Vector3D::from([r, g, b]) / final_weight.max(0.1)).unwrap()
     }
 }

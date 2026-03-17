@@ -172,12 +172,19 @@ impl<D: RtBlockData> Surface<'_, D> {
             }
 
             (LightingOption::Linear, _) => {
-                let light =
-                    rt.get_interpolated_light::<false>(self.intersection_point, self.normal);
+                let light = rt.get_interpolated_light::<false>(
+                    self.cube,
+                    self.intersection_point,
+                    self.normal,
+                );
                 (light, RaytraceInfo::default())
             }
             (LightingOption::Smoothstep, _) => {
-                let light = rt.get_interpolated_light::<true>(self.intersection_point, self.normal);
+                let light = rt.get_interpolated_light::<true>(
+                    self.cube,
+                    self.intersection_point,
+                    self.normal,
+                );
                 (light, RaytraceInfo::default())
             }
 

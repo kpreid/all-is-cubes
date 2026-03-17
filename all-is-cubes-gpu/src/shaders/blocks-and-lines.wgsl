@@ -344,10 +344,10 @@ fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
     let above_surface_epsilon = 0.5 / 256.0;
 
     // The position we should start with for texture lookup and interpolation.
-    let origin = in.world_position + in.normal * above_surface_epsilon;
+    let origin = in.world_position;
 
-    // Find linear interpolation coefficients based on where we are relative to
-    // a half-cube-offset grid.
+    // Find linear interpolation coefficients, on the tangent plane, based on where we are relative
+    // to a half-cube-offset grid.
     var mix_1: f32 = modulo(dot(origin, in.tangent) - 0.5, 1.0);
     var mix_2: f32 = modulo(dot(origin, in.bitangent) - 0.5, 1.0);
 
@@ -376,13 +376,63 @@ fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
         }
     }
 
-    // Retrieve texels, again using the half-cube-offset grid (this way we won't have edge artifacts).
+    // Choose texels, again using the half-cube-offset grid (this way we won't have edge artifacts).
     let lin_lo = -0.5;
     let lin_hi = 0.5;
-    var near12 = light_texture_fetch(origin + lin_lo * dir_1 + lin_lo * dir_2);
-    var near1far2 = light_texture_fetch(origin + lin_lo * dir_1 + lin_hi * dir_2);
-    var near2far1 = light_texture_fetch(origin + lin_hi * dir_1 + lin_lo * dir_2);
-    var far12 = light_texture_fetch(origin + lin_hi * dir_1 + lin_hi * dir_2);
+    let sample_offset_near12 = lin_lo * dir_1 + lin_lo * dir_2;
+    let sample_offset_near1_far2 = lin_lo * dir_1 + lin_hi * dir_2;
+    let sample_offset_near2_far1 = lin_hi * dir_1 + lin_lo * dir_2;
+    let sample_offset_far12 = lin_hi * dir_1 + lin_hi * dir_2;
+
+    // Up until now, we have been computing the parameters for interpolation in the tangent plane,
+    // parallel to the surface normal. Now, we compute the parameters for interpolation
+    // in the axis of the surface normal, and actually fetch the 8 texels involved.
+
+    let cube_center = in.world_cube + vec3<f32>(0.5);
+
+    // position of the surface where 0.0 is the deepest possible and 1.0 is at the face of the cube
+    // TODO: this calculation can be done in the vertex shader
+    let height_in_cube = dot(in.world_position, in.normal) - dot(cube_center, in.normal) + 0.5;
+
+    let light_in_cube_in_front = fetch_and_interpolate_light_2d(
+        origin + in.normal * (1.0 - above_surface_epsilon),
+        mix_1, mix_2, sample_offset_near12, sample_offset_near1_far2, sample_offset_near2_far1,
+        sample_offset_far12);
+
+    var final_mix = light_in_cube_in_front;
+    if height_in_cube > 1.0 - above_surface_epsilon {
+        // No 3D interpolation needed
+    } else {
+        // 3D interpolation needed
+        let light_in_same_cube = fetch_and_interpolate_light_2d(
+            origin + in.normal * above_surface_epsilon,
+            mix_1, mix_2, sample_offset_near12, sample_offset_near1_far2, sample_offset_near2_far1,
+            sample_offset_far12);
+        final_mix = mix(light_in_same_cube, light_in_cube_in_front, height_in_cube);
+    }
+
+    // Scale result by sum of valid texels.
+    // Because final_mix.a went through the mix, it scales with the proportion of valid texels
+    // that were used, so it is always a smooth blend without block edge effects.
+    // However, we don't want divide-by-a-small-number effects near the perimeter of valid data,
+    // so we cap the divisor.
+    return final_mix.rgb / max(0.1, final_mix.a);
+}
+
+// Helper for `interpolated_space_light`. Does texel fetches and 2D-only interpolation.
+fn fetch_and_interpolate_light_2d(
+    origin: vec3f,
+    mix_1: f32,
+    mix_2: f32,
+    sample_offset_near12: vec3f,
+    sample_offset_near1_far2: vec3f,
+    sample_offset_near2_far1: vec3f,
+    sample_offset_far12: vec3f,
+) -> vec4f {
+    var near12 = light_texture_fetch(origin + sample_offset_near12);
+    var near1far2 = light_texture_fetch(origin + sample_offset_near1_far2);
+    var near2far1 = light_texture_fetch(origin + sample_offset_near2_far1);
+    var far12 = light_texture_fetch(origin + sample_offset_far12);
 
     if !valid_light(near1far2) && !valid_light(near2far1) {
         // The far corner is on the other side of a diagonal wall, so should be
@@ -397,19 +447,14 @@ fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
     far12 = ao_fudge(far12);
 
     // Perform bilinear interpolation.
-    let v = mix(
+    return mix(
         mix(near12, near1far2, mix_2),
         mix(near2far1, far12, mix_2),
         mix_1
     );
-    // Scale result by sum of valid texels.
-    // Because v.a went through the mix, it scales with the proportion of valid texels
-    // that were used, so it is always a smooth blend without block edge effects.
-    // However, we don't want divide-by-a-small-number effects so we cap the divisor.
-    return v.rgb / max(0.1, v.a);
 }
 
-// Compute light intensity applying to the fragment.
+// Compute light intensity applying to the fragment, respecting the camera configuration.
 fn lighting(in: BlockFragmentInput) -> vec3<f32> {
     switch camera.light_option {
         // LightingOption::None or fallback: no lighting
