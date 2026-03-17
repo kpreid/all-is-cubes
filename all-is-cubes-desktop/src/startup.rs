@@ -168,7 +168,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
             log::trace!("Startup task received request for new universe");
             match source {
                 ReplaceUniverseCommand::New(source) => {
-                    let mut task = UniverseTask::new(&executor, source, false);
+                    let mut task = UniverseTask::new(&executor, source, false, None);
                     task.attach_to_main_task(&mut ctx);
                     // TODO: this should use set_universe_async but the progress reporting is not compatible
                     ctx.set_universe(task.future.await.unwrap());
@@ -284,12 +284,18 @@ enum ReplaceUniverseCommand {
 
 #[allow(missing_docs)] // sloppy API anyway
 impl UniverseTask {
-    pub fn new(executor: &Executor, source: crate::UniverseSource, precompute_light: bool) -> Self {
+    pub fn new(
+        executor: &Executor,
+        source: crate::UniverseSource,
+        precompute_light: bool,
+        teleport: Option<crate::universe_source::Teleport>,
+    ) -> Self {
         // Kick off constructing the universe in the background.
         let (n_tx, n_rx) = oneshot::channel();
         let (r_tx, r_rx) = async_channel::bounded(1);
         let future = executor.inner().spawn(source.create_universe(
             precompute_light,
+            teleport,
             n_rx,
             Arc::new({
                 let r_tx = r_tx.clone();

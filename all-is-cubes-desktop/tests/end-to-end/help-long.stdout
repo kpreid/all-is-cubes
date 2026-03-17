@@ -91,6 +91,12 @@ Options:
           [possible values: demo-city, dungeon, islands, atrium, cornell-box, menger-sponge,
           lighting-bench]
 
+      --teleport <POS,DIR>
+          Move the player character to a new position on loading.
+          
+          Specified as six numbers consisting of the coordinates of the new position, followed by
+          the look direction vector, all separated by commas or spaces.
+
       --template-size <X,Y,Z>
           Dimensions for the space the template generates.
           

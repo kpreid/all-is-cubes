@@ -40,7 +40,7 @@ pub use config_files::load_config;
 pub use glue::{Executor, Renderer, Window};
 pub use session::{ClockSource, DesktopSession};
 pub use startup::*;
-pub use universe_source::UniverseSource;
+pub use universe_source::{Teleport, UniverseSource};
 
 /// Our concrete session type.
 ///

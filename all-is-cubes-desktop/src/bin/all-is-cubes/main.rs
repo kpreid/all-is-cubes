@@ -52,6 +52,7 @@ fn main() -> Result<(), anyhow::Error> {
         template_size,
         seed,
         mut precompute_light,
+        teleport,
         input_file,
         #[cfg(feature = "record")]
             output_file_and_format: _, // used in RecordOptions
@@ -83,7 +84,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Done with options; now start creating the session.
 
-    let mut universe_task = UniverseTask::new(&executor, input_source, precompute_light);
+    let mut universe_task = UniverseTask::new(&executor, input_source, precompute_light, teleport);
 
     // This cell will be moved into the session after (possibly) being reset to the actual
     // window size. This is a kludge because the `Session`'s `Vui` wants to be able to track

@@ -8,8 +8,11 @@ use indicatif::ProgressBar;
 use rand::RngExt as _;
 
 use all_is_cubes::arcstr::literal;
-use all_is_cubes::space;
+use all_is_cubes::euclid::{Point3D, Vector3D};
+use all_is_cubes::math::{FreePoint, FreeVector, NotNan};
+use all_is_cubes::physics::BodyTransaction;
 use all_is_cubes::universe::Universe;
+use all_is_cubes::{character, space};
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 use all_is_cubes_ui::notification::{self, Notification};
 use all_is_cubes_ui::vui::widgets::ProgressBarState;
@@ -34,6 +37,7 @@ impl UniverseSource {
     pub async fn create_universe(
         self,
         precompute_light: bool,
+        teleport: Option<Teleport>,
         notif_rx: oneshot::Receiver<Notification>,
         replace_universe_callback: Arc<dyn Fn(&UniverseTemplate) + Send + Sync>,
     ) -> Result<Box<Universe>, anyhow::Error> {
@@ -85,10 +89,7 @@ impl UniverseSource {
                 let space = universe.insert("menu".into(), space)?;
                 universe.insert(
                     "character".into(),
-                    all_is_cubes::character::Character::spawn_default(
-                        universe.read_ticket(),
-                        space,
-                    )?,
+                    character::Character::spawn_default(universe.read_ticket(), space)?,
                 )?;
 
                 universe
@@ -128,14 +129,73 @@ impl UniverseSource {
             universe_done_time.duration_since(start_time).as_secs_f32()
         );
 
-        if precompute_light && let Some(c) = universe.get_default_character() {
-            let space_handle = c.read(universe.read_ticket()).unwrap().space().clone();
-            universe.mutate_space(&space_handle, evaluate_light_with_progress).unwrap();
+        if let Some(character_handle) = universe.get_default_character() {
+            if let Some(teleport) = teleport {
+                universe
+                    .execute_1(&character_handle, teleport.transaction())
+                    .context("requested teleport failed")?;
+            }
+
+            if precompute_light {
+                let space_handle =
+                    character_handle.read(universe.read_ticket()).unwrap().space().clone();
+                universe.mutate_space(&space_handle, evaluate_light_with_progress).unwrap();
+            }
         }
 
         Ok(universe)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Specifies a replacement character (and thus camera) position for a universe being loaded.
+///
+/// TODO: Eventually this should be able to reference named spawn points instead of only
+/// coordinates. (Once we have such a thing as a named spawn point.)
+#[derive(Clone, Copy, Debug)]
+pub struct Teleport {
+    position: FreePoint,
+    look_direction: FreeVector,
+}
+
+impl Teleport {
+    fn transaction(&self) -> character::CharacterTransaction {
+        let Self {
+            position,
+            look_direction,
+        } = *self;
+        character::CharacterTransaction::body(
+            BodyTransaction::default()
+                .with_position(position)
+                .with_look_direction(look_direction),
+        )
+    }
+}
+
+impl std::str::FromStr for Teleport {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        type Scalar = NotNan<f64>;
+        let [px, py, pz, lx, ly, lz]: [Scalar; 6] = s
+            .split(&[',', ';', ' '][..])
+            .map(|element_str| {
+                let value = element_str
+                    .parse::<Scalar>()
+                    .map_err(|_| format!("{element_str:?} not a number"))?;
+                Ok(value)
+            })
+            .collect::<Result<Vec<Scalar>, String>>()?
+            .try_into()
+            .map_err(|_| String::from("must be five numbers"))?;
+        Ok(Teleport {
+            position: Point3D::new(px, py, pz).map(NotNan::into_inner),
+            look_direction: Vector3D::new(lx, ly, lz).map(NotNan::into_inner),
+        })
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 fn evaluate_light_with_progress(m: &mut space::Mutation<'_, '_>) {
     let light_progress = logging::new_progress_bar(100).with_prefix("Lighting");

@@ -16,9 +16,9 @@ use all_is_cubes::math::{GridSize, GridSizeCoord};
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 use all_is_cubes_render::camera;
 
-use all_is_cubes_desktop::UniverseSource;
 #[cfg(feature = "record")]
 use all_is_cubes_desktop::record::{RecordAnimationOptions, RecordFormat, RecordOptions};
+use all_is_cubes_desktop::{Teleport, UniverseSource};
 
 #[derive(Clone, Debug, Parser)]
 #[command(
@@ -94,6 +94,13 @@ pub(crate) struct AicDesktopArgs {
     /// Fully calculate light before starting the game.
     #[arg(long = "precompute-light")]
     pub(crate) precompute_light: bool,
+
+    /// Move the player character to a new position on loading.
+    ///
+    /// Specified as six numbers consisting of the coordinates of the new position,
+    /// followed by the look direction vector, all separated by commas or spaces.
+    #[arg(long, value_name = "POS,DIR")]
+    pub(crate) teleport: Option<Teleport>,
 
     /// Output file name for 'record' mode.
     ///
