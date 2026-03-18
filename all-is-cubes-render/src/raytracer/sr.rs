@@ -262,7 +262,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let above_surface_epsilon = 0.5 / 256.0;
 
         // The position we should start with for light lookup and interpolation.
-        let origin = point.to_vector() + face.vector(above_surface_epsilon);
+        let origin = point + face.vector(above_surface_epsilon);
 
         // Find linear interpolation coefficients based on where we are relative to
         // a half-cube-offset grid.
@@ -275,8 +275,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let reference_frame_y: FreeVector =
             reference_frame.transform_vector(vec3(0, 1, 0)).to_f64();
 
-        let mut mix_1 = (origin.dot(reference_frame_x) - 0.5).rem_euclid(1.0);
-        let mut mix_2 = (origin.dot(reference_frame_y) - 0.5).rem_euclid(1.0);
+        let mut mix_1 = (origin.to_vector().dot(reference_frame_x) - 0.5).rem_euclid(1.0);
+        let mut mix_2 = (origin.to_vector().dot(reference_frame_y) - 0.5).rem_euclid(1.0);
 
         // Ensure that mix <= 0.5, i.e. the 'near' side below is the side we are on
         fn flip_mix(mix: &mut FreeCoordinate, dir: FreeVector) -> FreeVector {
@@ -296,17 +296,17 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         }
 
         // Retrieve light data, again using the half-cube-offset grid (this way we won't have edge artifacts).
-        let get_light = |p: FreeVector| match Cube::containing(origin.to_point() + p) {
+        let get_light = |p: FreePoint| match Cube::containing(p) {
             Some(cube) => self.get_packed_light(cube),
             // Numerical overflow case -- shouldn't be terribly relevant.
             None => self.block_sky.mean(),
         };
         let lin_lo = -0.5;
         let lin_hi = 0.5;
-        let near12 = get_light(dir_1 * lin_lo + dir_2 * lin_lo);
-        let near1far2 = get_light(dir_1 * lin_lo + dir_2 * lin_hi);
-        let near2far1 = get_light(dir_1 * lin_hi + dir_2 * lin_lo);
-        let mut far12 = get_light(dir_1 * lin_hi + dir_2 * lin_hi);
+        let near12 = get_light(origin + dir_1 * lin_lo + dir_2 * lin_lo);
+        let near1far2 = get_light(origin + dir_1 * lin_lo + dir_2 * lin_hi);
+        let near2far1 = get_light(origin + dir_1 * lin_hi + dir_2 * lin_lo);
+        let mut far12 = get_light(origin + dir_1 * lin_hi + dir_2 * lin_hi);
 
         if !near1far2.valid() && !near2far1.valid() {
             // The far corner is on the other side of a diagonal wall, so should be
