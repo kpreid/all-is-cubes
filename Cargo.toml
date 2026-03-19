@@ -115,7 +115,7 @@ imgref = { version = "1.10.1", default-features = false }
 indoc = { version = "2.0.1", default-features = false }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
 libm = { version = "0.2.8", default-features = false }
-log = { version = "0.4.28", default-features = false }
+log = { version = "0.4.29", default-features = false }
 macro_rules_attribute = { version = "0.2.0", default-features = false }
 manyfmt = { version = "0.1.0", default-features = false }
 mint = { version = "0.5.9", default-features = false }
@@ -172,7 +172,7 @@ unicode-segmentation = { version = "1.10.1", default-features = false }
 unicode-width = { version = "0.2", default-features = false }
 visibility = { version = "0.1.1", default-features = false }
 # explicitly enabling "std" needed for <https://github.com/rustwasm/wasm-bindgen/issues/4303>
-wasm-bindgen-futures = { version = "0.4.50", default-features = false, features = ["std"] }
+wasm-bindgen-futures = { version = "0.4.58", default-features = false, features = ["std"] }
 web-time = { version = "1.1.0", default-features = false }
 wgpu = { version = "29.0.0", default-features = false, features = ["std", "wgsl"] }
 yield-progress = { version = "0.2.0", default-features = false }
