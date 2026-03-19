@@ -2,15 +2,16 @@
 //!
 //! The modifier implementation itself is so simple that it does not have its own file.
 
-use super::*;
+use pretty_assertions::assert_eq;
+
 use crate::block::{
-    BlockAttributes, BlockCollision, EvaluatedBlock, Evoxel, Primitive, Resolution::R2, TickAction,
+    self, Block, BlockAttributes, BlockCollision, EvaluatedBlock, Evoxel, Evoxels, GridRotation,
+    Modifier, Primitive, Resolution::R2, TickAction, Vol,
 };
 use crate::content::make_some_voxel_blocks;
 use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
 use crate::op::Operation;
 use crate::universe::Universe;
-use pretty_assertions::assert_eq;
 
 #[test]
 fn rotate_evaluation() {

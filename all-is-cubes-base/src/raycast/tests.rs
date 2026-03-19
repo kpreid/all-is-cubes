@@ -1,10 +1,14 @@
 use alloc::vec::Vec;
 
-use euclid::{Point3D, point3, vec3};
+use euclid::{Point3D, Vector3D, point3, vec3};
 use rand::SeedableRng as _;
 
-use super::*;
-use crate::math::{Aab, FaceMap, ps64};
+use crate::math::{
+    Aab, Axis, Cube, Face7, FaceMap, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
+    ps64,
+};
+use crate::raycast::{Ray, RaycastStep, Raycaster, scale_to_integer_step};
+use crate::resolution::Resolution;
 
 /// Alternative to [`RaycastStep`] which contains optional data so partial assertions
 /// can be written, and contains 'final' values rather than ones used for calculation.
