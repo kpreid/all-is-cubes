@@ -16,6 +16,7 @@ mod images;
 mod inventory;
 mod knot;
 mod make_some_blocks;
+mod misc;
 mod move_modifier;
 mod resolutions;
 mod rotation;
@@ -42,6 +43,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[prelude::Exhibit] = &[
     resolutions::RESOLUTIONS,
     transparency::TRANSPARENCY_SHRUNKEN_BLOCK,
     move_modifier::PROJECTILE,
+    misc::MISC_BLOCKS,
     animation::ANIMATION,
     make_some_blocks::MAKE_SOME_BLOCKS,
     composite::DASHED_BOXES,
