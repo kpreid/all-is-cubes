@@ -62,6 +62,7 @@ visibility = { workspace = true, optional = true }
 async-io = { workspace = true }
 criterion = { workspace = true }
 pretty_assertions = { workspace = true }
+rstest = { workspace = true }
 # Using smol for async test-running.
 # TODO: Consider defining our own macros and stripping down the dependencies.
 smol-macros = { workspace = true }

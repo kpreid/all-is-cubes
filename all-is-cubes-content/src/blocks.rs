@@ -31,8 +31,11 @@ use all_is_cubes::util::YieldProgress;
 
 use crate::alg::{NoiseFnExt as _, gradient_lookup, scale_color, square_radius};
 use crate::landscape::install_landscape_blocks;
+use crate::load_block as lb;
 use crate::load_image::{block_from_image, default_srgb, include_image};
 use crate::palette;
+
+// -------------------------------------------------------------------------------------------------
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::IntoStaticStr /* kludge */, Exhaust)]
 #[exhaust(factory_is_self)]
@@ -492,10 +495,19 @@ fn demo_blocks_generator(
             }
 
             // TODO: not all text that should use this does yet
-            LabelTextVoxel => Block::builder()
-                .color(palette::ALMOST_BLACK.with_alpha_one())
-                .collision(BlockCollision::None)
-                .build(),
+            LabelTextVoxel => const {
+                lb::Block {
+                    primitive: lb::PrimitiveOrSuch::Atom(block::Atom {
+                        color: palette::ALMOST_BLACK.with_alpha_one(),
+                        emission: Rgb::ZERO,
+                        collision: BlockCollision::None,
+                    }),
+                    modifiers: &[block::Modifier::SetAttribute(
+                        block::SetAttribute::DisplayName(literal!("Sun")),
+                    )],
+                }
+            }
+            .load(txn)?,
 
             Clock => {
                 let bounds = GridAab::from_lower_size([0, 0, 0], [16, 16, 1]);

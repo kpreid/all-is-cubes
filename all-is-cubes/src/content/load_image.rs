@@ -260,20 +260,27 @@ pub struct LazyImage {
     encoded_data: &'static [u8],
 
     /// (File) name of the image, for printing in case of errors.
-    name: &'static str,
+    path: &'static str,
 }
 
 impl LazyImage {
     #[doc(hidden)]
     pub const fn private_include_image_macro_new(
-        name: &'static str,
+        path: &'static str,
         encoded_data: &'static [u8],
     ) -> Self {
         Self {
             decoded_data: LazyImageInner::new(),
-            name,
+            path,
             encoded_data,
         }
+    }
+
+    /// The path of the image, exposed for diagnostic purposes.
+    ///
+    /// This path is not guaranteed to be absolute or to be relative to any particular directory.
+    pub fn path(&self) -> &'static str {
+        self.path
     }
 }
 
@@ -287,8 +294,8 @@ impl core::ops::Deref for LazyImage {
                     rgba_image_data: data,
                 },
                 Err(error) => panic!(
-                    "Error loading image asset {name:?}: {error:?}",
-                    name = self.name
+                    "Error loading image asset {path:?}: {error:?}",
+                    path = self.path()
                 ),
             };
 

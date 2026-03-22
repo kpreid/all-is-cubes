@@ -137,6 +137,7 @@ dependencies = [
  "pretty_assertions",
  "rand 0.10.0",
  "rand_xoshiro",
+ "rstest",
  "smol-macros",
  "strum 0.28.0",
  "tempfile",

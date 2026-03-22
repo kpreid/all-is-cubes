@@ -7,11 +7,10 @@ use exhaust::Exhaust;
 use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, AIR, Block, Resolution, RotationPlacementRule, Zoom};
 use all_is_cubes::content::palette;
-use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
     Cube, Face6, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgb01, Rgba,
-    Vol, zo32,
+    Vol, ps32, zo32,
 };
 use all_is_cubes::space::{self, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
@@ -19,7 +18,8 @@ use all_is_cubes::util::YieldProgress;
 
 use crate::Fire;
 use crate::alg::{array_of_noise, scale_color};
-use crate::load_image::{block_from_image, include_image};
+use crate::load_block as lb;
+use crate::load_image::include_image;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -233,29 +233,37 @@ pub(in crate::atrium) async fn install_atrium_blocks(
     let one_diagonal = GridVector::new(1, 1, 1);
     let center_point_doubled = (one_diagonal * RESOLUTION_G).to_point();
 
-    let banner_shape = block_from_image(
-        ReadTicket::stub(),
-        include_image!("banner-shape.png"),
-        GridRotation::RXZY,
-        &|pixel| {
-            if pixel[3] == 0 {
-                VoxelBrush::EMPTY_REF.clone()
-            } else {
-                VoxelBrush::with_thickness(Block::from(Rgba::from_srgb8(pixel)), 0..RESOLUTION_G)
-                    .rotate(GridRotation::RXZY)
-            }
-        },
-    )?
-    .display_name("Uncolored Banner")
-    .build_txn(txn);
+    let banner_shape = const {
+        lb::Block {
+            primitive: lb::PrimitiveOrSuch::Image {
+                image: include_image!("banner-shape.png"),
+                rotation: GridRotation::RXZY,
+                extrusion: &[0..RESOLUTION_G],
+                visible: lb::Vox::DEFAULT,
+                invisible: lb::Vox::DENOTES_AIR,
+            },
+            modifiers: &[block::Modifier::SetAttribute(
+                block::SetAttribute::DisplayName(arcstr::literal!("Uncolored Banner")),
+            )],
+        }
+    }
+    .load(txn)?;
 
     Ok(BlockProvider::<AtriumBlocks>::new(progress, |key| {
         Ok(match key {
-            AtriumBlocks::Sun => Block::builder()
-                .display_name("Sun")
-                .color(Rgba::WHITE)
-                .light_emission(Rgb::new(1.0, 1.0, 0.9843) * 40.0)
-                .build(),
+            AtriumBlocks::Sun => const {
+                lb::Block {
+                    primitive: lb::PrimitiveOrSuch::Atom(block::Atom {
+                        color: Rgba::WHITE,
+                        emission: Rgb::new(1.0, 1.0, 0.9843).scale(ps32(40.0)),
+                        collision: block::BlockCollision::Hard,
+                    }),
+                    modifiers: &[block::Modifier::SetAttribute(
+                        block::SetAttribute::DisplayName(arcstr::literal!("Sun")),
+                    )],
+                }
+            }
+            .load(txn)?,
 
             AtriumBlocks::GroundFloor => Block::builder()
                 .display_name("Atrium Ground Floor")
@@ -374,23 +382,21 @@ pub(in crate::atrium) async fn install_atrium_blocks(
                 .with_modifier(block::SetAttribute::DisplayName(arcstr::format!(
                     "Atrium Banner {color}"
                 ))),
-            AtriumBlocks::BannerBottomAccent => block_from_image(
-                ReadTicket::stub(),
-                include_image!("banner-trim.png"),
-                GridRotation::RXyZ,
-                &|pixel| {
-                    if pixel[3] == 0 {
-                        VoxelBrush::EMPTY_REF.clone()
-                    } else {
-                        VoxelBrush::with_thickness(
-                            Block::from(Rgba::from_srgb8(pixel)),
-                            0..RESOLUTION_G,
-                        )
-                    }
-                },
-            )?
-            .display_name("Banner Accent")
-            .build_txn(txn),
+            AtriumBlocks::BannerBottomAccent => const {
+                lb::Block {
+                    primitive: lb::PrimitiveOrSuch::Image {
+                        image: include_image!("banner-trim.png"),
+                        rotation: GridRotation::RXyZ,
+                        extrusion: &[0..RESOLUTION_G],
+                        visible: lb::Vox::DEFAULT,
+                        invisible: lb::Vox::DENOTES_AIR,
+                    },
+                    modifiers: &[block::Modifier::SetAttribute(
+                        block::SetAttribute::DisplayName(arcstr::literal!("Banner Accent")),
+                    )],
+                }
+            }
+            .load(txn)?,
 
             AtriumBlocks::Pole => Block::builder()
                 .display_name("Pole")

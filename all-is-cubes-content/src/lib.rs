@@ -19,6 +19,10 @@
     clippy::shadow_unrelated,
     reason = "https://github.com/rust-lang/rust-clippy/issues/11827"
 )]
+#![expect(
+    clippy::single_range_in_vec_init,
+    reason = "https://github.com/rust-lang/rust-clippy/issues/11086"
+)]
 #![cfg_attr(
     not(test),
     warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)
@@ -37,6 +41,7 @@ mod animation;
 pub(crate) use animation::*;
 mod atrium;
 mod blocks;
+mod load_block;
 pub use blocks::*;
 mod city;
 pub(crate) use city::demo_city;

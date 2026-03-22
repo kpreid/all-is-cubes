@@ -1,12 +1,11 @@
 #![expect(unused_qualifications, reason = "derive macro false positive")]
 
-use alloc::vec::Vec;
 use core::f64::consts::TAU;
 
+use all_is_cubes::arcstr::literal;
 use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule};
-use all_is_cubes::content::load_image::{block_from_image, include_image};
+use all_is_cubes::content::load_image::include_image;
 use all_is_cubes::content::palette;
-use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{point3, vec3};
 use all_is_cubes::inv;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
@@ -17,6 +16,8 @@ use all_is_cubes::op;
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
+
+use crate::load_block as lb;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -138,21 +139,21 @@ pub(crate) async fn install_dungeon_blocks(
                 })
                 .build(),
 
-            FloorTile => {
-                let resolution = R32;
-                block_from_image(
-                    ReadTicket::stub(),
-                    include_image!("floor.png"),
-                    GridRotation::RXZY,
-                    &|pixel| {
-                        let block = Block::from(Rgba::from_srgb8(pixel));
-                        VoxelBrush::with_thickness(block, 0..resolution.into())
-                            .rotate(GridRotation::RXZY)
+            FloorTile => const {
+                lb::Block {
+                    primitive: lb::PrimitiveOrSuch::Image {
+                        image: include_image!("floor.png"),
+                        rotation: GridRotation::RXZY,
+                        extrusion: &[0..32], // TODO: "same as image resolution" should be an option
+                        visible: lb::Vox::DEFAULT,
+                        invisible: lb::Vox::DEFAULT,
                     },
-                )?
-                .display_name("Floor Tile")
-                .build_txn(txn)
+                    modifiers: &[block::Modifier::SetAttribute(
+                        block::SetAttribute::DisplayName(literal!("Floor Tile")),
+                    )],
+                }
             }
+            .load(txn)?,
 
             Spikes => Block::builder()
                 .display_name("Spikes")
@@ -167,69 +168,73 @@ pub(crate) async fn install_dungeon_blocks(
                 })?
                 .build_txn(txn),
 
-            Gate => {
-                let space = block_from_image(
-                    ReadTicket::stub(),
-                    include_image!("fence.png"),
-                    GridRotation::RXyZ,
-                    &|pixel| {
-                        // Note that this produces selectable collidable transparent blocks --
-                        // that's preferred here.
-                        let block = Block::builder().color(Rgba::from_srgb8(pixel)).build();
-                        VoxelBrush::with_thickness(block, 7..9)
+            Gate => const {
+                lb::Block {
+                    primitive: lb::PrimitiveOrSuch::Image {
+                        image: include_image!("fence.png"),
+                        rotation: GridRotation::RXyZ,
+                        extrusion: &[7..9],
+                        visible: lb::Vox::DEFAULT,
+                        // selectable collidable transparent blocks,
+                        // so it is impossible to reach through the gate.
+                        invisible: lb::Vox::DEFAULT,
                     },
-                )?;
-                space.display_name("Gate").build_txn(txn)
+                    modifiers: &[block::Modifier::SetAttribute(
+                        block::SetAttribute::DisplayName(literal!("Gate")),
+                    )],
+                }
             }
+            .load(txn)?,
 
-            GatePocket => {
-                let space = block_from_image(
-                    ReadTicket::stub(),
-                    include_image!("fence-pocket.png"),
-                    GridRotation::RXyZ,
-                    &|pixel| {
-                        let block = Block::builder().color(Rgba::from_srgb8(pixel)).build();
-                        VoxelBrush::new([([0, 0, 6], block.clone()), ([0, 0, 9], block)])
+            GatePocket => const {
+                lb::Block {
+                    primitive: lb::PrimitiveOrSuch::Image {
+                        image: include_image!("fence-pocket.png"),
+                        rotation: GridRotation::RXyZ,
+                        extrusion: &[6..7, 9..10],
+                        visible: lb::Vox::DEFAULT,
+                        // selectable collidable transparent blocks,
+                        // so it is impossible to reach through the gate.
+                        invisible: lb::Vox::DEFAULT,
                     },
-                )?;
-                space.display_name("Gate Pocket").build_txn(txn)
+                    modifiers: &[block::Modifier::SetAttribute(
+                        block::SetAttribute::DisplayName(literal!("Gate Pocket")),
+                    )],
+                }
             }
+            .load(txn)?,
 
-            GateLock => {
-                let space = block_from_image(
-                    ReadTicket::stub(),
-                    include_image!("gate-lock.png"),
-                    GridRotation::RXyZ,
-                    &|pixel| {
-                        let pixel = Rgba::from_srgb8(pixel);
-                        let block = if pixel.fully_transparent() {
-                            AIR
-                        } else {
-                            Block::builder().color(pixel).build()
-                        };
-                        VoxelBrush::new(
-                            (5..11).map(|z| ([0, 0, z], block.clone())).collect::<Vec<_>>(),
-                        )
+            GateLock => const {
+                lb::Block {
+                    primitive: lb::PrimitiveOrSuch::Image {
+                        image: include_image!("gate-lock.png"),
+                        rotation: GridRotation::RXyZ,
+                        extrusion: &[5..11],
+                        visible: lb::Vox::DEFAULT,
+                        invisible: lb::Vox::DENOTES_AIR,
                     },
-                )?;
-                space.display_name("Keyhole").build_txn(txn)
+                    modifiers: &[block::Modifier::SetAttribute(
+                        block::SetAttribute::DisplayName(literal!("Keyhole")),
+                    )],
+                }
             }
+            .load(txn)?,
 
-            Key => block_from_image(
-                ReadTicket::stub(),
-                include_image!("key.png"),
-                GridRotation::RXyZ,
-                &|pixel| {
-                    let block = if pixel[3] == 0 {
-                        AIR
-                    } else {
-                        Block::builder().color(Rgba::from_srgb8(pixel)).build()
-                    };
-                    VoxelBrush::with_thickness(block, 7..9)
-                },
-            )?
-            .display_name("Key")
-            .build_txn(txn),
+            Key => const {
+                lb::Block {
+                    primitive: lb::PrimitiveOrSuch::Image {
+                        image: include_image!("key.png"),
+                        rotation: GridRotation::RXyZ,
+                        extrusion: &[7..9],
+                        visible: lb::Vox::DEFAULT,
+                        invisible: lb::Vox::DENOTES_AIR,
+                    },
+                    modifiers: &[block::Modifier::SetAttribute(
+                        block::SetAttribute::DisplayName(literal!("Key")),
+                    )],
+                }
+            }
+            .load(txn)?,
 
             ItemHolder => {
                 // Makes the contained item float with a varying height
