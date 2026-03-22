@@ -15,12 +15,12 @@ use all_is_cubes::block::{
     RotationPlacementRule, TickAction,
 };
 use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::euclid::Vector3D;
+use all_is_cubes::euclid::{Vector3D, point3};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord,
-    GridVector, Rgb, Rgb01, Rgba, ps32, rgb_const, rgba_const,
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord, GridVector,
+    Rgb, Rgb01, Rgba, ps32, rgb_const, rgba_const,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::sound;
@@ -32,7 +32,7 @@ use all_is_cubes::util::YieldProgress;
 use crate::alg::{NoiseFnExt as _, gradient_lookup, scale_color, square_radius};
 use crate::landscape::install_landscape_blocks;
 use crate::load_block as lb;
-use crate::load_image::{block_from_image, default_srgb, include_image};
+use crate::load_image::{block_from_image, default_srgb, include_image, space_from_image};
 use crate::palette;
 
 // -------------------------------------------------------------------------------------------------
@@ -150,36 +150,62 @@ fn demo_blocks_generator(
 
     let pedestal_voxel = block::from_color!(palette::STONE);
 
-    let crate_inner_voxel = block::from_color!(palette::PLANK);
-    let crate_outer_voxel = block::from_color!(palette::STEEL);
-
     use DemoBlocks::*;
 
     move |provider, txn, key| {
         Ok(match key {
             // It's in Rust, gotta have crates ;)
+            // TODO: Make this composition of tiles expressible using `load_block`.
             Crate => {
-                let outer = GridAab::for_block(R32);
-                let in1 = outer.shrink(FaceMap::symmetric([1, 0, 1])).unwrap();
-                let in2 = in1.shrink(FaceMap::symmetric([1, 0, 1])).unwrap();
-                Block::builder()
-                    .display_name("Crate")
-                    .voxels_fn(R32, |cube| {
-                        if in2.contains_cube(cube) {
-                            &crate_inner_voxel
-                        } else if in1.contains_cube(cube) {
-                            if (cube.x + cube.z).rem_euclid(5) >= 2 {
-                                &crate_inner_voxel
-                            } else {
-                                &AIR
-                            }
-                        } else if cube.y < 3 || cube.y >= 29 {
-                            &crate_outer_voxel
-                        } else {
-                            &AIR
-                        }
-                    })?
-                    .build_txn(txn)
+                use GridRotation::*;
+                use block::Composite;
+                use block::CompositeOperator::Over;
+
+                let resolution = R32;
+                let resolution_g = GridCoordinate::from(resolution);
+
+                // This image is (32×4) by 32 in size, having four tiles making up parts of the
+                // crate.
+                let image_space = space_from_image(
+                    txn.read_ticket(),
+                    include_image!("blocks/crate.png"),
+                    GridRotation::IDENTITY,
+                    &default_srgb,
+                )?;
+                let image_space = txn.insert_anonymous(image_space);
+
+                // Make blocks which have each of the image tiles.
+                let make_part = |tile: GridCoordinate, depth: GridCoordinate| -> Block {
+                    let offset = point3(tile * resolution_g, 0, -(resolution_g - 1 - depth));
+                    Block::from_primitive(block::Primitive::Recur {
+                        space: image_space.clone(),
+                        offset,
+                        resolution,
+                    })
+                };
+                let side_bands = make_part(0, 0);
+                let side_boards = make_part(1, 1);
+                let side_inner = make_part(2, 2);
+                let top_and_bottom = make_part(3, 0);
+
+                // Assemble the tiles that make up one face.
+                let side = Composite::stack(
+                    side_bands,
+                    [side_boards, side_inner].map(|block| Composite::new(block, Over)),
+                );
+
+                // Assemble six faces into the block.
+                Composite::stack(
+                    top_and_bottom.clone().rotate(RXzy), // bottom
+                    [
+                        top_and_bottom.rotate(RXZY), // top
+                        side.clone().rotate(RZyx),   // +X side
+                        side.clone().rotate(RzyX),   // -X side
+                        side.clone().rotate(RXyZ),   // +Z side
+                        side.rotate(Rxyz),           // -Z side
+                    ]
+                    .map(|block| Composite::new(block, Over)),
+                )
             }
 
             GlassBlock => {
