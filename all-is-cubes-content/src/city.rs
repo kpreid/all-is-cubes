@@ -703,6 +703,11 @@ fn place_roads_and_tunnels(
 ) -> Result<(), InGenError> {
     use DemoBlocks::*;
 
+    let crate_pile_noise_fn = noise::ScaleBias::new(
+        noise::ScalePoint::new(noise::OpenSimplex::new(0x2e24bb63)).set_scale(0.1),
+    )
+    .set_scale(6.0);
+
     for face in CityPlanner::ROAD_DIRECTIONS {
         let perpendicular: GridVector = Face6::PY.clockwise().transform(face).normal_vector();
         let road_aligned_rotation = GridRotation::from_to(Face6::NZ, face, Face6::PY).unwrap();
@@ -779,6 +784,24 @@ fn place_roads_and_tunnels(
                             .clone()
                             .rotate(Face6::PY.clockwise() * rotations[side]),
                     )?;
+                }
+            }
+
+            // Underground piles of crates.
+            // Some of these will be later erased by exhibit entrances.
+            if i > CityPlanner::ROAD_RADIUS {
+                for (_side, p) in [
+                    (1, -CityPlanner::ROAD_RADIUS),
+                    (0, CityPlanner::ROAD_RADIUS),
+                ] {
+                    let bottom_cube =
+                        cube + perpendicular * p + vec3(0, CityPlanner::UNDERGROUND_FLOOR_Y, 0);
+                    let ccf = crate_pile_noise_fn.at_cube(bottom_cube);
+                    let crate_count = (ccf as i32).clamp(0, 6);
+
+                    for iy in 0..crate_count {
+                        m.set(bottom_cube + vec3(0, iy, 0), &demo_blocks[Crate])?;
+                    }
                 }
             }
         }
