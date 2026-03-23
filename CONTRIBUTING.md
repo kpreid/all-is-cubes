@@ -7,6 +7,7 @@ and I am open to contributions which make it a better library or are just nifty 
 
 This file contains information on the project’s development practices
 which may be useful when preparing a patch/PR.
+See also the [design principles](doc/design-principles.md) document.
 
 Testing
 -------
@@ -48,6 +49,8 @@ Code style
     Prefer using existing libraries whenever possible, as long as this does not trade off against
     soundness.
     Use small modules to keep the `unsafe` code's dependencies clear.
+    Always fully document unsafe functions’ safety conditions (`/// # Safety`),
+    and unsafe blocks’ soundness  (`// SAFETY: ...`).
 
 *   Avoid adding large amounts of data to version control.
     For example, image files for image-comparison testing should be kept as small as practical
