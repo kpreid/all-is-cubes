@@ -87,6 +87,33 @@ mod tests;
 ///
 /// [`Universe`] is a quite large data structure, so it may be desirable to keep it in a
 /// [`Box`], especially when being passed through `async` blocks.
+/// Constructors of [`Universe`] always return it in a [`Box`].
+///
+/// # Reading
+///
+/// To examine the current contents of a universe, obtain [`Handle`]s using
+/// [`get()`][Self::get] or one of the iteration methods, then call [`Handle::read()`]
+/// while passing [`universe.read_ticket()`][Self::read_ticket].
+///
+/// The universe cannot be mutated while a read ticket exists;
+/// this is statically enforced using lifetimes.
+/// Other varieties of [`ReadTicket`] exist for special circumstances;
+/// see its documentation for details.
+///
+/// # Mutation
+///
+/// Call [`step()`][Self::step] to advance simulated time in the universe.
+/// Other, explicit changes may be made through several means:
+///
+/// * [`insert()`][Self::insert] and [`insert_anonymous()`][Self::insert_anonymous]
+///   add new members to the universe.
+/// * Executing [`UniverseTransaction`]s,
+///   or other transactions through [`execute_1()`][Self::execute_1],
+///   allows making various changes.
+/// * [`mutate_space()`][Self::mutate_space] can be used for detailed modifications to a [`Space`]
+///   for which transactions are unsuitable.
+/// * Global properties of the universe may be modified using setters such as
+///   [`set_clock()`][Self::set_clock].
 ///
 /// [various types]: UniverseMember
 ///
