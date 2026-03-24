@@ -2,6 +2,8 @@
 
 This document contains information intended to explain the design choices in All is Cubes’s code, and guide future changes.
 
+See also [`CONTRIBUTING.md`](../CONTRIBUTING.md) for information about how code should be written.
+
 ## All is Cubes is a hobby project
 
 All is Cubes is, above all else, Kevin Reid’s hobby.
@@ -49,3 +51,23 @@ Exceptions:
 
 See also “The Sane Rendering Manifesto” ([text](https://gist.github.com/bazhenovc/c0aa56cdf50df495fda84de58ef1de5e), [video](https://www.youtube.com/watch?v=KwiwIbjcjW4)) by Kirill / baz! / 
 bazhenovc, which is a similar perspective arrived at independently.
+
+## Modularity
+
+All is Cubes is broken up into several library crates.
+The divisions are chosen to serve two purposes:
+
+* Minimizing rebuild time during development.
+* In theory, supporting the use of All is Cubes libraries for various purposes without bringing in
+  undesirable additional dependencies and assumptions.
+
+For the latter purpose (and for testability and other such considerations),
+most of All is Cubes’s code is designed to be “sans-IO” —
+to refrain from interacting with the outside world except as directed via callbacks and trait implementations.
+For example:
+
+* The `all-is-cubes` crate manages the simulation and data storage, but does not concern itself with rendering, UI, audio output, or disk IO.
+* The `all-is-cubes-mesh` crate contains algorithms for producing meshes from `all-is-cubes` content, but does not interact with any graphics API or prescribe a mesh data format.
+* The `all-is-cubes-gpu` crate uses `wgpu` to communicate with the GPU but does not create, or require, a window.
+
+Whenever possible, each crate is `no_std` compatible.
