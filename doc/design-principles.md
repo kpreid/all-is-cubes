@@ -71,3 +71,10 @@ For example:
 * The `all-is-cubes-gpu` crate uses `wgpu` to communicate with the GPU but does not create, or require, a window.
 
 Whenever possible, each crate is `no_std` compatible.
+
+## Async
+
+All is Cubes uses `async` functions for computations which may take significant amounts of time.
+This makes it compatible with WebAssembly-in-browsers and other platforms which do not have threads available, as well as enabling cancellation of the computations if desired.
+These `async` functions are compatible with any async executor.
+They often use the `YieldProgress` type to report progress information to the user while also ensuring they yield often enough.
