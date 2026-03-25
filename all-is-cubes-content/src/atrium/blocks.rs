@@ -1,15 +1,17 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use core::f64::consts::TAU;
 use core::fmt;
 
 use exhaust::Exhaust;
 
+use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, AIR, Block, Resolution, RotationPlacementRule, Zoom};
 use all_is_cubes::content::palette;
+use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, GridAab, GridCoordinate, GridPoint, GridVector, Rgb, Rgb01, Rgba, Vol, zo32,
+    Cube, Face6, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgb01, Rgba,
+    Vol, zo32,
 };
 use all_is_cubes::space::{self, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
@@ -17,6 +19,7 @@ use all_is_cubes::util::YieldProgress;
 
 use crate::Fire;
 use crate::alg::{array_of_noise, scale_color};
+use crate::load_image::{block_from_image, include_image};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -230,6 +233,22 @@ pub(in crate::atrium) async fn install_atrium_blocks(
     let one_diagonal = GridVector::new(1, 1, 1);
     let center_point_doubled = (one_diagonal * RESOLUTION_G).to_point();
 
+    let banner_shape = block_from_image(
+        ReadTicket::stub(),
+        include_image!("banner-shape.png"),
+        GridRotation::RXZY,
+        &|pixel| {
+            if pixel[3] == 0 {
+                VoxelBrush::EMPTY_REF.clone()
+            } else {
+                VoxelBrush::with_thickness(Block::from(Rgba::from_srgb8(pixel)), 0..RESOLUTION_G)
+                    .rotate(GridRotation::RXZY)
+            }
+        },
+    )?
+    .display_name("Uncolored Banner")
+    .build_txn(txn);
+
     Ok(BlockProvider::<AtriumBlocks>::new(progress, |key| {
         Ok(match key {
             AtriumBlocks::Sun => Block::builder()
@@ -345,31 +364,33 @@ pub(in crate::atrium) async fn install_atrium_blocks(
                 .voxels_fn(RESOLUTION, molding_fn)?
                 .build_txn(txn),
 
-            AtriumBlocks::Banner(color) => Block::builder()
-                .display_name(format!("Atrium Banner {color}"))
-                .voxels_fn(RESOLUTION, |p| {
-                    // wavy banner shape
-                    let wave = (f64::from(p.x) * (TAU / f64::from(RESOLUTION))).sin() * 2.2;
-                    if p.z == i32::from(RESOLUTION) / 2 + wave as i32 {
-                        Block::from(color.color())
+            AtriumBlocks::Banner(color) => banner_shape
+                .clone()
+                // dye the banner
+                .with_modifier(block::Composite::new(
+                    Block::from(color.color()),
+                    block::CompositeOperator::In,
+                ))
+                .with_modifier(block::SetAttribute::DisplayName(arcstr::format!(
+                    "Atrium Banner {color}"
+                ))),
+            AtriumBlocks::BannerBottomAccent => block_from_image(
+                ReadTicket::stub(),
+                include_image!("banner-trim.png"),
+                GridRotation::RXyZ,
+                &|pixel| {
+                    if pixel[3] == 0 {
+                        VoxelBrush::EMPTY_REF.clone()
                     } else {
-                        AIR
+                        VoxelBrush::with_thickness(
+                            Block::from(Rgba::from_srgb8(pixel)),
+                            0..RESOLUTION_G,
+                        )
                     }
-                })?
-                .build_txn(txn),
-            AtriumBlocks::BannerBottomAccent => {
-                let accent_color = block::from_color!(0.95, 0.89, 0.05, 1.0);
-                Block::builder()
-                    .display_name("Banner Accent")
-                    .voxels_fn(RESOLUTION, |p| {
-                        if [0, 1, 2, 6, 8].contains(&p.y) {
-                            &accent_color
-                        } else {
-                            &AIR
-                        }
-                    })?
-                    .build_txn(txn)
-            }
+                },
+            )?
+            .display_name("Banner Accent")
+            .build_txn(txn),
 
             AtriumBlocks::Pole => Block::builder()
                 .display_name("Pole")
