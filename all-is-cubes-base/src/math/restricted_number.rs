@@ -267,6 +267,23 @@ macro_rules! non_generic_impls {
                 // should never be able to panic
                 Self::new_clamped(self.0 - other.0)
             }
+
+            /// Const equivalent of the `*` multiplication operator.
+            ///
+            /// This multiplication operation differs from standard floating-point multiplication
+            /// in that multiplying zero by positive infinity returns zero instead of NaN.
+            /// This is necessary for the type to be closed under multiplication.
+            #[inline]
+            #[must_use]
+            pub const fn mul(self, rhs: Self) -> Self {
+                let value = self.0 * rhs.0;
+                if value.is_nan() {
+                    Self(0.0)
+                } else {
+                    debug_assert!(value.is_sign_positive());
+                    Self(value)
+                }
+            }
         }
 
         impl ZeroOne<$t> {
@@ -1046,6 +1063,10 @@ mod tests {
     #[test]
     fn ps_closed_under_multiplication() {
         assert_eq!(ps32(0.0) * PositiveSign::<f32>::INFINITY, ps32(0.0));
+        assert_eq!(PositiveSign::<f32>::INFINITY * ps32(0.0), ps32(0.0));
+
+        assert_eq!(ps32(0.0).mul(PositiveSign::<f32>::INFINITY), ps32(0.0));
+        assert_eq!(PositiveSign::<f32>::INFINITY.mul(ps32(0.0)), ps32(0.0));
     }
 
     #[test]

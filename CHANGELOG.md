@@ -11,6 +11,8 @@
       It replaces `Modifier::Attributes`.
     * `math::Aab::expand_or_shrink()`
     * `math::FaceMap::{as_array, as_array_mut}()`
+    * `math::PositiveSign::mul()`
+    * `math::Rgb::scale()`
     * `math::Vol::origin_empty()`, infallible construction of empty volume.
     * `physics::Contact::aab()`
     * `time::Clock::phase()`, returns the clock’s phase, which was previously only obtainable through `Tick`.

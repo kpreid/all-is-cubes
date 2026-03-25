@@ -329,6 +329,20 @@ impl Rgb {
             self.blue().saturating_sub(other.blue()),
         ))
     }
+
+    /// Multiply `self` componentwise by `scalar`.
+    ///
+    /// This function is identical to using the `*` multiplication operator, but can be called in
+    /// `const` contexts.
+    #[inline]
+    #[must_use]
+    pub const fn scale(self, scalar: PositiveSign<f32>) -> Self {
+        Self(vec3(
+            self.red().mul(scalar),
+            self.green().mul(scalar),
+            self.blue().mul(scalar),
+        ))
+    }
 }
 
 impl Rgb01 {
@@ -1168,7 +1182,7 @@ static CONST_SRGB_LOOKUP_TABLE: &[f32; 256] = &[
 
 #[cfg(test)]
 mod tests {
-    use crate::math::zo32;
+    use crate::math::{ps32, zo32};
 
     use super::*;
     use alloc::vec::Vec;
@@ -1249,6 +1263,17 @@ mod tests {
             format!("{:#?}", Rgba::new(0.1, 0.2, 0.3, 0.4)),
             "Rgba(0.1, 0.2, 0.3, 0.4)"
         );
+    }
+
+    #[test]
+    fn rgb_scale_and_mul() {
+        let small = Rgb::new(2., 3., 4.);
+        let large = Rgb::new(4., 6., 8.);
+        assert_eq!(small * ps32(2.), large);
+        assert_eq!(small.scale(ps32(2.)), large);
+
+        assert_eq!(large * zo32(0.5), small);
+        assert_eq!(large * ps32(0.5), small);
     }
 
     /// Test that [`Rgba::from_srgb8`] agrees with [`Rgba::to_srgb8`].
