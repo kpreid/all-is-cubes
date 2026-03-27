@@ -1,8 +1,9 @@
-//! Loading images for use as game assets (i.e. [`Block`]s).
+//! Loading images embedded in the binary for use as game assets (i.e. [`Block`]s).
 //!
-//! TODO: stuff in this module is kind of duplicative of [`crate::drawing`]...
+//! The images are lazily decompressed from PNG.
+//! This has the disadvantage of requiring a decoder, but makes up for it in the
+//! compactness of individual images.
 
-use all_is_cubes_base::math::{Cube, GridPoint};
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -16,13 +17,13 @@ use png_decoder::PngHeader;
 use crate::block::{self, AIR, Block, Resolution};
 use crate::camera::ImageSize;
 use crate::drawing::{VoxelBrush, rectangle_to_aab};
-use crate::math::{GridAab, GridCoordinate, GridRotation, Rgba};
+use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, GridRotation, Rgba};
 use crate::space::{self, Space, SpacePhysics};
 use crate::universe::{ReadTicket, UniverseTransaction};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Data type produced by [`include_image`].
+// TODO: better name
 #[doc(hidden)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct DecodedPng {
@@ -248,58 +249,82 @@ impl core::error::Error for BlockFromImageError {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Helper for [`include_image`] macro.
-#[doc(hidden)]
-#[inline(never)]
-pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DecodedPng {
-    match png_decoder::decode(bytes) {
-        Ok((header, data)) => DecodedPng {
-            header,
-            rgba_image_data: data,
-        },
-        Err(error) => panic!("Error loading image asset {name:?}: {error:?}"),
+/// Data type produced by [`include_image!`];
+/// dereferences to a [`DecodedPng`].
+#[derive(Debug)]
+pub struct LazyImage {
+    /// Lazily decoded image data.
+    decoded_data: LazyImageInner,
+
+    /// PNG image data for decoding.
+    encoded_data: &'static [u8],
+
+    /// (File) name of the image, for printing in case of errors.
+    name: &'static str,
+}
+
+impl LazyImage {
+    #[doc(hidden)]
+    pub const fn private_include_image_macro_new(
+        name: &'static str,
+        encoded_data: &'static [u8],
+    ) -> Self {
+        Self {
+            decoded_data: LazyImageInner::new(),
+            name,
+            encoded_data,
+        }
     }
+}
+
+impl core::ops::Deref for LazyImage {
+    type Target = DecodedPng;
+    fn deref(&self) -> &Self::Target {
+        self.decoded_data.get_or_init(|| {
+            let decoded = match png_decoder::decode(self.encoded_data) {
+                Ok((header, data)) => DecodedPng {
+                    header,
+                    rgba_image_data: data,
+                },
+                Err(error) => panic!(
+                    "Error loading image asset {name:?}: {error:?}",
+                    name = self.name
+                ),
+            };
+
+            // When we use OnceBox, we need to return a box.
+            #[cfg(not(feature = "std"))]
+            let decoded = ::alloc::boxed::Box::new(decoded);
+
+            decoded
+        })
+    }
+}
+
+/// Load an image from a relative path.
+///
+/// This macro expands to an expression of type [`&'static LazyImage`][LazyImage],
+/// which dereferences to [`DecodedPng`].
+#[doc(hidden)]
+#[macro_export]
+macro_rules! _content_load_image_include_image {
+    ( $path:literal ) => {{
+        static IMAGE: $crate::content::load_image::LazyImage =
+            $crate::content::load_image::LazyImage::private_include_image_macro_new(
+                $path,
+                include_bytes!($path),
+            );
+        &IMAGE
+    }};
 }
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
         #[doc(hidden)]
-        pub use ::std::sync::LazyLock as LazyForIncludeImage;
-
-        /// Load an image from a relative path.
-        #[doc(hidden)]
-        #[macro_export]
-        macro_rules! _content_load_image_include_image {
-            ( $path:literal ) => {{
-                static IMAGE: $crate::content::load_image::LazyForIncludeImage<
-                    $crate::content::load_image::DecodedPng,
-                > = $crate::content::load_image::LazyForIncludeImage::new(|| {
-                    $crate::content::load_image::load_png_from_bytes($path, include_bytes!($path))
-                });
-
-                &*IMAGE
-            }};
-        }
+        type LazyImageInner = ::std::sync::OnceLock<DecodedPng>;
     } else {
         #[doc(hidden)]
-        pub use ::once_cell::race::OnceBox as OnceBoxForIncludeImage;
-        #[doc(hidden)]
-        pub use ::alloc::boxed::Box as BoxForIncludeImage;
-
-        /// Load an image from a relative path.
-        #[doc(hidden)]
-        #[macro_export]
-        macro_rules! _content_load_image_include_image {
-            ( $path:literal ) => {{
-                static IMAGE: $crate::content::load_image::OnceBoxForIncludeImage<
-                    $crate::content::load_image::DecodedPng,
-                > = $crate::content::load_image::OnceBoxForIncludeImage::new();
-
-                IMAGE.get_or_init(|| $crate::content::load_image::BoxForIncludeImage::new(
-                    $crate::content::load_image::load_png_from_bytes($path, include_bytes!($path))
-                ))
-            }};
-        }
+        type LazyImageInner = ::once_cell::race::OnceBox<DecodedPng>;
     }
 }
 pub use _content_load_image_include_image as include_image;
@@ -390,5 +415,34 @@ mod tests {
             GridAab::from_lower_upper([10, 0, 0], [12, 2, 1])
         );
         assert_eq!(space[[11, 0, 0]], block::from_color!(1., 0., 0.));
+    }
+
+    #[test]
+    fn include_image() {
+        // Putting this in a `const` item shows that `include_image!` can be called from a
+        // const context.
+        const IMAGE: &LazyImage = include_image!("load_image_test.png");
+
+        let decoded: &DecodedPng = IMAGE;
+        assert_eq!(
+            (
+                decoded.header.width,
+                decoded.header.height,
+                decoded.pixels()
+            ),
+            (
+                3u32,
+                2u32,
+                [
+                    [0, 0, 0, 0],
+                    [255, 0, 0, 255],
+                    [255, 0, 0, 255],
+                    [255, 0, 0, 255],
+                    [255, 0, 0, 255],
+                    [255, 0, 0, 255]
+                ]
+                .as_slice()
+            )
+        )
     }
 }
