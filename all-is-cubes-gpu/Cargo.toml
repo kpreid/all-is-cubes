@@ -89,7 +89,7 @@ wgpu = { workspace = true, features = ["std", "wgsl"] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 # Used in the `poll` module to implement timeout
-gloo-timers = { version = "0.3.0", default-features = false, features = ["futures"]}
+gloo-timers = { version = "0.4.0", default-features = false, features = ["futures"]}
 # If we don't set this feature, it will try to access files at run time and fail
 # since web wasm has no std::fs.
 resource = { version = "0.6.0", features = ["force-static"] }
