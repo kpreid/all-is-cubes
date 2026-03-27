@@ -96,6 +96,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.1.5 -> 0.2.0"
 
+[[audits.gloo-timers]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.3.0 -> 0.4.0"
+
 [[audits.gltf-derive]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
