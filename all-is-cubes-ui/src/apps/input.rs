@@ -10,9 +10,7 @@ use all_is_cubes::math::{FreeCoordinate, FreeVector};
 use all_is_cubes::physics;
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{self, Handle, Universe};
-use all_is_cubes_render::camera::{
-    FogOption, LightingOption, NdcPoint2, NominalPixel, RenderMethod, Viewport,
-};
+use all_is_cubes_render::camera::{NdcPoint2, NominalPixel, Viewport};
 
 use crate::settings;
 use crate::{apps::ControlMessage, settings::Settings};
@@ -343,6 +341,17 @@ impl InputProcessor {
             })?;
         }
 
+        fn increment<T: Clone + PartialEq + Send + Sync + 'static>(
+            settings: Option<&Settings>,
+            key: &'static settings::TypedKey<T>,
+        ) {
+            if let Some(settings) = settings {
+                settings.update(key, |_, data| {
+                    key.incrementer().unwrap().adjustment(data, true, true).unwrap()
+                });
+            }
+        }
+
         for key in self.command_buffer.drain(..) {
             match key {
                 Key::Escape => {
@@ -351,29 +360,7 @@ impl InputProcessor {
                     }
                 }
                 Key::Character('i') => {
-                    if let Some(settings) = settings {
-                        settings.update(settings::LIGHTING_DISPLAY, |setting, others| {
-                            match setting {
-                                LightingOption::None => LightingOption::Flat,
-                                LightingOption::Flat => LightingOption::Coarse,
-                                LightingOption::Coarse => LightingOption::Linear,
-                                LightingOption::Linear => LightingOption::Smoothstep,
-                                LightingOption::Smoothstep => {
-                                    // TODO: the question we actually want to ask is,
-                                    // what does the *current renderer* support?
-                                    if others.to_graphics_options().render_method
-                                        == RenderMethod::Reference
-                                    {
-                                        LightingOption::Bounce
-                                    } else {
-                                        LightingOption::None
-                                    }
-                                }
-                                LightingOption::Bounce => LightingOption::None,
-                                _ => LightingOption::None, // TODO: either stop doing cycle-commands or put it on the enum so it can be exhaustive
-                            }
-                        });
-                    }
+                    increment(settings, settings::LIGHTING_DISPLAY);
                 }
                 Key::Character('l') => {
                     // TODO: duplicated with fn toggle_mouselook_mode() because of borrow conflicts
@@ -385,16 +372,7 @@ impl InputProcessor {
                     }
                 }
                 Key::Character('o') => {
-                    if let Some(settings) = settings {
-                        settings.update(settings::TRANSPARENCY, |setting, _| {
-                            use settings::TransparencyMode as Tr;
-                            match setting {
-                                Tr::Surface => Tr::Volumetric,
-                                Tr::Volumetric => Tr::Threshold,
-                                Tr::Threshold => Tr::Surface,
-                            }
-                        });
-                    }
+                    increment(settings, settings::TRANSPARENCY);
                 }
                 Key::Character('p') => {
                     // TODO: eliminate this weird binding once escape-based pausing is working well
@@ -403,26 +381,10 @@ impl InputProcessor {
                     }
                 }
                 Key::Character('u') => {
-                    if let Some(settings) = settings {
-                        settings.update(settings::FOG, |setting, _| {
-                            match setting {
-                                FogOption::None => FogOption::Abrupt,
-                                FogOption::Abrupt => FogOption::Compromise,
-                                FogOption::Compromise => FogOption::Physical,
-                                FogOption::Physical => FogOption::None,
-                                _ => FogOption::None, // TODO: either stop doing cycle-commands or put it on the enum so it can be exhaustive
-                            }
-                        });
-                    }
+                    increment(settings, settings::FOG);
                 }
                 Key::Character('y') => {
-                    if let Some(settings) = settings {
-                        settings.update(settings::RENDER_METHOD, |setting, _| match setting {
-                            RenderMethod::Mesh => RenderMethod::Reference,
-                            RenderMethod::Reference => RenderMethod::Mesh,
-                            _ => RenderMethod::Reference,
-                        });
-                    }
+                    increment(settings, settings::RENDER_METHOD);
                 }
                 Key::Character('`' | '~') => {
                     if let Some(ch) = control_channel {
