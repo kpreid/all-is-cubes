@@ -10,6 +10,7 @@ use crate::block::{
     self, Block, BlockChange, BlockDefStepInfo, EvalBlockError, InEvalError, MinEval,
 };
 use crate::listen::{self, Gate, IntoListener as _, Listener};
+use crate::time;
 use crate::universe::{HandleVisitor, ReadTicket, VisitHandles};
 
 // -------------------------------------------------------------------------------------------------
@@ -115,15 +116,16 @@ impl CachedBlock {
 
     pub(crate) fn update_phase_1(
         &self,
-        info: &mut BlockDefStepInfo,
         read_ticket: ReadTicket<'_>,
-    ) -> Option<CacheUpdate> {
+    ) -> (Option<CacheUpdate>, BlockDefStepInfo) {
         let mut next = None;
+        let mut attempted = None;
+        let mut info = BlockDefStepInfo::default();
 
         if !self.listeners_ok {
-            info.attempted += 1;
             // If there was an evaluation error, then we may also be missing listeners.
             // Start over.
+            attempted = Some(time::Instant::now());
             next = Some(CacheUpdate::NewState(CachedBlock::new(
                 self.block.clone(),
                 read_ticket,
@@ -132,7 +134,7 @@ impl CachedBlock {
         } else if self.cache_dirty.get_and_clear() {
             // We have a cached value, but it is stale.
 
-            info.attempted += 1;
+            attempted = Some(time::Instant::now());
 
             let new_cache = self
                 .block
@@ -151,11 +153,15 @@ impl CachedBlock {
             }
         }
 
-        if info.attempted > 0 && matches!(self.cache, Err(ref e) if e.is_transient()) {
-            info.was_in_use += 1;
+        if let Some(attempted) = attempted {
+            if matches!(self.cache, Err(ref e) if e.is_transient()) {
+                info.was_in_use += 1;
+            }
+
+            info.attempted = time::TimeStats::one(attempted.elapsed());
         }
 
-        next
+        (next, info)
     }
 
     /// Finish a cache update. Returns whether the cached value changed.

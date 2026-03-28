@@ -735,30 +735,26 @@ impl fmt::Display for BlockDefConflict {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct BlockDefStepInfo {
-    /// A cache update was attempted.
-    attempted: usize,
-    /// A cache update succeeded.
+    /// Evaluation cache updates attempted.
+    attempted: time::TimeStats,
+    /// Evaluation cache updates that succeeded.
     updated: usize,
-    /// A cache update failed because of a [`HandleError::InUse`] conflict.
+    /// Evaluation cache updates that failed because of a [`HandleError::InUse`] conflict.
+    /// TODO(ecs): Isn’t this impossible now?
     was_in_use: usize,
-}
-
-impl ops::Add for BlockDefStepInfo {
-    type Output = Self;
-    #[inline]
-    fn add(self, rhs: Self) -> Self::Output {
-        Self {
-            attempted: self.attempted + rhs.attempted,
-            updated: self.updated + rhs.updated,
-            was_in_use: self.was_in_use + rhs.was_in_use,
-        }
-    }
 }
 
 impl ops::AddAssign for BlockDefStepInfo {
     #[inline]
     fn add_assign(&mut self, other: Self) {
-        *self = *self + other;
+        let Self {
+            attempted,
+            updated,
+            was_in_use,
+        } = self;
+        *attempted += other.attempted;
+        *updated += other.updated;
+        *was_in_use += other.was_in_use;
     }
 }
 
@@ -771,7 +767,7 @@ impl manyfmt::Fmt<crate::util::StatusText> for BlockDefStepInfo {
         } = self;
         write!(
             fmt,
-            "{attempted} attempted, {updated} updated, {was_in_use} were in use"
+            "{attempted}, {updated} successful, {was_in_use} were in use"
         )
     }
 }
@@ -818,7 +814,6 @@ fn update_phase_1(
 ) {
     let mq = data_sources.get();
     let read_ticket = ReadTicket::from_queries(&mq);
-    let mut info = BlockDefStepInfo::default();
     // TODO(ecs): parallel iter
     for (def_state, mut next) in defs.iter_mut() {
         debug_assert!(
@@ -826,13 +821,14 @@ fn update_phase_1(
             "CacheUpdate should have been cleared",
         );
 
-        // TODO: Instead of checking only the current frame, check other frames
+        // TODO: Instead of checking only the current frame, check the caches of all frames
         // (maybe only if free time permits).
-        if let Some(update) = def_state.current_frame().update_phase_1(&mut info, read_ticket) {
+        let (maybe_update, info) = def_state.current_frame().update_phase_1(read_ticket);
+        if let Some(update) = maybe_update {
             *next = update;
         }
+        info_collector.record(info);
     }
-    info_collector.record(info);
 }
 
 /// ECS system function that moves new evaluations from `CacheUpdate` to `BlockDef`.
