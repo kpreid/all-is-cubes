@@ -21,6 +21,9 @@
 * `all-is-cubes-render` library:
     * `camera::Viewport::scale()`
 
+* `all-is-cubes-ui` library:
+    * `settings::TypedKey::incrementer()`
+
 ### Changed
 
 * `all-is-cubes` library:

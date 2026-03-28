@@ -12,7 +12,7 @@ use hashbrown::HashMap;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::listen::{self, Source as _};
-use all_is_cubes_render::camera::GraphicsOptions;
+use all_is_cubes_render::camera::{GraphicsOptions, LightingOption, RenderMethod};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -395,11 +395,117 @@ impl<T: Send + Sync + 'static> TypedKey<T> {
     pub fn offered_value_list(&self) -> &[T] {
         Vec::as_slice(&self.offered_value_list)
     }
+
+    /// Returns an [`Incrementer`] for this setting, if possible.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`None`] if the setting does not support this type of manipulation.
+    pub fn incrementer(&'static self) -> Option<Incrementer<T>> {
+        // TODO: Currently, incrementing only works based on value lists, but we should also
+        // be able to increment numeric values such as FOV.
+
+        if self.offered_value_list().len() > 1 {
+            Some(Incrementer(self))
+        } else {
+            None
+        }
+    }
 }
 
 impl<T> fmt::Debug for TypedKey<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{key}: {type}", key = self.key, type = core::any::type_name::<T>())
+    }
+}
+
+/// Allows toggling, cycling, or stepping a setting.
+///
+/// This is intended as the underlying mechanism for user interfaces which consist of either
+/// one or two buttons to change the value.
+///
+/// Obtain this from the setting’s [`TypedKey`].
+#[derive(Debug)]
+pub struct Incrementer<T: 'static>(
+    /// Invariant: the key's value list must have at least two items.
+    &'static TypedKey<T>,
+);
+
+impl<T: Clone + Send + Sync + 'static> Incrementer<T> {
+    /// Finds the “next” or “previous” value of this setting.
+    ///
+    /// This is usually the next or previous element of [`TypedKey::offered_value_list()`], when
+    /// that list is available, but may be slightly different in a way intended to be useful for
+    /// users stepping through the choices.
+    ///
+    /// * `forward` should be `true` to go to the next item or increase the value,
+    ///   or `false` to go to the preceding item or decrease the value.
+    /// * `wrapping` controls whether to prefer wrapping to the beginning of a list,
+    ///   or stopping at the maximum or last value.
+    ///
+    /// Returns `None` if `wrapping` is false and there is no next/previous value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the set of possible values is empty, if `debug_assertions` are enabled.
+    /// This indicates that the setting is not defined correctly.
+    pub fn adjustment(&self, data: &Data, forward: bool, wrapping: bool) -> Option<T>
+    where
+        T: PartialEq,
+    {
+        /// Whether a value should be included in incrementing, rather than skipped.
+        fn include_value<T: 'static>(data: &Data, value: &T) -> bool {
+            // Special rule for excluding `LightingOption::Bounce` when `RenderMethod` is not
+            // `Reference`, because it does nothing in those cases.
+            // TODO: Have a general system for all settings, instead of a special case.
+            if let Some(lighting_option) = <dyn Any>::downcast_ref::<LightingOption>(value)
+                && *RENDER_METHOD.read(data) != RenderMethod::Reference
+            {
+                *lighting_option != LightingOption::Bounce
+            } else {
+                true
+            }
+        }
+
+        let list = self.0.offered_value_list();
+        let current_value = self.0.read(data);
+
+        // Find the index of the current value.
+        // If the current value is not on the list, pretend it is index 0 (TODO: not ideal)
+        let mut index: usize = list.iter().position(|value| value == current_value).unwrap_or(0);
+
+        for _attempt in 0..list.len() {
+            index = match (forward, wrapping) {
+                (true, true) => index.wrapping_add(1).rem_euclid(list.len()),
+                (false, true) => index.checked_sub(1).unwrap_or(list.len() - 1),
+
+                (true, false) => {
+                    let ni = index.saturating_add(1);
+                    if ni >= list.len() {
+                        return None;
+                    } else {
+                        ni
+                    }
+                }
+                (false, false) => index.checked_sub(1)?,
+            };
+
+            let value = &list[index];
+            if include_value(data, value) {
+                return Some(value.clone());
+            } else {
+                // continue loop to try the next value in sequence
+            }
+        }
+
+        if cfg!(debug_assertions) {
+            panic!(
+                "shouldn’t happen: all values for {key:?} are excluded",
+                key = self.0.key()
+            )
+        } else {
+            Some(current_value.clone())
+        }
     }
 }
 
@@ -477,9 +583,17 @@ impl core::error::Error for SetError {}
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::needless_pass_by_value)]
+
     use super::*;
     use all_is_cubes::arcstr::literal;
     use all_is_cubes::math::ps64;
+    use all_is_cubes_render::camera::{LightingOption, RenderMethod};
+
+    /// Construct `Data` with a single non-default setting.
+    fn one<T: Send + Sync + 'static>(key: &TypedKey<T>, value: T) -> Data {
+        Data::from_iter([(key.key(), (key.serialize)(&value))])
+    }
 
     #[test]
     fn update() {
@@ -571,6 +685,103 @@ mod tests {
         assert_eq!(
             (&sv.unparsed, sv.parsed.is_none()),
             (&literal!("nonsense"), true)
+        );
+    }
+
+    #[test]
+    fn increment_cycle() {
+        let i = LIGHTING_DISPLAY.incrementer().unwrap();
+
+        assert_eq!(
+            i.adjustment(&one(LIGHTING_DISPLAY, LightingOption::Flat), true, false),
+            Some(LightingOption::Coarse),
+        );
+        assert_eq!(
+            i.adjustment(&one(LIGHTING_DISPLAY, LightingOption::Flat), false, false),
+            Some(LightingOption::None),
+        );
+    }
+
+    #[test]
+    fn increment_toggle_bool() {
+        let i = SHOW_UI.incrementer().unwrap();
+        let show_false = one(SHOW_UI, false);
+        let show_true = one(SHOW_UI, true);
+
+        assert_eq!(i.adjustment(&show_false, true, true), Some(true));
+        assert_eq!(i.adjustment(&show_false, false, true), Some(true));
+        assert_eq!(i.adjustment(&show_true, true, true), Some(false));
+        assert_eq!(i.adjustment(&show_true, false, true), Some(false));
+
+        if false {
+            // TODO: only a separate bool toggling mode can do this
+            assert_eq!(i.adjustment(&show_false, true, false), Some(true));
+            assert_eq!(i.adjustment(&show_false, false, false), Some(true));
+            assert_eq!(i.adjustment(&show_true, true, false), Some(false));
+            assert_eq!(i.adjustment(&show_true, false, false), Some(false));
+        }
+    }
+
+    #[test]
+    fn increment_not_available() {
+        // DEBUG_INFO_TEXT_CONTENTS is individual bits and has no meaningful way to increment
+        assert!(DEBUG_INFO_TEXT_CONTENTS.incrementer().is_none());
+    }
+
+    // Desired behavior: increment/decrement numerical values when no static list is provided.
+    // This is not implemented yet; the test is ignored so it documents expected behavior.
+    #[test]
+    #[ignore = "incrementing numeric values not implemented yet"]
+    fn adjustment_numeric_want_increment() {
+        let data = Data::from_iter([(FOV_Y.key(), "60.0".into())]);
+        let new = FOV_Y
+            .incrementer()
+            .unwrap()
+            .adjustment(&data, true, false)
+            .expect("should increment");
+        assert_eq!(new, ps64(61.0));
+    }
+
+    /// Test the special case conditionally excluding [`LightingOption::Bounce`] from incrementing.
+    ///
+    /// TODO: This test should belong in `schema` once this is handled more generically.
+    #[test]
+    fn increment_lighting_option_bounce() {
+        fn setup(lighting: LightingOption, render: RenderMethod) -> Data {
+            Data::from_iter([
+                (
+                    LIGHTING_DISPLAY.key(),
+                    (LIGHTING_DISPLAY.serialize)(&lighting),
+                ),
+                (RENDER_METHOD.key(), (RENDER_METHOD.serialize)(&render)),
+            ])
+        }
+
+        let i = LIGHTING_DISPLAY.incrementer().unwrap();
+        let smooth_mesh = setup(LightingOption::Smoothstep, RenderMethod::Mesh);
+        let smooth_ref = setup(LightingOption::Smoothstep, RenderMethod::Reference);
+        let none_mesh = setup(LightingOption::None, RenderMethod::Mesh);
+        let none_ref = setup(LightingOption::None, RenderMethod::Reference);
+
+        assert_eq!(
+            i.adjustment(&smooth_mesh, true, true),
+            Some(LightingOption::None),
+            "excluded (forward)"
+        );
+        assert_eq!(
+            i.adjustment(&smooth_ref, true, true),
+            Some(LightingOption::Bounce),
+            "included (forward)"
+        );
+        assert_eq!(
+            i.adjustment(&none_mesh, false, true),
+            Some(LightingOption::Smoothstep),
+            "excluded (backward, wrap)"
+        );
+        assert_eq!(
+            i.adjustment(&none_ref, false, true),
+            Some(LightingOption::Bounce),
+            "included (backward, wrap)"
         );
     }
 }
