@@ -809,13 +809,15 @@ fn animate(
 #[allow(clippy::needless_pass_by_value)]
 fn update_phase_1(
     mut info_collector: ecs::ResMut<universe::InfoCollector<BlockDefStepInfo>>,
+    // mutex used to allow collecting data from parallel execution (`InfoCollector` doesn't help)
+    info_buffer: ecs::Local<bevy_platform::sync::Mutex<BlockDefStepInfo>>,
     mut defs: ecs::Query<(&BlockDefState, &mut CacheUpdate)>,
     data_sources: universe::QueryBlockDataSources,
 ) {
     let mq = data_sources.get();
     let read_ticket = ReadTicket::from_queries(&mq);
-    // TODO(ecs): parallel iter
-    for (def_state, mut next) in defs.iter_mut() {
+
+    defs.par_iter_mut().for_each(|(def_state, mut next)| {
         debug_assert!(
             matches!(*next, CacheUpdate::None),
             "CacheUpdate should have been cleared",
@@ -824,11 +826,14 @@ fn update_phase_1(
         // TODO: Instead of checking only the current frame, check the caches of all frames
         // (maybe only if free time permits).
         let (maybe_update, info) = def_state.current_frame().update_phase_1(read_ticket);
+
         if let Some(update) = maybe_update {
             *next = update;
         }
-        info_collector.record(info);
-    }
+
+        *info_buffer.lock().unwrap() += info;
+    });
+    info_collector.record(mem::take(&mut info_buffer.lock().unwrap()));
 }
 
 /// ECS system function that moves new evaluations from `CacheUpdate` to `BlockDef`.
