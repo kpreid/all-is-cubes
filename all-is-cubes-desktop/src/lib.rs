@@ -2,6 +2,7 @@
 #![feature(const_trait_impl)]
 #![feature(doc_cfg)]
 #![feature(never_type)]
+#![feature(new_range, new_range_api)]
 
 //! Components for creating a desktop application that renders interactive [`all_is_cubes`]
 //! content.

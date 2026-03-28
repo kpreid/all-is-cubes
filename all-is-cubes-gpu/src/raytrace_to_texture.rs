@@ -1,6 +1,5 @@
 //! Runs the software raytracer and writes the results into a texture.
 
-use all_is_cubes::util::{ConciseDebug, Refmt};
 use alloc::sync::Arc;
 // TODO: if not using threads, don't even use a Mutex as it's entirely wasted
 use alloc::boxed::Box;
@@ -19,8 +18,9 @@ use web_time::{Duration, Instant};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::{Box2D, point2, point3, vec2, vec3};
 use all_is_cubes::listen;
-use all_is_cubes::math::{OpacityCategory, VectorOps as _};
+use all_is_cubes::math::{OpacityCategory, VectorOps as _, range_len};
 use all_is_cubes::universe::ReadTicket;
+use all_is_cubes::util::{ConciseDebug, Refmt};
 use all_is_cubes_render::camera::{
     Camera, ImagePixel, ImageSize, Layers, StandardCameras, Viewport,
 };
@@ -526,7 +526,7 @@ impl RaytraceToTexture {
                     .saturating_mul(render_viewport.framebuffer_size.height)
                     .saturating_mul(3);
                 render_pass.set_pipeline(&pipelines.rt_reproject_pipeline);
-                render_pass.draw(0..vertex_count, 0..1);
+                render_pass.draw((0..vertex_count).into(), (0..1).into());
             }
 
             // Run gap-filling operation on output of draw
@@ -557,7 +557,7 @@ impl RaytraceToTexture {
         // Draw a straightforward upscaling with no reprojection.
         // TODO: If we previously reprojected, grab the gap-fill output
         render_pass.set_pipeline(&pipelines.rt_frame_copy_pipeline);
-        render_pass.draw(0..3, 0..1);
+        render_pass.draw((0..3).into(), (0..1).into());
 
         Flaws::empty()
     }
@@ -705,6 +705,7 @@ impl Inner {
             }
             UpdateStrategy::Consistent { ref mut next, .. } => {
                 let pixel_iter = (0..self.rays_per_frame)
+                    .into_iter()
                     .map(|i| point_from_pixel_index(render_viewport, i + *next));
                 cfg_select! {
                     feature = "auto-threads" => {
@@ -840,8 +841,8 @@ struct PixelPicker {
 
     /// Iterator that generates indices into `sorted_pixels` to tell us what to render next.
     iter: itertools::Interleave<
-        core::iter::Cycle<core::ops::Range<usize>>,
-        core::iter::Cycle<core::ops::Range<usize>>,
+        core::iter::Cycle<core::range::RangeIter<usize>>,
+        core::iter::Cycle<core::range::RangeIter<usize>>,
     >,
 
     /// Ordering of pixels such that earlier pixels are higher priorities
@@ -861,7 +862,7 @@ impl PixelPicker {
         let image_center = viewport.framebuffer_size.to_vector().to_f64() / 2.0 - vec2(0.5, 0.5);
 
         // Precompute an ordering of the pixels based on distance from center with some dithering.
-        let mut sorted_pixels: Box<[usize]> = (0..pixel_count).collect();
+        let mut sorted_pixels: Box<[usize]> = (0..pixel_count).into_iter().collect();
         sorted_pixels.sort_by_key(|index| {
             let image_point = vec2(index % width, index / width);
             let from_center_point = image_point.to_f64() - image_center;
@@ -880,10 +881,10 @@ impl PixelPicker {
 
         // There are two cyclic iterators interleaved, so the overall cycle length is
         // twice the longest individual cycle length.
-        let cycle_length = inner_range.len().max(outer_range.len()) * 2;
+        let cycle_length = range_len(inner_range).max(range_len(outer_range)) * 2;
 
         PixelPicker {
-            iter: ((inner_range).cycle()).interleave(outer_range.cycle()),
+            iter: ((inner_range).into_iter().cycle()).interleave(outer_range.into_iter().cycle()),
             viewport,
             sorted_pixels,
             cycle_length,

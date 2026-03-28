@@ -178,7 +178,7 @@ mod tests {
     fn all_masks() -> impl Iterator<Item = Mask> {
         // We could have `Mask` implement `Exhaust` instead, but I can’t think of a reason why
         // having that in the public API would ever be useful for anything.
-        (0..=0b1111).map(|flags| Mask { flags })
+        (0..=0b1111).into_iter().map(|flags| Mask { flags })
     }
 
     #[test]

@@ -11,6 +11,8 @@ use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe};
 use all_is_cubes::util::YieldProgress;
 
+use itertools::izip;
+
 use crate::mv;
 use crate::mv::error::DotVoxConversionError;
 
@@ -227,7 +229,7 @@ fn view_all_models_as_blocks(
         })
         .read_ticket(read_ticket)
         .build_and_mutate(|m| {
-            for ((i, space), model) in (0i32..).zip(space_handles).zip(models) {
+            for (i, space, model) in izip!(0i32.., space_handles, models) {
                 let max_size = model.size.x.max(model.size.y).max(model.size.z);
                 let mut resolution = Resolution::R1;
                 while u32::from(resolution) < max_size

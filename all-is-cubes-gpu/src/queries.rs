@@ -117,7 +117,7 @@ impl Queries {
         // Transfer query results from `query_set` to `resolve_buffer`.
         encoder.resolve_query_set(
             &self.query_set,
-            0..Query::COUNT as u32,
+            (0..Query::COUNT as u32).into(),
             &self.resolve_buffer,
             0,
         );
