@@ -176,9 +176,25 @@ impl ops::AddAssign for TimeStats {
         *self = TimeStats {
             count: self.count + rhs.count,
             sum: self.sum + rhs.sum,
-            min: self.min.map_or(rhs.min, |value| Some(value.min(rhs.min?))),
+            // TODO: Replace this with `Option::reduce()` when stable
+            min: match (self.min, rhs.min) {
+                (Some(a), Some(b)) => Some(Duration::min(a, b)),
+                (Some(a), None) | (None, Some(a)) => Some(a),
+                (None, None) => None,
+            },
             max: self.max.max(rhs.max),
         };
+    }
+}
+
+impl ops::Add for TimeStats {
+    type Output = Self;
+
+    #[inline]
+    fn add(mut self, rhs: Self) -> Self::Output {
+        // Note: Test coverage relies on this being implemented via +=
+        self += rhs;
+        self
     }
 }
 
@@ -223,5 +239,38 @@ mod tests {
                 Deadline::Whenever,
             ]
         );
+    }
+
+    #[test]
+    fn time_stats_addition() {
+        let d1 = Duration::from_secs(1);
+        let d2 = Duration::from_secs(2);
+        let stats1 = TimeStats::one(d1);
+        let stats2 = TimeStats::one(d2);
+
+        assert_eq!(
+            stats1,
+            TimeStats {
+                count: 1,
+                sum: d1,
+                min: Some(d1),
+                max: d1
+            },
+            "without addition",
+        );
+        assert_eq!(
+            stats1 + stats2,
+            TimeStats {
+                count: 2,
+                sum: d1 + d2,
+                min: Some(d1),
+                max: d2,
+            },
+            "with addition",
+        );
+        assert_eq!(stats1 + stats2, stats2 + stats1, "commutative");
+
+        assert_eq!(TimeStats::default() + stats2, stats2, "left identity");
+        assert_eq!(stats2 + TimeStats::default(), stats2, "right identity");
     }
 }
