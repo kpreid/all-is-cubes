@@ -3,6 +3,7 @@
 #![feature(const_trait_impl)]
 #![feature(doc_cfg)]
 #![feature(never_type)]
+#![feature(new_range)]
 #![allow(exported_private_dependencies, reason = "false positive on wgpu_types")]
 //! Algorithms for rendering [All is Cubes] content using a GPU, via
 //! the [`wgpu`] graphics library.

@@ -3,7 +3,7 @@
 //! If this documentation looks strangely blank, it's because non-wasm builds have
 //! most of the modules excluded from compilation.
 
-#![feature(new_range, new_range_api)]
+#![cfg_attr(target_family = "wasm", feature(new_range, new_range_api))]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 #![allow(

@@ -25,11 +25,13 @@ fn plane_to_text(voxels: Vol<&[block::Evoxel]>) -> Vec<String> {
     voxels
         .bounds()
         .y_range()
+        .into_iter()
         .rev() // flip Y axis
         .map(|y| {
             voxels
                 .bounds()
                 .x_range()
+                .into_iter()
                 .map(|x| convert_voxel(&voxels[Cube::new(x, y, z)]))
                 .collect::<String>()
         })
@@ -198,8 +200,8 @@ fn bounding_voxels_of_positioning_high() {
 fn positioning_x(
     #[case] pos: PositioningX,
     #[case] odd_font: bool,
-    #[case] bounds_range: core::ops::Range<i32>,
-    #[case] expected: core::ops::Range<i32>,
+    #[case] bounds_range: core::range::Range<i32>,
+    #[case] expected: core::range::Range<i32>,
 ) {
     let text = Text::builder()
         .string(if odd_font {

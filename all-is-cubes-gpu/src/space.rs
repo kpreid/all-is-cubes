@@ -7,7 +7,6 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 use core::mem;
-use core::ops::Range;
 use core::time::Duration;
 use std::sync::{Mutex, PoisonError};
 
@@ -524,7 +523,7 @@ impl SpaceRenderer {
         // Helper for the common logic of opaque + transparent drawing of a single instance
         // that's a chunk mesh (i.e. instance range is length 1).
         fn draw_chunk_instance<'pass>(
-            index_range: Range<usize>,
+            index_range: std::range::Range<usize>,
             render_pass: &mut wgpu::RenderPass<'pass>,
             buffers: &'pass ChunkBuffers,
             instance_buffer_writer: &mut MapVec<'_, WgpuInstanceData>,
@@ -555,8 +554,12 @@ impl SpaceRenderer {
                     return;
                 }
 
-                render_pass.draw_indexed(to_wgpu_index_range(index_range.clone()), 0, id..(id + 1));
-                *triangles_drawn += index_range.len() / 3;
+                render_pass.draw_indexed(
+                    to_wgpu_index_range(index_range),
+                    0,
+                    (id..(id + 1)).into(),
+                );
+                *triangles_drawn += range_len(index_range) / 3;
             }
         }
 
@@ -566,7 +569,7 @@ impl SpaceRenderer {
             // smarter depth test setup.
             render_pass.set_pipeline(&pipelines.skybox_render_pipeline);
             // No vertex buffer; shader generates a fullscreen triangle.
-            render_pass.draw(0..3, 0..1);
+            render_pass.draw((0..3).into(), (0..1).into());
         }
 
         if camera.options().debug_pixel_cost {
@@ -707,12 +710,12 @@ impl SpaceRenderer {
 
             // Record draw command for all instances using this mesh
             let instance_range = first_instance_index..(first_instance_index + count);
-            blocks_drawn += range_len(&instance_range);
-            triangles_drawn += (range_len(&meta.opaque_range()) / 3) * range_len(&instance_range);
+            blocks_drawn += range_len(instance_range);
+            triangles_drawn += (range_len(meta.opaque_range()) / 3) * range_len(instance_range);
             render_pass.draw_indexed(
                 to_wgpu_index_range(meta.opaque_range()),
                 0,
-                instance_range.clone(),
+                instance_range.into(),
             );
 
             // If we are doing overdraw visualization, run the depthless overdraw visualization.
@@ -724,7 +727,7 @@ impl SpaceRenderer {
                 render_pass.draw_indexed(
                     to_wgpu_index_range(meta.opaque_range()),
                     0,
-                    instance_range,
+                    instance_range.into(),
                 );
                 // Restore previous pipeline
                 render_pass.set_pipeline(pipeline_for_opaque);

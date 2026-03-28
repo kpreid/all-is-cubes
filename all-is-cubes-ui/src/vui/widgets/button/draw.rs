@@ -115,7 +115,7 @@ impl ButtonLabel {
             move |label_widget| {
                 let text = label_widget.text(gravity);
                 let bb = text.bounding_blocks();
-                bb.x_range().map(move |x| {
+                bb.x_range().into_iter().map(move |x| {
                     Block::from_primitive(block::Primitive::Text {
                         text: text.clone(),
                         offset: GridVector::new(x, bb.lower_bounds().y, bb.lower_bounds().z),
@@ -288,7 +288,7 @@ fn draw_button_multiblock_from_image(
         &|color| match color {
             image_palette::OUTSIDE => VoxelBrush::single(AIR),
             image_palette::FRAME => VoxelBrush::single(block::from_color!(palette::BUTTON_FRAME)),
-            image_palette::RIM => VoxelBrush::new((0..label_z).map(|z| {
+            image_palette::RIM => VoxelBrush::new((0..label_z).into_iter().map(|z| {
                 // Highlight just the corner with a lighter color;
                 // otherwise identical to BACK.
                 (

@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::error::Error;
 use core::iter;
-use core::ops::Range;
+use core::range::Range;
 use std::sync::Mutex;
 
 use all_is_cubes::block::{self, Block, Resolution, text};
@@ -146,7 +146,7 @@ impl ToolbarController {
         // Note that `contents_iter` is infinite; when zipped with `slot_range` it is then
         // guaranteed to be the right length for our number of slots.
         let slots = watcher.inventory().slots();
-        let slot_range = self.definition.slot_range.clone();
+        let slot_range = self.definition.slot_range;
         let contents_iter = slots[usize::from(slot_range.start).min(slots.len())..]
             .iter()
             .chain(iter::repeat(&inv::Slot::Empty));
@@ -196,7 +196,7 @@ impl ToolbarController {
         pressed: [bool; inv::TOOL_SELECTIONS],
     ) -> WidgetTransaction {
         let mut txn = SpaceTransaction::default();
-        for index in self.definition.slot_range.clone() {
+        for index in self.definition.slot_range {
             let position = self.slot_position(index);
             let this_slot_selected_mask = core::array::from_fn(|sel| {
                 if selected_slots.get(sel).is_some_and(|&i| i == index) {
