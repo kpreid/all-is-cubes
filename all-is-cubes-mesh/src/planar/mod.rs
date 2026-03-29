@@ -169,13 +169,6 @@ pub struct Triangulator {
     /// newly obtained.
     new_frontier: VecDeque<Vertex>,
 
-    /// End position (exclusive) of the slice of `old_frontier` which has been copied/transformed
-    /// into `new_frontier`.
-    ///
-    /// Invariant: If a triangle in the output has vertices that are from some combination of
-    /// `old_frontier[..end_in_old_frontier]` and `new_frontier`, then it has already been emitted.
-    end_in_old_frontier: usize,
-
     /// This flag is set when the main algorithm is unable to create non-inverted triangles.
     /// When this happens, we skip that triangle, and set this flag. Then, the next time
     /// `sweep_position` is advanced, we run the the “ear clipping” algorithm on the frontier
@@ -228,7 +221,6 @@ impl Triangulator {
             sweep_position: GridCoordinate::MIN,
             old_frontier: VecDeque::new(),
             new_frontier: VecDeque::new(),
-            end_in_old_frontier: 0,
             needs_ears_fixed: false,
         }
     }
@@ -244,14 +236,12 @@ impl Triangulator {
             sweep_position,
             old_frontier,
             new_frontier,
-            end_in_old_frontier,
             needs_ears_fixed,
         } = self;
         *basis = new_basis;
         *sweep_position = GridCoordinate::MIN;
         old_frontier.clear();
         new_frontier.clear();
-        *end_in_old_frontier = 0;
         *needs_ears_fixed = false;
     }
 
@@ -284,7 +274,6 @@ impl Triangulator {
 
         mem::swap(&mut self.old_frontier, &mut self.new_frontier);
         self.new_frontier.clear();
-        self.end_in_old_frontier = 0;
         self.sweep_position = new_sweep_position;
 
         viz.set_frontier(&self.old_frontier, &self.new_frontier);
