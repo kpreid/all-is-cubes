@@ -51,32 +51,21 @@
 //! * We could take greedy meshing’s output of quads (not yet converted to triangles), then find
 //!   each T-junction between these quads’ edges and corners, and mark it as a place to introduce
 //!   an extra vertex on all quads touching that point (triangulating each quad as a simple convex
-//!   polygon). This produces extra vertices, and requires comparing all the quads to each other
-//!   to find the junctions.
+//!   polygon).
+//!   However, in cases such as a diamond shape, it is impossible to use only quads without ending
+//!   up with one quad per voxel (or T-junctions).
 //!
 //! * We could use an existing polygon triangulation library.
-//!   This has not been done because
+//!   We are not doing this because:
 //!
-//!   * algorithms not designed exclusively for [orthogonal polygons] would require us
-//!     to preprocess the vertices into separate loops and identify holes, and might do more
-//!     work than necessary to handle diagonal lines that won’t ever occur;
-//!   * with an algorithm dedicated solely to voxel shapes we can optimize it for this use case,
-//!   * and writing a new algorithm was more fun.
-//!
-//!   Searching for libraries that currently exist on crates.io which
-//!   claim to triangulate polygons with holes turned up the following:
-//!
-//!   * [`earcut`](https://crates.io/crates/earcut) — looks promising overall, but contains
-//!     unsafe indexing code without safety comments
-//!   * [`earcutr`](https://crates.io/crates/earcutr) — another port of the same algorithm as
-//!     `earcut`, but is not `no_std` and does not allow avoiding reallocations
-//!   * [`i_triangle`](https://crates.io/crates/i_triangle) — large API with little documentation
-//!   * [`poly2tri-rs`](https://crates.io/crates/poly2tri-rs) — not `no_std` (includes things like
-//!     file loading functions), not efficient in allocations, little documentation
-//!   * [`triangulate`](https://crates.io/crates/triangulate) — heavy required deps
-//!     (`rand`, `backtrace`)
-//!
-//!   TODO: We should test and benchmark at least some of the above list of alternatives.
+//!   * Algorithms not designed for the kind of input we get from our block analysis stage
+//!     (which is all of them, as far as I know)
+//!     would require us to first assemble the vertices into separate loops and identify which
+//!     loops are holes, which would be both more complex and slower.
+//!     (This claim was tested using [`earcut`](https://crates.io/crates/earcut) version 0.4.5.)
+//!   * We can optimize this algorithm for the [orthogonal polygons] that result from our block
+//!     shapes, rather than other use cases.
+//!   * Writing a new algorithm was more fun.
 //!
 //! [sweep line algorithm]: https://en.wikipedia.org/wiki/Sweep_line_algorithm
 //! [orthogonal polygons]: https://en.wikipedia.org/wiki/Rectilinear_polygon
