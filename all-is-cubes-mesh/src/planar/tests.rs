@@ -107,6 +107,7 @@ fn vert(x: i32, y: i32, z: i32, connectivity: Mask, index: u8) -> planar::Vertex
 /// * and `.` for interior fill,
 ///
 /// produce triangulator input vertices compatible with [`test_basis()`].
+/// The vertical axis is flipped, so that the resulting Y coordinates increase up the page.
 ///
 /// The `-` and `|` are not currently used or validated; only `.` vs ` ` near vertices determines
 /// connectivity and thus whether an area is interior.
@@ -497,8 +498,7 @@ fn doc_example_svg_test() {
 
 #[test]
 fn winding() {
-    // Set up right-handed and left-handed in the sense that matters here,
-    // which is *not* which way the plane normal is pointing but
+    // See the doc comment on `is_correct_winding()` for details on what makes these LH and RH
     let xy_rh_basis = planar::Basis::new(Face6::PZ, Face6::PX, Face6::PY);
     let xy_lh_basis = planar::Basis::new(Face6::NZ, Face6::PX, Face6::PY);
     let yx_rh_basis = planar::Basis::new(Face6::NZ, Face6::PY, Face6::PX);

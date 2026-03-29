@@ -662,7 +662,17 @@ impl Basis {
     /// # Explanation
     ///
     /// “Correct” always means counterclockwise wound in the (sweep right, perpendicular up)
-    /// coordinate system, regardless of the 3D handedness of the [`Basis`] we were given.
+    /// right-handed 2D coordinate system, regardless of the 3D handedness that results when the
+    /// third `face` axis is included.
+    /// For example, the triangle ABC in this diagram is correctly wound:
+    ///
+    /// ```text
+    /// C
+    /// |\     ↑ perpendicular ↑
+    /// | \
+    /// A--B   → sweep →
+    /// ```
+    ///
     /// Doing things this way allows us to avoid making each case of triangle emission in the
     /// algorithm handedness-aware; instead, if the desired output is left-handed, [`Basis::emit()`]
     /// reverses *all* triangles.
