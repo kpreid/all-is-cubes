@@ -258,7 +258,7 @@ impl Triangulator {
         );
 
         // Move the end-of-row old frontier vertices to new frontier.
-        self.new_frontier.extend(self.old_frontier.drain(..));
+        self.new_frontier.append(&mut self.old_frontier);
 
         if self.needs_ears_fixed {
             self.clip_ears_in_new_frontier(viz, triangle_callback);
