@@ -40,6 +40,10 @@ allow-wildcard-paths = true
 # workspace-default-features = "warn"
 # external-default-features = "warn"
 
+skip = [
+    { name = "winnow" }, # currently duplicated within bevy_ecs
+]
+
 skip-tree = [
     { name = "criterion" }, # criterion is rarely updated but only used for benching
     { name = "bitflags", version = "=1.3.2", depth = 1 },

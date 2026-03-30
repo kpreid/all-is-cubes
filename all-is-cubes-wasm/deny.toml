@@ -40,6 +40,7 @@ skip = [
     { name = "mutants" }, # lightweight, used by my packages
     { name = "rustc-hash" }, # lightweight, used by naga
     { name = "spin" }, # used by bevy_platform and flume
+    { name = "winnow" }, # currently duplicated within bevy_ecs
 ]
 
 skip-tree = [
