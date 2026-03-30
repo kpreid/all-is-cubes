@@ -27,11 +27,7 @@ pub struct RtOptionsRef<'a, C> {
 }
 
 impl<'a, C> RtOptionsRef<'a, C> {
-    #[doc(hidden)]
-    pub fn _new_but_please_do_not_construct_this_if_you_are_not_all_is_cubes_itself(
-        graphics_options: &'a GraphicsOptions,
-        custom_options: &'a C,
-    ) -> Self {
+    pub(crate) fn new(graphics_options: &'a GraphicsOptions, custom_options: &'a C) -> Self {
         Self {
             graphics_options,
             custom_options,

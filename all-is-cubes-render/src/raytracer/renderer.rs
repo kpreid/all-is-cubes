@@ -382,14 +382,8 @@ impl<P: Accumulate + Default> RtScene<'_, P> {
     /// Constructs [`RtOptionsRef`] referring to the options stored in `self`.
     fn options_refs(&self) -> Layers<RtOptionsRef<'_, <P::BlockData as RtBlockData>::Options>> {
         Layers {
-            world: RtOptionsRef::_new_but_please_do_not_construct_this_if_you_are_not_all_is_cubes_itself(
-                self.cameras.world.options(),
-                &*self.custom_options.world,
-            ),
-            ui: RtOptionsRef::_new_but_please_do_not_construct_this_if_you_are_not_all_is_cubes_itself(
-                self.cameras.ui.options(),
-                &*self.custom_options.ui,
-            ),
+            world: RtOptionsRef::new(self.cameras.world.options(), &*self.custom_options.world),
+            ui: RtOptionsRef::new(self.cameras.ui.options(), &*self.custom_options.ui),
         }
     }
 

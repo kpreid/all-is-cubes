@@ -140,7 +140,7 @@ where
             // TODO: need to listen to the options sources for accurate change detection
             let graphics_options = &*self.graphics_options.get();
             let custom_options = &*self.custom_options.get();
-            let options = RtOptionsRef::_new_but_please_do_not_construct_this_if_you_are_not_all_is_cubes_itself(
+            let options = RtOptionsRef::new(
                 graphics_options,
                 custom_options,
             );

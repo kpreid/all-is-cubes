@@ -141,7 +141,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         allow_ray_bounce: bool,
     ) -> RaytraceInfo {
         let options =
-            RtOptionsRef::_new_but_please_do_not_construct_this_if_you_are_not_all_is_cubes_itself(
+            RtOptionsRef::new(
                 &self.graphics_options,
                 &self.custom_options,
             );
