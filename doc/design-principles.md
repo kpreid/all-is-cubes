@@ -52,6 +52,17 @@ Exceptions:
 See also “The Sane Rendering Manifesto” ([text](https://gist.github.com/bazhenovc/c0aa56cdf50df495fda84de58ef1de5e), [video](https://www.youtube.com/watch?v=KwiwIbjcjW4)) by Kirill / baz! / 
 bazhenovc, which is a similar perspective arrived at independently.
 
+## Correctness
+
+Code should not misbehave in edge cases.
+At worst, it should panic or return an error when successful execution is not possible.
+
+* There should be no possible misbehavior due to numeric overflow, regardless of whether `overflow-checks` are enabled or disabled.
+  If an input exceeds the range that is possible to process, the code should panic, return an error, or clamp the input to the valid range (whichever suits the specific situation).
+  * Explicitly wrapping arithmetic and conversions may be used to improve performance by bypassing overflow checks,
+    when the range of possible values is known as an invariant or it is known that wrapping in that case will not cause misbehavior.
+  * The project’s profile enables `overflow-checks`, not because it is expected that all binaries ever using these libraries will be built with overflow checks, but because we want to discover overflow bugs rather than letting them pass unnoticed.
+
 ## Modularity
 
 All is Cubes is broken up into several library crates.
