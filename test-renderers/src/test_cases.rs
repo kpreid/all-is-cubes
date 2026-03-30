@@ -39,7 +39,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     let tested_lighting_options = || {
         LightingOption::exhaust().filter(|value| {
             // still experimental, and so noisy that a useful test image isn't possible
-            *value != LightingOption::Bounce
+            !matches!(value, LightingOption::Bounce { .. })
         })
     };
 

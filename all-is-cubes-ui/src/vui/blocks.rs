@@ -182,6 +182,7 @@ impl UiBlocks {
             settings::Key::LightingEnabled => None,
             settings::Key::LightInterpolation => None,
             settings::Key::LightingBounce => None,
+            settings::Key::BounceSamples => None,
             settings::Key::Transparency => None,
             settings::Key::TransparencyThreshold => None,
             settings::Key::ShowUi => None,

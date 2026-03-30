@@ -479,7 +479,10 @@ pub enum LightingOption {
     ///
     /// This option has the most physical accuracy, but may be very slow or unsupported.
     /// If unsupported, the renderer should substitute [`Linear`][Self::Linear].
-    Bounce,
+    Bounce {
+        /// The number of light samples that should be taken per pixel.
+        samples: u8,
+    },
 }
 
 /// How to render transparent objects; part of a [`GraphicsOptions`].

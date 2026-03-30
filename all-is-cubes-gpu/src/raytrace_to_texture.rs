@@ -172,7 +172,7 @@ impl RaytraceToTexture {
         let inner = Arc::new(Mutex::new(Inner {
             rays_per_frame: 5000
                 * match cameras.graphics_options().lighting_display {
-                    all_is_cubes_render::camera::LightingOption::Bounce => 1,
+                    all_is_cubes_render::camera::LightingOption::Bounce { .. } => 1,
                     _ => 10,
                 },
             rtr: RtRenderer::new(

@@ -116,12 +116,16 @@ impl<D: RtBlockData> Surface<'_, D> {
         bounce: Option<&mut BounceRng>,
     ) -> (Rgb, RaytraceInfo) {
         match (&rt.graphics_options.lighting_display, bounce) {
-            (LightingOption::Bounce, Some(rng)) => {
+            (
+                &LightingOption::Bounce {
+                    samples: sample_count,
+                },
+                Some(rng),
+            ) => {
                 let mut multi_ray_accum: Rgb = Rgb::ZERO;
                 let mut info_accum = RaytraceInfo::default();
 
                 // Trace multiple pseudorandomly-directed secondary rays.
-                let sample_count = 16u8;
                 for _ in 0..sample_count {
                     // Choose a random reflection direction.
                     // This formula produces a distribution that obeys Lambert’s cosine law.
@@ -166,7 +170,7 @@ impl<D: RtBlockData> Surface<'_, D> {
 
             // Note that if we've exceeded our bounce budget (which is always 1) we use Flat.
             // We don't combine Bounce and interpolation because the improvement is negligible.
-            (LightingOption::Flat | LightingOption::Bounce, _) => {
+            (LightingOption::Flat | LightingOption::Bounce { .. }, _) => {
                 let light = rt.get_packed_light(self.cube + self.normal.normal_vector()).value();
                 (light, RaytraceInfo::default())
             }

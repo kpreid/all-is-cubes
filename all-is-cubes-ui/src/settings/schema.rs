@@ -316,6 +316,22 @@ pub enum Key {
     )]
     LightingBounce,
 
+    /// When [`Self::LightingBounce`] is enabled, determines the number of random rays used.
+    ///
+    /// Note that this is not the number of bounces, which is always either 1 or ∞ depending
+    /// on whether you count the [`Space`] light calculation.
+    ///
+    /// * Indirectly controls [`GraphicsOptions::lighting_display`].
+    /// * Has no effect if [`Self::LightingBounce`] is [`false`].
+    #[custom(
+        key = "graphics/bounce-samples",
+        type = u8,
+        display_name = "Bounce Samples",
+        default = 16,
+        offered_value_list = [4, 16, 64, 255],
+    )]
+    BounceSamples,
+
     /// Method/fidelity to use for transparency.
     ///
     /// * Indirectly controls [`GraphicsOptions::transparency`].
@@ -569,7 +585,9 @@ pub(super) fn assemble_graphics_options(data: &super::Data) -> GraphicsOptions {
     options.lighting_display = if !*data.get(LIGHTING_ENABLED) {
         camera::LightingOption::None
     } else if *data.get(LIGHTING_BOUNCE) {
-        camera::LightingOption::Bounce
+        camera::LightingOption::Bounce {
+            samples: *data.get(BOUNCE_SAMPLES),
+        }
     } else {
         match *data.get(LIGHT_INTERPOLATION) {
             LightInterpolation::Flat => camera::LightingOption::Flat,

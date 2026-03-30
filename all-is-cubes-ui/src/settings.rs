@@ -772,7 +772,7 @@ mod tests {
         );
         assert_eq!(
             i.adjustment(&smooth_ref, true, true),
-            Some(LightingOption::Bounce),
+            Some(LightingOption::Bounce { samples: 16 }),
             "included (forward)"
         );
         assert_eq!(
@@ -782,7 +782,7 @@ mod tests {
         );
         assert_eq!(
             i.adjustment(&none_ref, false, true),
-            Some(LightingOption::Bounce),
+            Some(LightingOption::Bounce { samples: 16 }),
             "included (backward, wrap)"
         );
     }

@@ -66,7 +66,7 @@ impl ShaderSpaceCamera {
             light_option: match options.lighting_display {
                 LightingOption::None => 0,
                 LightingOption::Flat => 1,
-                LightingOption::Linear | LightingOption::Bounce => 2,
+                LightingOption::Linear | LightingOption::Bounce { .. } => 2,
                 LightingOption::Smoothstep => 3,
                 LightingOption::Coarse => 4,
                 ref u => unreachable!("Unhandled LightingOption value {u:?}"),

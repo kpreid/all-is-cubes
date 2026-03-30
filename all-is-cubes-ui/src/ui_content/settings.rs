@@ -115,6 +115,12 @@ pub(crate) fn setting_widget(
             style,
             settings::LIGHTING_BOUNCE,
         )),
+        Key::BounceSamples => Some(setting_enum_button(
+            hud_inputs,
+            style,
+            literal!("Light Bounce Samples"),
+            settings::BOUNCE_SAMPLES,
+        )),
         Key::Transparency => Some(setting_enum_button(
             hud_inputs,
             style,
