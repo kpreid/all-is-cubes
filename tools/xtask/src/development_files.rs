@@ -1,3 +1,5 @@
+use core::fmt::Write as _;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
@@ -147,6 +149,19 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             }
         }),
         json!({
+            "label": "all-is-cubes: benchmark all",
+            "type": "cargo",
+            "command": "bench",
+            // TODO: Ideally we would do something to set up a useful baseline automatically,
+            // but that’ll require stateful logic checking git state and switching branches.
+            "args": [],
+            "problemMatcher": ["$rustc"],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        }),
+        json!({
             "label": "all-is-cubes: check feature flag combinations",
             "type": "cargo",
             "command": "xtask",
@@ -205,7 +220,11 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
     ]);
 
     for package_to_test in crate::ALL_NONTEST_PACKAGES {
-        let mut test_package_args = vec![format!("--package={package_to_test}")];
+        if package_to_test == "all-is-cubes-wasm" {
+            // special testing requirements because it is web code and because it is not in the main
+            // workspace; not supported for now
+            continue;
+        }
 
         // Find the topic-specific part of the package name, e.g. `foo` in `all-is-cubes-foo`.
         let topic = if package_to_test == "all-is-cubes" {
@@ -216,15 +235,13 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             panic!("package name {package_to_test:?} doesn't follow a recognized scheme")
         };
 
+        // List of packages that may contain relevant tests and benches
+        let mut relevant_packages: BTreeSet<String> = BTreeSet::from([package_to_test.into()]);
+
         // Add the associated test package if it exists.
         let test_package_name = format!("test-{topic}");
-        if metadata
-            .workspace_packages()
-            .iter()
-            .find(|p| *p.name == test_package_name)
-            .is_some()
-        {
-            test_package_args.push(format!("--package={test_package_name}"));
+        if metadata.packages.iter().find(|p| *p.name == test_package_name).is_some() {
+            relevant_packages.insert(test_package_name);
         }
 
         // Add test-renderers if the package to test implements renderering.
@@ -235,29 +252,88 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
         ]
         .contains(&package_to_test)
         {
-            test_package_args.push("--package=test-renderers".into());
+            relevant_packages.insert("test-renderers".into());
         }
 
-        let test_task_label = if test_package_args.len() == 1 {
-            format!("all-is-cubes: test {package_to_test}")
+        // Determine which packages, out of the relevant packages, contain benchmarks
+        let benchmark_packages: Vec<String> = relevant_packages
+            .iter()
+            .filter(|package_name| {
+                metadata
+                    .packages
+                    .iter()
+                    .find(|p| p.name == package_name)
+                    .unwrap_or_else(|| panic!("failed to find package {package_name:?}"))
+                    .targets
+                    .iter()
+                    .any(|t| t.is_bench())
+            })
+            .cloned()
+            .collect();
+
+        // Some benchmarks only run if the _special_testing feature is enabled.
+        // But we can't just always specify it, because Cargo will error if none of the selected
+        // packages has it.
+        let needs_special_testing_feature = metadata.packages.iter().any(|p| {
+            benchmark_packages.contains(&p.name) && p.features.contains_key("_special_testing")
+        });
+        let benchmark_features_arg = if needs_special_testing_feature {
+            "--features=_special_testing"
         } else {
-            format!("all-is-cubes: test {package_to_test} and related")
+            "--features=" // noop placeholder
         };
 
         tasks.push(json!({
-            "label": test_task_label,
+            "label": if relevant_packages.len() == 1 {
+                format!("all-is-cubes: test {package_to_test}")
+            } else {
+                format!("all-is-cubes: test {package_to_test} and related")
+            },
             "type": "cargo",
             "command": "test",
-            "args": test_package_args,
+            "args": [cargo_package_arg(relevant_packages)],
             "problemMatcher": ["$rustc"],
             "group": {
                 "kind": "test"
             }
         }));
+
+        if !benchmark_packages.is_empty() {
+            tasks.push(json!({
+                "label": if benchmark_packages.len() == 1 {
+                    format!("all-is-cubes: benchmark {package_to_test}")
+                } else {
+                    format!("all-is-cubes: benchmark {package_to_test} and related")
+                },
+                "type": "cargo",
+                "command": "bench",
+                "args": [cargo_package_arg(benchmark_packages), benchmark_features_arg],
+                "problemMatcher": ["$rustc"],
+                "group": {
+                    "kind": "test"
+                }
+            }));
+        }
     }
 
     json!({
         "version": "2.0.0",
         "tasks": tasks,
     })
+}
+
+/// Construct a `--package=...` argument value.
+fn cargo_package_arg<D: core::fmt::Display>(packages: impl IntoIterator<Item = D>) -> String {
+    let mut packages = packages.into_iter();
+    let mut string = String::from("--package=");
+    write!(
+        string,
+        "{}",
+        packages.next().expect("must have at least one package")
+    )
+    .unwrap();
+    for package in packages {
+        write!(string, ",{package}").unwrap();
+    }
+    string
 }
