@@ -7,6 +7,7 @@
 /all-is-cubes-wasm/pkg
 
 # Generated file (by xtask)
+/.vscode/tasks.json
 /all-is-cubes-wasm/static/third-party-licenses.html
 
 # Tool outputs

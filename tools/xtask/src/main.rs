@@ -41,6 +41,8 @@ use fs_ops::{copy_file_with_context, directory_tree_contents, newer_than};
 mod reporting;
 use reporting::*;
 
+mod development_files;
+
 // -------------------------------------------------------------------------------------------------
 
 fn main() -> Result<(), ActionError> {
@@ -85,8 +87,8 @@ fn run_command(
     time_log: &mut Vec<Timing>,
 ) -> Result<(), ActionError> {
     match command {
-        XtaskCommand::Init => {
-            write_development_files(config)?;
+        XtaskCommand::Init { overwrite } => {
+            development_files::write_development_files(config, overwrite)?;
             if config.scope.includes_main_workspace() {
                 build_web(config, time_log, Profile::Dev)?; // includes installing wasm tools
             }
@@ -807,54 +809,6 @@ fn measure_binary_sizes(config: &Config<'_>) -> Result<(), ActionError> {
     measure("target/release/all-is-cubes")?;
     measure("target/release/aic-server")?;
     measure("all-is-cubes-wasm/target/wasm-pack-release/all_is_cubes_wasm_bg.wasm")?;
-
-    Ok(())
-}
-
-/// Create files which may be useful for development in the workspace but which cannot
-/// simply have constant contents.
-fn write_development_files(_config: &Config<'_>) -> Result<(), ActionError> {
-    // .desktop file, used by Linux desktop application launchers to describe how to run
-    // our executable. It needs to have an absolute path to the file.
-    // The file is also required to be encoded in UTF-8, so non-UTF-8 paths cannot be
-    // supported.
-    if let Some(dir) = PROJECT_DIR.to_str() {
-        let desktop_path = format!("{dir}/all-is-cubes-desktop/all-is-cubes.desktop");
-        fs::write(
-            &desktop_path,
-            format!(
-                "\
-[Desktop Entry]
-Type=Application
-Version=1.0
-Name=All is Cubes (dev)
-Path={dir}
-Exec=cargo run --bin all-is-cubes
-Terminal=false
-Categories=Game;
-PrefersNonDefaultGPU=true
-SingleMainWindow=true
-"
-            )
-            .as_bytes(),
-        )
-        .with_context(|| format!("failed to write {desktop_path}"))?;
-
-        // Desktops may decline to use the file unless it has the execute bit set.
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt as _;
-            let mut permissions = fs::metadata(&desktop_path)
-                .context("read metadata for desktop file")?
-                .permissions();
-            // Set execute bit
-            permissions.set_mode(permissions.mode() | 0o111);
-            fs::set_permissions(&desktop_path, permissions)
-                .context("write metadata for desktop file")?;
-        }
-    } else {
-        eprintln!("Skipping creation of .desktop file because path is not UTF-8");
-    }
 
     Ok(())
 }

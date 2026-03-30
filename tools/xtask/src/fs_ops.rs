@@ -109,18 +109,24 @@ mod tests {
 
     #[test]
     fn test_directory_tree_contents() {
+        // We don't actually care what is in this directory, but it's a relatively stable
+        // and locally-relevant directory to werite this test for.
         let p = &Path::new(env!("CARGO_MANIFEST_DIR"));
         assert_eq!(
             directory_tree_contents(p, p).unwrap(),
-            BTreeSet::from([
-                "Cargo.toml".into(),
-                "src".into(),
-                "src/args.rs".into(),
-                "src/context.rs".into(),
-                "src/fs_ops.rs".into(),
-                "src/main.rs".into(),
-                "src/reporting.rs".into(),
-            ])
+            BTreeSet::from(
+                [
+                    "Cargo.toml",
+                    "src",
+                    "src/args.rs",
+                    "src/context.rs",
+                    "src/development_files.rs",
+                    "src/fs_ops.rs",
+                    "src/main.rs",
+                    "src/reporting.rs",
+                ]
+                .map(PathBuf::from)
+            )
         );
     }
 }

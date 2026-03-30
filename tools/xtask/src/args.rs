@@ -31,7 +31,12 @@ pub(crate) enum XtaskCommand {
     ///
     /// * wasm build output
     /// * `all-is-cubes.desktop` file
-    Init,
+    /// * `.vscode/tasks.json` file
+    Init {
+        /// Overwrite existing files if they differ, rather than only warning.
+        #[arg(long)]
+        overwrite: bool,
+    },
 
     /// Run all tests (and some builds without tests) with default features.
     Test {
