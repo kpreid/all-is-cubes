@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
 use std::fs;
+use std::io;
 use std::path::Path;
 
 use anyhow::Context as _;
@@ -54,18 +55,38 @@ pub(crate) fn write_development_files(
 }
 
 /// Compare the contents of a file against expected contents, and overwrite it if directed to.
+///
+/// TODO: This function is complex and could use unit tests.
 fn check_or_overwrite_file(
     path: &Path,
     expected_contents: &[u8],
     overwrite: bool,
     set_executable: bool,
 ) -> Result<(), ActionError> {
-    let current_contents = fs::read(path)
-        .with_context(|| format!("checking current contents of “{}”", path.display()))?;
-    if current_contents == expected_contents {
+    let current_contents_result = fs::read(path);
+
+    let is_not_found = current_contents_result
+        .as_ref()
+        .is_err_and(|e| e.kind() == io::ErrorKind::NotFound);
+    if current_contents_result
+        .as_ref()
+        .is_ok_and(|contents| contents == expected_contents)
+    {
         // File is up to date; do nothing.
-    } else if overwrite {
-        eprintln!("Overwriting “{}” with new configuration.", path.display());
+    } else if !is_not_found && let Err(error) = current_contents_result {
+        // Unexpected error
+        return Err(ActionError::from(error)
+            .context(format!("checking current contents of “{}”", path.display())));
+    } else if overwrite || is_not_found {
+        eprintln!(
+            "{action} “{path}” with new configuration.",
+            action = if is_not_found {
+                "Creating"
+            } else {
+                "Overwriting"
+            },
+            path = path.display()
+        );
         fs::write(path, expected_contents)
             .with_context(|| format!("overwriting development file “{}”", path.display()))?;
 
