@@ -147,15 +147,27 @@ pub struct Triangulator {
 
     /// Vertices, sorted by `perpendicular_direction.dot(vertex.position)`,
     /// such that the regions bounded by these vertices
-    /// and their projections onto the sweep line is yet to be covered by triangles.
+    /// and their projections onto the sweep line are yet to be covered by triangles.
     ///
-    /// The contents of this are consumed as they are moved to `new_frontier`.
+    /// This deque’s elements are popped as they are either moved to `new_frontier`, or discarded
+    /// when all triangles of the vertex are finished.
     old_frontier: VecDeque<Vertex>,
 
     /// Partial list of vertices that will be swapped into `old_frontier` when the sweep advances.
     /// This is made up of vertices that are all ≤ in `perpendicular_direction` than the most
     /// recently consumed input vertex, and may be copies of `old_frontier`’s vertices or may be
     /// newly obtained.
+    ///
+    /// These vertices serve three purposes:
+    ///
+    /// 1. Those which are connected forward are moved into `old_frontier` the next time the sweep
+    ///    line advances, and then new triangles are built back to them once suitable new vertices
+    ///    have been found.
+    /// 2. The back of this deque (the most recently added vertices) is used to remember recent
+    ///    vertices that we might building further triangles to.
+    /// 3. When [`Self::clip_ears_in_new_frontier`] runs, it uses these vertices as the set of
+    ///    polylines that it operates on. This is why vertices without forward connectivity are
+    ///    included here; such vertices may be the vertices the ear triangles connect to.
     new_frontier: VecDeque<Vertex>,
 
     /// This flag is set when the main algorithm is unable to create non-inverted triangles.
@@ -246,21 +258,23 @@ impl Triangulator {
             "incorrect vertex ordering"
         );
 
-        // Move the end-of-row old frontier vertices to new frontier.
+        // Keep the end-of-row old frontier vertices, which we didn't already handle by
+        // encountering an input vertex that interacted with them, in the frontier.
+        // These will be in `old_frontier` when this function finishes.
         self.new_frontier.append(&mut self.old_frontier);
 
         if self.needs_ears_fixed {
             self.clip_ears_in_new_frontier(viz, triangle_callback);
         }
 
-        // Discard all vertices that are connected only to area that is behind the line.
-        // It would be more efficient to not insert them in the first place, but that would
-        // complicate the algorithm when it is producing triangles connecting to the preceding
-        // vertex. TODO(planar_new): Implement that later.
+        // Discard all vertices that are connected only backward (to area that is behind the sweep).
+        // We needed to remember these vertices because they might have been used by the
+        // preceding ear-clipping step, but now they are irrelevant.
         self.new_frontier.retain(|frontier_vertex| {
             frontier_vertex.connectivity.contains_any_of(Mask::FSFP | Mask::FSBP)
         });
 
+        // Every frontier vertex created or kept is now “old” instead of “new”.
         mem::swap(&mut self.old_frontier, &mut self.new_frontier);
         self.new_frontier.clear();
         self.sweep_position = new_sweep_position;
