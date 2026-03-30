@@ -28,8 +28,9 @@ This repository is divided into several Rust packages:
 
 The following packages and other directories are for testing:
 
-* `fuzz/` is a package containing fuzz tests.
+* `test-*/` are packages containing tests and bencvhmarks for the above packages which require significant additional dependencies. (For example, `test-aic/` contains tests for `all-is-cubes`, but also depends on `all-is-cubes-render`.)
 * `test-renderers/` is a package containing image-comparison tests.
+* `fuzz/` is a package containing fuzz tests.
 * `tools/` contains miscellaneous files relating to development.
 
 Building and running

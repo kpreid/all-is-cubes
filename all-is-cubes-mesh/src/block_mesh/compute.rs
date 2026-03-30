@@ -30,6 +30,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
     block: &EvaluatedBlock,
     texture_allocator: &M::Alloc,
     options: &MeshOptions,
+    // Calls to `Viz` compile to nothing when the "rerun" feature is not enabled.
     mut viz: Viz,
 ) {
     output.clear();
