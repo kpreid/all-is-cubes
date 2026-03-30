@@ -117,27 +117,29 @@ SingleMainWindow=true
 fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
     let mut tasks = Vec::new();
 
+    // These fixed tasks are largely a subset of the subcommands from `XtaskCommand`
     tasks.extend([
         json!({
-            "label": "all-is-cubes: lint all",
+            "label": "all-is-cubes: lint all code",
             "type": "cargo",
             "command": "xtask",
-            "args": [
-                "lint"
-            ],
+            "args": ["lint"],
             "problemMatcher": ["$rustc"],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
+            "group": {"kind": "build"},
+        }),
+        json!({
+            "label": "all-is-cubes: lint dependency graph",
+            "type": "cargo",
+            "command": "xtask",
+            "args": ["check-deps"],
+            "problemMatcher": ["$rustc"],
+            "group": {"kind": "build"},
         }),
         json!({
             "label": "all-is-cubes: test all",
             "type": "cargo",
             "command": "xtask",
-            "args": [
-                "test"
-            ],
+            "args": ["test"],
             "problemMatcher": ["$rustc"],
             "group": {
                 "kind": "test",
@@ -145,14 +147,18 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             }
         }),
         json!({
+            "label": "all-is-cubes: check feature flag combinations",
+            "type": "cargo",
+            "command": "xtask",
+            "args": ["check-features"],
+            "problemMatcher": ["$rustc"],
+            "group": {"kind": "build"},
+        }),
+        json!({
             "label": "all-is-cubes: run desktop",
             "type": "cargo",
             "command": "run",
-            "args": [
-                "--bin",
-                "all-is-cubes",
-                "--",
-            ],
+            "args": ["--bin", "all-is-cubes", "--"],
             "problemMatcher": ["$rustc"],
             "group": "test"
         }),
@@ -160,11 +166,41 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             "label": "all-is-cubes: run dev-server",
             "type": "cargo",
             "command": "xtask",
-            "args": [
-                "run-dev",
-            ],
+            "args": ["run-dev"],
             "problemMatcher": ["$rustc"],
             "group": "test"
+        }),
+        json!({
+            "label": "all-is-cubes: run all fuzzers",
+            "type": "cargo",
+            "command": "xtask",
+            "args": ["fuzz", "60"],
+            "problemMatcher": ["$rustc"],
+            "group": "test"
+        }),
+        json!({
+            "label": "all-is-cubes: build documentation",
+            "type": "cargo",
+            "command": "xtask",
+            "args": ["doc"],
+            "problemMatcher": ["$rustc"],
+            "group": {"kind": "build"}
+        }),
+        json!({
+            "label": "all-is-cubes: check release binary sizes",
+            "type": "cargo",
+            "command": "xtask",
+            "args": ["bin-size"],
+            "problemMatcher": ["$rustc"],
+            "group": {"kind": "test"}
+        }),
+        json!({
+            "label": "all-is-cubes: reinitialize development files",
+            "type": "cargo",
+            "command": "xtask",
+            "args": ["init", "--overwrite"],
+            "problemMatcher": ["$rustc"],
+            "group": {"kind": "build"}
         }),
     ]);
 
