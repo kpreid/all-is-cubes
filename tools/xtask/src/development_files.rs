@@ -1,5 +1,5 @@
-use core::fmt::Write as _;
 use std::collections::BTreeSet;
+use std::fmt;
 use std::fs;
 use std::path::Path;
 
@@ -291,7 +291,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             },
             "type": "cargo",
             "command": "test",
-            "args": [cargo_package_arg(relevant_packages)],
+            "args": Vec::from_iter(relevant_packages.iter().map(cargo_package_arg)),
             "problemMatcher": ["$rustc"],
             "group": {
                 "kind": "test"
@@ -307,7 +307,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
                 },
                 "type": "cargo",
                 "command": "bench",
-                "args": [cargo_package_arg(benchmark_packages), benchmark_features_arg],
+                "args": Vec::from_iter(benchmark_packages.iter().map(cargo_package_arg).chain([String::from(benchmark_features_arg)])),
                 "problemMatcher": ["$rustc"],
                 "group": {
                     "kind": "test"
@@ -323,17 +323,6 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
 }
 
 /// Construct a `--package=...` argument value.
-fn cargo_package_arg<D: core::fmt::Display>(packages: impl IntoIterator<Item = D>) -> String {
-    let mut packages = packages.into_iter();
-    let mut string = String::from("--package=");
-    write!(
-        string,
-        "{}",
-        packages.next().expect("must have at least one package")
-    )
-    .unwrap();
-    for package in packages {
-        write!(string, ",{package}").unwrap();
-    }
-    string
+fn cargo_package_arg(package: impl fmt::Display) -> String {
+    format!("--package={package}")
 }
