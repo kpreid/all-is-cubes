@@ -170,6 +170,14 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             }
         }),
         json!({
+            "label": "all-is-cubes: test renderers",
+            "type": "cargo",
+            "command": "test",
+            "args": ["--package=test-renderers", "--no-fail-fast"],
+            "problemMatcher": ["$rustc"],
+            "group": {"kind": "test"},
+        }),
+        json!({
             "label": "all-is-cubes: benchmark all",
             "type": "cargo",
             "command": "bench",
