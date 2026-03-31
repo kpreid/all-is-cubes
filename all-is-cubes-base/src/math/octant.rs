@@ -235,8 +235,7 @@ impl OctantMask {
     pub const NONE: Self = Self { flags: 0x00 };
 
     #[inline]
-    #[doc(hidden)]
-    pub const fn from_zmaj_bits(flags: u8) -> Self {
+    const fn from_zmaj_bits(flags: u8) -> Self {
         Self { flags }
     }
 
