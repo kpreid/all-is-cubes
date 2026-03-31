@@ -241,19 +241,19 @@ impl OctantMask {
 
     /// Get the flag for the given octant.
     #[inline]
-    pub fn get(self, octant: Octant) -> bool {
+    pub const fn get(self, octant: Octant) -> bool {
         self.flags & (1 << octant.to_zmaj_index()) != 0
     }
 
     /// Set the flag for the given octant.
     #[inline]
-    pub fn set(&mut self, octant: Octant) {
+    pub const fn set(&mut self, octant: Octant) {
         self.flags |= 1 << octant.to_zmaj_index();
     }
 
-    /// Clear the flat for the given octant.
+    /// Clear the flag for the given octant.
     #[inline]
-    pub fn clear(&mut self, octant: Octant) {
+    pub const fn clear(&mut self, octant: Octant) {
         self.flags &= !(1 << octant.to_zmaj_index());
     }
 
@@ -261,7 +261,7 @@ impl OctantMask {
     /// [`false`]/clear.
     #[inline]
     #[must_use]
-    pub fn shift(self, direction: Face6) -> Self {
+    pub const fn shift(self, direction: Face6) -> Self {
         let flags = self.flags;
         Self {
             flags: match direction {
