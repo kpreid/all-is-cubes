@@ -206,6 +206,7 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "criterion",
+ "derive_more",
  "flume",
  "futures-channel",
  "futures-core",

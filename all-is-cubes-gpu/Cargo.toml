@@ -54,6 +54,7 @@ all-is-cubes-mesh = { workspace = true, features = ["dynamic"] }
 all-is-cubes-render = { workspace = true, features = ["raytracer"] }
 bytemuck = { workspace = true, features = ["derive"] }
 cfg-if = { workspace = true }
+derive_more = { workspace = true }
 # Used to implement start_polling(). Also a `wgpu` dependency already.
 flume = { workspace = true }
 futures-channel = { workspace = true, features = ["sink"] }

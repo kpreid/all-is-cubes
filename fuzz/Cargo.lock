@@ -96,6 +96,7 @@ dependencies = [
  "all-is-cubes-render",
  "bytemuck",
  "cfg-if",
+ "derive_more",
  "flume",
  "futures-channel",
  "futures-core",

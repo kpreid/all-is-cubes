@@ -1,5 +1,5 @@
+use core::fmt;
 use core::time::Duration;
-use core::{fmt, ops};
 
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
@@ -331,24 +331,12 @@ impl Fmt<StatusText> for SpaceDrawInfo {
 /// Performance info about [`Block`] texture management.
 ///
 /// [`Block`]: all_is_cubes::block::Block
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, derive_more::Add)]
 pub struct BlockTextureInfo {
     pub(crate) flushed: usize,
     pub(crate) flush_time: Duration,
     pub(crate) in_use_tiles: usize,
     pub(crate) texels: crate::octree_alloc::Info,
-}
-
-impl ops::Add for BlockTextureInfo {
-    type Output = Self;
-    fn add(self, rhs: Self) -> Self::Output {
-        BlockTextureInfo {
-            flushed: self.flushed + rhs.flushed,
-            flush_time: self.flush_time + rhs.flush_time,
-            in_use_tiles: self.in_use_tiles + rhs.in_use_tiles,
-            texels: self.texels + rhs.texels,
-        }
-    }
 }
 
 impl Fmt<StatusText> for BlockTextureInfo {
