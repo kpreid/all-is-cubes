@@ -11,6 +11,7 @@
       It replaces `Modifier::Attributes`.
     * `math::Aab::expand_or_shrink()`
     * `math::FaceMap::{as_array, as_array_mut}()`
+    * `math::OctantMask::{any, from_face, from_octant}()`
     * `math::PositiveSign::mul()`
     * `math::Rgb::scale()`
     * `math::Vol::origin_empty()`, infallible construction of empty volume.

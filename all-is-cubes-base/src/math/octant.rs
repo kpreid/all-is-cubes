@@ -239,6 +239,31 @@ impl OctantMask {
         Self { flags }
     }
 
+    /// Returns the [`OctantMask`] which contains only the given [`Octant`].
+    #[inline]
+    pub const fn from_octant(octant: Octant) -> Self {
+        let mut new_self = OctantMask::NONE;
+        new_self.set(octant);
+        new_self
+    }
+
+    /// Returns the [`OctantMask`] which contains the four octants that lie on the given side of
+    /// the origin.
+    #[inline]
+    pub const fn from_face(face: Face6) -> Self {
+        // Optimization note: this compiles down to bitwise trickery and does not branch
+        // or use an out-of-line lookup table.
+        OctantMask::ALL.shift(face)
+    }
+
+    /// Returns whether the mask has any bit set.
+    ///
+    /// This is equivalent to `self != OctantMask::NONE`.
+    #[inline]
+    pub const fn any(self) -> bool {
+        self.flags != 0
+    }
+
     /// Get the flag for the given octant.
     #[inline]
     pub const fn get(self, octant: Octant) -> bool {
@@ -407,11 +432,10 @@ impl FromIterator<Octant> for OctantMask {
 }
 
 impl From<Octant> for OctantMask {
+    /// Equivalent to [`OctantMask::from_octant()`].
     #[inline]
     fn from(octant: Octant) -> Self {
-        let mut new_self = OctantMask::NONE;
-        new_self.set(octant);
-        new_self
+        Self::from_octant(octant)
     }
 }
 
@@ -575,6 +599,30 @@ mod tests {
 
         assert_eq!(format!("{some:?}"), "{+X−Y−Z, +X+Y−Z}");
         assert_eq!(format!("{some:#?}"), "{+X−Y−Z, +X+Y−Z}");
+    }
+
+    #[test]
+    fn mask_from_octant() {
+        assert_eq!(
+            OctantMask::from_octant(Octant::Pnp),
+            OctantMask::from_face(PX).shift(NY).shift(PZ)
+        );
+    }
+
+    #[test]
+    fn mask_from_face() {
+        let face_mask = OctantMask::from_face(PY);
+        assert_eq!(
+            [face_mask.get(Octant::Pnp), face_mask.get(Octant::Ppp)],
+            [false, true]
+        );
+    }
+
+    #[test]
+    fn mask_any() {
+        assert_eq!(OctantMask::NONE.any(), false);
+        assert_eq!(OctantMask::ALL.any(), true);
+        assert_eq!(OctantMask::from_octant(Octant::Nnp).any(), true);
     }
 
     #[test]

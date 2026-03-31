@@ -334,7 +334,7 @@ fn analyze_one_window(
 /// Returns whether any bits in the more `face`ward side of `mask` are set while the
 /// corresponding bits on the opposite side are *not* set.
 fn uncovered(mask: OctantMask, face: Face6) -> bool {
-    mask & OctantMask::ALL.shift(face) & !mask.shift(face) != OctantMask::NONE
+    (mask & OctantMask::from_face(face) & !mask.shift(face)).any()
 }
 
 /// Iterates over all 2×2×2 windows that intersect at least one voxel, and calls `f` with

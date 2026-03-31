@@ -220,7 +220,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
         let voxel_transform_inverse = voxel_transform.inverse();
         let face_mesh = &mut output.face_vertices[face];
         let interior_mesh = &mut output.interior_vertices[face];
-        let interior_side_octant_mask = OctantMask::ALL.shift(-face);
+        let interior_side_octant_mask = OctantMask::from_face(-face);
 
         let triangulator_basis = planar::Basis::new(
             face,
@@ -342,8 +342,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                         v.renderable & !v.opaque
                     } else {
                         v.opaque
-                    } & interior_side_octant_mask
-                        != OctantMask::NONE)
+                    } & interior_side_octant_mask)
+                        .any()
                         && voxel_transform_inverse.transform_point(v.position).z == layer
                 }));
 
@@ -529,7 +529,7 @@ fn analysis_vertex_to_planar_vertex(
             } else {
                 basis.perpendicular_direction()
             })
-            != OctantMask::NONE
+            .any()
     }
 
     let mut connectivity = Mask::EMPTY;
