@@ -1,3 +1,4 @@
+use all_is_cubes::util::StatusText;
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -177,12 +178,12 @@ where
     /// Panics if `output`’s length is not correct.
     ///
     /// [`Universe`]: all_is_cubes::universe::Universe
-    pub fn draw<P, E, O, IF>(&self, info_text_fn: IF, encoder: E, output: &mut [O]) -> RaytraceInfo
+    pub fn draw<P, E, O, IF>(&self, info_text_fn: IF, encoder: E, output: &mut [O]) -> ImageInfo
     where
         P: Accumulate<BlockData = D> + Default,
         E: Fn(P) -> O + Send + Sync,
         O: Clone + Send + Sync, // Clone is used in the no-data case
-        IF: FnOnce(&RaytraceInfo) -> String,
+        IF: FnOnce(&ImageInfo) -> String,
     {
         let scene = self.scene();
         let viewport = scene.cameras.world.viewport();
@@ -193,10 +194,15 @@ where
             "Viewport size does not match output buffer length",
         );
 
-        let info = trace_image::trace_scene_to_image_impl(&scene, &encoder, output);
+        let raw_info: RaytraceInfo =
+            trace_image::trace_scene_to_image_impl(&scene, &encoder, output);
 
-        let info_text: String = info_text_fn(&info);
-        if !info_text.is_empty() && self.cameras.cameras().world.options().debug_info_text {
+        // Add image size so that we can put the tracing info in context
+        let image_info = ImageInfo::new(raw_info, viewport);
+
+        let onscreen_info_text: String = info_text_fn(&image_info);
+        if !onscreen_info_text.is_empty() && self.cameras.cameras().world.options().debug_info_text
+        {
             eg::draw_info_text(
                 output,
                 viewport,
@@ -204,11 +210,11 @@ where
                     encoder(P::paint(Rgba::BLACK, scene.options_refs().ui)),
                     encoder(P::paint(Rgba::WHITE, scene.options_refs().ui)),
                 ],
-                &info_text,
+                &onscreen_info_text,
             );
         }
 
-        info
+        image_info
     }
 
     /// Returns a [`RtScene`] which may be used to compute individual image pixels.
@@ -256,7 +262,7 @@ impl RtRenderer<()> {
     ///
     ///  [`Camera::post_process_color()`]: crate::camera::Camera::post_process_color
     #[expect(clippy::missing_panics_doc)]
-    pub fn draw_rgba(&self, info_text_fn: impl FnOnce(&RaytraceInfo) -> String) -> Rendering {
+    pub fn draw_rgba(&self, info_text_fn: impl FnOnce(&ImageInfo) -> String) -> Rendering {
         let camera = self.cameras.cameras().world.clone();
         let size = self.modified_viewport().framebuffer_size;
 
@@ -453,6 +459,8 @@ fn point_within_patch(patch: NdcRect, uv: euclid::default::Vector2D<f64>) -> Ndc
     patch.min + (patch.max - patch.min).component_mul(uv.cast_unit())
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Threaded and non-threaded implementations of generating a full image.
 /// TODO: The design of this code (and its documentation) are slightly residual from
 /// when `trace_scene_to_image()` was a public interface. Revisit them.
@@ -568,6 +576,55 @@ mod trace_image {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
+/// Info about the raytracing performed by [`RtRenderer`].
+///
+/// Builds on [`RaytraceInfo`] to describe the per-pixel cost as well as the total cost.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct ImageInfo {
+    /// Information about all the tracing that was performed, without considering the size of
+    /// the image.
+    pub trace_info: RaytraceInfo,
+    viewport: Viewport,
+}
+
+impl ImageInfo {
+    fn new(trace_info: RaytraceInfo, viewport: Viewport) -> Self {
+        Self {
+            trace_info,
+            viewport,
+        }
+    }
+}
+
+impl manyfmt::Fmt<StatusText> for ImageInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+        let &Self {
+            trace_info: RaytraceInfo { cubes_traced },
+            viewport,
+        } = self;
+        let cubes_per_pixel = cubes_traced as f64 / viewport.pixel_count().unwrap_or(0) as f64;
+        let width = viewport.framebuffer_size.width;
+        let height = viewport.framebuffer_size.height;
+        write!(
+            fmt,
+            "Traced {cubes_traced} cubes, {cubes_per_pixel:.01} cubes/pixel in {width}×{height} image"
+        )
+    }
+}
+
+impl Default for ImageInfo {
+    fn default() -> Self {
+        Self {
+            trace_info: RaytraceInfo::default(),
+            viewport: Viewport::with_scale(1.0, [0, 0]),
+        }
+    }
+}
+// -------------------------------------------------------------------------------------------------
+
 mod eg {
     use super::*;
     use embedded_graphics::Drawable;
@@ -660,6 +717,8 @@ mod eg {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

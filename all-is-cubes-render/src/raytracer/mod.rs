@@ -35,7 +35,7 @@ use sr::{TracingBlock, TracingCubeData};
 mod rayon_util;
 
 mod renderer;
-pub use renderer::{RtRenderer, RtScene};
+pub use renderer::{ImageInfo, RtRenderer, RtScene};
 
 #[doc(hidden)] // experimental/internal, used only by test-renderers right now
 pub mod ortho;

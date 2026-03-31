@@ -2,7 +2,7 @@ use std::fmt;
 
 use all_is_cubes::euclid::Vector2D;
 use all_is_cubes_render::camera::{ImagePixel, Viewport};
-use all_is_cubes_render::raytracer::RaytraceInfo;
+use all_is_cubes_render::raytracer::ImageInfo;
 
 use super::{TerminalOptions, TextAndColor};
 
@@ -19,7 +19,7 @@ pub(super) struct TextRayImage {
     pub image: Vec<TextAndColor>,
     /// Not relevant to the image per se, but it is convenient to carry along the info
     /// through this path.
-    pub info: RaytraceInfo,
+    pub info: ImageInfo,
 }
 
 impl fmt::Debug for TextRayImage {

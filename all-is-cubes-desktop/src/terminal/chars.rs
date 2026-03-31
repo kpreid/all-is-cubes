@@ -305,7 +305,7 @@ mod tests {
     use crate::terminal::TerminalOptions;
     use all_is_cubes::euclid::size2;
     use all_is_cubes_render::camera::{ImageSize, Viewport, area_usize};
-    use all_is_cubes_render::raytracer::RaytraceInfo;
+    use all_is_cubes_render::raytracer::ImageInfo;
 
     fn test_image(
         options: TerminalOptions,
@@ -323,7 +323,7 @@ mod tests {
             viewport: Viewport::with_scale(1.0, dimensions), // scale is ignored
             options,
             image,
-            info: RaytraceInfo::default(),
+            info: ImageInfo::default(),
         }
     }
 

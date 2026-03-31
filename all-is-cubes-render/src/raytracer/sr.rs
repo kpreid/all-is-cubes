@@ -140,11 +140,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         include_sky: bool,
         allow_ray_bounce: bool,
     ) -> RaytraceInfo {
-        let options =
-            RtOptionsRef::new(
-                &self.graphics_options,
-                &self.custom_options,
-            );
+        let options = RtOptionsRef::new(&self.graphics_options, &self.custom_options);
         let ray_direction = ray.direction();
 
         let sky_light = include_sky.then(|| self.sky.sample(ray.direction()));
@@ -503,14 +499,17 @@ fn mix4(a: [f32; 4], b: [f32; 4], amount: f32) -> [f32; 4] {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Performance info from a [`SpaceRaytracer`] operation.
+/// Performance info from one or more [`SpaceRaytracer`] tracing operations.
 ///
 /// The contents of this structure are subject to change; use [`Debug`] to view it.
 /// The [`Default`] value is the zero value.
+///
+/// See also [`ImageInfo`][crate::raytracer::renderer::ImageInfo]
+/// which incorporates image dimensions.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct RaytraceInfo {
-    cubes_traced: usize,
+    pub(crate) cubes_traced: usize,
 }
 
 impl core::ops::Add for RaytraceInfo {
