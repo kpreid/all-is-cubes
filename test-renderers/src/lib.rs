@@ -19,19 +19,18 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use all_is_cubes::util::ConciseDebug;
-use all_is_cubes::util::Refmt as _;
-use all_is_cubes::util::StatusText;
 use clap::builder::PossibleValue;
 use image::RgbaImage;
 use rendiff::{Histogram, Threshold};
 
 use all_is_cubes::character::Character;
+use all_is_cubes::euclid::size2;
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::Handle;
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{Handle, Universe};
+use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText};
 use all_is_cubes_content::free_editing_starter_inventory;
 use all_is_cubes_render::Rendering;
+use all_is_cubes_render::camera::ImageSize;
 
 mod harness;
 pub use harness::*;
@@ -119,15 +118,25 @@ pub fn finish_universe_from_space(
 /// Result of calling [`compare_rendered_image`]
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ComparisonRecord {
-    expected_file_name: String,
-    actual_file_name: String,
-    diff_file_name: Option<String>,
+    expected_image: ComparisonImage,
+    actual_image: ComparisonImage,
+    diff_image: Option<ComparisonImage>,
     diff_histogram: Vec<usize>, // length 256; is a Vec for serializability
     outcome: ComparisonOutcome,
 
     // Info from the renderer.
     // Not part of the comparison, but something we want to include in the report.
     render_info: String,
+}
+
+/// Information about an image file to be displayed in the report.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ComparisonImage {
+    /// Name of the image file (only; not an absolute path).
+    /// The directory must be known by context.
+    file_name: String,
+    width: u32,
+    height: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -145,6 +154,7 @@ pub enum ComparisonOutcome {
     /// The flaws included `Flaws::UNFINISHED`, which shouldn't happen.
     Unfinished,
 }
+
 impl ComparisonOutcome {
     /// Check if the outcome is flawed, that is, a comparison failure occurred but should be disregarded.|
     /// This method exists to centralize a couple of cases where we make this check
@@ -161,24 +171,18 @@ impl ComparisonOutcome {
 }
 
 impl ComparisonRecord {
-    fn from_paths(
-        expected_file_path: &Path,
-        actual_file_path: &Path,
-        diff_file_path: Option<&Path>,
+    fn new(
+        expected_image: ComparisonImage,
+        actual_image: ComparisonImage,
+        diff_image: Option<ComparisonImage>,
         diff_histogram: Histogram,
         outcome: ComparisonOutcome,
         render_info: String,
     ) -> Self {
         ComparisonRecord {
-            expected_file_name: expected_file_path
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string(),
-            actual_file_name: actual_file_path.file_name().unwrap().to_str().unwrap().to_string(),
-            diff_file_name: diff_file_path
-                .map(|p| p.file_name().unwrap().to_str().unwrap().to_string()),
+            expected_image,
+            actual_image,
+            diff_image,
             diff_histogram: diff_histogram.0.into_iter().collect(),
             outcome,
             render_info,
@@ -194,9 +198,19 @@ impl ComparisonRecord {
             }
             ComparisonOutcome::NoExpected => Some(format!(
                 "Expected image not found; no comparison done: {p}",
-                p = self.expected_file_name
+                p = self.expected_image.file_name
             )),
             ComparisonOutcome::Unfinished => Some(String::from("Image unfinished!")),
+        }
+    }
+}
+
+impl ComparisonImage {
+    fn new(path: &Path, size: ImageSize) -> Self {
+        Self {
+            file_name: path.file_name().unwrap().to_str().unwrap().to_string(),
+            width: size.width,
+            height: size.height,
         }
     }
 }
@@ -241,9 +255,9 @@ pub fn compare_rendered_image(
                 }) {
                     Ok(r) => r,
                     Err(NotFound(expected_file_path)) => {
-                        return ComparisonRecord::from_paths(
-                            &expected_file_path,
-                            &actual_file_path,
+                        return ComparisonRecord::new(
+                            ComparisonImage::new(&expected_file_path, ImageSize::zero()), // TODO: should be optional
+                            ComparisonImage::new(&actual_file_path, actual_rendering.size),
                             None,
                             Histogram::ZERO,
                             ComparisonOutcome::NoExpected,
@@ -260,7 +274,7 @@ pub fn compare_rendered_image(
     let end_diff_time = Instant::now();
 
     // Save diff image to disk
-    if let Some(image) = diff_result.diff_image() {
+    let diff_c_image: Option<ComparisonImage> = if let Some(image) = diff_result.diff_image() {
         RgbaImage::from_raw(
             image.width() as u32,
             image.height() as u32,
@@ -269,6 +283,10 @@ pub fn compare_rendered_image(
         .unwrap()
         .save(&diff_file_path)
         .expect("failed to write renderer diff image");
+        Some(ComparisonImage::new(
+            &diff_file_path,
+            size2(image.width() as u32, image.height() as u32),
+        ))
     } else {
         match fs::remove_file(&diff_file_path) {
             Ok(()) => {}
@@ -280,12 +298,19 @@ pub fn compare_rendered_image(
                 )
             }
         }
-    }
+        None
+    };
 
-    let record = ComparisonRecord::from_paths(
-        &expected_file_path,
-        &actual_file_path,
-        Some(&diff_file_path),
+    let record = ComparisonRecord::new(
+        ComparisonImage::new(
+            &expected_file_path,
+            size2(
+                expected_image.width() as u32,
+                expected_image.height() as u32,
+            ),
+        ),
+        ComparisonImage::new(&actual_file_path, actual_rendering.size),
+        diff_c_image,
         diff_result.histogram(),
         if allowed_difference.allows(diff_result.histogram()) {
             ComparisonOutcome::Equal

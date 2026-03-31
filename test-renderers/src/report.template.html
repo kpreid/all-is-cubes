@@ -38,16 +38,31 @@
                   {{ if comp_record.show_expected_for_comparison }} open {{ endif }}               
                 >🔍</summary>
                 <figure>
-                  <img src="expected/{comp_record.expected.file_name}" title="Expected">
+                  <img
+                    src="expected/{comp_record.expected.file_name}"
+                    width="{comp_record.expected.width}"
+                    height="{comp_record.expected.height}"
+                    title="Expected"
+                  >
                   <figcaption>Expected</figcaption>
                 </figure><!--
                 -->{{ for diff in comp_record.diff }}<figure>
-                  <img src="diff/{diff.file_name}" title="Diff">
+                  <img
+                    src="diff/{diff.file_name}"
+                    width="{diff.width}"
+                    height="{diff.height}"
+                    title="Diff"
+                  >
                   <figcaption>Diff</figcaption>
                 </figure>{{ endfor }}
               </details><!--
               --><figure>
-                <img src="actual/{comp_record.actual.file_name}" title="Actual">
+                  <img
+                    src="actual/{comp_record.actual.file_name}"
+                    width="{comp_record.actual.width}"
+                    height="{comp_record.actual.height}"
+                    title="Actual"
+                  >
                 <figcaption>
                   <div>Actual</div>
                   <div class="diffcount">{comp_record.diffcount}</div>
