@@ -157,21 +157,21 @@ mod tmpl {
     /// As [`ComparisonRecord`] but adjusted for the needs of the templating
     #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
     pub struct TmplComparison {
-        expected_file_name: String,
-        actual_file_name: String,
-        diff_file_name: String,
+        expected: TmplImage,
+        actual: TmplImage,
+        /// Contains 0 or 1 item depending on whether there is a diff.
+        diff: Vec<TmplImage>,
         show_expected_for_comparison: bool,
         diffcount: String,
         flawedness: String,
         render_info: String,
     }
-
     impl From<&ComparisonRecord> for TmplComparison {
         fn from(input: &ComparisonRecord) -> Self {
             Self {
-                expected_file_name: input.expected_file_name.clone(),
-                actual_file_name: input.actual_file_name.clone(),
-                diff_file_name: input.diff_file_name.clone().unwrap_or_default(),
+                expected: TmplImage::new(&input.expected_file_name),
+                actual: TmplImage::new(&input.actual_file_name),
+                diff: Vec::from_iter(input.diff_file_name.as_ref().map(|url| TmplImage::new(url))),
                 show_expected_for_comparison: match input.outcome {
                     ComparisonOutcome::Different { .. } => true,
                     ComparisonOutcome::Equal => false,
@@ -199,6 +199,25 @@ mod tmpl {
                     _ => String::new(),
                 },
                 render_info: input.render_info.clone(),
+            }
+        }
+    }
+
+    /// Information for an embedded image
+    #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+    pub struct TmplImage {
+        file_name: String,
+        // TODO: pass through size information so we can have clean reloading
+        // width: u32,
+        // height: u32,
+    }
+
+    // TODO: Once we are passing size information, change what this impl is from
+
+    impl TmplImage {
+        fn new(file_name: &str) -> Self {
+            Self {
+                file_name: file_name.to_string(),
             }
         }
     }
