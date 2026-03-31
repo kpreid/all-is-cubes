@@ -21,6 +21,7 @@ dependencies = [
  "bitflags",
  "bytemuck",
  "cfg-if",
+ "derive_more",
  "displaydoc",
  "embedded-graphics",
  "euclid",
@@ -130,6 +131,7 @@ dependencies = [
  "bitvec",
  "bytemuck",
  "cfg-if",
+ "derive_more",
  "either",
  "exhaust",
  "flume",
@@ -177,6 +179,7 @@ version = "0.10.0"
 dependencies = [
  "all-is-cubes",
  "bitflags",
+ "derive_more",
  "displaydoc",
  "embedded-graphics",
  "futures-core",

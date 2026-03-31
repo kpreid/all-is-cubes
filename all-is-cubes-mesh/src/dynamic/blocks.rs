@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::num::NonZeroU32;
 use core::time::Duration;
-use core::{fmt, ops};
+use core::{fmt};
 
 use futures_channel::oneshot::Canceled;
 
@@ -472,7 +472,7 @@ fn should_use_instances<M: DynamicMeshTypes>(
         || block_mesh.count_indices() > M::MAXIMUM_MERGED_BLOCK_MESH_SIZE
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, derive_more::AddAssign)]
 pub(crate) struct VbmUpdateInfo {
     /// Total time taken by the `update()` operation.
     total_time: Duration,
@@ -527,26 +527,5 @@ impl all_is_cubes::util::Fmt<StatusText> for VbmUpdateInfo {
             queued = queued,
             unfinished = unfinished,
         )
-    }
-}
-
-impl ops::AddAssign for VbmUpdateInfo {
-    fn add_assign(&mut self, rhs: Self) {
-        let VbmUpdateInfo {
-            total_time,
-            block_calculations,
-            block_callbacks,
-            running,
-            waiting,
-            queued,
-            unfinished,
-        } = self;
-        *total_time += rhs.total_time;
-        *block_calculations += rhs.block_calculations;
-        *block_callbacks += rhs.block_callbacks;
-        *running += rhs.running;
-        *waiting += rhs.waiting;
-        *queued += rhs.queued;
-        *unfinished += rhs.unfinished;
     }
 }

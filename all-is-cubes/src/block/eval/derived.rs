@@ -200,7 +200,7 @@ pub(in crate::block::eval) fn compute_derived(voxels: &block::Evoxels) -> Derive
 
 /// Accumulator of surface properties of faces of a cube.
 /// Used internally by evaluation to produce average colors.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, derive_more::AddAssign)]
 struct VoxSum {
     /// Color multiplied by its alpha (i.e. "premultiplied")
     color_sum: Vector3D<f32, Intensity>,
@@ -254,20 +254,6 @@ impl ops::AddAssign<EvalTrace> for VoxSum {
         self.alpha_sum += alpha;
         self.emission_sum += emission;
         self.count += 1;
-    }
-}
-impl ops::AddAssign for VoxSum {
-    fn add_assign(&mut self, rhs: VoxSum) {
-        let Self {
-            color_sum,
-            alpha_sum,
-            emission_sum,
-            count,
-        } = rhs;
-        self.color_sum += color_sum;
-        self.alpha_sum += alpha_sum;
-        self.emission_sum += emission_sum;
-        self.count += count;
     }
 }
 

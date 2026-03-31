@@ -929,7 +929,7 @@ impl fmt::Display for DeserializeHandlesError {
 /// The exact contents of this structure
 /// are unstable; use only `Debug` formatting to examine its contents unless you have
 /// a specific need for one of the values.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, derive_more::AddAssign)]
 #[non_exhaustive]
 #[expect(clippy::module_name_repetitions)] // TODO: consider renaming to StepInfo
 pub struct UniverseStepInfo {
@@ -942,16 +942,6 @@ pub struct UniverseStepInfo {
     pub(crate) block_def_step: BlockDefStepInfo,
     pub(crate) body_step: BodyStepInfo,
     pub(crate) space_step: SpaceStepInfo,
-}
-impl core::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
-    fn add_assign(&mut self, other: Self) {
-        self.computation_time += other.computation_time;
-        self.active_members += other.active_members;
-        self.total_members += other.total_members;
-        self.block_def_step += other.block_def_step;
-        self.body_step += other.body_step;
-        self.space_step += other.space_step;
-    }
 }
 impl Fmt<StatusText> for UniverseStepInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {

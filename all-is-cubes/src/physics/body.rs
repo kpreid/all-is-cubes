@@ -1,5 +1,4 @@
 use core::fmt;
-use core::ops;
 
 use bevy_ecs::prelude as ecs;
 use euclid::{Point3D, Vector3D};
@@ -376,7 +375,7 @@ impl<'de> serde::Deserialize<'de> for Body {
 /// Performance data produced by stepping a [`Body`].
 ///
 /// Use [`fmt::Debug`] or [`StatusText`] formatting to examine this.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, derive_more::AddAssign)]
 pub(crate) struct BodyStepInfo {
     /// Number of bodies whose updates were aggregated into this value.
     pub(crate) count: usize,
@@ -386,13 +385,6 @@ impl Fmt<StatusText> for BodyStepInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
         let Self { count } = self;
         write!(f, "{count} bodies' steps")
-    }
-}
-
-impl ops::AddAssign for BodyStepInfo {
-    fn add_assign(&mut self, other: Self) {
-        let Self { count } = self;
-        *count += other.count;
     }
 }
 

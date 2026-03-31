@@ -9,7 +9,6 @@
 )]
 
 use alloc::vec::Vec;
-use core::ops;
 use core::time::Duration;
 
 use bevy_ecs::prelude as ecs;
@@ -83,20 +82,13 @@ pub(crate) fn collect_space_step_info(
 
 // -------------------------------------------------------------------------------------------------
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, derive_more::AddAssign)]
 // must be pub only because this is indirectly mentioned in Universe::step
 pub(crate) struct TickActionsInfo {
     /// Number of cubes ticked.
     count: usize,
     /// Time spent on cube ticks.
     time: Duration,
-}
-impl ops::AddAssign for TickActionsInfo {
-    fn add_assign(&mut self, rhs: Self) {
-        let Self { count, time } = self;
-        *count += rhs.count;
-        *time += rhs.time;
-    }
 }
 
 /// ECS system that handles the [`block::BlockAttributes::tick_action`]s of blocks in [`Space`]s.

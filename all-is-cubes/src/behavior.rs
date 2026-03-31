@@ -6,7 +6,6 @@ use alloc::vec::Vec;
 use core::any::{Any, TypeId};
 use core::fmt;
 use core::mem;
-use core::ops;
 use core::task::Waker;
 use core::time::Duration;
 use manyfmt::Refmt as _;
@@ -886,7 +885,7 @@ pub struct Persistence(
 /// Performance data returned by [`BehaviorSet::step()`].
 ///
 /// Use `Debug` or [`StatusText`] formatting to examine this.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, derive_more::AddAssign)]
 pub(crate) struct BehaviorSetStepInfo {
     /// Number of behaviors in the set.
     total_count: usize,
@@ -896,21 +895,6 @@ pub(crate) struct BehaviorSetStepInfo {
     stepped: usize,
     /// Of the stepped behaviors, how many returned a nonempty transaction.
     acted: usize,
-}
-
-impl ops::AddAssign for BehaviorSetStepInfo {
-    fn add_assign(&mut self, other: Self) {
-        let Self {
-            total_count,
-            total_time,
-            stepped,
-            acted,
-        } = self;
-        *total_count += other.total_count;
-        *total_time += other.total_time;
-        *stepped += other.stepped;
-        *acted += other.acted;
-    }
 }
 
 impl crate::util::Fmt<StatusText> for BehaviorSetStepInfo {

@@ -48,6 +48,7 @@ serde = ["all-is-cubes/_serde_math_and_graphics_options"]
 [dependencies]
 all-is-cubes = { workspace = true }
 bitflags = { workspace = true }
+derive_more = { workspace = true } # features specified in workspace
 displaydoc = { workspace = true }
 embedded-graphics = { workspace = true, optional = true }
 futures-core = { workspace = true }

@@ -7,7 +7,6 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
-use core::ops::AddAssign;
 
 use manyfmt::Fmt;
 /// Acts as polyfill for float methods
@@ -506,38 +505,23 @@ fn mix4(a: [f32; 4], b: [f32; 4], amount: f32) -> [f32; 4] {
 ///
 /// See also [`ImageInfo`][crate::raytracer::renderer::ImageInfo]
 /// which incorporates image dimensions.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    Eq,
+    PartialEq,
+    derive_more::Add,
+    derive_more::AddAssign,
+    derive_more::Sum,
+)]
 #[non_exhaustive]
 pub struct RaytraceInfo {
     pub(crate) cubes_traced: usize,
 }
 
-impl core::ops::Add for RaytraceInfo {
-    type Output = Self;
-    fn add(mut self, other: Self) -> Self {
-        self += other;
-        self
-    }
-}
-impl AddAssign<RaytraceInfo> for RaytraceInfo {
-    fn add_assign(&mut self, other: Self) {
-        self.cubes_traced += other.cubes_traced;
-    }
-}
-impl core::iter::Sum for RaytraceInfo {
-    fn sum<I>(iter: I) -> Self
-    where
-        I: Iterator<Item = Self>,
-    {
-        let mut sum = Self::default();
-        for part in iter {
-            sum += part;
-        }
-        sum
-    }
-}
-
-/// Same as the [`AddAssign`] implementation.
+/// Same as the [`AddAssign`][core::ops::AddAssign] implementation.
 /// Provided to enable `unzip()` / tuple collection use cases.
 impl Extend<RaytraceInfo> for RaytraceInfo {
     fn extend<T: IntoIterator<Item = RaytraceInfo>>(&mut self, iter: T) {

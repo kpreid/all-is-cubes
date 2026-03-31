@@ -7,7 +7,8 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
-use core::{fmt, mem, ops};
+use core::fmt;
+use core::mem;
 
 use bevy_ecs::change_detection::DetectChangesMut;
 use bevy_ecs::prelude as ecs;
@@ -733,7 +734,7 @@ impl fmt::Display for BlockDefConflict {
 
 // -------------------------------------------------------------------------------------------------
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, derive_more::AddAssign)]
 pub(crate) struct BlockDefStepInfo {
     /// Evaluation cache updates attempted.
     attempted: time::TimeStats,
@@ -742,20 +743,6 @@ pub(crate) struct BlockDefStepInfo {
     /// Evaluation cache updates that failed because of a [`HandleError::InUse`] conflict.
     /// TODO(ecs): Isn’t this impossible now?
     was_in_use: usize,
-}
-
-impl ops::AddAssign for BlockDefStepInfo {
-    #[inline]
-    fn add_assign(&mut self, other: Self) {
-        let Self {
-            attempted,
-            updated,
-            was_in_use,
-        } = self;
-        *attempted += other.attempted;
-        *updated += other.updated;
-        *was_in_use += other.was_in_use;
-    }
 }
 
 impl manyfmt::Fmt<crate::util::StatusText> for BlockDefStepInfo {

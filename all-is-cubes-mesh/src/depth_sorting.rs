@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
-use core::ops::{self, Range};
+use core::ops::{Range};
 
 use exhaust::Exhaust as _;
 use ordered_float::OrderedFloat;
@@ -262,7 +262,7 @@ pub struct DepthSortResult {
 /// Performance information returned by [`SpaceMesh::depth_sort_for_view()`].
 ///
 /// Format this with [`fmt::Debug`] to see its information.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, derive_more::AddAssign)]
 #[non_exhaustive]
 pub struct DepthSortInfo {
     /// How many individual items (triangles or rectangles) were in the data to be sorted.
@@ -299,19 +299,6 @@ impl DepthSortInfo {
 impl Default for DepthSortInfo {
     fn default() -> Self {
         Self::DEFAULT
-    }
-}
-
-impl ops::AddAssign for DepthSortInfo {
-    fn add_assign(&mut self, rhs: Self) {
-        let Self {
-            elements_sorted,
-            groups_sorted,
-            static_groups_sorted,
-        } = self;
-        *elements_sorted += rhs.elements_sorted;
-        *groups_sorted += rhs.groups_sorted;
-        *static_groups_sorted += rhs.static_groups_sorted;
     }
 }
 

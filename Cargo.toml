@@ -93,6 +93,7 @@ cfg-if = { version = "1.0.4", default-features = false }
 # When upgrading clap, beware text output changes causing integration tests to fail.
 clap = { version = "4.5", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
 criterion = { version = "0.8.0", features = ["async", "cargo_bench_support", "html_reports"] }
+derive_more = { version = "2.1.1", default-features = false, features = ["add", "add_assign", "sum"] }
 displaydoc = { version = "0.2.5", default-features = false }
 either = { version = "1.10.0", default-features = false }
 # embedded-graphics and embedded-graphics-core must match
