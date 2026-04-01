@@ -6,7 +6,6 @@ use alloc::sync::Arc;
 use core::error::Error;
 
 use futures_core::future::BoxFuture;
-use paste::paste;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::character::{Character, Spawn};
@@ -42,14 +41,12 @@ macro_rules! template_tests {
         }
     ) => {
         $(
-            paste! {
-                $( #[cfg($variant_cfg)] )*
-                #[cfg(test)]
-                #[allow(non_snake_case)]
-                #[all_is_cubes::util::async_test]
-                async fn [< template_ $variant_name >] () {
-                    tests::check_universe_template($enum_name::$variant_name).await;
-                }
+            $( #[cfg($variant_cfg)] )*
+            #[cfg(test)]
+            #[allow(non_snake_case)]
+            #[all_is_cubes::util::async_test]
+            async fn ${concat(template_, $variant_name)} () {
+                tests::check_universe_template($enum_name::$variant_name).await;
             }
         )*
     }
