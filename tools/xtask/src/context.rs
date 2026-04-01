@@ -4,6 +4,7 @@ use anyhow::Error as ActionError;
 use xshell::{Cmd, Shell};
 
 use crate::args::Scope;
+use crate::reporting::{CaptureTime, Timing};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -14,8 +15,10 @@ pub struct Config<'a> {
     pub sh: &'a Shell,
     pub cargo_timings: bool,
     pub cargo_quiet: bool,
+    pub time_log_quiet: bool,
     pub scope: Scope,
     pub main_metadata: cargo_metadata::Metadata,
+    pub time_log_tx: std::sync::mpsc::Sender<Timing>,
 }
 
 impl Config<'_> {
@@ -68,6 +71,10 @@ impl Config<'_> {
             f(Workspace::Fuzz)?;
         }
         Ok(())
+    }
+
+    pub fn capture_time(&self, label: impl Into<String>) -> CaptureTime {
+        CaptureTime::new(!self.time_log_quiet, self.time_log_tx.clone(), label)
     }
 }
 

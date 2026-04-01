@@ -23,41 +23,47 @@ impl fmt::Display for Timing {
 // -------------------------------------------------------------------------------------------------
 
 /// Measure the time from creation to drop. Also prints text to mark these spans.
-pub(crate) struct CaptureTime<'a> {
+pub(crate) struct CaptureTime {
+    print: bool,
     label: String,
     start: Instant,
-    output: &'a mut Vec<Timing>,
+    output: std::sync::mpsc::Sender<Timing>,
 }
 
-impl<'a> CaptureTime<'a> {
-    pub fn new(time_log: &'a mut Vec<Timing>, label: impl Into<String>) -> Self {
+impl CaptureTime {
+    pub fn new(
+        print: bool,
+        output: std::sync::mpsc::Sender<Timing>,
+        label: impl Into<String>,
+    ) -> Self {
         let label = label.into();
         if std::env::var("GITHUB_ACTIONS").is_ok() {
             eprintln!("::group::{label}");
-        } else {
+        } else if print {
             eprintln!("------ [xtask] START: {label} ------");
         }
         Self {
+            print,
             label,
             start: Instant::now(),
-            output: time_log,
+            output,
         }
     }
 }
 
-impl Drop for CaptureTime<'_> {
+impl Drop for CaptureTime {
     fn drop(&mut self) {
         let label = mem::take(&mut self.label);
         let time = Instant::now().duration_since(self.start);
         if std::env::var("GITHUB_ACTIONS").is_ok() {
             eprintln!("::endgroup::");
-        } else {
+        } else if self.print {
             eprintln!(
                 "------ [xtask] END: {label} ({time:.1?} s) ------",
                 time = time.as_secs_f64()
             );
         }
-        self.output.push(Timing { label, time });
+        let (Ok(()) | Err(_)) = self.output.send(Timing { label, time });
     }
 }
 
