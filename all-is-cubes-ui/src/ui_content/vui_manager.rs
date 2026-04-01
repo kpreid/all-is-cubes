@@ -95,6 +95,9 @@ pub(crate) struct Vui {
     /// should be in `current_space`, taken from one of the [`PageInst`]s.
     state: listen::Cell<Arc<VuiPageState>>,
 
+    /// Caches instantiated [`Page`]s, including but not only for the current `state`.
+    pages: Pages,
+
     /// Listens to the provided user graphics options.
     changed_graphics_options: listen::Flag,
     /// Modified version of the user graphics options for rendering UI.
@@ -104,14 +107,6 @@ pub(crate) struct Vui {
     /// Size computed from `viewport_source` and compared with `PageInst`.
     last_ui_size: UiSize,
     hud_inputs: HudInputs,
-
-    hud_page: PageInst,
-    paused_page: PageInst,
-    about_page: PageInst,
-    progress_page: PageInst,
-    options_page: PageInst,
-    /// Whatever [`VuiPageState::Dump`] contained.
-    dump_page: PageInst,
 
     /// Receiving internal messages from widgets for controlling the UI itself
     /// (changing `state`, etc).
@@ -177,24 +172,19 @@ impl Vui {
             vui_control_channel: control_send,
             page_state: state.as_source(),
         };
-        let hud_page =
-            super::hud::new_hud_page(universe.read_ticket(), &hud_inputs, tooltip_state.clone());
-
-        let paused_page = pages::new_paused_page(&mut universe, &hud_inputs).unwrap();
-        let options_page =
-            pages::new_settings_page_widget_tree(universe.read_ticket(), &hud_inputs);
-        let about_page = pages::new_about_page(&mut universe, &hud_inputs).unwrap();
-        let progress_page =
-            pages::new_progress_page(&hud_inputs.hud_blocks.widget_theme, &notif_hub);
 
         let mut new_self = Box::write(
             empty_box,
             Self {
-                universe: *universe,
-
                 current_view: listen::Cell::new(Arc::new(UiViewState::default())),
                 current_focus_on_ui: false,
                 state: listen::Cell::new(Arc::new(VuiPageState::Hud)),
+                pages: Pages::new(
+                    &mut universe,
+                    &hud_inputs,
+                    tooltip_state.clone(),
+                    &notif_hub,
+                ),
 
                 changed_graphics_options,
                 ui_graphics_options,
@@ -203,19 +193,14 @@ impl Vui {
                 last_ui_size: ui_size,
                 hud_inputs,
 
-                hud_page: PageInst::new(hud_page),
-                paused_page: PageInst::new(paused_page),
-                options_page: PageInst::new(options_page),
-                about_page: PageInst::new(about_page),
-                dump_page: PageInst::new(vui::Page::empty()),
-                progress_page: PageInst::new(progress_page),
-
                 control_channel: control_recv,
                 changed_character: listen::Flag::listening(false, &params.character_source),
                 changed_custom_commands,
                 tooltip_state,
                 cue_channel,
                 notif_hub,
+
+                universe: *universe,
             },
         );
         new_self.compute_view_state();
@@ -256,7 +241,7 @@ impl Vui {
                 Some(page) => (*page).clone(),
                 None => vui::Page::empty(),
             };
-            self.dump_page = PageInst::new(content);
+            self.pages.dump_page = PageInst::new(content);
         }
 
         self.compute_view_state();
@@ -267,27 +252,24 @@ impl Vui {
         let size = self.last_ui_size;
         let universe = &mut self.universe;
 
-        let next_page: &mut PageInst = match &*self.state.get() {
-            VuiPageState::Hud => &mut self.hud_page,
+        let state = self.state.get();
+        let next_page: &mut PageInst = self.pages.get_mut(&state);
+
+        match *state {
             VuiPageState::Paused => {
                 if self.changed_custom_commands.get_and_clear() {
                     // TODO: make this dependency solely the page's responsibility
-                    // instead of hardcoding it here
-                    self.paused_page =
+                    // instead of hardcoding it here.
+
+                    // Note that this assignment replaces the stored PageInst,
+                    // not just `next_page` this time.
+                    *next_page =
                         PageInst::new(pages::new_paused_page(universe, &self.hud_inputs).unwrap());
                 }
-                &mut self.paused_page
             }
-            VuiPageState::Settings => &mut self.options_page,
-            VuiPageState::AboutText => &mut self.about_page,
-            VuiPageState::Progress => &mut self.progress_page,
+            _ => {}
+        }
 
-            // Note: checking the `content` is handled in `set_state()`.
-            VuiPageState::Dump {
-                previous: _,
-                content: _,
-            } => &mut self.dump_page,
-        };
         let next_space: Handle<Space> = next_page.get_or_create_space(size, universe);
         let page_layout = next_page.page().layout;
         let graphics_options = self.ui_graphics_options.get();
@@ -577,6 +559,8 @@ impl Vui {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Identifies which “page” the UI should be showing — what should be in
 /// [`Vui::current_space()`].
 #[derive(Clone, Debug, PartialEq)]
@@ -621,6 +605,68 @@ impl VuiPageState {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Storage of all [`PageInst`]s we might want to switch between.
+/// Loosely speaking, a map from [`VuiPageState`] to [`PageInst`].
+///
+/// TODO: Ideally this would not have hard-coded knowledge of specific pages, but we still haven’t
+/// figured out how the top level of the UI really ought to work.
+#[derive(Debug)]
+struct Pages {
+    hud_page: PageInst,
+    paused_page: PageInst,
+    about_page: PageInst,
+    progress_page: PageInst,
+    options_page: PageInst,
+    /// Whatever [`VuiPageState::Dump`] contained.
+    dump_page: PageInst,
+}
+
+impl Pages {
+    pub fn new(
+        universe: &mut Universe,
+        hud_inputs: &HudInputs,
+        tooltip_state: Arc<Mutex<TooltipState>>,
+        notif_hub: &notification::Hub,
+    ) -> Self {
+        let hud_page = super::hud::new_hud_page(universe.read_ticket(), hud_inputs, tooltip_state);
+
+        let paused_page = pages::new_paused_page(universe, hud_inputs).unwrap();
+        let options_page = pages::new_settings_page_widget_tree(universe.read_ticket(), hud_inputs);
+        let about_page = pages::new_about_page(universe, hud_inputs).unwrap();
+        let progress_page =
+            pages::new_progress_page(&hud_inputs.hud_blocks.widget_theme, notif_hub);
+
+        Self {
+            hud_page: PageInst::new(hud_page),
+            paused_page: PageInst::new(paused_page),
+            options_page: PageInst::new(options_page),
+            about_page: PageInst::new(about_page),
+            dump_page: PageInst::new(vui::Page::empty()),
+            progress_page: PageInst::new(progress_page),
+        }
+    }
+
+    fn get_mut(&mut self, state: &VuiPageState) -> &mut PageInst {
+        match state {
+            VuiPageState::Hud => &mut self.hud_page,
+            VuiPageState::Paused => &mut self.paused_page,
+            VuiPageState::Settings => &mut self.options_page,
+            VuiPageState::AboutText => &mut self.about_page,
+            VuiPageState::Progress => &mut self.progress_page,
+
+            // Note: checking the `content` is handled in `set_state()`.
+            VuiPageState::Dump {
+                previous: _,
+                content: _,
+            } => &mut self.dump_page,
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Message indicating a UI action that affects the UI itself
 #[derive(Clone, Debug)]
