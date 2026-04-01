@@ -256,16 +256,14 @@ impl Vui {
         let next_page: &mut PageInst = self.pages.get_mut(&state);
 
         match *state {
-            VuiPageState::Paused => {
-                if self.changed_custom_commands.get_and_clear() {
-                    // TODO: make this dependency solely the page's responsibility
-                    // instead of hardcoding it here.
+            VuiPageState::Paused if self.changed_custom_commands.get_and_clear() => {
+                // TODO: make this dependency solely the page's responsibility
+                // instead of hardcoding it here.
 
-                    // Note that this assignment replaces the stored PageInst,
-                    // not just `next_page` this time.
-                    *next_page =
-                        PageInst::new(pages::new_paused_page(universe, &self.hud_inputs).unwrap());
-                }
+                // Note that this assignment replaces the stored PageInst,
+                // not just `next_page` this time.
+                *next_page =
+                    PageInst::new(pages::new_paused_page(universe, &self.hud_inputs).unwrap());
             }
             _ => {}
         }
