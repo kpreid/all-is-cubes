@@ -17,6 +17,7 @@ use crate::{ActionError, PROJECT_DIR};
 pub(crate) fn write_development_files(
     config: &Config<'_>,
     overwrite: bool,
+    quiet_tasks: bool,
 ) -> Result<(), ActionError> {
     // .desktop file, used by Linux desktop application launchers to describe how to run
     // our executable. It needs to have an absolute path to the file.
@@ -39,7 +40,10 @@ pub(crate) fn write_development_files(
     // TODO: It would be useful to have some support for merging generated tasks with existing ones,
     // or even copying them back into the fixed part of this generator.
     {
-        let tasks_data = format!("{:#}", generate_vscode_tasks(&config.main_metadata));
+        let tasks_data = format!(
+            "{:#}",
+            generate_vscode_tasks(&config.main_metadata, quiet_tasks)
+        );
         check_or_overwrite_file(
             &PROJECT_DIR.join(".vscode/tasks.json"),
             tasks_data.as_bytes(),
@@ -137,16 +141,29 @@ SingleMainWindow=true
 /// other functions will write it or check whether it is up to date.
 ///
 /// Format as per <https://go.microsoft.com/fwlink/?LinkId=733558>
-fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
-    let mut tasks = Vec::new();
+fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata, quiet_tasks: bool) -> Value {
+    /// Accept any number of iterators of `Into<String>`s (which do not need to have the same
+    /// element type) and assemble a `Vec<String>`.
+    macro_rules! flatten_strings {
+        ($($iter:expr),* $(,)?) => {
+            Vec::from_iter(::itertools::chain!(
+                $(
+                    IntoIterator::into_iter($iter).map(Into::<String>::into)
+                ),*
+            ))
+        }
+    }
+
+    let quiet_arg = quiet_tasks.then_some("--quiet");
 
     // These fixed tasks are largely a subset of the subcommands from `XtaskCommand`
+    let mut tasks = Vec::new();
     tasks.extend([
         json!({
             "label": "all-is-cubes: lint all code",
             "type": "cargo",
             "command": "xtask",
-            "args": ["lint"],
+            "args": flatten_strings!(quiet_arg, ["lint"]),
             "problemMatcher": ["$rustc"],
             "group": {"kind": "build"},
         }),
@@ -154,7 +171,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             "label": "all-is-cubes: lint dependency graph",
             "type": "cargo",
             "command": "xtask",
-            "args": ["check-deps"],
+            "args": flatten_strings!(quiet_arg, ["check-deps"]),
             "problemMatcher": ["$rustc"],
             "group": {"kind": "build"},
         }),
@@ -162,7 +179,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             "label": "all-is-cubes: test all",
             "type": "cargo",
             "command": "xtask",
-            "args": ["test"],
+            "args": flatten_strings!(quiet_arg, ["test"]),
             "problemMatcher": ["$rustc"],
             "group": {
                 "kind": "test",
@@ -173,7 +190,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             "label": "all-is-cubes: test renderers",
             "type": "cargo",
             "command": "test",
-            "args": ["--package=test-renderers", "--no-fail-fast"],
+            "args": flatten_strings!(quiet_arg, ["--package=test-renderers", "--no-fail-fast"]),
             "problemMatcher": ["$rustc"],
             "group": {"kind": "test"},
         }),
@@ -183,7 +200,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             "command": "bench",
             // TODO: Ideally we would do something to set up a useful baseline automatically,
             // but that’ll require stateful logic checking git state and switching branches.
-            "args": [],
+            "args": flatten_strings!(quiet_arg),
             "problemMatcher": ["$rustc"],
             "group": {
                 "kind": "test",
@@ -194,7 +211,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             "label": "all-is-cubes: check feature flag combinations",
             "type": "cargo",
             "command": "xtask",
-            "args": ["check-features"],
+            "args": flatten_strings!(quiet_arg, ["check-features"]),
             "problemMatcher": ["$rustc"],
             "group": {"kind": "build"},
         }),
@@ -202,7 +219,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             "label": "all-is-cubes: run desktop",
             "type": "cargo",
             "command": "run",
-            "args": ["--bin", "all-is-cubes", "--"],
+            "args": flatten_strings!(quiet_arg, ["--bin", "all-is-cubes", "--"]),
             "problemMatcher": ["$rustc"],
             "group": "test"
         }),
@@ -210,7 +227,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             "label": "all-is-cubes: run dev-server",
             "type": "cargo",
             "command": "xtask",
-            "args": ["run-dev"],
+            "args": flatten_strings!(quiet_arg, ["run-dev"]),
             "problemMatcher": ["$rustc"],
             "group": "test"
         }),
@@ -218,7 +235,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             "label": "all-is-cubes: run all fuzzers",
             "type": "cargo",
             "command": "xtask",
-            "args": ["fuzz", "60"],
+            "args": flatten_strings!(quiet_arg, ["fuzz", "60"]),
             "problemMatcher": ["$rustc"],
             "group": "test"
         }),
@@ -226,7 +243,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             "label": "all-is-cubes: build documentation",
             "type": "cargo",
             "command": "xtask",
-            "args": ["doc"],
+            "args": flatten_strings!(quiet_arg, ["doc"]),
             "problemMatcher": ["$rustc"],
             "group": {"kind": "build"}
         }),
@@ -234,7 +251,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             "label": "all-is-cubes: check release binary sizes",
             "type": "cargo",
             "command": "xtask",
-            "args": ["bin-size"],
+            "args": flatten_strings!(quiet_arg, ["bin-size"]),
             "problemMatcher": ["$rustc"],
             "group": {"kind": "test"}
         }),
@@ -242,7 +259,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             "label": "all-is-cubes: reinitialize development files",
             "type": "cargo",
             "command": "xtask",
-            "args": ["init", "--overwrite"],
+            "args": flatten_strings!(quiet_arg, ["init", "--overwrite"]),
             "problemMatcher": ["$rustc"],
             "group": {"kind": "build"}
         }),
@@ -320,7 +337,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
             },
             "type": "cargo",
             "command": "test",
-            "args": Vec::from_iter(relevant_packages.iter().map(cargo_package_arg)),
+            "args": flatten_strings!(quiet_arg, relevant_packages.iter().map(cargo_package_arg)),
             "problemMatcher": ["$rustc"],
             "group": {
                 "kind": "test"
@@ -336,7 +353,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata) -> Value {
                 },
                 "type": "cargo",
                 "command": "bench",
-                "args": Vec::from_iter(benchmark_packages.iter().map(cargo_package_arg).chain([String::from(benchmark_features_arg)])),
+                "args": flatten_strings!(quiet_arg, benchmark_packages.iter().map(cargo_package_arg).chain([String::from(benchmark_features_arg)])),
                 "problemMatcher": ["$rustc"],
                 "group": {
                     "kind": "test"

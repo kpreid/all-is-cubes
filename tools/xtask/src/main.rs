@@ -89,8 +89,11 @@ fn main() -> Result<(), ActionError> {
 
 fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionError> {
     match command {
-        XtaskCommand::Init { overwrite } => {
-            development_files::write_development_files(config, overwrite)?;
+        XtaskCommand::Init {
+            overwrite,
+            quiet_tasks,
+        } => {
+            development_files::write_development_files(config, overwrite, quiet_tasks)?;
             if config.scope.includes_main_workspace() {
                 build_web(config, Profile::Dev)?; // includes installing wasm tools
             }

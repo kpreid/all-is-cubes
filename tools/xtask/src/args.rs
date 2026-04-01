@@ -36,6 +36,11 @@ pub(crate) enum XtaskCommand {
         /// Overwrite existing files if they differ, rather than only warning.
         #[arg(long)]
         overwrite: bool,
+
+        /// Configure `.vscode/tasks.json` to pass `--quiet` to all jobs, minimizing output
+        /// that is not errors.
+        #[arg(long)]
+        quiet_tasks: bool,
     },
 
     /// Run all tests (and some builds without tests) with default features.
