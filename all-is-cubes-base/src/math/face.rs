@@ -15,9 +15,52 @@ use crate::math::{
     GridVector, Gridgid, PositiveSign, Zero, lines,
 };
 
-/// Identifies a face of a cube or an orthogonal unit vector.
+/// Identifies a face of a cube, or an orthogonal direction, or a normal vector.
 ///
-/// See also the similar type [`Face7`], which adds a “zero” or “within the cube”
+/// <figure style='text-align:center'>
+#[doc = r"<svg style='width:20em; max-width: 100%; height: 20em' viewBox='-160 -130 320 260'>
+    <style type='text/css'>
+        text { 
+            fill: var(--main-color, black);
+            font-size: 25px;
+            font-family: var(--font-family, serif);
+            dominant-baseline: central;
+        }
+        .face6-line { 
+            stroke: var(--main-color, black);
+            fill: none;
+        }
+        .face6-hidden { opacity: 25%; }
+    </style>
+    <defs>
+        <g id='depth-line'>
+            <line x1='-10' y1='-10' x2='10' y2='10' />
+        </g>
+    </defs>
+    <g id='back' transform='translate(-10, -10)'>
+        <!--  two paths instead of a rect to dim hidden lines -->
+        <path d='M -100 100 L -100 -100 L 100 -100' class='face6-line' />
+        <path d='M -100 100 L 100 100 L 100 -100' class='face6-hidden face6-line' />
+    </g>
+    <g id='middle'>
+        <use xlink:href='#depth-line' transform='translate(-100, -100)' class='face6-line' />
+        <use xlink:href='#depth-line' transform='translate(100, -100)' class='face6-line' />
+        <use xlink:href='#depth-line' transform='translate(-100, 100)' class='face6-line' />
+        <use xlink:href='#depth-line' transform='translate(100, 100)' class='face6-hidden face6-line' />
+        <text x='120' y='0' style='text-anchor: left'>PX</text>
+        <text x='-120' y='0' style='text-anchor: end'>NX</text>
+        <text x='0' y='-130' style='text-anchor: middle'>PY</text>
+        <text x='0' y='130' style='text-anchor: middle'>NY</text>
+        <text x='-10' y='-10' style='text-anchor: middle' class='face6-hidden'>NZ</text>
+        <text x='10' y='10' style='text-anchor: middle'>PZ</text>
+    </g>
+    <g id='front' transform='translate(10, 10)'>
+        <rect x='-100' y='-100' width='200' height='200' class='face6-line' />
+    </g>
+</svg>"]
+/// </figure>
+///
+/// See also the similar type [`Face7`], which adds a “zero vector” or “within the cube”
 /// variant. The two enums use the same discriminant numbering.
 ///
 #[doc = include_str!("../serde-warning.md")]
