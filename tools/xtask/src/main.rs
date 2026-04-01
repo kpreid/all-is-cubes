@@ -77,7 +77,8 @@ fn main() -> Result<(), ActionError> {
 
     run_command(&config, command)?;
 
-    if !config.time_log_quiet {
+    let Config { time_log_quiet, .. } = { config }; // closes time_log_tx
+    if !time_log_quiet {
         for t in time_log_rx {
             eprintln!("{t}");
         }
