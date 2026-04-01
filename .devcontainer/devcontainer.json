@@ -1,0 +1,13 @@
+{
+    "image": "mcr.microsoft.com/devcontainers/rust:latest",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "tamasfe.even-better-toml",
+                "ms-vscode.live-server"
+            ]
+        }
+    },
+    "postCreateCommand": "rustup install && cargo install wasm-pack && cargo xtask init"
+}
