@@ -7,7 +7,6 @@ use core::error::Error;
 
 use futures_core::future::BoxFuture;
 use macro_rules_attribute::macro_rules_derive;
-use paste::paste;
 
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
@@ -48,31 +47,29 @@ macro_rules! generate_template_test {
         }
     ) => {
         $(
-            paste! {
-                $( #[cfg($variant_cfg)] )*
-                #[cfg(test)]
-                #[macro_rules_attribute::apply(smol_macros::test)]
-                #[allow(non_snake_case)]
-                async fn [< template_ $variant_name _default_size >] () {
-                    tests::check_universe_template_default_size($enum_name::$variant_name).await;
-                }
+            $( #[cfg($variant_cfg)] )*
+            #[cfg(test)]
+            #[macro_rules_attribute::apply(smol_macros::test)]
+            #[allow(non_snake_case)]
+            async fn ${concat(template_, $variant_name, _default_size )} () {
+                tests::check_universe_template_default_size($enum_name::$variant_name).await;
+            }
 
-                $( #[cfg($variant_cfg)] )*
-                #[cfg(test)]
-                #[macro_rules_attribute::apply(smol_macros::test)]
-                #[allow(non_snake_case)]
-                async fn [< template_ $variant_name _minimum_size >] () {
-                    tests::check_universe_template_minimum_size($enum_name::$variant_name).await;
-                }
+            $( #[cfg($variant_cfg)] )*
+            #[cfg(test)]
+            #[macro_rules_attribute::apply(smol_macros::test)]
+            #[allow(non_snake_case)]
+            async fn ${concat(template_, $variant_name, _minimum_size )} () {
+                tests::check_universe_template_minimum_size($enum_name::$variant_name).await;
+            }
 
-                $( #[cfg($variant_cfg)] )*
-                #[cfg(test)]
-                #[macro_rules_attribute::apply(smol_macros::test)]
-                #[allow(non_snake_case)]
-                #[ignore = "not implemented yet"]
-                async fn [< template_ $variant_name _too_big >] () {
-                    tests::check_universe_template_too_big($enum_name::$variant_name).await;
-                }
+            $( #[cfg($variant_cfg)] )*
+            #[cfg(test)]
+            #[macro_rules_attribute::apply(smol_macros::test)]
+            #[allow(non_snake_case)]
+            #[ignore = "not implemented yet"]
+            async fn ${concat(template_, $variant_name, _too_big )} () {
+                tests::check_universe_template_too_big($enum_name::$variant_name).await;
             }
         )*
     }
