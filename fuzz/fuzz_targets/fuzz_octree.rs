@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use all_is_cubes::math::{Face6, FaceMap, GridAab};
+use all_is_cubes::math::{Face, FaceMap, GridAab};
 use all_is_cubes_gpu::octree_alloc::Alloctree;
 
 use libfuzzer_sys::{arbitrary::Arbitrary, fuzz_target};
@@ -86,7 +86,7 @@ impl<'a> arbitrary::Arbitrary<'a> for NonEmptyGridAab {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let mut candidate = GridAab::arbitrary(u)?;
         if candidate.is_empty() {
-            candidate = candidate.expand(FaceMap::default().with(Face6::arbitrary(u)?, 1));
+            candidate = candidate.expand(FaceMap::default().with(Face::arbitrary(u)?, 1));
         }
         if candidate.is_empty() {
             Err(arbitrary::Error::IncorrectFormat)
@@ -98,7 +98,7 @@ impl<'a> arbitrary::Arbitrary<'a> for NonEmptyGridAab {
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
         arbitrary::size_hint::and(
             GridAab::size_hint(depth),
-            arbitrary::size_hint::or((0, Some(0)), Face6::size_hint(depth)),
+            arbitrary::size_hint::or((0, Some(0)), Face::size_hint(depth)),
         )
     }
 }

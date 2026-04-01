@@ -9,7 +9,7 @@ use crate::block::{
     Resolution::{self, R1},
 };
 use crate::math::{
-    Cube, Face6, FaceMap, GridAab, Intensity, OpacityCategory, Rgb, Rgba, Vol, ZeroOne,
+    Cube, Face, FaceMap, GridAab, Intensity, OpacityCategory, Rgb, Rgba, Vol, ZeroOne,
 };
 use crate::raytracer_components::{EvalTrace, trace_for_eval};
 
@@ -111,7 +111,7 @@ pub(in crate::block::eval) fn compute_derived(voxels: &block::Evoxels) -> Derive
 
         // Loop over all face voxels.
         // (This is a similar structure to the algorithm we use for mesh generation.)
-        for face in Face6::ALL {
+        for face in Face::ALL {
             let transform = face.face_transform(resolution.into());
             let rotated_voxel_range = data_bounds.transform(transform.inverse()).unwrap();
 

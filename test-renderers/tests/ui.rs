@@ -9,7 +9,7 @@ use clap::Parser as _;
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen;
-use all_is_cubes::math::Face6;
+use all_is_cubes::math::Face;
 use all_is_cubes::transaction::Transaction as _;
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
@@ -155,7 +155,7 @@ async fn widget_progress_bar(mut context: RenderTestContext) {
     let cell = listen::Cell::new(widgets::ProgressBarState::new(0.0));
     let widget = vui::leaf_widget(widgets::ProgressBar::new(
         &theme,
-        Face6::PX,
+        Face::PX,
         cell.as_source(),
     ));
     for value in [0.0, 0.5, 1.0] {

@@ -42,13 +42,13 @@ fn INVENTORY(ctx: Context<'_>) {
         // TODO: Should prepare_pipes() automatically fix the lack of inventories?
         pipe::Descriptor {
             block: straight_pipe_block.evaluate(txn.read_ticket()).unwrap().with_inventory([]),
-            from_face: Face6::NZ,
-            to_face: Face6::PZ,
+            from_face: Face::NZ,
+            to_face: Face::PZ,
         },
         pipe::Descriptor {
             block: elbow_pipe_block.evaluate(txn.read_ticket()).unwrap().with_inventory([]),
-            from_face: Face6::NZ,
-            to_face: Face6::NX,
+            from_face: Face::NZ,
+            to_face: Face::NX,
         },
     ]);
 

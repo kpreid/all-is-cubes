@@ -10,7 +10,7 @@ use all_is_cubes::content::palette;
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{Face6, GridAab};
+use all_is_cubes::math::{Face, GridAab};
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::transaction::{self, Merge, Transaction as _};
 use all_is_cubes::universe::{Name, ReadTicket, Universe, UniverseTransaction};
@@ -106,7 +106,7 @@ fn template_menu_widget_tree(
     }
     let tree: vui::WidgetTree =
         widget_theme.dialog_background().as_background_of(Arc::new(LayoutTree::Stack {
-            direction: Face6::NY,
+            direction: Face::NY,
             children: vertical_widgets,
         }));
     Ok((tree, txn))

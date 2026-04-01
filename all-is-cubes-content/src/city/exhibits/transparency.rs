@@ -21,7 +21,7 @@ fn TRANSPARENCY_WHOLE_BLOCK(ctx: Context<'_>) {
     let space = Space::builder(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]))
         .read_ticket(ctx.universe.read_ticket())
         .build_and_mutate(|m| {
-            for (rot, color) in Face6::PY.clockwise().iterate().zip(&colors) {
+            for (rot, color) in Face::PY.clockwise().iterate().zip(&colors) {
                 m.fill(
                     windowpane.transform(rot.to_positive_octant_transform(1)).unwrap(),
                     |Cube { y, .. }| Some(Block::from(color.with_alpha(alphas[y as usize]))),
@@ -67,7 +67,7 @@ fn TRANSPARENCY_SHRUNKEN_BLOCK(ctx: Context<'_>) {
     let space = Space::builder(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]))
         .read_ticket(ctx.universe.read_ticket())
         .build_and_mutate(|m| {
-            for rot in Face6::PY.clockwise().iterate() {
+            for rot in Face::PY.clockwise().iterate() {
                 let region = GridAab::from_lower_upper([-1, 0, 3], [2, 4, 4]);
                 m.fill(
                     region.transform(rot.to_positive_octant_transform(1)).unwrap(),
@@ -126,7 +126,7 @@ fn TRANSPARENCY_GLASS_AND_WATER(ctx: Context<'_>) {
         let upper = GridCoordinate::from(window_pane_resolution) - 1;
 
         Block::builder()
-            .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
+            .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ })
             .voxels_fn(window_pane_resolution, |p| {
                 if p.z >= depth {
                     return &AIR;
@@ -149,7 +149,7 @@ fn TRANSPARENCY_GLASS_AND_WATER(ctx: Context<'_>) {
 
     space.mutate(ctx.universe.read_ticket(), |m| {
         BoxStyle::from_fn(|part| {
-            if part == BoxPart::face(Face6::PY) {
+            if part == BoxPart::face(Face::PY) {
                 // top
                 Some(water_surface_block.clone())
             } else if let Some(face) = part.centered_on(Axis::Y).to_face() {
@@ -157,9 +157,9 @@ fn TRANSPARENCY_GLASS_AND_WATER(ctx: Context<'_>) {
                 Some(
                     window_block
                         .clone()
-                        .rotate(GridRotation::from_to(Face6::PZ, face, Face6::PY).unwrap()),
+                        .rotate(GridRotation::from_to(Face::PZ, face, Face::PY).unwrap()),
                 )
-            } else if part == BoxPart::INTERIOR || part == BoxPart::face(Face6::NY) {
+            } else if part == BoxPart::INTERIOR || part == BoxPart::face(Face::NY) {
                 // interior or bottom
                 Some(water_voxel.clone())
             } else {

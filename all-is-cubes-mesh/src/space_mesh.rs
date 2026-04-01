@@ -7,7 +7,7 @@ use smallvec::SmallVec;
 use bitvec::vec::BitVec;
 use exhaust::Exhaust;
 
-use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, Vol};
+use all_is_cubes::math::{Cube, Face, FaceMap, GridAab, Vol};
 use all_is_cubes::space::{self, BlockIndex, Space};
 use all_is_cubes_render::Flaws;
 
@@ -494,7 +494,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     opaque_indices: &mut IndexVecDeque,
     transparent_indices: &mut FaceMap<IndexVec>,
     meta: &mut MeshMeta<M>,
-    mut neighbor_is_fully_opaque: impl FnMut(Face6) -> bool,
+    mut neighbor_is_fully_opaque: impl FnMut(Face) -> bool,
 ) {
     if block_mesh.is_empty() {
         return;

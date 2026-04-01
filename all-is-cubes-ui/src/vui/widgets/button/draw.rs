@@ -19,7 +19,7 @@ use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{Vector2D, vec3};
 use all_is_cubes::linking::{self, InGenError};
-use all_is_cubes::math::{Cube, Face6, GridCoordinate, GridRotation, GridSize, GridVector, Rgba};
+use all_is_cubes::math::{Cube, Face, GridCoordinate, GridRotation, GridSize, GridVector, Rgba};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, ReadTicket, UniverseTransaction};
 
@@ -309,7 +309,7 @@ fn draw_button_multiblock_from_image(
 // Move a block that's part of a button label so that its z=0 aligns with the button's face.
 fn shift_label_block(state: &impl ButtonBase, block: Block) -> Block {
     block.with_modifier(block::Move::new(
-        Face6::PZ,
+        Face::PZ,
         (state.button_label_z() * 256 / theme::RESOLUTION_G) as u16,
         0,
     ))

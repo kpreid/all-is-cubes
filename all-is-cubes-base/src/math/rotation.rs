@@ -9,7 +9,7 @@ use core::ops::Mul;
 
 use euclid::vec3;
 
-use crate::math::{Face6, GridCoordinate, GridMatrix, GridSize, GridVector, Gridgid, Vector3D};
+use crate::math::{Face, GridCoordinate, GridMatrix, GridSize, GridVector, Gridgid, Vector3D};
 
 #[cfg(doc)]
 use crate::math::GridAab;
@@ -25,9 +25,9 @@ use crate::math::GridAab;
 ///
 /// See also:
 ///
-/// * [`Face6`] is less general, in that it specifies a single axis but not
+/// * [`Face`] is less general, in that it specifies a single axis but not
 ///   rotation about that axis.
-///     * [`Face6::clockwise()`] and [`Face6::counterclockwise()`] can be used to obtain
+///     * [`Face::clockwise()`] and [`Face::counterclockwise()`] can be used to obtain
 ///       [`GridRotation`] values.
 /// * [`GridMatrix`] is more general, specifying an affine transformation.
 ///
@@ -93,7 +93,7 @@ impl GridRotation {
     ///
     /// Panics if the three provided axes are not mutually perpendicular.
     #[inline]
-    pub fn from_basis(basis: impl Into<[Face6; 3]>) -> Self {
+    pub fn from_basis(basis: impl Into<[Face; 3]>) -> Self {
         let basis = basis.into();
         Self::try_from_basis_const(basis)
             .unwrap_or_else(|| panic!("Invalid basis given to GridRotation::from_basis: {basis:?}"))
@@ -103,8 +103,8 @@ impl GridRotation {
     // When const traits are available, make regular `from_basis()` const.
     #[doc(hidden)]
     #[inline]
-    pub const fn try_from_basis_const(basis: [Face6; 3]) -> Option<Self> {
-        use {Face6::*, GridRotation::*};
+    pub const fn try_from_basis_const(basis: [Face; 3]) -> Option<Self> {
+        use {Face::*, GridRotation::*};
         Some(match basis {
             [PX, PY, PZ] => RXYZ,
             [PX, PZ, PY] => RXZY,
@@ -172,11 +172,11 @@ impl GridRotation {
     /// If it is not possible to leave `up` unaffected, returns [`None`]. (Trying two
     /// perpendicular `up` directions will always succeed.)
     #[allow(clippy::missing_inline_in_public_items)]
-    pub fn from_to(source: Face6, destination: Face6, up: Face6) -> Option<Self> {
+    pub fn from_to(source: Face, destination: Face, up: Face) -> Option<Self> {
         let perpendicular = source.cross(up);
         if source == destination {
             Some(Self::IDENTITY)
-        } else if let Ok(perpendicular) = Face6::try_from(perpendicular) {
+        } else if let Ok(perpendicular) = Face::try_from(perpendicular) {
             // Find rotation from the frame source=NZ up=PY to the actual given one.
             let canonical_to_given = Self::from_basis([perpendicular, up, source.opposite()]);
             let given_to_canonical = canonical_to_given.inverse();
@@ -185,7 +185,7 @@ impl GridRotation {
             // The destination expressed in that frame.
             let canonical_destination = given_to_canonical.transform(destination);
             // Find which of the four rotations in a plane matches.
-            use Face6::*;
+            use Face::*;
             let canonical_rotation = match canonical_destination {
                 NY | PY => {
                     // Tried to rotate into the up vector.
@@ -210,15 +210,15 @@ impl GridRotation {
     // TODO: properly public API? It’s very useful for building operations but kind of wacky.
     #[doc(hidden)]
     #[inline]
-    pub const fn to_basis(self) -> Vector3D<Face6, ()> {
+    pub const fn to_basis(self) -> Vector3D<Face, ()> {
         // Compute an explicit lookup table to ensure the program uses a nice dense 144 bytes of
         // data instead of a switch table with separate machine code to load each value.
         // (Yes, that actually happened.)
-        static TABLE: [Vector3D<Face6, ()>; 48] = {
-            let mut table = [Vector3D::new(Face6::PX, Face6::PX, Face6::PX); 48];
+        static TABLE: [Vector3D<Face, ()>; 48] = {
+            let mut table = [Vector3D::new(Face::PX, Face::PX, Face::PX); 48];
             let mut i = 0;
             while i < table.len() {
-                use {Face6::*, GridRotation::*};
+                use {Face::*, GridRotation::*};
                 let rot = GridRotation::ALL[i];
                 table[rot as usize] = match rot {
                     // Note that each entry in this table is just reiterating the name of the
@@ -298,10 +298,10 @@ impl GridRotation {
     /// #   pub use all_is_cubes_base::math;
     /// # }
     /// use all_is_cubes::block::Resolution;
-    /// use all_is_cubes::math::{Face6, GridAab, GridRotation};
+    /// use all_is_cubes::math::{Face, GridAab, GridRotation};
     ///
     /// let b = GridAab::for_block(Resolution::R8);
-    /// let rotation = Face6::PY.clockwise().to_positive_octant_transform(8);
+    /// let rotation = Face::PY.clockwise().to_positive_octant_transform(8);
     /// assert_eq!(b.transform(rotation), Some(b));
     /// ```
     ///
@@ -311,9 +311,9 @@ impl GridRotation {
     /// (due to the lower-corner format of cube coordinates).
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// # use all_is_cubes::math::{Cube, Face6, GridAab, GridRotation};
+    /// # use all_is_cubes::math::{Cube, Face, GridAab, GridRotation};
     ///
-    /// let rotation = Face6::PY.clockwise().to_positive_octant_transform(4);
+    /// let rotation = Face::PY.clockwise().to_positive_octant_transform(4);
     /// assert_eq!(rotation.transform_cube(Cube::new(0, 0, 0)), Cube::new(3, 0, 0));
     /// assert_eq!(rotation.transform_cube(Cube::new(3, 0, 0)), Cube::new(3, 0, 3));
     /// assert_eq!(rotation.transform_cube(Cube::new(3, 0, 3)), Cube::new(0, 0, 3));
@@ -324,7 +324,7 @@ impl GridRotation {
     #[inline]
     pub const fn to_positive_octant_transform(self, size: GridCoordinate) -> Gridgid {
         #[inline(always)]
-        const fn offset(face: Face6, size: GridCoordinate) -> GridVector {
+        const fn offset(face: Face, size: GridCoordinate) -> GridVector {
             if face.is_positive() {
                 GridVector::new(0, 0, 0)
             } else {
@@ -369,7 +369,7 @@ impl GridRotation {
     /// Rotate the face by this rotation.
     // TODO: test equivalence with matrix
     #[inline]
-    pub fn transform(self, face: Face6) -> Face6 {
+    pub fn transform(self, face: Face) -> Face {
         // TODO: there ought to be a much cleaner way to express this
         // ... and it should be a const fn, too
         let p = self.to_basis()[face.axis()];
@@ -443,7 +443,7 @@ impl GridRotation {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::{GridRotation, Face6::*};
+    /// use all_is_cubes::math::{GridRotation, Face::*};
     ///
     /// assert!(!GridRotation::IDENTITY.is_reflection());
     /// assert!(!GridRotation::from_basis([PX, PZ, NY]).is_reflection());
@@ -499,7 +499,7 @@ impl GridRotation {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::{Face6::*, GridRotation};
+    /// use all_is_cubes::math::{Face::*, GridRotation};
     ///
     /// // The identity rotation remains itself when iterated.
     /// assert_eq!(
@@ -567,13 +567,13 @@ impl Mul<Self> for GridRotation {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::{Face6, Face6::*, GridRotation, GridPoint};
+    /// use all_is_cubes::math::{Face, Face::*, GridRotation, GridPoint};
     ///
     /// let transform_1 = GridRotation::from_basis([NY, PX, PZ]);
     /// let transform_2 = GridRotation::from_basis([PY, PZ, PX]);
     ///
     /// // Demonstrate the directionality of concatenation.
-    /// for face in Face6::ALL {
+    /// for face in Face::ALL {
     ///     assert_eq!(
     ///         (transform_1 * transform_2).transform(face),
     ///         transform_1.transform(transform_2.transform(face)),
@@ -652,7 +652,7 @@ mod tests {
     use super::*;
     use crate::math::{FaceMap, GridPoint};
     use crate::util::MultiFailure;
-    use Face6::*;
+    use Face::*;
     use num_traits::One;
     use std::collections::HashSet;
 
@@ -795,9 +795,9 @@ mod tests {
     #[test]
     fn from_to_exhaustive() {
         let mut f = MultiFailure::new();
-        for from_face in Face6::ALL {
-            for to_face in Face6::ALL {
-                for up_face in Face6::ALL {
+        for from_face in Face::ALL {
+            for to_face in Face::ALL {
+                for up_face in Face::ALL {
                     f.catch(|| {
                         let result = GridRotation::from_to(from_face, to_face, up_face);
                         let info = (from_face, to_face, up_face, result);

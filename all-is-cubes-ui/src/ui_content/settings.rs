@@ -5,7 +5,7 @@ use exhaust::Exhaust;
 
 use all_is_cubes::arcstr::{self, literal};
 use all_is_cubes::block::{Block, text};
-use all_is_cubes::math::Face6;
+use all_is_cubes::math::Face;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::ShowStatus;
 use all_is_cubes_render::camera::AntialiasingOption;
@@ -183,7 +183,7 @@ fn info_text_contents_flags_button(
         SettingsStyle::CompactRow => LayoutTree::spacer(vui::LayoutRequest::EMPTY),
         // TODO this should be wrapped and also have a label. maybe even its own page
         SettingsStyle::LabeledColumn => Arc::new(LayoutTree::Stack {
-            direction: Face6::PX,
+            direction: Face::PX,
             children: ShowStatus::all()
                 .iter_names()
                 .map(|(bit_name, bit_mask)| {
@@ -306,7 +306,7 @@ fn setting_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'static
     match style {
         SettingsStyle::CompactRow => LayoutTree::spacer(vui::LayoutRequest::EMPTY),
         SettingsStyle::LabeledColumn => Arc::new(LayoutTree::Stack {
-            direction: Face6::PX,
+            direction: Face::PX,
             children: [label]
                 .into_iter()
                 .chain(value_list.iter().map(|value_ref| {

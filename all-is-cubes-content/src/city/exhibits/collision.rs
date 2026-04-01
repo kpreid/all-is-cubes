@@ -23,11 +23,11 @@ fn COLLISION(ctx: Context<'_>) {
                     m.set(
                         GridPoint::new(1, 0, 1) + offset,
                         // Rotate block so its +Y is towards the offset vector
-                        half_block.clone().rotate(match Face6::try_from(offset) {
+                        half_block.clone().rotate(match Face::try_from(offset) {
                             Ok(face) => GridRotation::from_to(
-                                Face6::PY,
+                                Face::PY,
                                 face,
-                                face.cross(Face6::PY).try_into().unwrap(),
+                                face.cross(Face::PY).try_into().unwrap(),
                             )
                             .unwrap(),
                             Err(GridVector {

@@ -10,7 +10,7 @@ use all_is_cubes::content::{BoxStyle, free_editing_starter_inventory};
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
+    Axis, Cube, Face, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
     GridSizeCoord, GridVector, Gridgid, Rgba, Vol, rgb_const,
 };
 use all_is_cubes::space::{self, SetCubeError, Space};
@@ -79,7 +79,7 @@ fn atrium_non_async(
     let top_floor_pos = GridVector::new(0, (CEILING_HEIGHT + UWALL).cast_signed() * 2, 0);
 
     let space_bounds = outer_walls_footprint
-        .expand(FaceMap::default().with(Face6::PY, SUN_HEIGHT + CEILING_HEIGHT * FLOOR_COUNT));
+        .expand(FaceMap::default().with(Face::PY, SUN_HEIGHT + CEILING_HEIGHT * FLOOR_COUNT));
 
     let floor_with_cutout = |mut cube: Cube| {
         cube.y = 0;
@@ -115,11 +115,11 @@ fn atrium_non_async(
         if !MOVING_LIGHT {
             m.fill_uniform(
                 m.bounds()
-                    .abut(Face6::PY, -1)
+                    .abut(Face::PY, -1)
                     .unwrap()
-                    .abut(Face6::PX, -6)
+                    .abut(Face::PX, -6)
                     .unwrap()
-                    .abut(Face6::PZ, -30) // TODO: we can shrink this once we manage to have denser ray distribution
+                    .abut(Face::PZ, -30) // TODO: we can shrink this once we manage to have denser ray distribution
                     .unwrap(),
                 &blocks[AtriumBlocks::Sun],
             )?;
@@ -136,9 +136,9 @@ fn atrium_non_async(
                 Some(
                     blocks[AtriumBlocks::GroovedBricks]
                         .clone()
-                        .rotate(GridRotation::from_to(Face6::NX, face, Face6::PY).unwrap()),
+                        .rotate(GridRotation::from_to(Face::NX, face, Face::PY).unwrap()),
                 )
-            } else if part.is_edge() && !part.is_on_face(Face6::PY) {
+            } else if part.is_edge() && !part.is_on_face(Face::PY) {
                 Some(blocks[AtriumBlocks::SolidBricks].clone())
             } else {
                 None
@@ -146,7 +146,7 @@ fn atrium_non_async(
         })
         .create_box(
             outer_walls_footprint
-                .expand(FaceMap::default().with(Face6::PY, CEILING_HEIGHT * FLOOR_COUNT)),
+                .expand(FaceMap::default().with(Face::PY, CEILING_HEIGHT * FLOOR_COUNT)),
         )
         .execute_m(m)?;
 
@@ -163,7 +163,7 @@ fn atrium_non_async(
         m.fill(
             outer_walls_footprint
                 .translate(top_floor_pos)
-                .expand(FaceMap::splat(0).with(Face6::PY, CEILING_HEIGHT)),
+                .expand(FaceMap::splat(0).with(Face::PY, CEILING_HEIGHT)),
             floor_with_cutout,
         )?;
 
@@ -289,7 +289,7 @@ fn atrium_non_async(
                                     GridRotation::RxYZ
                                 } else {
                                     GridRotation::IDENTITY
-                                }) * Face6::PY.counterclockwise(),
+                                }) * Face::PY.counterclockwise(),
                             );
                             let arch_axis_arch = lookup_multiblock_2d(
                                 blocks,
@@ -308,7 +308,7 @@ fn atrium_non_async(
         }
 
         if MOVING_LIGHT {
-            let mut movement = block::Move::new(Face6::PZ, 16, 16);
+            let mut movement = block::Move::new(Face::PZ, 16, 16);
             movement.schedule = time::Schedule::from_period(NonZero::new(2).unwrap());
             let tick_action = block::TickAction {
                 operation: crate::animation::back_and_forth_movement(movement),
@@ -343,7 +343,7 @@ fn map_text_block(
     match ascii {
         b' ' => existing_block,
         b'.' => AIR,
-        b'#' => blocks[AtriumBlocks::GroovedBricks].clone().rotate(Face6::PY.clockwise()),
+        b'#' => blocks[AtriumBlocks::GroovedBricks].clone().rotate(Face::PY.clockwise()),
         b'G' => blocks[AtriumBlocks::GroundColumn].clone(),
         b'o' => blocks[AtriumBlocks::SmallColumn].clone(),
         b'|' => blocks[AtriumBlocks::SquareColumn].clone(),
@@ -361,7 +361,7 @@ fn map_text_block(
             // TODO: Coordinate systems in use aren't really consistent.
             // If we reorient the bricks so that they run along the X axis instead of the Z axis, that should help.
             block.rotate(
-                Face6::PY.clockwise()
+                Face::PY.clockwise()
                     * if mirrored_half {
                         GridRotation::IDENTITY
                     } else {
@@ -385,7 +385,7 @@ fn map_text_block(
             // TODO: Coordinate systems in use aren't really consistent.
             // If we reorient the bricks so that they run along the X axis instead of the Z axis, that should help.
             block.rotate(
-                Face6::PY.clockwise()
+                Face::PY.clockwise()
                     * if mirrored_half {
                         GridRotation::IDENTITY
                     } else {
@@ -394,7 +394,7 @@ fn map_text_block(
             )
         }
         b'T' => block::Composite::new(
-            blocks[AtriumBlocks::Molding].clone().rotate(Face6::PY.clockwise()),
+            blocks[AtriumBlocks::Molding].clone().rotate(Face::PY.clockwise()),
             block::CompositeOperator::Over,
         )
         .with_disassemblable()
@@ -433,11 +433,11 @@ fn arch_row(
     first_column_base: Cube,
     section_length: GridSizeCoord,
     section_count: GridSizeCoord,
-    parallel: Face6,
+    parallel: Face,
     pattern: Vol<&[u8]>,
 ) -> Result<(), InGenError> {
     let offset = parallel.vector(section_length as GridCoordinate);
-    let rotation = GridRotation::from_to(Face6::NX, parallel, Face6::PY).unwrap();
+    let rotation = GridRotation::from_to(Face::NX, parallel, Face::PY).unwrap();
     for i in 0..(section_count as GridCoordinate) {
         let column_base = first_column_base + offset * (i + 1);
 

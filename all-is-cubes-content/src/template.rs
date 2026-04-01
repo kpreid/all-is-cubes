@@ -14,7 +14,7 @@ use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{GenError, InGenError};
 use all_is_cubes::math::{
-    Face6, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgb, Rgba,
+    Face, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgb, Rgba,
 };
 use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{LightPhysics, Space};
@@ -436,7 +436,7 @@ fn cornell_box(requested_size: GridSize) -> Result<Space, InGenError> {
         m.fill_uniform(
             GridAab::from_lower_upper([21, 55, 23], [34, 55, 33])
                 .multiply(box_size_c).divide(55)
-                .abut(Face6::PY, 1).unwrap(),
+                .abut(Face::PY, 1).unwrap(),
             &light,
         )?;
         // Back wall.

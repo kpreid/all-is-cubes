@@ -76,7 +76,7 @@ use core::format_args;
 use core::mem;
 use core::num::Wrapping;
 
-use all_is_cubes::math::{Cube, Face6, GridCoordinate, GridPoint, GridRotation, rgba_const};
+use all_is_cubes::math::{Cube, Face, GridCoordinate, GridPoint, GridRotation, rgba_const};
 
 use crate::Viz;
 
@@ -182,17 +182,17 @@ pub struct Triangulator {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Basis {
     /// Orientation of the face/plane being processed.
-    face: Face6,
+    face: Face,
 
     /// Direction along the plane in which we are receiving input vertices.
     /// Input vertices must be sorted by `sweep_direction.dot(vertex.position)`.
-    sweep_direction: Face6,
+    sweep_direction: Face,
 
     /// A direction perpendicular to `self.face` and `self.sweep_direction`.
     ///
     /// Input vertices must be sorted by `perpendicular_direction.dot(vertex.position)`
     /// as a secondary key after `sweep_direction`.
-    perpendicular_direction: Face6,
+    perpendicular_direction: Face,
 
     /// `perpendicular_direction` as a unit vector.
     /// Wrapping arithmetic helps `compare_perp()` compile to simple code.
@@ -585,9 +585,9 @@ impl Basis {
     /// Value used as a placeholder in [`Triangulator`]s that are not currently in use.
     /// Its data is nonsense and it is never actually used.
     const DUMMY: Self = Self {
-        face: Face6::PX,
-        sweep_direction: Face6::PX,
-        perpendicular_direction: Face6::PX,
+        face: Face::PX,
+        sweep_direction: Face::PX,
+        perpendicular_direction: Face::PX,
         perpendicular_vector: WrappingVector3D::new(Wrapping(0), Wrapping(0), Wrapping(0)),
         left_handed: false,
     };
@@ -604,7 +604,7 @@ impl Basis {
     ///
     /// Panics if the three provided directions are not perpendicular.
     #[track_caller]
-    pub const fn new(face: Face6, sweep_direction: Face6, perpendicular_direction: Face6) -> Self {
+    pub const fn new(face: Face, sweep_direction: Face, perpendicular_direction: Face) -> Self {
         let left_handed = match GridRotation::try_from_basis_const([
             face,
             sweep_direction,
@@ -629,19 +629,19 @@ impl Basis {
 
     /// Returns the `face` direction this was constructed with.
     #[inline(always)]
-    pub fn face(&self) -> Face6 {
+    pub fn face(&self) -> Face {
         self.face
     }
 
     /// Returns the `sweep_direction` this was constructed with.
     #[inline(always)]
-    pub fn sweep_direction(&self) -> Face6 {
+    pub fn sweep_direction(&self) -> Face {
         self.sweep_direction
     }
 
     /// Returns the `perpendicular_direction` this was constructed with.
     #[inline(always)]
-    pub fn perpendicular_direction(&self) -> Face6 {
+    pub fn perpendicular_direction(&self) -> Face {
         self.perpendicular_direction
     }
 

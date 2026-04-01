@@ -7,7 +7,7 @@ use arcstr::ArcStr;
 
 use crate::block::Modifier;
 use crate::inv::InvInBlock;
-use crate::math::{Face6, GridRotation};
+use crate::math::{Face, GridRotation};
 use crate::op::Operation;
 use crate::sound;
 use crate::time;
@@ -545,7 +545,7 @@ pub enum RotationPlacementRule {
         ///
         /// If the block was somehow placed without such an adjacent block, it will not be
         /// rotated.
-        by: Face6,
+        by: Face,
         // TODO: control rotation about additional axis
     },
 }

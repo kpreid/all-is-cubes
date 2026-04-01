@@ -10,7 +10,7 @@ use pollster::block_on;
 use all_is_cubes::block::{self, Block, EvaluatedBlock, Resolution};
 use all_is_cubes::euclid::{Point3D, point3};
 use all_is_cubes::linking::BlockProvider;
-use all_is_cubes::math::{Face6, FaceMap, GridAab, Rgb, Rgba};
+use all_is_cubes::math::{Face, FaceMap, GridAab, Rgb, Rgba};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
@@ -179,8 +179,8 @@ fn make_transparent_boxes(universe: &mut Universe) -> Block {
         .build();
     let resolution = Resolution::R16;
     let solid_box = GridAab::for_block(resolution).shrink(FaceMap::splat(2)).unwrap();
-    let transparent_box = GridAab::for_block(resolution).abut(Face6::PX, -4).unwrap();
-    let emissive_box = GridAab::for_block(resolution).abut(Face6::NX, -4).unwrap();
+    let transparent_box = GridAab::for_block(resolution).abut(Face::PX, -4).unwrap();
+    let emissive_box = GridAab::for_block(resolution).abut(Face::NX, -4).unwrap();
     Block::builder()
         .display_name(arcstr::literal!("transparent-boxes"))
         .voxels_fn(resolution, |cube| {

@@ -4,7 +4,7 @@
 )]
 
 use all_is_cubes::math::{
-    Face6, GridAab, GridCoordinate, GridRotation, GridSize, GridVector, Gridgid,
+    Face, GridAab, GridCoordinate, GridRotation, GridSize, GridVector, Gridgid,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -55,7 +55,7 @@ pub(crate) fn mv_to_aic_size(size: dot_vox::Size) -> GridSize {
 pub(crate) fn mv_to_aic_rotation(rotation: dot_vox::Rotation) -> GridRotation {
     GridRotation::from_basis(rotation.to_cols_array_2d().map(|col| {
         let col = GridVector::from(col.map(|el| el as i32));
-        Face6::try_from(col).unwrap_or_else(|_| unreachable!())
+        Face::try_from(col).unwrap_or_else(|_| unreachable!())
     }))
 }
 

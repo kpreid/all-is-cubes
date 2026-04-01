@@ -6,7 +6,7 @@ use alloc::collections::VecDeque;
 use rand::SeedableRng;
 use rand::seq::{IteratorRandom as _, SliceRandom as _};
 
-use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, GridSize, Vol};
+use all_is_cubes::math::{Cube, Face, FaceMap, GridAab, GridSize, Vol};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -46,12 +46,12 @@ pub struct MazeRoom {
 }
 
 impl MazeRoom {
-    pub fn has_passage(&self, direction: Face6) -> bool {
+    pub fn has_passage(&self, direction: Face) -> bool {
         self.passages[direction]
     }
 }
 
-fn open_passage(maze: &mut Maze, from: Cube, dir: Face6) {
+fn open_passage(maze: &mut Maze, from: Cube, dir: Face) {
     maze[from].passages[dir] = true;
     maze[from + dir.normal_vector()].passages[dir.opposite()] = true;
 }
@@ -94,7 +94,7 @@ fn generate_path(
         maze[path_cube].position_on_path = Some(position_on_path);
         position_on_path += 1;
 
-        let Some(next_direction) = Face6::ALL
+        let Some(next_direction) = Face::ALL
             .into_iter()
             .filter(|dir| {
                 let neighbor = path_cube + dir.normal_vector();
@@ -136,7 +136,7 @@ fn generate_dead_ends(maze: &mut Maze, rng: &mut rand_xoshiro::Xoshiro256Plus) {
     let mut checked_without_progress = 0;
 
     while let Some(cube_to_fill) = needs_filling.pop_front() {
-        match Face6::ALL
+        match Face::ALL
             .into_iter()
             .filter(|dir| {
                 let neighbor = cube_to_fill + dir.normal_vector();
@@ -172,7 +172,7 @@ fn fill_remaining_distances(maze: &mut Maze, starting_room: Cube) {
         let Some(here_position_on_path) = maze[here].position_on_path else {
             panic!("rooms in needs_neighbors_filled should have their positions");
         };
-        for direction in Face6::ALL {
+        for direction in Face::ALL {
             if maze[here].has_passage(direction) {
                 let neighbor = here + direction;
                 let needs_fill = maze[neighbor].position_on_path.is_none();

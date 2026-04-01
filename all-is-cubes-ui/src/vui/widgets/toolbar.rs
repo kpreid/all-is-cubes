@@ -361,7 +361,7 @@ impl listen::Store<CueMessage> for ToolbarTodo {
 mod tests {
     use super::*;
     use all_is_cubes::euclid::Vector3D;
-    use all_is_cubes::math::Face6;
+    use all_is_cubes::math::Face;
     use all_is_cubes::space::Space;
     use all_is_cubes::universe::{Universe, UniverseTransaction};
     use all_is_cubes::util::yield_progress_for_testing;
@@ -392,7 +392,7 @@ mod tests {
         let gravity = Vector3D::splat(vui::layout::Align::Low);
 
         let widgets = Arc::new(vui::LayoutTree::Stack {
-            direction: Face6::PX,
+            direction: Face::PX,
             children: vec![
                 // This one is longer than the inventory
                 vui::leaf_widget(Toolbar::new(

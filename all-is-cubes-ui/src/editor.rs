@@ -9,7 +9,7 @@ use all_is_cubes::arcstr::{self, ArcStr, literal};
 use all_is_cubes::block::{self, Block};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::size3;
-use all_is_cubes::math::Face6;
+use all_is_cubes::math::Face;
 use all_is_cubes::universe::{Handle, ReadTicket};
 
 use crate::ui_content::hud::HudInputs;
@@ -25,17 +25,17 @@ pub fn inspect_block_at_cursor(
     let hit = cursor.hit();
 
     let contents = Arc::new(vui::LayoutTree::Stack {
-        direction: Face6::NY,
+        direction: Face::NY,
         children: vec![
             vui::leaf_widget(vui::quote_and_snapshot_block(
                 [read_ticket, ReadTicket::stub()],
                 &hit.block,
             )),
             Arc::new(vui::LayoutTree::Stack {
-                direction: Face6::PX,
+                direction: Face::PX,
                 children: vec![
                     Arc::new(vui::LayoutTree::Stack {
-                        direction: Face6::NY,
+                        direction: Face::NY,
                         children: vec![
                             vui::leaf_widget(widgets::Label::new(literal!("Definition"))),
                             inspect_block_definition(read_ticket, &hit.block),
@@ -62,7 +62,7 @@ fn inspect_block_definition(read_ticket: ReadTicket<'_>, block: &Block) -> vui::
         stack.push(inspect_modifier(read_ticket, block, i));
     }
     Arc::new(vui::LayoutTree::Stack {
-        direction: Face6::NY,
+        direction: Face::NY,
         children: stack,
     })
 }
@@ -77,7 +77,7 @@ fn inspect_primitive(read_ticket: ReadTicket<'_>, primitive: &block::Primitive) 
         }) => (
             literal!("Atom"),
             Arc::new(vui::LayoutTree::Stack {
-                direction: Face6::NY,
+                direction: Face::NY,
                 children: vec![paragraph(arcstr::format!(
                     "\
                         Color: {color:?}\n\
@@ -94,7 +94,7 @@ fn inspect_primitive(read_ticket: ReadTicket<'_>, primitive: &block::Primitive) 
         } => (
             literal!("Recur"),
             Arc::new(vui::LayoutTree::Stack {
-                direction: Face6::NY,
+                direction: Face::NY,
                 children: vec![
                     inspect_handle(space),
                     paragraph(arcstr::format!(
@@ -125,10 +125,10 @@ fn inspect_primitive(read_ticket: ReadTicket<'_>, primitive: &block::Primitive) 
         _ => (literal!("<unknown>"), vui::LayoutTree::empty()),
     };
     Arc::new(vui::LayoutTree::Stack {
-        direction: Face6::NY,
+        direction: Face::NY,
         children: vec![
             Arc::new(vui::LayoutTree::Stack {
-                direction: Face6::PX,
+                direction: Face::PX,
                 children: vec![
                     vui::leaf_widget(vui::quote_and_snapshot_block(
                         [read_ticket, ReadTicket::stub()],
@@ -138,7 +138,7 @@ fn inspect_primitive(read_ticket: ReadTicket<'_>, primitive: &block::Primitive) 
                 ],
             }),
             Arc::new(vui::LayoutTree::Stack {
-                direction: Face6::PX,
+                direction: Face::PX,
                 children: vec![indent(), details],
             }),
         ],
@@ -175,7 +175,7 @@ fn inspect_modifier(
         }) => (
             literal!("Composite"),
             Arc::new(vui::LayoutTree::Stack {
-                direction: Face6::NY,
+                direction: Face::NY,
                 children: vec![
                     inspect_block_definition(read_ticket, source),
                     paragraph(arcstr::format!(
@@ -225,10 +225,10 @@ fn inspect_modifier(
     };
 
     Arc::new(vui::LayoutTree::Stack {
-        direction: Face6::NY,
+        direction: Face::NY,
         children: vec![
             Arc::new(vui::LayoutTree::Stack {
-                direction: Face6::PX,
+                direction: Face::PX,
                 children: vec![
                     vui::leaf_widget(vui::quote_and_snapshot_block(
                         [read_ticket, ReadTicket::stub()],
@@ -238,7 +238,7 @@ fn inspect_modifier(
                 ],
             }),
             Arc::new(vui::LayoutTree::Stack {
-                direction: Face6::PX,
+                direction: Face::PX,
                 children: vec![indent(), details],
             }),
         ],
@@ -247,7 +247,7 @@ fn inspect_modifier(
 
 fn inspect_evaluated(ev: &block::EvaluatedBlock) -> vui::WidgetTree {
     Arc::new(vui::LayoutTree::Stack {
-        direction: Face6::NY,
+        direction: Face::NY,
         children: vec![
             vui::leaf_widget(widgets::Label::new(literal!("Evaluation"))),
             paragraph(arcstr::format!("{ev:#?}")),

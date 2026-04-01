@@ -2,7 +2,7 @@ use crate::block::TickAction;
 use crate::block::{
     self, AIR, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution::R16,
 };
-use crate::math::{Face6, GridAab, GridCoordinate, GridRotation, GridVector, Vol};
+use crate::math::{Face, GridAab, GridCoordinate, GridRotation, GridVector, Vol};
 use crate::op::Operation;
 use crate::time;
 use crate::universe;
@@ -23,7 +23,7 @@ use crate::universe;
 #[non_exhaustive]
 pub struct Move {
     /// The direction in which the block is displaced.
-    pub direction: Face6,
+    pub direction: Face,
 
     /// The distance, in 1/256ths, by which it is displaced.
     pub distance: u16,
@@ -40,7 +40,7 @@ pub struct Move {
 
 impl Move {
     /// TODO: make a cleaner, less internals-ish constructor
-    pub fn new(direction: Face6, distance: u16, velocity: i16) -> Self {
+    pub fn new(direction: Face, distance: u16, velocity: i16) -> Self {
         Self {
             direction,
             distance,
@@ -252,7 +252,7 @@ mod tests {
         let color = rgba_const!(1.0, 0.0, 0.0, 1.0);
         let original = Block::from(color);
         let moved = original.clone().with_modifier(Move {
-            direction: Face6::PY,
+            direction: Face::PY,
             distance: 128, // distance 1/2 block × scale factor of 256
             velocity: 0,
             schedule: time::Schedule::EVERY_TICK,
@@ -286,7 +286,7 @@ mod tests {
                         pz: color.to_rgb().with_alpha(zo32(0.5)),
                     },
                     light_emission: Rgb::ZERO,
-                    opaque: FaceMap::splat(false).with(Face6::PY, true),
+                    opaque: FaceMap::splat(false).with(Face::PY, true),
                     visible: true,
                     uniform_collision: None,
                     voxel_opacity_mask: VoxelOpacityMask::new_raw(
@@ -309,7 +309,7 @@ mod tests {
             .build_into(&mut universe);
 
         let moved = original.clone().with_modifier(Move {
-            direction: Face6::PY,
+            direction: Face::PY,
             distance: 128, // distance 1/2 block × scale factor of 256
             velocity: 0,
             schedule: time::Schedule::EVERY_TICK,
@@ -343,7 +343,7 @@ mod tests {
                         pz: color.to_rgb().with_alpha(zo32(0.5)),
                     },
                     light_emission: Rgb::ZERO,
-                    opaque: FaceMap::splat(false).with(Face6::PY, true),
+                    opaque: FaceMap::splat(false).with(Face::PY, true),
                     visible: true,
                     uniform_collision: None,
                     voxel_opacity_mask: VoxelOpacityMask::new_raw(
@@ -365,7 +365,7 @@ mod tests {
             .tick_action(Some(TickAction::from(Operation::Become(AIR))))
             .build();
         let moved = original.with_modifier(Move {
-            direction: Face6::PY,
+            direction: Face::PY,
             distance: 128,
             velocity: 0,
             schedule: time::Schedule::EVERY_TICK,
@@ -379,7 +379,7 @@ mod tests {
 
     /// Set up a `Modifier::Move`, let it run, and then allow assertions to be made about the result.
     fn move_block_test(
-        direction: Face6,
+        direction: Face,
         velocity: i16,
         checker: impl FnOnce(space::Read<'_>, &Block),
     ) {
@@ -407,7 +407,7 @@ mod tests {
 
     #[test]
     fn velocity_zero() {
-        move_block_test(Face6::PX, 0, |space, block| {
+        move_block_test(Face::PX, 0, |space, block| {
             assert_eq!(&space[[0, 0, 0]], block);
             assert_eq!(&space[[1, 0, 0]], &AIR);
         });
@@ -415,7 +415,7 @@ mod tests {
 
     #[test]
     fn velocity_slow() {
-        move_block_test(Face6::PX, 1, |space, block| {
+        move_block_test(Face::PX, 1, |space, block| {
             assert_eq!(&space[[0, 0, 0]], &AIR);
             assert_eq!(&space[[1, 0, 0]], block);
         });
@@ -423,7 +423,7 @@ mod tests {
 
     #[test]
     fn velocity_whole_cube_in_one_tick() {
-        move_block_test(Face6::PX, 256, |space, block| {
+        move_block_test(Face::PX, 256, |space, block| {
             assert_eq!(&space[[0, 0, 0]], &AIR);
             assert_eq!(&space[[1, 0, 0]], block);
         });
@@ -435,12 +435,12 @@ mod tests {
     fn move_inside_rotation() {
         let universe = Universe::new();
         let [base] = make_some_blocks();
-        const R: Modifier = Modifier::Rotate(Face6::PY.clockwise());
+        const R: Modifier = Modifier::Rotate(Face::PY.clockwise());
 
         let block = base
             .clone()
             .with_modifier(Move {
-                direction: Face6::PX,
+                direction: Face::PX,
                 distance: 10,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,
@@ -449,7 +449,7 @@ mod tests {
 
         let expected_after_tick = base
             .with_modifier(Move {
-                direction: Face6::PX,
+                direction: Face::PX,
                 distance: 20,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,
@@ -472,7 +472,7 @@ mod tests {
         let block = base
             .clone()
             .with_modifier(Move {
-                direction: Face6::PX,
+                direction: Face::PX,
                 distance: 10,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,
@@ -481,7 +481,7 @@ mod tests {
 
         let expected_after_tick = base
             .with_modifier(Move {
-                direction: Face6::PX,
+                direction: Face::PX,
                 distance: 20,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,
@@ -502,7 +502,7 @@ mod tests {
 
         let block = extra.clone().with_modifier(Composite::new(
             base.clone().with_modifier(Move {
-                direction: Face6::PX,
+                direction: Face::PX,
                 distance: 10,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,
@@ -512,7 +512,7 @@ mod tests {
 
         let expected_after_tick = extra.with_modifier(Composite::new(
             base.with_modifier(Move {
-                direction: Face6::PX,
+                direction: Face::PX,
                 distance: 20,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,

@@ -1,14 +1,14 @@
 use alloc::vec::Vec;
 
 use all_is_cubes::euclid::point3;
-use all_is_cubes::math::{Face6, GridPoint};
+use all_is_cubes::math::{Face, GridPoint};
 
 use crate::planar::{self, Mask};
 
 // -------------------------------------------------------------------------------------------------
 
 fn test_basis() -> planar::Basis {
-    let b = planar::Basis::new(Face6::PZ, Face6::PX, Face6::PY);
+    let b = planar::Basis::new(Face::PZ, Face::PX, Face::PY);
     assert!(!b.left_handed); // TODO: could use tests that *are* left-handed
     b
 }
@@ -499,10 +499,10 @@ fn doc_example_svg_test() {
 #[test]
 fn winding() {
     // See the doc comment on `is_correct_winding()` for details on what makes these LH and RH
-    let xy_rh_basis = planar::Basis::new(Face6::PZ, Face6::PX, Face6::PY);
-    let xy_lh_basis = planar::Basis::new(Face6::NZ, Face6::PX, Face6::PY);
-    let yx_rh_basis = planar::Basis::new(Face6::NZ, Face6::PY, Face6::PX);
-    let yx_lh_basis = planar::Basis::new(Face6::PZ, Face6::PY, Face6::PX);
+    let xy_rh_basis = planar::Basis::new(Face::PZ, Face::PX, Face::PY);
+    let xy_lh_basis = planar::Basis::new(Face::NZ, Face::PX, Face::PY);
+    let yx_rh_basis = planar::Basis::new(Face::NZ, Face::PY, Face::PX);
+    let yx_lh_basis = planar::Basis::new(Face::PZ, Face::PY, Face::PX);
     assert_eq!(xy_rh_basis.left_handed, false, "xy_rh_basis");
     assert_eq!(xy_lh_basis.left_handed, true, "xy_lh_basis");
     assert_eq!(yx_rh_basis.left_handed, false, "yx_rh_basis");

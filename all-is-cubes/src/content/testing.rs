@@ -7,7 +7,7 @@ use crate::block::{self, AIR, Block};
 use crate::character::Spawn;
 use crate::content::{free_editing_starter_inventory, palette};
 use crate::linking::InGenError;
-use crate::math::{Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba};
+use crate::math::{Face, FaceMap, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba};
 use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::Universe;
 use crate::util::YieldProgress;
@@ -39,7 +39,7 @@ pub async fn lighting_bench_space(
         .build_and_mutate(|m| {
             // Ground level
             m.fill_uniform(
-                m.bounds().shrink(FaceMap::default().with(Face6::PY, layout.yup())).unwrap(),
+                m.bounds().shrink(FaceMap::default().with(Face::PY, layout.yup())).unwrap(),
                 &block::from_color!(0.5, 0.5, 0.5),
             )
         })
@@ -79,7 +79,7 @@ pub async fn lighting_bench_space(
                 1 => {
                     m.fill_uniform(
                         section_bounds
-                            .shrink(FaceMap::default().with(Face6::PY, layout.yup()))
+                            .shrink(FaceMap::default().with(Face::PY, layout.yup()))
                             .unwrap(),
                         &color,
                     )

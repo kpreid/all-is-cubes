@@ -15,7 +15,7 @@ use crate::block::{
     VoxelOpacityMask,
 };
 use crate::inv;
-use crate::math::{Face6, Face7, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
+use crate::math::{Face, Face7, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
@@ -241,7 +241,7 @@ impl EvaluatedBlock {
     }
 
     pub(crate) fn face7_color(&self, face: Face7) -> Rgba {
-        match Face6::try_from(face) {
+        match Face::try_from(face) {
             Ok(face) => self.derived.face_colors[face],
             Err(_) => self.derived.color,
         }

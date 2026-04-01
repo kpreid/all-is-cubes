@@ -7,7 +7,7 @@ use rand::SeedableRng as _;
 use all_is_cubes::block::{self, AIR, Block, Resolution::R16};
 use all_is_cubes::euclid::point3;
 use all_is_cubes::linking::BlockProvider;
-use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridPoint, Rgba};
+use all_is_cubes::math::{Face, GridAab, GridCoordinate, GridPoint, Rgba};
 use all_is_cubes::space::Space;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::{self, Universe};
@@ -421,7 +421,7 @@ fn planar_benches(c: &mut Criterion) {
     // TODO: Do randomly-generated holes (corresponding to blocks on a plane) instead.
     g.bench_function("random-solid", |b| {
         let mut triangulator = planar::Triangulator::new();
-        let basis = planar::Basis::new(Face6::PZ, Face6::PX, Face6::PY);
+        let basis = planar::Basis::new(Face::PZ, Face::PX, Face::PY);
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3887829);
         let rectangle_size = 1000;
         let full_connectivity =

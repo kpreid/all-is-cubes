@@ -8,7 +8,7 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::euclid::Size3D;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridSizeCoord, GridVector,
+    Cube, Face, FaceMap, GridAab, GridCoordinate, GridSize, GridSizeCoord, GridVector,
     VectorOps as _, Vol, ps32,
 };
 use all_is_cubes::space::{self, Space};
@@ -67,7 +67,7 @@ impl DungeonGrid {
 
     /// Returns the volume which lies between two rooms and meets their adjoining faces.
     #[expect(dead_code)] // TODO: superseded in use by theme-specific sizes; review if should keep
-    pub fn shared_wall_at(&self, room_position: Cube, face: Face6) -> GridAab {
+    pub fn shared_wall_at(&self, room_position: Cube, face: Face) -> GridAab {
         self.room_box_at(room_position)
             .abut(
                 face,

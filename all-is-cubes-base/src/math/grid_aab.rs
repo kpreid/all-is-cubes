@@ -9,8 +9,8 @@ use manyfmt::Refmt;
 use rand::RngExt as _;
 
 use crate::math::{
-    Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridCoordinate, GridIter,
-    GridPoint, GridSize, GridSizeCoord, GridVector, Gridgid, Vol, sort_two,
+    Aab, Axis, Cube, Face, FaceMap, FreeCoordinate, FreePoint, GridCoordinate, GridIter, GridPoint,
+    GridSize, GridSizeCoord, GridVector, Gridgid, Vol, sort_two,
 };
 use crate::resolution::Resolution;
 use crate::util::ConciseDebug;
@@ -922,11 +922,11 @@ impl GridAab {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::{GridAab, Face6};
+    /// use all_is_cubes::math::{GridAab, Face};
     ///
     /// let interior = GridAab::from_lower_upper([10, 10, 10], [20, 20, 20]);
-    /// let left_wall = interior.abut(Face6::NX, 2)?;
-    /// let right_wall = interior.abut(Face6::PX, 2)?;
+    /// let left_wall = interior.abut(Face::NX, 2)?;
+    /// let right_wall = interior.abut(Face::PX, 2)?;
     ///
     /// assert_eq!(left_wall, GridAab::from_lower_upper([8, 10, 10], [10, 20, 20]));
     /// assert_eq!(right_wall, GridAab::from_lower_upper([20, 10, 10], [22, 20, 20]));
@@ -937,22 +937,22 @@ impl GridAab {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// # use all_is_cubes::math::{GridAab, Face6};
+    /// # use all_is_cubes::math::{GridAab, Face};
     ///
     /// let b = GridAab::from_lower_upper([10, 10, 10], [20, 20, 20]);
     /// assert_eq!(
-    ///     b.abut(Face6::PX, -3)?,
+    ///     b.abut(Face::PX, -3)?,
     ///     GridAab::from_lower_upper([17, 10, 10], [20, 20, 20]),
     /// );
     /// assert_eq!(
     ///     // Thicker than the input, therefore clamped.
-    ///     b.abut(Face6::PX, -30)?,
+    ///     b.abut(Face::PX, -30)?,
     ///     GridAab::from_lower_upper([10, 10, 10], [20, 20, 20]),
     /// );
     /// # Ok::<(), all_is_cubes::math::GridOverflowError>(())
     /// ```
     #[inline]
-    pub fn abut(self, face: Face6, thickness: GridCoordinate) -> Result<Self, GridOverflowError> {
+    pub fn abut(self, face: Face, thickness: GridCoordinate) -> Result<Self, GridOverflowError> {
         let axis = face.axis();
 
         // Apply change in size.
@@ -1064,7 +1064,7 @@ enum OverflowKind {
     // },
     OverflowedAbut {
         original: GridAab,
-        face: Face6,
+        face: Face,
         thickness: GridCoordinate,
     },
 }

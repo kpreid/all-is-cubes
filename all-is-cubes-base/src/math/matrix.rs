@@ -13,7 +13,7 @@ use num_traits::One;
 use num_traits::float::FloatCore as _;
 
 use crate::math::{
-    Axis, Cube, Face6, Face7, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector,
+    Axis, Cube, Face, Face7, FreeCoordinate, GridCoordinate, GridPoint, GridRotation, GridVector,
     Gridgid,
 };
 
@@ -180,7 +180,7 @@ impl GridMatrix {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::{Face6::*, Gridgid, GridMatrix, GridRotation, GridVector};
+    /// use all_is_cubes::math::{Face::*, Gridgid, GridMatrix, GridRotation, GridVector};
     ///
     /// assert_eq!(
     ///     GridMatrix::new(
@@ -199,9 +199,9 @@ impl GridMatrix {
     pub fn decompose(self) -> Option<Gridgid> {
         Some(Gridgid {
             rotation: GridRotation::from_basis([
-                Face6::try_from(self.x).ok()?,
-                Face6::try_from(self.y).ok()?,
-                Face6::try_from(self.z).ok()?,
+                Face::try_from(self.x).ok()?,
+                Face::try_from(self.y).ok()?,
+                Face::try_from(self.z).ok()?,
             ]),
             translation: self.w,
         })

@@ -421,13 +421,13 @@ impl Block {
     /// ```
     /// use all_is_cubes::block;
     /// use all_is_cubes::content::make_some_voxel_blocks;
-    /// use all_is_cubes::math::{Face6, Rgba};
+    /// use all_is_cubes::math::{Face, Rgba};
     /// use all_is_cubes::universe::Universe;
     ///
     /// let mut universe = Universe::new();
     /// let [mut block] = make_some_voxel_blocks(&mut universe);
     /// block.modifiers_mut().clear();
-    /// let clockwise = Face6::PY.clockwise();
+    /// let clockwise = Face::PY.clockwise();
     ///
     /// // Basic rotation
     /// let rotated = block.clone().rotate(clockwise);
@@ -480,12 +480,12 @@ impl Block {
     /// ```
     /// use all_is_cubes::block::Block;
     /// # use all_is_cubes::content::make_some_voxel_blocks;
-    /// use all_is_cubes::math::Face6;
+    /// use all_is_cubes::math::Face;
     /// use all_is_cubes::universe::Universe;
     ///
     /// let mut universe = Universe::new();
     /// let [block] = make_some_voxel_blocks(&mut universe);
-    /// let rotated = block.clone().rotate(Face6::PY.clockwise());
+    /// let rotated = block.clone().rotate(Face::PY.clockwise());
     ///
     /// assert_ne!(&block, &rotated);
     /// assert_eq!(vec![block], rotated.clone().unspecialize());

@@ -516,7 +516,7 @@ mod tests {
     use crate::block::{self, Resolution::*, SetAttribute, TickAction};
     use crate::content::palette;
     use crate::inv;
-    use crate::math::{Face6, GridRotation, Vol, ps32};
+    use crate::math::{Face, GridRotation, Vol, ps32};
     use crate::op::Operation;
     use crate::sound;
     use crate::space::SpacePhysics;
@@ -564,7 +564,7 @@ mod tests {
             s.noise_bands[sound::Band::MIN] = ps32(0.5);
             s
         };
-        let rotation_rule = block::RotationPlacementRule::Attach { by: Face6::NZ };
+        let rotation_rule = block::RotationPlacementRule::Attach { by: Face::NZ };
         let placement_action = Some(block::PlacementAction {
             operation: Operation::Become(block::from_color!(1.0, 0.0, 1.0)),
             in_front: false,
@@ -587,7 +587,7 @@ mod tests {
                 .animation_hint(block::AnimationHint::replacement(
                     block::AnimationChange::Shape
                 ))
-                .modifier(Modifier::Rotate(Face6::PY.clockwise()))
+                .modifier(Modifier::Rotate(Face::PY.clockwise()))
                 .build(),
             Block::from(block::Atom {
                 color,
@@ -609,7 +609,7 @@ mod tests {
             .with_modifier(SetAttribute::AnimationHint(
                 block::AnimationHint::replacement(block::AnimationChange::Shape)
             ))
-            .with_modifier(Modifier::Rotate(Face6::PY.clockwise()))
+            .with_modifier(Modifier::Rotate(Face::PY.clockwise()))
         );
     }
 

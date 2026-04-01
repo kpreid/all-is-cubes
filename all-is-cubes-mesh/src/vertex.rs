@@ -4,7 +4,7 @@ use core::fmt;
 
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Point3D, Vector3D};
-use all_is_cubes::math::{Cube, Face6, Rgba};
+use all_is_cubes::math::{Cube, Face, Rgba};
 use all_is_cubes::util::{ConciseDebug, Fmt, Refmt as _};
 
 #[cfg(doc)]
@@ -87,8 +87,8 @@ pub struct BlockVertex<T> {
 
     /// Cube face, or vertex normal, of the surface this vertex is part of.
     ///
-    /// If you need a normal vector, call [`Face6::normal_vector()`].
-    pub face: Face6,
+    /// If you need a normal vector, call [`Face::normal_vector()`].
+    pub face: Face,
 
     /// Surface color or texture coordinate.
     pub coloring: Coloring<T>,

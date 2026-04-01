@@ -41,7 +41,7 @@ fn COMPOSITE(ctx: Context<'_>) {
             for (si, source) in (0i32..).zip(sources) {
                 for (oi, operator) in (0i32..).zip(operators) {
                     let composite = destination.clone().with_modifier(Composite::new(
-                        source.clone().rotate(Face6::PY.clockwise()),
+                        source.clone().rotate(Face::PY.clockwise()),
                         operator,
                     ));
 

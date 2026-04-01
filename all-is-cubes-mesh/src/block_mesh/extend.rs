@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D, point2, vec3};
 use all_is_cubes::math::{
-    Face6, FaceMap, GridAab, GridCoordinate, OpacityCategory, Rgba, rgba_const,
+    Face, FaceMap, GridAab, GridCoordinate, OpacityCategory, Rgba, rgba_const,
 };
 
 use crate::texture::{self, Plane as _, TexelUnit, TextureCoordinate, TilePoint};
@@ -36,7 +36,7 @@ pub(crate) fn push_box<M: MeshTypes>(
         return;
     }
     let fully_opaque = opacity_category == OpacityCategory::Opaque;
-    for face in Face6::ALL {
+    for face in Face::ALL {
         let volume_to_planar = face.face_transform(GridCoordinate::from(resolution)).inverse();
         let aab_in_face_coordinates = aab.transform(volume_to_planar).unwrap();
 
@@ -242,7 +242,7 @@ const QUAD_VERTICES: &[Vector2D<PosCoord, TexelUnit>; 4] = &[
     // Note that looked at from a X-right Y-up view, these triangles are
     // clockwise, but they're properly counterclockwise from the perspective
     // that we're drawing the face _facing towards negative Z_ (into the screen),
-    // which is how cube faces as implicitly defined by Face6::matrix work.
+    // which is how cube faces as implicitly defined by Face::matrix work.
     //
     // Units note: these are not technically `TexelUnit`s but their sole usage is
     // multiplying so they are.
@@ -282,7 +282,7 @@ impl<T: texture::Tile> Clone for QuadColoring<'_, T> {
 /// Ingredients for [`push_quad`] that are uniform for a resolution and face,
 /// so they can be computed only six times per block.
 pub(crate) struct QuadTransform {
-    face: Face6,
+    face: Face,
     resolution: Resolution,
     // TODO: specialize transforms since there are only 6 possible values plus scale,
     // so we don't need as many ops as a full matrix-vector multiplication?
@@ -293,7 +293,7 @@ pub(crate) struct QuadTransform {
 }
 
 impl QuadTransform {
-    pub fn new(face: Face6, resolution: Resolution) -> Self {
+    pub fn new(face: Face, resolution: Resolution) -> Self {
         // TODO: Have a different coordinate system type for planar coordinates
         let voxel_to_block_scale: Scale<PosCoord, MeshRel, MeshRel> =
             Scale::new(resolution.recip_f32());
@@ -301,7 +301,7 @@ impl QuadTransform {
             face,
             resolution,
             position_transform: Transform3D::from_scale(voxel_to_block_scale).then(
-                // TODO: make it possible to get this transform from Face6 with less casting.
+                // TODO: make it possible to get this transform from Face with less casting.
                 &face
                     .face_transform(1)
                     .to_matrix()

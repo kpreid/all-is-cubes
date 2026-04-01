@@ -10,7 +10,7 @@ use crate::character::{self, Character, CharacterTransaction, Cursor};
 use crate::fluff::Fluff;
 use crate::inv::{self, Icons, InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
-use crate::math::{Cube, Face6, GridRotation, Gridgid};
+use crate::math::{Cube, Face, GridRotation, Gridgid};
 use crate::op::{self, Operation};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
@@ -199,7 +199,7 @@ impl Tool {
                 // make it possible to express as just a `Tool::Custom`.
 
                 let cursor = input.cursor()?;
-                let direction: Face6 = cursor
+                let direction: Face = cursor
                     .face_selected()
                     .opposite()
                     .try_into()
@@ -407,12 +407,12 @@ impl<'ticket> ToolInput<'ticket> {
         let rotation = match new_ev.attributes().rotation_rule {
             RotationPlacementRule::Never => GridRotation::IDENTITY,
             RotationPlacementRule::Attach { by: attached_face } => {
-                let world_cube_face: Face6 =
-                    cursor.face_selected().opposite().try_into().unwrap_or(Face6::NZ);
+                let world_cube_face: Face =
+                    cursor.face_selected().opposite().try_into().unwrap_or(Face::NZ);
                 // TODO: RotationPlacementRule should control the "up" axis choices
-                GridRotation::from_to(attached_face, world_cube_face, Face6::PY)
-                    .or_else(|| GridRotation::from_to(attached_face, world_cube_face, Face6::PX))
-                    .or_else(|| GridRotation::from_to(attached_face, world_cube_face, Face6::PZ))
+                GridRotation::from_to(attached_face, world_cube_face, Face::PY)
+                    .or_else(|| GridRotation::from_to(attached_face, world_cube_face, Face::PX))
+                    .or_else(|| GridRotation::from_to(attached_face, world_cube_face, Face::PZ))
                     .unwrap_or(GridRotation::IDENTITY)
             }
         };

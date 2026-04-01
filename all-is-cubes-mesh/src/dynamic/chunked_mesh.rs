@@ -8,7 +8,7 @@ use rayon::iter::{ParallelBridge, ParallelIterator as _};
 
 use all_is_cubes::chunking::{ChunkChart, ChunkPos, cube_to_chunk, point_to_chunk};
 use all_is_cubes::listen::{self, Listen as _};
-use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, OctantMask, lines};
+use all_is_cubes::math::{Cube, Face, FreeCoordinate, GridCoordinate, OctantMask, lines};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
@@ -840,7 +840,7 @@ impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
         // blocks' faces. We don't need to bother with the current block since
         // the adjacent chunks will always include it (presuming that the chunk
         // size is greater than 1).
-        for direction in Face6::ALL {
+        for direction in Face::ALL {
             let (chunk_pos, _) = cube_to_chunk(cube + direction.normal_vector());
             if let Some(chunk) = self.chunks.get_mut(&chunk_pos) {
                 f(chunk);

@@ -9,7 +9,7 @@ use euclid::point3;
 
 use crate::block::{Block, EvaluatedBlock, Evoxel};
 use crate::content::palette;
-use crate::math::{Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign, lines};
+use crate::math::{Cube, Face, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign, lines};
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
 use crate::universe::{Handle, HandleError, ReadTicket};
@@ -239,7 +239,7 @@ impl lines::Wireframe for Cursor {
 
         // Frame the selected face with a square.
         // TODO: Position this frame relative to block_aabb.
-        if let Ok(face) = Face6::try_from(self.face_selected()) {
+        if let Ok(face) = Face::try_from(self.face_selected()) {
             let face_transform_full = face.face_transform(1).to_matrix().to_free().then(
                 &self
                     .hit()
@@ -268,7 +268,7 @@ impl lines::Wireframe for Cursor {
         // Frame the cursor intersection point with a diamond.
         // TODO: This addition is experimental and we may or may not want to keep it.
         // For now, it visualizes the intersection and face information.
-        if let Ok(face) = Face6::try_from(self.face_entered) {
+        if let Ok(face) = Face::try_from(self.face_entered) {
             let face_transform_axes_only = face.rotation_from_nz().to_rotation_matrix().to_free();
             output.extend(lines::line_loop(
                 [Face7::PX, Face7::PY, Face7::NX, Face7::NY].map(|f| {

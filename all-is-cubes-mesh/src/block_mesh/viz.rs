@@ -7,7 +7,7 @@
 use alloc::collections::VecDeque;
 
 use all_is_cubes::block::{Evoxel, Evoxels};
-use all_is_cubes::math::{Face6, GridCoordinate, GridPoint, Rgba, Vol};
+use all_is_cubes::math::{Face, GridCoordinate, GridPoint, Rgba, Vol};
 
 use crate::Position;
 use crate::block_mesh::analyze::Analysis;
@@ -233,7 +233,7 @@ impl Viz {
 
     pub(crate) fn set_layer_in_progress(
         &mut self,
-        #[allow(unused)] face: Face6,
+        #[allow(unused)] face: Face,
         #[allow(unused)] layer: GridCoordinate,
     ) {
         #[cfg(feature = "rerun")]
@@ -300,7 +300,7 @@ impl Viz {
         #[allow(unused)] mut vertex_position_iter: impl Iterator<Item = Position> + Clone,
         #[allow(unused)] mut relative_indices_iter: impl Iterator<Item = u32> + Clone,
         #[allow(unused)] color_fn: impl FnOnce() -> Rgba,
-        #[allow(unused)] normal: Face6,
+        #[allow(unused)] normal: Face,
     ) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
@@ -337,12 +337,12 @@ impl Viz {
                     .push(rg::components::LineStrip3D(vec![p1.0, p2.0, p3.0, p1.0]));
                 state.mesh_edge_classes.push(
                     match normal {
-                        Face6::NX => rg::ClassId::MeshVizEdgeNx,
-                        Face6::NY => rg::ClassId::MeshVizEdgeNy,
-                        Face6::NZ => rg::ClassId::MeshVizEdgeNz,
-                        Face6::PX => rg::ClassId::MeshVizEdgePx,
-                        Face6::PY => rg::ClassId::MeshVizEdgePy,
-                        Face6::PZ => rg::ClassId::MeshVizEdgePz,
+                        Face::NX => rg::ClassId::MeshVizEdgeNx,
+                        Face::NY => rg::ClassId::MeshVizEdgeNy,
+                        Face::NZ => rg::ClassId::MeshVizEdgeNz,
+                        Face::PX => rg::ClassId::MeshVizEdgePx,
+                        Face::PY => rg::ClassId::MeshVizEdgePy,
+                        Face::PZ => rg::ClassId::MeshVizEdgePz,
                     }
                     .into(),
                 );
@@ -373,7 +373,7 @@ impl Viz {
 
 #[cfg(feature = "rerun")]
 impl Inner {
-    fn layer_box(&self, face: Face6, layer: GridCoordinate) -> GridAab {
+    fn layer_box(&self, face: Face, layer: GridCoordinate) -> GridAab {
         self.analysis.occupied_plane_box(face, layer).unwrap()
     }
 
@@ -414,7 +414,7 @@ impl Inner {
     /// Logs the current `self.analysis.occupied_planes`.
     /// Used from two different phases.
     fn log_occupied_planes(&self) {
-        let iter = Face6::ALL.into_iter().flat_map(|face| {
+        let iter = Face::ALL.into_iter().flat_map(|face| {
             self.analysis
                 .occupied_planes(face)
                 .map(move |(layer, _)| self.layer_box(face, layer))

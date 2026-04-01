@@ -12,7 +12,7 @@ use core::mem;
 use crate::block::{self, AIR, BlRotate, Block};
 use crate::fluff::Fluff;
 use crate::inv::{self, Inventory, InventoryTransaction};
-use crate::math::{Cube, Face6, GridAab, GridRotation, Gridgid};
+use crate::math::{Cube, Face, GridAab, GridRotation, Gridgid};
 use crate::space::{self, CubeTransaction, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
 use crate::universe::VisitHandles;
@@ -114,7 +114,7 @@ pub enum Operation {
     MoveInventory {
         /// Attempt to transfer inventory items to the block that is adjacent to this face of
         /// the target block.
-        transfer_into_adjacent: Option<Face6>,
+        transfer_into_adjacent: Option<Face>,
     },
 
     /// Move the contents of the target block’s inventory to the tool user’s inventory.
@@ -598,14 +598,14 @@ mod tests {
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::space::Space;
     use crate::universe::Universe;
-    use all_is_cubes_base::math::Face6;
+    use all_is_cubes_base::math::Face;
     use pretty_assertions::assert_eq;
 
     #[test]
     fn alt() {
-        let move_x = Operation::StartMove(block::Move::new(Face6::PX, 1, 1));
-        let move_y = Operation::StartMove(block::Move::new(Face6::PY, 1, 1));
-        let move_z = Operation::StartMove(block::Move::new(Face6::PZ, 1, 1));
+        let move_x = Operation::StartMove(block::Move::new(Face::PX, 1, 1));
+        let move_y = Operation::StartMove(block::Move::new(Face::PY, 1, 1));
+        let move_z = Operation::StartMove(block::Move::new(Face::PZ, 1, 1));
         let alt = Operation::Alt([move_x.clone(), move_y.clone(), move_z.clone()].into());
 
         // Control which `StartMove` succeeds by changing the size of the space.
@@ -638,7 +638,7 @@ mod tests {
     fn rotated_become_atom() {
         let [atom] = make_some_blocks();
         let op = Operation::Become(atom);
-        assert_eq!(op.clone(), op.rotate(Face6::PY.clockwise()));
+        assert_eq!(op.clone(), op.rotate(Face::PY.clockwise()));
     }
 
     #[test]
@@ -688,14 +688,14 @@ mod tests {
             })
             .unwrap();
 
-        let op = Operation::AddModifiers([block::Modifier::Rotate(Face6::PY.clockwise())].into());
+        let op = Operation::AddModifiers([block::Modifier::Rotate(Face::PY.clockwise())].into());
 
         assert_eq!(
             op.apply(&space.read(), None, Gridgid::IDENTITY).unwrap(),
             (
                 CubeTransaction::replacing(
                     Some(block.clone()),
-                    Some(block.clone().rotate(Face6::PY.clockwise()))
+                    Some(block.clone().rotate(Face::PY.clockwise()))
                 )
                 .at(Cube::ORIGIN),
                 InventoryTransaction::default()
@@ -718,7 +718,7 @@ mod tests {
             .filled_with(block.clone())
             .build();
 
-        let modifier = block::Modifier::Move(block::Move::new(Face6::PX, 4, 0));
+        let modifier = block::Modifier::Move(block::Move::new(Face::PX, 4, 0));
         let op = Operation::AddModifiers([modifier.clone()].into());
 
         assert_eq!(
@@ -765,7 +765,7 @@ mod tests {
             op.apply(
                 &space.read(),
                 None,
-                Face6::PY.clockwise().to_positive_octant_transform(1)
+                Face::PY.clockwise().to_positive_octant_transform(1)
             )
             .unwrap(),
             (
@@ -861,7 +861,7 @@ mod tests {
     ///
     /// This function should be called at least once for each Operation variant.
     fn transform_consistent_with_rotate(universe: &Universe, initial_block: Block, op: Operation) {
-        let rotation = Face6::PY.clockwise();
+        let rotation = Face::PY.clockwise();
         let space = Space::builder(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]))
             .read_ticket(universe.read_ticket())
             .build_and_mutate(|m| {
@@ -892,7 +892,7 @@ mod tests {
         transform_consistent_with_rotate(
             universe,
             b1,
-            Operation::Alt([Operation::StartMove(block::Move::new(Face6::PX, 4, 0))].into()),
+            Operation::Alt([Operation::StartMove(block::Move::new(Face::PX, 4, 0))].into()),
         );
     }
     #[test]
@@ -902,7 +902,7 @@ mod tests {
         transform_consistent_with_rotate(
             universe,
             b1,
-            Operation::AddModifiers([block::Move::new(Face6::PX, 4, 0).into()].into()),
+            Operation::AddModifiers([block::Move::new(Face::PX, 4, 0).into()].into()),
         );
     }
     #[test]
@@ -918,7 +918,7 @@ mod tests {
         transform_consistent_with_rotate(
             universe,
             b1,
-            Operation::StartMove(block::Move::new(Face6::PX, 4, 0)),
+            Operation::StartMove(block::Move::new(Face::PX, 4, 0)),
         );
     }
     #[test]
@@ -931,7 +931,7 @@ mod tests {
             Operation::Neighbors(
                 [(
                     Cube::new(1, 0, 0),
-                    Operation::StartMove(block::Move::new(Face6::PZ, 4, 0)),
+                    Operation::StartMove(block::Move::new(Face::PZ, 4, 0)),
                 )]
                 .into(),
             ),

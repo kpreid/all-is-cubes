@@ -4,7 +4,7 @@ use alloc::vec;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::euclid::size3;
-use all_is_cubes::math::{Face6, FaceMap};
+use all_is_cubes::math::{Face, FaceMap};
 
 use crate::vui;
 use crate::vui::widgets::BoxStyle;
@@ -52,7 +52,7 @@ impl Frame {
         });
 
         Arc::new(vui::LayoutTree::Stack {
-            direction: Face6::PZ,
+            direction: Face::PZ,
             children: vec![vui::leaf_widget(self), tree],
         })
     }

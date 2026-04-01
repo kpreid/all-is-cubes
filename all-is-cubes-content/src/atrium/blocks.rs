@@ -9,7 +9,7 @@ use all_is_cubes::block::{self, AIR, Block, Resolution, RotationPlacementRule, Z
 use all_is_cubes::content::palette;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgb01, Rgba,
+    Cube, Face, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgb01, Rgba,
     Vol, ps32, zo32,
 };
 use all_is_cubes::space::{self, Space, SpacePhysics, SpaceTransaction};
@@ -332,7 +332,7 @@ pub(in crate::atrium) async fn install_atrium_blocks(
             )?,
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
-                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(RESOLUTION, |p| {
                     let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x + mid.z < RESOLUTION_G * 6 / 4 {
@@ -344,7 +344,7 @@ pub(in crate::atrium) async fn install_atrium_blocks(
                 .build_txn(txn),
             AtriumBlocks::SquareColumn => Block::builder()
                 .display_name("Square Atrium Column")
-                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(RESOLUTION, |p| {
                     let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x.max(p.z) < RESOLUTION_G * 6 / 4 {
@@ -356,7 +356,7 @@ pub(in crate::atrium) async fn install_atrium_blocks(
                 .build_txn(txn),
             AtriumBlocks::SmallColumn => Block::builder()
                 .display_name("Round Atrium Column")
-                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(RESOLUTION, |p| {
                     let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
                     if mid.x.pow(2) + mid.z.pow(2) < (RESOLUTION_G * 3 / 4).pow(2) {

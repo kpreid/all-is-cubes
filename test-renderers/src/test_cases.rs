@@ -13,7 +13,7 @@ use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::euclid::{Point2D, Size2D, Size3D, Vector3D, point3, size2, size3, vec2, vec3};
 use all_is_cubes::listen;
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
+    Axis, Cube, Face, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
     GridVector, Rgb, Rgb01, Rgba, Vol, ps32, ps64, rgb_const, rgba_const, zo32,
 };
 use all_is_cubes::space::{self, LightPhysics, Space};
@@ -110,7 +110,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         tested_lighting_options(),
     );
     c.insert("no_update", None, no_update);
-    c.insert_variants("sky", &None, sky, Face6::exhaust());
+    c.insert_variants("sky", &None, sky, Face::exhaust());
     c.insert_variants("info_text", &None, info_text, [1.0, 1.5, 2.0]);
     c.insert_variants(
         "template",
@@ -962,7 +962,7 @@ async fn no_update(mut context: RenderTestContext) {
         .await;
 }
 
-async fn sky(mut context: RenderTestContext, face: Face6) {
+async fn sky(mut context: RenderTestContext, face: Face) {
     // The face passed is the face of the sky we are *looking at*.
 
     let [block] = make_some_voxel_blocks(context.universe_mut());
@@ -1274,10 +1274,10 @@ async fn antialias_test_universe() -> Arc<Universe> {
         })
         .build_and_mutate(|m| {
             // Bottom floor
-            m.fill(bounds.abut(Face6::NY, -1).unwrap(), voxel_block_pattern)?;
+            m.fill(bounds.abut(Face::NY, -1).unwrap(), voxel_block_pattern)?;
 
             // Right wall
-            m.fill(bounds.abut(Face6::PX, -1).unwrap(), solid_block_pattern)?;
+            m.fill(bounds.abut(Face::PX, -1).unwrap(), solid_block_pattern)?;
             Ok(())
         })
         .unwrap();
@@ -1322,13 +1322,13 @@ async fn fog_test_universe() -> Arc<Universe> {
         .build_and_mutate(|m| {
             // Bottom floor
             m.fill_uniform(
-                bounds.abut(Face6::NY, -1).unwrap(),
+                bounds.abut(Face::NY, -1).unwrap(),
                 &block::from_color!(0.0, 1.0, 0.5, 1.0),
             )?;
 
             // Right wall
             m.fill_uniform(
-                bounds.abut(Face6::PX, -1).unwrap(),
+                bounds.abut(Face::PX, -1).unwrap(),
                 &block::from_color!(1.0, 0.5, 0.5, 1.0),
             )?;
 
@@ -1371,7 +1371,7 @@ async fn light_spread_test_universe() -> Arc<Universe> {
         .build_and_mutate(|m| {
             // Back wall
             m.fill_uniform(
-                bounds.abut(Face6::NZ, -1).unwrap(),
+                bounds.abut(Face::NZ, -1).unwrap(),
                 &block::from_color!(0.5, 0.5, 0.5, 1.0),
             )
             .unwrap();
@@ -1438,7 +1438,7 @@ async fn light_on_slab_test_universe() -> Arc<Universe> {
         .build_and_mutate(|m| {
             // Back wall
             m.fill_uniform(
-                bounds.abut(Face6::NZ, -1).unwrap(),
+                bounds.abut(Face::NZ, -1).unwrap(),
                 &block::from_color!(0.5, 0.5, 0.5, 1.0),
             )
             .unwrap();
@@ -1512,13 +1512,13 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
         .build_and_mutate(|m| {
             // Back wall
             m.fill_uniform(
-                bounds.abut(Face6::NZ, -1).unwrap(),
+                bounds.abut(Face::NZ, -1).unwrap(),
                 &block::from_color!(0.5, 0.5, 0.5, 1.0),
             )
             .unwrap();
 
             // Front air space
-            m.fill_uniform(bounds.abut(Face6::PZ, -1).unwrap(), &AIR).unwrap();
+            m.fill_uniform(bounds.abut(Face::PZ, -1).unwrap(), &AIR).unwrap();
 
             for (i, luminance) in (0i32..).zip(luminance_ramp) {
                 let x = i * x_spacing;

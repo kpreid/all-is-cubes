@@ -8,7 +8,7 @@ use crate::character::{
 };
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listen as _, Log};
-use crate::math::{Face6, GridAab, Rgb01};
+use crate::math::{Face, GridAab, Rgb01};
 use crate::physics::BodyTransaction;
 use crate::raycast::Ray;
 use crate::space::Space;
@@ -37,8 +37,8 @@ fn spawn_inferred_position() {
     let cbox = character.body.collision_box_abs();
     dbg!(character.body.position(), cbox);
     assert_eq!(
-        bounds.to_free().face_coordinate(Face6::NY),
-        cbox.face_coordinate(Face6::NY)
+        bounds.to_free().face_coordinate(Face::NY),
+        cbox.face_coordinate(Face::NY)
     );
 }
 
@@ -220,7 +220,7 @@ fn jumping() {
     let mut character = Character::spawn_default(universe.read_ticket(), space).unwrap();
     character.body.set_position(point3(
         0.,
-        character.body.collision_box_rel().face_coordinate(Face6::NY) + 1.001,
+        character.body.collision_box_rel().face_coordinate(Face::NY) + 1.001,
         0.,
     ));
     let character = universe.insert("character".into(), character).unwrap();

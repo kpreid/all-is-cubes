@@ -6,7 +6,7 @@ use all_is_cubes::block::{self, AIR, Block, Resolution, text};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{Size2D, size2};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, FreeVector, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba,
+    Cube, Face, FreeCoordinate, FreeVector, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba,
 };
 use all_is_cubes::space::{self, Space, SpacePhysics};
 use all_is_cubes::universe::{Handle, ReadTicket, StrongHandle, Universe};
@@ -140,7 +140,7 @@ impl Page {
         contents: WidgetTree,
     ) -> Self {
         let tree = Arc::new(LayoutTree::Stack {
-            direction: Face6::PZ,
+            direction: Face::PZ,
             children: vec![
                 Arc::new(LayoutTree::Spacer(LayoutRequest {
                     // magic number 2 allows us to fill the edges of the viewport, ish
@@ -157,10 +157,10 @@ impl Page {
                 ))),
                 Arc::new(LayoutTree::Shrink(
                     theme.dialog_background().as_background_of(Arc::new(LayoutTree::Stack {
-                        direction: Face6::NY,
+                        direction: Face::NY,
                         children: vec![
                             Arc::new(LayoutTree::Stack {
-                                direction: Face6::PX,
+                                direction: Face::PX,
                                 children: if let Some(corner_button) = corner_button {
                                     // TODO: arrange so that title text is centered if possible
                                     // (need a new LayoutTree variant or to generalize Stack, but it might help with our HUD too)

@@ -8,7 +8,7 @@ use rand::seq::{IndexedRandom as _, SliceRandom as _};
 use all_is_cubes::block::{self, AIR, Block};
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Vol,
+    Cube, Face, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Vol,
 };
 use all_is_cubes::space::SpaceTransaction;
 
@@ -82,8 +82,8 @@ pub(crate) fn make_log(
                     return AIR;
                 };
                 blocks[Log(growth)].clone().rotate(
-                    GridRotation::from_to(Face6::NY, face, Face6::PX)
-                        .or_else(|| GridRotation::from_to(Face6::NY, face, Face6::PZ))
+                    GridRotation::from_to(Face::NY, face, Face::PX)
+                        .or_else(|| GridRotation::from_to(Face::NY, face, Face::PZ))
                         .unwrap(),
                 )
             })
@@ -119,10 +119,10 @@ pub(crate) fn make_tree(
     bounds: GridAab,
 ) -> SpaceTransaction {
     // Graph of which blocks are to be connected by logs.
-    let mut graph = Growph::new(bounds.expand(FaceMap::default().with(Face6::NY, 1)));
+    let mut graph = Growph::new(bounds.expand(FaceMap::default().with(Face::NY, 1)));
 
     // Establish the root.
-    *graph.edge_mut(root, Face6::NY).unwrap() = Some(TreeGrowth::Sapling);
+    *graph.edge_mut(root, Face::NY).unwrap() = Some(TreeGrowth::Sapling);
 
     let not_on_surface = bounds.shrink(FaceMap::splat(1)).unwrap_or(GridAab::ORIGIN_EMPTY);
 
@@ -131,7 +131,7 @@ pub(crate) fn make_tree(
 
     // Generate foliage (before the branches that lead to it)
     let mut leaves_missing_branches = Vec::new();
-    for cube in bounds.abut(Face6::PY, -leaves_height).unwrap().interior_iter() {
+    for cube in bounds.abut(Face::PY, -leaves_height).unwrap().interior_iter() {
         if not_on_surface.contains_cube(cube) {
             // leaves don't hide behind other leaves
             continue;
@@ -196,7 +196,7 @@ pub(crate) fn make_tree(
             },
         ) {
             for &[rootward, leafward] in path.array_windows() {
-                let face = Face6::try_from(leafward - rootward).unwrap();
+                let face = Face::try_from(leafward - rootward).unwrap();
                 // TODO: cleverer algorithm (at least don't overwrite)
                 *graph.edge_mut(rootward, face).unwrap() = Some(TreeGrowth::Sapling);
 
@@ -216,7 +216,7 @@ pub(crate) fn make_tree(
 
     // Adjust branch sizes based on flow data
     for cube in graph.bounds().interior_iter() {
-        for face in Face6::ALL {
+        for face in Face::ALL {
             let neighbor = cube + face.normal_vector();
             if graph.bounds().contains_cube(neighbor) {
                 let flow1 = graph.data[cube].flow;
@@ -269,7 +269,7 @@ mod graph {
             self.data.bounds()
         }
 
-        pub fn edge(&self, cube: Cube, neighbor_face: Face6) -> Option<Option<TreeGrowth>> {
+        pub fn edge(&self, cube: Cube, neighbor_face: Face) -> Option<Option<TreeGrowth>> {
             if neighbor_face.is_negative() {
                 // For any pair, data is stored in the cell with the lower coordinates.
                 // TODO: could, theoretically, numeric overflow
@@ -284,7 +284,7 @@ mod graph {
         pub fn edge_mut(
             &mut self,
             cube: Cube,
-            neighbor_face: Face6,
+            neighbor_face: Face,
         ) -> Option<&mut Option<TreeGrowth>> {
             if neighbor_face.is_negative() {
                 // For any pair, data is stored in the cell with the lower coordinates.
@@ -406,11 +406,11 @@ mod graph {
     #[derive(Clone, Copy, Debug)]
     pub(crate) struct GrowphEdgeRef {
         cube: Cube,
-        face: Face6,
+        face: Face,
         pub growth: Option<TreeGrowth>,
     }
     impl GrowphEdgeRef {
-        fn from_face(cube: Cube, face: Face6, growth: Option<TreeGrowth>) -> Self {
+        fn from_face(cube: Cube, face: Face, growth: Option<TreeGrowth>) -> Self {
             Self { cube, face, growth }
         }
     }

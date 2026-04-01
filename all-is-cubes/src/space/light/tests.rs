@@ -5,7 +5,7 @@ use pretty_assertions::assert_eq;
 use super::{LightUpdatesInfo, PackedLight, Priority, data::LightStatus};
 use crate::block::{self, AIR, Block};
 use crate::listen::{Listen as _, Listener, Log};
-use crate::math::{Cube, Face6, FaceMap, GridPoint, Rgb, Rgb01, Rgba, rgb_const};
+use crate::math::{Cube, Face, FaceMap, GridPoint, Rgb, Rgb01, Rgba, rgb_const};
 use crate::space::{
     CubeTransaction, GridAab, LightPhysics, SetCubeError, Sky, Space, SpaceChange, SpacePhysics,
 };
@@ -53,7 +53,7 @@ fn initial_value_initialized_after_creation() {
     // Note: this is pretty specific to the `fast_evaluate_light()` algorithm
     // and will probably break when we improve it.
     assert_eq!(
-        space.light.block_sky.in_direction(Face6::PY),
+        space.light.block_sky.in_direction(Face::PY),
         space.get_lighting([1, 2, 1]),
         "sky above obstacle"
     );
@@ -92,7 +92,7 @@ fn out_of_bounds_light_is_sky(#[values(0.0, 0.5, 1.0)] opacity: f32) {
             space.get_lighting(neighboring_cube),
             // TODO: This should also be NO_RAYS in the case where it would be NO_RAYS inside the
             // space, that is, when the adjacent cube inside the space is transparent.
-            if let Ok(face) = Face6::try_from(neighboring_cube.lower_bounds().to_vector()) {
+            if let Ok(face) = Face::try_from(neighboring_cube.lower_bounds().to_vector()) {
                 space.physics().sky.for_blocks().in_direction(face)
             } else {
                 PackedLight::NO_RAYS

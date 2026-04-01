@@ -6,7 +6,7 @@ use itertools::Itertools;
 use all_is_cubes::block::{Evoxel, Resolution};
 use all_is_cubes::euclid::{Point2D, point3, vec3};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, Octant, OctantMap, OctantMask,
+    Axis, Cube, Face, FaceMap, GridAab, GridCoordinate, GridPoint, Octant, OctantMap, OctantMask,
     OpacityCategory, Vol, ZMaj,
 };
 
@@ -120,10 +120,7 @@ impl Analysis {
     /// For each face normal, which depths will need any triangles generated.
     /// Index 0 is depth 0 (the surface of the block volume), index 1 is one voxel
     /// deeper, and so on.
-    pub fn occupied_planes(
-        &self,
-        face: Face6,
-    ) -> impl Iterator<Item = (GridCoordinate, Rect)> + '_ {
+    pub fn occupied_planes(&self, face: Face) -> impl Iterator<Item = (GridCoordinate, Rect)> + '_ {
         (0..GridCoordinate::from(self.resolution))
             .zip(self.occupied_planes[face])
             .filter_map(move |(i, pbox)| {
@@ -136,7 +133,7 @@ impl Analysis {
     }
 
     #[cfg(feature = "rerun")]
-    pub fn occupied_plane_box(&self, face: Face6, layer: GridCoordinate) -> Option<GridAab> {
+    pub fn occupied_plane_box(&self, face: Face, layer: GridCoordinate) -> Option<GridAab> {
         let pbox = self.occupied_planes[face][usize::try_from(layer).unwrap()];
         if pbox.is_empty() {
             return None;
@@ -152,11 +149,11 @@ impl Analysis {
         ))
     }
 
-    pub(crate) fn surface_is_occupied(&self, face: Face6) -> bool {
+    pub(crate) fn surface_is_occupied(&self, face: Face) -> bool {
         !self.occupied_planes[face][0].is_empty()
     }
 
-    fn pbox_to_rect(&self, face: Face6, pbox: PlaneBox) -> Rect {
+    fn pbox_to_rect(&self, face: Face, pbox: PlaneBox) -> Rect {
         let t = face.face_transform(self.resolution.into()).inverse();
         Rect::from_points([
             t.transform_point(unflatten(face.axis(), 0, pbox.min)).to_2d(),
@@ -167,7 +164,7 @@ impl Analysis {
     #[inline(always)] // we want this specialized for each case
     fn expand_rect(
         &mut self,
-        face: Face6,
+        face: Face,
         layer: GridCoordinate,
         center: Point2D<GridCoordinate, Cube>,
     ) {
@@ -182,7 +179,7 @@ impl Analysis {
     }
 
     #[cfg(feature = "rerun")]
-    pub(crate) fn delete_occupied_plane(&mut self, face: Face6, layer: GridCoordinate) {
+    pub(crate) fn delete_occupied_plane(&mut self, face: Face, layer: GridCoordinate) {
         self.occupied_planes[face][layer as usize] = EMPTY_PLANE_BOX;
     }
 }
@@ -226,7 +223,7 @@ fn analyze_one_window(
     window: OctantMap<&Evoxel>,
     transparency: TransparencyFormat,
 ) {
-    use Face6::*;
+    use Face::*;
     const ALL: OctantMask = OctantMask::ALL;
     const NONE: OctantMask = OctantMask::NONE;
 
@@ -333,7 +330,7 @@ fn analyze_one_window(
 
 /// Returns whether any bits in the more `face`ward side of `mask` are set while the
 /// corresponding bits on the opposite side are *not* set.
-fn uncovered(mask: OctantMask, face: Face6) -> bool {
+fn uncovered(mask: OctantMask, face: Face) -> bool {
     (mask & OctantMask::from_face(face) & !mask.shift(face)).any()
 }
 
@@ -463,7 +460,7 @@ mod tests {
         let plane_box_size = 16; // 4 × i32
         assert_eq!(size_of::<PlaneBox>(), plane_box_size);
         let planes_per_face = MAX_PLANES;
-        let faces = Face6::ALL.len();
+        let faces = Face::ALL.len();
         // One GridAab + one Vec + 2 byte-sized fields, aligned to 16
         let other_fields =
             (size_of::<GridAab>() + size_of::<Vec<AnalysisVertex>>() + 2).next_multiple_of(16);
@@ -497,7 +494,7 @@ mod tests {
         } else {
             assert_eq!(analysis.needs_texture, true, "needs_texture");
             // Note: the orientation of these rects depends on the arbitrary choices of
-            // Face6::face_transform().
+            // Face::face_transform().
             assert_eq!(
                 occupied_planes,
                 FaceMap {
@@ -542,7 +539,7 @@ mod tests {
             &mut Viz::disabled(),
         );
 
-        assert!(analysis.occupied_planes(Face6::NX).next().is_some());
+        assert!(analysis.occupied_planes(Face::NX).next().is_some());
     }
 
     // TODO: We have no test coverage for uniform-color transparent blocks

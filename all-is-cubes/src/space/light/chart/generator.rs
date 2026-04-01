@@ -11,7 +11,7 @@ use core::num::NonZero;
 use euclid::{Point3D, Vector3D};
 use hashbrown::HashMap;
 
-use crate::math::{Cube, Face6, FaceMap, FreePoint, FreeVector};
+use crate::math::{Cube, Face, FaceMap, FreePoint, FreeVector};
 use crate::raycast::Ray;
 
 use super::{FlatNode, Weight};
@@ -66,7 +66,7 @@ pub fn generate_light_ray_pattern() -> impl Iterator<Item = OneRay> {
             let direction = Vector3D::new(x as f32, y as f32, z as f32).normalize();
 
             let mut face_cosines = FaceMap::splat(0.0f32);
-            for face in Face6::ALL {
+            for face in Face::ALL {
                 let unit_vector: FreeVector = face.normal_vector();
                 let cosine = unit_vector.to_f32().dot(direction.to_f32()).max(0.0);
                 face_cosines[face] = cosine;
@@ -114,7 +114,7 @@ impl RayTreeNode {
     pub fn insert(&mut self, tail: &[Step], weight: FaceMap<Weight>) {
         self.weight += weight;
         if let &[Step { relative_cube, .. }, ref tail @ ..] = tail {
-            let direction = Face6::try_from((relative_cube - self.relative_cube).to_i32()).unwrap();
+            let direction = Face::try_from((relative_cube - self.relative_cube).to_i32()).unwrap();
             self.children[direction]
                 .get_or_insert_with(|| {
                     Box::new(RayTreeNode {

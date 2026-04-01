@@ -9,7 +9,7 @@ use crate::block::{
 };
 use crate::content::make_some_blocks;
 use crate::listen::{self, Log, NullListener};
-use crate::math::{Face6, GridRotation, Rgba};
+use crate::math::{Face, GridRotation, Rgba};
 use crate::space::{Space, SpaceTransaction};
 use crate::time;
 use crate::transaction::{self, Transaction as _};
@@ -219,7 +219,7 @@ fn overflow_evaluate() {
 
     let mut block = AIR;
     block.modifiers_mut().extend(std::iter::repeat_n(
-        Modifier::Rotate(Face6::PY.clockwise()),
+        Modifier::Rotate(Face::PY.clockwise()),
         too_many_modifiers as usize,
     ));
     assert_eq!(
@@ -326,14 +326,14 @@ mod modify {
     #[test]
     pub fn rotate_atom_is_identity() {
         let block = block::from_color!(1.0, 0.0, 0.0);
-        assert_eq!(block.clone().rotate(Face6::PY.clockwise()), block);
+        assert_eq!(block.clone().rotate(Face::PY.clockwise()), block);
     }
 
     #[test]
     fn rotate_atom_with_symmetric_modifier_is_identity() {
         // Quote is an example of a modifer that doesn't add asymmetry.
         let block = block::from_color!(1.0, 0.0, 0.0).with_modifier(block::Quote::new());
-        assert_eq!(block.clone().rotate(Face6::PY.clockwise()), block);
+        assert_eq!(block.clone().rotate(Face::PY.clockwise()), block);
     }
 }
 

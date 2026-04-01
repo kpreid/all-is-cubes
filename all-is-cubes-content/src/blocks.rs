@@ -19,7 +19,7 @@ use all_is_cubes::euclid::{Vector3D, point3};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord, GridVector,
+    Cube, Face, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord, GridVector,
     Rgb, Rgb01, Rgba, ps32, rgb_const, rgba_const,
 };
 use all_is_cubes::op::Operation;
@@ -286,7 +286,7 @@ fn demo_blocks_generator(
 
             LamppostSegment => Block::builder()
                 .display_name("Lamppost")
-                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(resolution, |cube| {
                     if (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
                         .component_mul(GridVector::new(1, 0, 1))
@@ -302,7 +302,7 @@ fn demo_blocks_generator(
 
             LamppostBase => Block::builder()
                 .display_name("Lamppost Base")
-                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(resolution, |cube| {
                     let shape: [GridCoordinate; 16] =
                         [8, 8, 7, 7, 6, 6, 6, 5, 5, 5, 6, 6, 5, 4, 4, 3];
@@ -321,7 +321,7 @@ fn demo_blocks_generator(
 
             LamppostTop => Block::builder()
                 .display_name("Lamppost Top")
-                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(resolution, |cube| {
                     let shape: [GridCoordinate; 16] =
                         [4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 7, 8];
@@ -341,7 +341,7 @@ fn demo_blocks_generator(
                 let globe_r2 = (resolution_g - 2).pow(2);
                 Block::builder()
                     .display_name("Sconce")
-                    .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
+                    .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ })
                     .ambient_sound(if on {
                         lamp_sound.clone()
                     } else {
@@ -415,7 +415,7 @@ fn demo_blocks_generator(
 
                 Block::builder()
                     .display_name("Arrow")
-                    .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
+                    .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                     .voxels_handle(resolution, txn.insert_anonymous(space))
                     .build()
             }
@@ -423,7 +423,7 @@ fn demo_blocks_generator(
             Curb => Block::builder()
                 .display_name("Curb")
                 // TODO: rotation should specify curb line direction
-                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(resolution, &curb_fn)?
                 .build_txn(txn),
 
@@ -442,7 +442,7 @@ fn demo_blocks_generator(
 
             Pedestal => Block::builder()
                 .display_name("Pedestal")
-                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(resolution, |cube| {
                     // TODO: fancier shape
                     let shape: [GridCoordinate; 16] =
@@ -515,7 +515,7 @@ fn demo_blocks_generator(
 
                 Block::builder()
                     .display_name("Signboard")
-                    .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
+                    .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                     .voxels_handle(resolution, txn.insert_anonymous(space))
                     .build()
             }
@@ -551,7 +551,7 @@ fn demo_blocks_generator(
                             phase,
                             Block::builder()
                                 .display_name(literal!("Clock"))
-                                .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
+                                .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ })
                                 // TODO: Ideally, animated BlockDefs would automatically set the
                                 // animation hint.
                                 .animation_hint(AnimationHint::redefinition(
@@ -713,7 +713,7 @@ fn demo_blocks_generator(
                 .tick_action(TickAction {
                     operation: Operation::Alt(
                         [
-                            Operation::StartMove(block::Move::new(Face6::PY, 32, 32)),
+                            Operation::StartMove(block::Move::new(Face::PY, 32, 32)),
                             // if we can't move, vanish
                             Operation::Become(AIR),
                         ]
@@ -746,7 +746,7 @@ fn demo_blocks_generator(
                         .color(rgba_const!(1.0, 0.0, 0.5, 1.0))
                         .display_name("Greebled")
                         .build(),
-                    Face6::ALL
+                    Face::ALL
                         .iter()
                         .map(|face| carve_block.clone().rotate(face.rotation_from_nz()))
                         .map(|carve_face_block| {
@@ -754,7 +754,7 @@ fn demo_blocks_generator(
                                 .reversed()
                         })
                         .chain(
-                            Face6::ALL
+                            Face::ALL
                                 .iter()
                                 .map(|face| image_block.clone().rotate(face.rotation_from_nz()))
                                 .map(|face_block| {

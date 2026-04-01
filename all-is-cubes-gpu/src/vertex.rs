@@ -91,7 +91,7 @@ pub(crate) struct BPosition {
     ///   This block-relative vertex position is added to `cube_packed` to obtain the chunk-relative
     ///   vertex position.
     ///
-    /// * Bits 24..28 indicate the normal of the face, a `Face6` converted to integer.
+    /// * Bits 24..28 indicate the normal of the face, a `Face` converted to integer.
     ///   (There is an unused high bit here.)
     ///
     /// * Bits 28..32 indicate the logarithm of the resolution of the texture data.
@@ -407,7 +407,7 @@ fn format_into_debug_text_vector(message: &dyn fmt::Display) -> [u32; 4] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::math::{Face6, Rgba};
+    use all_is_cubes::math::{Face, Rgba};
 
     /// Assert the vertex's size, just so that we're reminded to think about it when we
     /// change the amount of data in it. This assertion is not platform-dependent because
@@ -426,7 +426,7 @@ mod tests {
     fn block_vertex_position() {
         let mut vertex = BPosition::from_block_vertex(BlockVertex {
             position: Point3D::new(0.25, 0.0, 1.0),
-            face: Face6::PX,
+            face: Face::PX,
             coloring: mesh::Coloring::Solid(Rgba::new(0.0, 0.5, 1.0, 0.5)),
         })
         .0;

@@ -21,7 +21,7 @@ fn MOVED_BLOCKS(ctx: Context<'_>) {
 
                     // Vertical
                     {
-                        let [move_out, move_in] = Move::new(Face6::PY, distance, 0).into_paired();
+                        let [move_out, move_in] = Move::new(Face::PY, distance, 0).into_paired();
                         m.set(
                             [x * 2, 0, (1 - z) * 2],
                             block.clone().with_modifier(move_out),
@@ -34,7 +34,7 @@ fn MOVED_BLOCKS(ctx: Context<'_>) {
 
                     // Horizontal
                     {
-                        let [move_out, move_in] = Move::new(Face6::PZ, distance, 0).into_paired();
+                        let [move_out, move_in] = Move::new(Face::PZ, distance, 0).into_paired();
                         m.set([i, 0, -2], block.clone().with_modifier(move_out))?;
                         m.set([i, 0, -1], block.clone().with_modifier(move_in))?;
                     }
@@ -59,7 +59,7 @@ fn PROJECTILE(ctx: Context<'_>) {
 
     let projectile = &demo_blocks[DemoBlocks::Projectile];
 
-    let [move_in, _move_out] = Move::new(Face6::NY, 256, -32).into_paired();
+    let [move_in, _move_out] = Move::new(Face::NY, 256, -32).into_paired();
     let projectile_moving_in = projectile.clone().with_modifier(move_in);
     // let projectile_moving_out = projectile.clone().with_modifier(move_out);
 

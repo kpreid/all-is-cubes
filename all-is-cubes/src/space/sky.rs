@@ -1,7 +1,7 @@
 use euclid::vec3;
 
 use crate::content::palette;
-use crate::math::{Cube, Face6, FaceMap, FreeVector, GridAab, Rgb};
+use crate::math::{Cube, Face, FaceMap, FreeVector, GridAab, Rgb};
 use crate::space::PackedLight;
 
 #[cfg(doc)]
@@ -147,7 +147,7 @@ impl BlockSky {
     }
 
     #[inline]
-    pub fn in_direction(&self, face: Face6) -> PackedLight {
+    pub fn in_direction(&self, face: Face) -> PackedLight {
         self.faces[face]
     }
 

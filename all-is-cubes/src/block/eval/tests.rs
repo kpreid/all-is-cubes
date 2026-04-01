@@ -15,7 +15,7 @@ use crate::block::{
     VoxelOpacityMask, modifier,
 };
 use crate::math::{
-    Cube, Face6, FaceMap, GridAab, GridPoint, GridVector, Intensity, OpacityCategory, Rgb, Rgba,
+    Cube, Face, FaceMap, GridAab, GridPoint, GridVector, Intensity, OpacityCategory, Rgb, Rgba,
     Vol, zo32,
 };
 use crate::space::Space;
@@ -429,7 +429,7 @@ fn voxels_partial_not_filling() {
     // of 6 faces, 2 are opaque and 2 are half-transparent, thus there are 8 opaque half-faces.
     assert_eq!(e.color(), Rgba::new(1.0, 1.0, 1.0, 8. / 12.));
     assert_eq!(e.resolution(), resolution);
-    assert_eq!(e.opaque(), FaceMap::splat(false).with(Face6::NX, true));
+    assert_eq!(e.opaque(), FaceMap::splat(false).with(Face::NX, true));
     assert_eq!(e.visible(), true);
 }
 
@@ -624,7 +624,7 @@ fn color_evaluation_regression_1() {
     let block = Block::builder()
         .color(Rgba::new(1e28, 1e28, 1e28, 1.0))
         // Modifier matters because it causes the block to become voxels
-        .modifier(Modifier::Move(modifier::Move::new(Face6::NX, 0, 0)))
+        .modifier(Modifier::Move(modifier::Move::new(Face::NX, 0, 0)))
         .build();
     eval_out(&block);
 }

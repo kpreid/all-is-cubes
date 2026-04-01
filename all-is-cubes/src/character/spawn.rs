@@ -4,7 +4,7 @@ use euclid::{Point3D, Vector3D};
 
 use crate::camera::eye_for_look_at;
 use crate::inv::Slot;
-use crate::math::{Cube, Face6, FreeCoordinate, FreePoint, FreeVector, GridAab, NotNan};
+use crate::math::{Cube, Face, FreeCoordinate, FreePoint, FreeVector, GridAab, NotNan};
 #[cfg(feature = "save")]
 use crate::save::schema;
 use crate::universe::{HandleVisitor, VisitHandles};
@@ -47,7 +47,7 @@ impl Spawn {
     /// necessarily mandating a specification.
     pub fn default_for_new_space(bounds: GridAab) -> Self {
         Spawn {
-            bounds: bounds.abut(Face6::PZ, 40).unwrap_or(bounds),
+            bounds: bounds.abut(Face::PZ, 40).unwrap_or(bounds),
             eye_position: None,
             look_direction: Vector3D::new(NotNan::from(0), NotNan::from(0), NotNan::from(-1)),
             inventory: vec![],

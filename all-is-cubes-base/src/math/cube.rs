@@ -6,7 +6,7 @@ use core::fmt;
 use num_traits::float::FloatCore as _;
 
 use crate::math::{
-    Aab, Face6, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint,
+    Aab, Face, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint,
     GridVector,
 };
 use crate::util::ConciseDebug;
@@ -272,30 +272,30 @@ mod arithmetic {
         }
     }
 
-    impl ops::Add<Face6> for Cube {
+    impl ops::Add<Face> for Cube {
         type Output = Self;
         #[inline]
-        fn add(self, rhs: Face6) -> Self::Output {
+        fn add(self, rhs: Face) -> Self::Output {
             self + rhs.normal_vector()
         }
     }
-    impl ops::AddAssign<Face6> for Cube {
+    impl ops::AddAssign<Face> for Cube {
         #[inline]
-        fn add_assign(&mut self, rhs: Face6) {
+        fn add_assign(&mut self, rhs: Face) {
             *self += rhs.normal_vector()
         }
     }
 
-    impl ops::Sub<Face6> for Cube {
+    impl ops::Sub<Face> for Cube {
         type Output = Self;
         #[inline]
-        fn sub(self, rhs: Face6) -> Self::Output {
+        fn sub(self, rhs: Face) -> Self::Output {
             self - rhs.normal_vector()
         }
     }
-    impl ops::SubAssign<Face6> for Cube {
+    impl ops::SubAssign<Face> for Cube {
         #[inline]
-        fn sub_assign(&mut self, rhs: Face6) {
+        fn sub_assign(&mut self, rhs: Face) {
             *self -= rhs.normal_vector()
         }
     }

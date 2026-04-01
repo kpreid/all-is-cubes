@@ -7,7 +7,7 @@ use alloc::sync::Arc;
 use num_traits::float::FloatCore as _;
 
 use all_is_cubes::block::{self, AIR, Block, Composite, CompositeOperator};
-use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridSize, Rgb01, ZeroOne};
+use all_is_cubes::math::{Face, GridAab, GridCoordinate, GridSize, Rgb01, ZeroOne};
 use all_is_cubes::space::SpaceTransaction;
 use all_is_cubes::{listen, universe};
 
@@ -19,7 +19,7 @@ use crate::vui::widgets::{BoxStyle, WidgetTheme};
 pub struct ProgressBar {
     empty_style: BoxStyle,
     filled_style: BoxStyle,
-    direction: Face6,
+    direction: Face,
     source: listen::DynSource<ProgressBarState>,
 }
 
@@ -45,7 +45,7 @@ impl ProgressBar {
     /// * `source` is the data source.
     pub fn new(
         theme: &WidgetTheme,
-        direction: Face6,
+        direction: Face,
         source: listen::DynSource<ProgressBarState>,
     ) -> Arc<Self> {
         Arc::new(Self {
@@ -147,12 +147,12 @@ impl ProgressBarController {
 
                 let mask_substance = block::from_color!(Rgb01::WHITE);
                 let fill_mask = mask_substance.clone().with_modifier(block::Move::new(
-                    Face6::NX,
+                    Face::NX,
                     u16::try_from((16 - partial_fill) * 16).unwrap(),
                     0,
                 ));
                 let empty_mask = mask_substance.with_modifier(block::Move::new(
-                    Face6::PX,
+                    Face::PX,
                     u16::try_from(partial_fill * 16).unwrap(),
                     0,
                 ));
@@ -254,7 +254,7 @@ mod tests {
         let pb = |fraction: f64| -> String {
             let tree = vui::leaf_widget(ProgressBar::new(
                 &widget_theme,
-                Face6::PX,
+                Face::PX,
                 listen::constant(ProgressBarState::new(fraction)),
             ));
 

@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use all_is_cubes::inv::Icons;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen;
-use all_is_cubes::math::Face6;
+use all_is_cubes::math::Face;
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
@@ -66,7 +66,7 @@ pub(super) fn new_hud_page(
             hud_inputs.mouselook_mode.clone(),
         )),
         toolbar: Arc::new(LayoutTree::Stack {
-            direction: Face6::PY,
+            direction: Face::PY,
             children: vec![vui::leaf_widget(toolbar), vui::leaf_widget(tooltip)],
         }),
         control_bar: control_bar(read_ticket, hud_inputs),
@@ -82,10 +82,10 @@ pub(super) fn new_hud_page(
 /// positioned in the top right corner.
 pub(crate) fn control_bar(read_ticket: ReadTicket<'_>, hud_inputs: &HudInputs) -> WidgetTree {
     let control_bar_widgets: WidgetTree = Arc::new(LayoutTree::Stack {
-        direction: Face6::NX,
+        direction: Face::NX,
         children: vec![
             Arc::new(LayoutTree::Stack {
-                direction: Face6::NX,
+                direction: Face::NX,
                 children: settings_widgets(read_ticket, hud_inputs, SettingsStyle::CompactRow),
             }),
             vui::leaf_widget(open_page_button(
@@ -112,7 +112,7 @@ pub(crate) fn control_bar(read_ticket: ReadTicket<'_>, hud_inputs: &HudInputs) -
     if false {
         // reveal the bounds by adding a widgets::Frame
         Arc::new(LayoutTree::Stack {
-            direction: Face6::PZ,
+            direction: Face::PZ,
             children: vec![
                 vui::leaf_widget(hud_inputs.hud_blocks.widget_theme.dialog_background()),
                 control_bar_widgets,

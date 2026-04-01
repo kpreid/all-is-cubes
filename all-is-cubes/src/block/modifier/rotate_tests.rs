@@ -9,7 +9,7 @@ use crate::block::{
     Modifier, Primitive, Resolution::R2, TickAction, Vol,
 };
 use crate::content::make_some_voxel_blocks;
-use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
+use crate::math::{Cube, Face, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
 use crate::op::Operation;
 use crate::universe::Universe;
 
@@ -38,7 +38,7 @@ fn rotate_evaluation() {
             Block::from(color_fn(cube))
         })
         .unwrap()
-        .rotation_rule(block::RotationPlacementRule::Attach { by: Face6::PX })
+        .rotation_rule(block::RotationPlacementRule::Attach { by: Face::PX })
         .tick_action(Some(TickAction::from(Operation::Become(
             replacement.clone(),
         ))))
@@ -68,7 +68,7 @@ fn rotate_evaluation() {
                 tick_action: Some(TickAction::from(Operation::Become(
                     replacement.rotate(rotation).clone()
                 ))),
-                rotation_rule: block::RotationPlacementRule::Attach { by: Face6::PY },
+                rotation_rule: block::RotationPlacementRule::Attach { by: Face::PY },
                 ..BlockAttributes::default()
             },
             cost: block::Cost {
@@ -80,7 +80,7 @@ fn rotate_evaluation() {
                 color: be.color(),
                 face_colors: be.face_colors().rotate(rotation),
                 light_emission: Rgb::ZERO,
-                opaque: FaceMap::splat(false).with(rotation.transform(Face6::NY), true),
+                opaque: FaceMap::splat(false).with(rotation.transform(Face::NY), true),
                 visible: true,
                 uniform_collision: Some(BlockCollision::Hard),
                 voxel_opacity_mask: block::VoxelOpacityMask::new_raw(
@@ -138,5 +138,5 @@ fn rotate_by_identity() {
     let [block] = make_some_voxel_blocks(universe);
     assert_eq!(block, block.clone().rotate(GridRotation::IDENTITY));
     // prove that the test didn't trivially pass by applying to a symmetric block
-    assert_ne!(block, block.clone().rotate(Face6::PY.clockwise()));
+    assert_ne!(block, block.clone().rotate(Face::PY.clockwise()));
 }

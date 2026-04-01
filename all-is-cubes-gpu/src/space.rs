@@ -17,7 +17,7 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::{
-    Face6, FreeCoordinate, GridCoordinate, GridPoint, GridSize, PositiveSign, Rgb, Rgba, ZeroOne,
+    Face, FreeCoordinate, GridCoordinate, GridPoint, GridSize, PositiveSign, Rgb, Rgba, ZeroOne,
     lines::Wireframe as _,
 };
 #[cfg(feature = "rerun")]
@@ -836,7 +836,7 @@ impl SpaceRenderer {
 
             // Frame the nearest chunk in detail
             let chunk_origin = view_chunk.bounds().lower_bounds().map(FreeCoordinate::from);
-            for face in Face6::ALL {
+            for face in Face::ALL {
                 let ft = face.face_transform(CHUNK_SIZE);
                 for i in 1..CHUNK_SIZE {
                     let mut push = |points: [GridPoint; 2]| {

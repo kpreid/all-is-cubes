@@ -10,7 +10,7 @@ use all_is_cubes::euclid::{point3, vec3};
 use all_is_cubes::inv;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Rgb, Rgba, zo32,
+    Cube, Face, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Rgb, Rgba, zo32,
 };
 use all_is_cubes::op;
 use all_is_cubes::space::{Space, SpaceTransaction};
@@ -83,7 +83,7 @@ pub(crate) async fn install_dungeon_blocks(
         Ok(match key {
             CorridorLight => Block::builder()
                 .display_name("Corridor Light")
-                .rotation_rule(RotationPlacementRule::Attach { by: Face6::PY })
+                .rotation_rule(RotationPlacementRule::Attach { by: Face::PY })
                 .voxels_fn(resolution, |cube| {
                     let centered = cube.lower_bounds() * 2 - center_point_doubled;
                     if centered.y > centered.x.abs() && centered.y > centered.z.abs() {

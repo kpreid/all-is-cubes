@@ -8,7 +8,7 @@ use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::{self, Icons, InventoryTransaction, Slot, Tool, ToolError, ToolInput};
 use all_is_cubes::linking::BlockProvider;
-use all_is_cubes::math::{Cube, Face6, FreeCoordinate, Rgba, rgba_const};
+use all_is_cubes::math::{Cube, Face, FreeCoordinate, Rgba, rgba_const};
 use all_is_cubes::op::Operation;
 use all_is_cubes::raycast::Ray;
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
@@ -278,7 +278,7 @@ fn use_block_automatic_rotation() {
     tool_block
         .modifiers_mut()
         .push(block::Modifier::from(block::SetAttribute::RotationRule(
-            block::RotationPlacementRule::Attach { by: Face6::NZ },
+            block::RotationPlacementRule::Attach { by: Face::NZ },
         )));
 
     // TODO: For more thorough testing, we need to be able to control ToolTester's choice of ray
@@ -289,7 +289,7 @@ fn use_block_automatic_rotation() {
             let mut t = SpaceTransaction::set_cube(
                 Cube::ORIGIN,
                 Some(AIR),
-                Some(tool_block.clone().rotate(Face6::PY.clockwise())),
+                Some(tool_block.clone().rotate(Face::PY.clockwise())),
             );
             t.at(Cube::ORIGIN).add_fluff(Fluff::PlaceBlockGeneric);
             t
@@ -497,7 +497,7 @@ fn use_custom_success() {
         SpaceTransaction::set_cube(
             [0, 0, 0],
             Some(existing),
-            Some(placed.rotate(Face6::PY.clockwise())),
+            Some(placed.rotate(Face::PY.clockwise())),
         )
         .bind(tester.space_handle)
     );

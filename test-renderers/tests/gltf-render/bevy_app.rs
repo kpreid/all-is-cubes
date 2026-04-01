@@ -12,7 +12,7 @@ use half::f16;
 use tokio::sync::mpsc;
 
 use all_is_cubes::euclid::vec3 as evec3;
-use all_is_cubes::math::{Cube, Face6, GridAab, Rgba, Vol};
+use all_is_cubes::math::{Cube, Face, GridAab, Rgba, Vol};
 use all_is_cubes::space::PackedLight;
 use all_is_cubes_content::palette;
 use all_is_cubes_render::camera::{Camera, FogOption, Layers, LightingOption, Viewport};
@@ -456,7 +456,7 @@ fn expand_light(original: Vol<Box<[PackedLight]>>) -> Vol<Box<[PackedLight]>> {
         if valid(original_value) {
             original_value
         } else {
-            Face6::ALL
+            Face::ALL
                 .into_iter()
                 .filter_map(|dir| original.get(cube + dir).copied())
                 .max_by_key(|p| p.as_texel()[3])

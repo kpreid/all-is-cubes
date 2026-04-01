@@ -18,7 +18,7 @@ use crate::block::{
 use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
 use crate::inv::{self, EphemeralOpaque, Inventory, Tool};
-use crate::math::{Cube, Face6, GridAab, GridRotation, Rgb, Rgba, notnan, ps32, zo32};
+use crate::math::{Cube, Face, GridAab, GridRotation, Rgb, Rgba, notnan, ps32, zo32};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::time;
@@ -184,7 +184,7 @@ fn block_atom_with_all_attributes() {
                     inv::IconRow::new(6..9, point3(1, 1, 11), vec3(5, 0, 0)),
                 ],
             ))
-            .rotation_rule(block::RotationPlacementRule::Attach { by: Face6::PX })
+            .rotation_rule(block::RotationPlacementRule::Attach { by: Face::PX })
             .tick_action(Some(block::TickAction {
                 operation: op::Operation::Become(AIR),
                 schedule: time::Schedule::from_period(NonZeroU16::new(3).unwrap()),

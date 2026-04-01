@@ -5,7 +5,7 @@ use core::ops;
 use euclid::{Vector3D, vec3};
 
 use crate::block::{self, Block, Resolution};
-use crate::math::{Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation};
+use crate::math::{Axis, Cube, Face, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation};
 use crate::{space, universe};
 
 // Bits in [`BoxPart`] and indexes of [`BoxStyle::parts`].
@@ -160,7 +160,7 @@ impl BoxStyle {
         ceiling: Option<Block>,
         corner: Option<Block>,
     ) -> Self {
-        let up = Face6::PY;
+        let up = Face::PY;
 
         let corner_px_nz = corner.clone().map(|block| block.rotate(up.clockwise()));
         let corner_px_pz = corner.clone().map(|block| block.rotate(GridRotation::RxYz));
@@ -263,7 +263,7 @@ impl BoxStyle {
     ///   corners of the box. It should be oriented as the `lower_bounds` corner of the box;
     ///   the other seven corners will be mirrored across the relevant axis.
     /// * `line_section_block` should be a block which is a line segment at the origin and
-    ///   extending in the [`+Z`](crate::math::Face6::PZ) direction.
+    ///   extending in the [`+Z`][crate::math::Face::PZ] direction.
     ///   It should be symmetric about the X-Y=0 plane, and will be rotated and mirrored
     ///   to make the other forms.
     #[expect(clippy::needless_pass_by_value, reason = "consistency")]
@@ -472,14 +472,14 @@ impl BoxPart {
     ///
     /// This function is the inverse of [`BoxPart::to_face()`].
     #[must_use]
-    pub const fn face(face: Face6) -> Self {
+    pub const fn face(face: Face) -> Self {
         match face {
-            Face6::NX => Self(vec3(LOWER, 0, 0)),
-            Face6::NY => Self(vec3(0, LOWER, 0)),
-            Face6::NZ => Self(vec3(0, 0, LOWER)),
-            Face6::PX => Self(vec3(UPPER, 0, 0)),
-            Face6::PY => Self(vec3(0, UPPER, 0)),
-            Face6::PZ => Self(vec3(0, 0, UPPER)),
+            Face::NX => Self(vec3(LOWER, 0, 0)),
+            Face::NY => Self(vec3(0, LOWER, 0)),
+            Face::NZ => Self(vec3(0, 0, LOWER)),
+            Face::PX => Self(vec3(UPPER, 0, 0)),
+            Face::PY => Self(vec3(0, UPPER, 0)),
+            Face::PZ => Self(vec3(0, 0, UPPER)),
         }
     }
 
@@ -526,14 +526,14 @@ impl BoxPart {
     ///
     /// This function is the inverse of [`BoxPart::face()`].
     #[rustfmt::skip]
-    pub fn to_face(self) -> Option<Face6> {
+    pub fn to_face(self) -> Option<Face> {
         match self.0 {
-            Vector3D { x: LOWER, y: 0, z: 0, .. } => Some(Face6::NX),
-            Vector3D { x: 0, y: LOWER, z: 0, .. } => Some(Face6::NY),
-            Vector3D { x: 0, y: 0, z: LOWER, .. } => Some(Face6::NZ),
-            Vector3D { x: UPPER, y: 0, z: 0, .. } => Some(Face6::PX),
-            Vector3D { x: 0, y: UPPER, z: 0, .. } => Some(Face6::PY),
-            Vector3D { x: 0, y: 0, z: UPPER, .. } => Some(Face6::PZ),
+            Vector3D { x: LOWER, y: 0, z: 0, .. } => Some(Face::NX),
+            Vector3D { x: 0, y: LOWER, z: 0, .. } => Some(Face::NY),
+            Vector3D { x: 0, y: 0, z: LOWER, .. } => Some(Face::NZ),
+            Vector3D { x: UPPER, y: 0, z: 0, .. } => Some(Face::PX),
+            Vector3D { x: 0, y: UPPER, z: 0, .. } => Some(Face::PY),
+            Vector3D { x: 0, y: 0, z: UPPER, .. } => Some(Face::PZ),
             _ => None,
         }
     }
@@ -556,7 +556,7 @@ impl BoxPart {
     /// but also all the adjacent edges and corners,
     /// and the “both faces” case used when the box is 1 block thick on some axis.
     #[must_use]
-    pub fn is_on_face(self, face: Face6) -> bool {
+    pub fn is_on_face(self, face: Face) -> bool {
         self.0[face.axis()] & if face.is_negative() { LOWER } else { UPPER } != 0
     }
 
@@ -579,7 +579,7 @@ impl BoxPart {
     /// This may be used to find an edge or corner starting from a face,
     /// or to find ends starting from [`UNIT`](Self::UNIT).
     #[must_use]
-    pub fn push(mut self, direction: Face6) -> Self {
+    pub fn push(mut self, direction: Face) -> Self {
         self.0[direction.axis()] = if direction.is_negative() {
             LOWER
         } else {
@@ -629,7 +629,7 @@ mod tests {
 
     #[test]
     pub fn part_face_relationships() {
-        for face in Face6::ALL {
+        for face in Face::ALL {
             assert!(BoxPart::face(face).is_on_face(face), "{face:?} is_on_face");
             assert_eq!(
                 BoxPart::face(face),

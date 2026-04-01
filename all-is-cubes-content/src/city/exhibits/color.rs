@@ -123,7 +123,7 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
             .read_ticket(ctx.universe.read_ticket())
             .filled_with(wall_color_block.clone())
             .build_and_mutate(|m| {
-                for rotation in Face6::PY.clockwise().iterate() {
+                for rotation in Face::PY.clockwise().iterate() {
                     let transform = rotation.to_positive_octant_transform(wall_resolution_g)
                         * Gridgid::from_translation([4, 4, wall_resolution_g - 1]);
 
@@ -151,7 +151,7 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
     // Wall corner
     let corner = Block::builder()
         .display_name("Color room wall corner")
-        .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ }) // TODO: more specific
+        .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ }) // TODO: more specific
         .voxels_fn(wall_resolution, |p| {
             if p.x.pow(2) + p.z.pow(2) < GridCoordinate::from(wall_resolution).pow(2) {
                 &wall_color_block
@@ -289,7 +289,7 @@ fn COLORED_BOUNCE(ctx: Context<'_>) {
             m.fill_uniform(interior, &AIR).unwrap();
 
             // Dig pockets for lights to be in
-            for dir in Face6::ALL {
+            for dir in Face::ALL {
                 let far_end = GridAab::ORIGIN_CUBE.translate(dir.vector(total_radius - 1));
                 m.fill_uniform(GridAab::ORIGIN_CUBE.union_box(far_end), &AIR).unwrap();
                 m.fill_uniform(far_end, &light_block).unwrap();

@@ -7,7 +7,7 @@ use itertools::Itertools;
 
 use all_is_cubes::block::BlockDef;
 use all_is_cubes::euclid::{point3, vec3};
-use all_is_cubes::math::{Cube, Face6, GridCoordinate, GridRotation};
+use all_is_cubes::math::{Cube, Face, GridCoordinate, GridRotation};
 use all_is_cubes::op::Operation;
 use all_is_cubes::time;
 use all_is_cubes::universe::UniverseTransaction;
@@ -31,16 +31,16 @@ pub struct Descriptor {
     /// The pipe block.
     pub block: Block,
     /// Which face of the block is to be connected backward along the pipeline.
-    pub from_face: Face6,
+    pub from_face: Face,
     /// Which face of the block is to be connected forward along the pipeline.
-    pub to_face: Face6,
+    pub to_face: Face,
 }
 
 /// Complete set of pipe blocks usable to assemble a pipeline using [`Kit::fit()`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct Kit(
     /// Must be complete (except that there is no such thing as a U-turn pipe).
-    HashMap<(Face6, Face6), Block>,
+    HashMap<(Face, Face), Block>,
 );
 
 impl Kit {
@@ -48,7 +48,7 @@ impl Kit {
     ///
     /// One straight and one right-angle pipe is sufficient input to make all possible connections.
     pub fn new_with_rotations(pipes: impl IntoIterator<Item = Descriptor>) -> Self {
-        let mut table: HashMap<(Face6, Face6), Block> = HashMap::new();
+        let mut table: HashMap<(Face, Face), Block> = HashMap::new();
         for pipe in pipes {
             // TODO: Allow caller — or the individual pipes — to rank preferred and dispreferred
             // rotations more finely than "prefer IDENTITY".
@@ -88,9 +88,9 @@ impl Kit {
         path: impl IntoIterator<Item = Cube>,
     ) -> impl Iterator<Item = (Cube, &Block)> {
         path.into_iter().tuple_windows().map(|(cube_behind, cube_here, cube_ahead)| {
-            let face_behind = Face6::try_from(cube_behind - cube_here)
+            let face_behind = Face::try_from(cube_behind - cube_here)
                 .expect("path must consist of adjacent cubes");
-            let face_ahead = Face6::try_from(cube_ahead - cube_here)
+            let face_ahead = Face::try_from(cube_ahead - cube_here)
                 .expect("path must consist of adjacent cubes");
             (cube_here, &self.0[&(face_behind, face_ahead)])
         })
@@ -108,7 +108,7 @@ pub(crate) fn make_pipe_blocks(txn: &mut UniverseTransaction) -> (Block, Block) 
     let pipe_box_style = BoxStyle::from_fn(|part| {
         if part.is_corner() || part.is_edge() {
             Some(pipe_corner_material.clone())
-        } else if part.is_face() && !part.is_on_face(Face6::NZ) && !part.is_on_face(Face6::PZ) {
+        } else if part.is_face() && !part.is_on_face(Face::NZ) && !part.is_on_face(Face::PZ) {
             // replaced in actual use
             Some(block::from_color!(0.1, 0.1, 0.1))
         } else {
@@ -127,7 +127,7 @@ pub(crate) fn make_pipe_blocks(txn: &mut UniverseTransaction) -> (Block, Block) 
         let Some(part) = BoxPart::from_cube(straight_pipe_box, cube) else {
             return &block::AIR;
         };
-        if part.is_face() && !part.is_on_face(Face6::NZ) && !part.is_on_face(Face6::PZ) {
+        if part.is_face() && !part.is_on_face(Face::NZ) && !part.is_on_face(Face::PZ) {
             // Sides of the pipe get an arrow pattern
             let xy_diamond_radius = (cube.x * 2 - 31).abs().min((cube.y * 2 - 31).abs());
             if (cube.z + xy_diamond_radius + 2).rem_euclid(32) < 12 {
@@ -190,7 +190,7 @@ pub(crate) fn make_pipe_blocks(txn: &mut UniverseTransaction) -> (Block, Block) 
                     vec3(0, 0, voxels_per_movement_step),
                 )],
             ))
-            .tick_action(tick_action(Face6::PZ))
+            .tick_action(tick_action(Face::PZ))
             .animation_hint(animation_hint)
             .build_txn(txn)
     });
@@ -223,7 +223,7 @@ pub(crate) fn make_pipe_blocks(txn: &mut UniverseTransaction) -> (Block, Block) 
                     ),
                 ],
             ))
-            .tick_action(tick_action(Face6::NX))
+            .tick_action(tick_action(Face::NX))
             .animation_hint(animation_hint)
             .build_txn(txn)
     });

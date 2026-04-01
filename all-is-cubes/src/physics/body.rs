@@ -20,7 +20,7 @@ use crate::camera::Eye;
 )]
 use crate::math::Euclid as _;
 use crate::math::{
-    Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, try_into_finite_point,
+    Aab, Cube, Face, Face7, FreeCoordinate, FreePoint, FreeVector, try_into_finite_point,
     try_into_finite_vector,
 };
 use crate::physics::{Velocity, step::PhysicsOutputs};
@@ -134,7 +134,7 @@ impl Fmt<StatusText> for Body {
             yaw,
             pitch,
         } = self;
-        let dir_face = Face6::from_snapped_vector(self.look_direction()).unwrap();
+        let dir_face = Face::from_snapped_vector(self.look_direction()).unwrap();
         write!(
             fmt,
             "Position: {}  Yaw: {yaw:5.1}°  Pitch: {pitch:5.1}°\n\

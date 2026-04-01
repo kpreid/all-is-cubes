@@ -15,7 +15,7 @@ use num_traits::float::Float as _;
 use crate::camera::ViewTransform;
 use crate::inv::{self, Inventory, InventoryComponent, InventoryTransaction, Slot, Tool};
 use crate::listen::{self, IntoListener};
-use crate::math::{Aab, Face6, FreePoint, FreeVector};
+use crate::math::{Aab, Face, FreePoint, FreeVector};
 use crate::physics::{self, Body, BodyTransaction, step::PhysicsOutputs};
 use crate::rerun_glue as rg;
 #[cfg(feature = "save")]
@@ -198,8 +198,8 @@ impl Character {
                 // Stand on the floor of the spawn bounds.
                 // TODO: Account for different gravity.
                 let mut pos: FreePoint = spawn.bounds.center();
-                pos.y = collision_box.face_coordinate(Face6::NY)
-                    - spawn.bounds.to_free().face_coordinate(Face6::NY);
+                pos.y = collision_box.face_coordinate(Face::NY)
+                    - spawn.bounds.to_free().face_coordinate(Face::NY);
                 pos
             }
         };

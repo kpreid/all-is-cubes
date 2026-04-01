@@ -7,7 +7,7 @@ use itertools::Itertools as _;
 use all_is_cubes::block::{self, AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
 use all_is_cubes::euclid::Scale;
 use all_is_cubes::math::{
-    Cube, Face6, GridAab, GridCoordinate, GridSizeCoord, OctantMask, OpacityCategory, Rgb, Rgba,
+    Cube, Face, GridAab, GridCoordinate, GridSizeCoord, OctantMask, OpacityCategory, Rgb, Rgba,
     Vol, ZeroOne,
 };
 use all_is_cubes_render::Flaws;
@@ -214,7 +214,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
 
     // Walk through the planes (layers) of the block, figuring out what geometry to
     // generate for each layer and whether it needs a texture.
-    for face in Face6::ALL {
+    for face in Face::ALL {
         // TODO: rename voxel_transform to be clearer about what coordinate system this is
         let voxel_transform = face.face_transform(resolution_g);
         let voxel_transform_inverse = voxel_transform.inverse();
@@ -226,21 +226,21 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             face,
             /* sweep_direction: */
             match face {
-                Face6::NX => Face6::PY,
-                Face6::NY => Face6::PX,
-                Face6::NZ => Face6::PX,
-                Face6::PX => Face6::PY,
-                Face6::PY => Face6::PX,
-                Face6::PZ => Face6::PX,
+                Face::NX => Face::PY,
+                Face::NY => Face::PX,
+                Face::NZ => Face::PX,
+                Face::PX => Face::PY,
+                Face::PY => Face::PX,
+                Face::PZ => Face::PX,
             },
             /* perpendicular_direction: */
             match face {
-                Face6::NX => Face6::PZ,
-                Face6::NY => Face6::PZ,
-                Face6::NZ => Face6::PY,
-                Face6::PX => Face6::PZ,
-                Face6::PY => Face6::PZ,
-                Face6::PZ => Face6::PY,
+                Face::NX => Face::PZ,
+                Face::NY => Face::PZ,
+                Face::NZ => Face::PY,
+                Face::PX => Face::PZ,
+                Face::PY => Face::PZ,
+                Face::PZ => Face::PY,
             },
         );
 

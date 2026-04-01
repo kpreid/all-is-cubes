@@ -7,7 +7,7 @@ use all_is_cubes::arcstr::{ArcStr, literal};
 use all_is_cubes::block::Resolution::*;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::listen::Source as _;
-use all_is_cubes::math::Face6;
+use all_is_cubes::math::Face;
 use all_is_cubes::universe::{ReadTicket, Universe};
 
 use crate::logo::logo_text;
@@ -83,7 +83,7 @@ pub(super) fn new_paused_page(
         )))
     }
     let contents = Arc::new(LayoutTree::Stack {
-        direction: Face6::NY,
+        direction: Face::NY,
         children,
     });
     Ok(vui::Page::new_modal_dialog(
@@ -115,11 +115,11 @@ pub(super) fn new_progress_page(
     ));
 
     let contents = Arc::new(LayoutTree::Stack {
-        direction: Face6::NY,
+        direction: Face::NY,
         children: vec![
             vui::leaf_widget(widgets::ProgressBar::new(
                 theme,
-                Face6::PX,
+                Face::PX,
                 Arc::new(hub.primary_content().map(|c| match c {
                     Some(NotificationContent::Progress {
                         title: _,
@@ -153,9 +153,9 @@ pub(super) fn new_settings_page_widget_tree(
     hud_inputs: &HudInputs,
 ) -> vui::Page {
     let contents = Arc::new(LayoutTree::Stack {
-        direction: Face6::NY,
+        direction: Face::NY,
         children: vec![Arc::new(LayoutTree::Stack {
-            direction: Face6::NY,
+            direction: Face::NY,
             children: settings_widgets(read_ticket, hud_inputs, SettingsStyle::LabeledColumn),
         })],
     });
@@ -198,7 +198,7 @@ pub(super) fn new_about_page(
     "#}) + env!("CARGO_PKG_VERSION");
 
     let contents = Arc::new(LayoutTree::Stack {
-        direction: Face6::NY,
+        direction: Face::NY,
         children: vec![
             vui::leaf_widget(shrink(u, R8, &vui::leaf_widget(logo_text()))?),
             heading("Controls"),

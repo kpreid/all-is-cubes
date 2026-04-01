@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use all_is_cubes::block::{EvaluatedBlock, VoxelOpacityMask};
-use all_is_cubes::math::{Face6, FaceMap};
+use all_is_cubes::math::{Face, FaceMap};
 use all_is_cubes::space;
 use all_is_cubes_render::Flaws;
 
@@ -161,7 +161,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     /// * mesh data
     pub(super) fn all_sub_meshes_keyed(
         &self,
-    ) -> impl Iterator<Item = (Face6, bool, &SubMesh<M::Vertex>)> {
+    ) -> impl Iterator<Item = (Face, bool, &SubMesh<M::Vertex>)> {
         Iterator::chain(
             self.interior_vertices.iter().map(|(f, mesh)| (f, false, mesh)),
             self.face_vertices.iter().map(|(f, mesh)| (f, true, mesh)),

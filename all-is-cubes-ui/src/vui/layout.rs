@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use all_is_cubes::euclid::{self, Size3D, Vector3D, size3};
-use all_is_cubes::math::{Axis, Cube, Face6, FaceMap, GridAab, GridPoint, GridSize};
+use all_is_cubes::math::{Axis, Cube, Face, FaceMap, GridAab, GridPoint, GridSize};
 use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
 use all_is_cubes::util::{ConciseDebug, Fmt};
@@ -224,7 +224,7 @@ pub enum LayoutTree<W> {
     /// Fill the available space with the children arranged along an axis.
     Stack {
         /// Which axis of space to arrange on.
-        direction: Face6,
+        direction: Face,
         #[allow(missing_docs)]
         children: Vec<Arc<LayoutTree<W>>>,
     },
@@ -536,7 +536,7 @@ impl<W: Layoutable> Layoutable for LayoutTree<W> {
             } => {
                 // Minimum space is the same as a stack, for now
                 LayoutTree::Stack {
-                    direction: Face6::PY,
+                    direction: Face::PY,
                     children: vec![crosshair.clone(), toolbar.clone(), control_bar.clone()],
                 }
                 .requirements()
@@ -637,7 +637,7 @@ mod tests {
     #[test]
     fn simple_stack_with_extra_room() {
         let tree = LayoutTree::Stack {
-            direction: Face6::PX,
+            direction: Face::PX,
             children: vec![
                 LayoutTree::leaf(LT::new("a", [1, 1, 1])),
                 LayoutTree::leaf(LT::new("b", [1, 1, 1])),
@@ -677,7 +677,7 @@ mod tests {
     #[test]
     fn spacer() {
         let tree = LayoutTree::Stack {
-            direction: Face6::PX,
+            direction: Face::PX,
             children: vec![
                 LayoutTree::leaf(LT::new("a", [1, 1, 1])),
                 LayoutTree::spacer(LayoutRequest {

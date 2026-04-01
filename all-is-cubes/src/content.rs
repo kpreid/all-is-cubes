@@ -10,7 +10,7 @@ use crate::arcstr::{ArcStr, literal};
 use crate::block::{self, Block, Resolution, Resolution::R16, RotationPlacementRule};
 use crate::inv::{Slot, Tool};
 use crate::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridVector, Rgb01, Rgba, ps32, rgb01,
+    Cube, Face, FaceMap, GridAab, GridCoordinate, GridSize, GridVector, Rgb01, Rgba, ps32, rgb01,
 };
 use crate::space::{self, SetCubeError, Space};
 use crate::transaction::Transactional as _;
@@ -120,7 +120,7 @@ fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usiz
                             // are laid out in an even width of ink, and by nudging it
                             // positiveward the result is balanced (and preserves old layout
                             // that got the good result by a wrong path).
-                            .with(Face6::NX, 1),
+                            .with(Face::NX, 1),
                     )
                     .unwrap(),
             )
@@ -130,7 +130,7 @@ fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usiz
 
     block::Composite::stack(
         base_block,
-        Face6::ALL
+        Face::ALL
             .iter()
             .map(|face| text_block.clone().rotate(face.rotation_from_nz()))
             .map(|text_block| block::Composite::new(text_block, block::CompositeOperator::Over)),
@@ -197,7 +197,7 @@ pub fn make_slab_txn(
 
     Block::builder()
         .display_name(format!("Slab {numerator}/{denominator}"))
-        .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
+        .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
         .voxels_handle(denominator, txn.insert_anonymous(space))
         .build()
 }
@@ -231,7 +231,7 @@ pub fn axes(m: &mut space::Mutation<'_, '_>) -> Result<(), SetCubeError> {
         pz: literal!("Z"),
     };
 
-    for face in Face6::ALL {
+    for face in Face::ALL {
         let axis = face.axis();
         let direction = face.normal_vector::<GridCoordinate, ()>()[axis];
         let raycaster = crate::raycast::AaRay::new(Cube::ORIGIN, face.into())

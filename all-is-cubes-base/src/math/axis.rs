@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::math::{Face6, Rgb01};
+use crate::math::{Face, Rgb01};
 
 /// Enumeration of the axes of three-dimensional space.
 ///
@@ -8,7 +8,7 @@ use crate::math::{Face6, Rgb01};
 ///
 /// See also:
 ///
-/// * [`Face6`] specifies an axis and a direction on the axis.
+/// * [`Face`] specifies an axis and a direction on the axis.
 #[expect(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
 #[exhaust(factory_is_self)]
@@ -42,23 +42,23 @@ impl Axis {
         }
     }
 
-    /// Returns the [`Face6`] value which corresponds to the positive direction on this axis.
+    /// Returns the [`Face`] value which corresponds to the positive direction on this axis.
     #[inline]
-    pub fn positive_face(self) -> Face6 {
+    pub fn positive_face(self) -> Face {
         match self {
-            Axis::X => Face6::PX,
-            Axis::Y => Face6::PY,
-            Axis::Z => Face6::PZ,
+            Axis::X => Face::PX,
+            Axis::Y => Face::PY,
+            Axis::Z => Face::PZ,
         }
     }
 
-    /// Returns the [`Face6`] value which corresponds to the negative direction on this axis.
+    /// Returns the [`Face`] value which corresponds to the negative direction on this axis.
     #[inline]
-    pub fn negative_face(self) -> Face6 {
+    pub fn negative_face(self) -> Face {
         match self {
-            Axis::X => Face6::NX,
-            Axis::Y => Face6::NY,
-            Axis::Z => Face6::NZ,
+            Axis::X => Face::NX,
+            Axis::Y => Face::NY,
+            Axis::Z => Face::NZ,
         }
     }
 

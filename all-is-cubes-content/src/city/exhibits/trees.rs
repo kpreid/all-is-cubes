@@ -24,7 +24,7 @@ fn TREES(ctx: Context<'_>) {
         .mutate(ctx.universe.read_ticket(), |m| {
             // Grassy floor
             m.fill_uniform(
-                bounds.abut(Face6::NY, -1).unwrap(),
+                bounds.abut(Face::NY, -1).unwrap(),
                 &landscape_blocks[LandscapeBlocks::Grass],
             )?;
 

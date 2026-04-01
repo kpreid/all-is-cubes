@@ -15,7 +15,7 @@ use crate::block::{self, AIR, Block, BlockDef, BlockDefTransaction, Resolution::
 use crate::content::make_some_blocks;
 use crate::fluff::{self, Fluff};
 use crate::listen::{Listen as _, Log};
-use crate::math::{Cube, Face6, GridAab, GridCoordinate, GridPoint, Rgba, Vol};
+use crate::math::{Cube, Face, GridAab, GridCoordinate, GridPoint, Rgba, Vol};
 use crate::op::Operation;
 use crate::space::{
     CubeTransaction, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpaceFluff,
@@ -682,7 +682,7 @@ fn set_physics_light_rays() {
     assert_eq!(space.light.contents.volume(), 2);
     assert_eq!(
         space.get_lighting([0, 0, 0]),
-        space.light.block_sky.in_direction(Face6::NX)
+        space.light.block_sky.in_direction(Face::NX)
     );
     assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(space.light.light_update_queue.len(), 1);
@@ -792,7 +792,7 @@ fn block_tick_action_conflict() {
         mut modifies_nx_neighbor,
         output2,
     ] = make_some_blocks();
-    fn connect(from: &mut Block, to: &Block, face: Face6) {
+    fn connect(from: &mut Block, to: &Block, face: Face) {
         from.modifiers_mut().push(
             block::SetAttribute::TickAction(Some(Arc::new(TickAction {
                 // TODO: replace this with a better-behaved neighbor-modifying operation,
@@ -809,8 +809,8 @@ fn block_tick_action_conflict() {
             .into(),
         );
     }
-    connect(&mut modifies_px_neighbor, &output1, Face6::PX);
-    connect(&mut modifies_nx_neighbor, &output2, Face6::NX);
+    connect(&mut modifies_px_neighbor, &output1, Face::PX);
+    connect(&mut modifies_nx_neighbor, &output2, Face::NX);
 
     // Create test setup.
     let fluff_log = Log::new();

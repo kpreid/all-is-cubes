@@ -9,7 +9,7 @@ use std::num::NonZero;
 
 use euclid::{Point3D, Vector3D};
 
-use all_is_cubes::math::{Cube, Face6, FaceMap, FreePoint, FreeVector};
+use all_is_cubes::math::{Cube, Face, FaceMap, FreePoint, FreeVector};
 use all_is_cubes::raycast::Ray;
 
 use all_is_cubes::rerun_glue as rg;
@@ -42,7 +42,7 @@ fn main() {
     let table = generator::tree_to_flat(&tree);
     // dbg!(&table[0..20]);
 
-    let mut deduped_arrows: HashMap<(Point3D<i8, Cube>, Face6), FaceMap<f32>> = HashMap::new();
+    let mut deduped_arrows: HashMap<(Point3D<i8, Cube>, Face), FaceMap<f32>> = HashMap::new();
     tree.traverse_post(&mut |node| {
         for (child_dir, child) in node.children.iter() {
             if let Some(child) = child {

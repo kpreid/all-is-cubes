@@ -9,7 +9,7 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Point2D, Scale, Transform3D, point2, vec2, vec3};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FreeVector, GridAab, GridRotation, GridSizeCoord, Gridgid, Rgba,
+    Axis, Cube, Face, FreeVector, GridAab, GridRotation, GridSizeCoord, Gridgid, Rgba,
 };
 use all_is_cubes::raycast;
 use all_is_cubes::space::Space;
@@ -146,11 +146,11 @@ pub struct MultiOrthoCamera {
 
 impl MultiOrthoCamera {
     pub fn new(resolution: Resolution, bounds: GridAab) -> Self {
-        let top = OrthoCamera::new(resolution, bounds, Face6::PY);
-        let left = OrthoCamera::new(resolution, bounds, Face6::NX);
-        let front = OrthoCamera::new(resolution, bounds, Face6::PZ);
-        let right = OrthoCamera::new(resolution, bounds, Face6::PX);
-        let bottom = OrthoCamera::new(resolution, bounds, Face6::NY);
+        let top = OrthoCamera::new(resolution, bounds, Face::PY);
+        let left = OrthoCamera::new(resolution, bounds, Face::NX);
+        let front = OrthoCamera::new(resolution, bounds, Face::PZ);
+        let right = OrthoCamera::new(resolution, bounds, Face::PX);
+        let bottom = OrthoCamera::new(resolution, bounds, Face::NY);
         let views = [
             (top, point2(left.image_size.width + 1, 0)),
             (left, point2(0, top.image_size.height + 1)),
@@ -213,7 +213,7 @@ pub struct OrthoCamera {
 }
 
 impl OrthoCamera {
-    pub fn new(resolution: Resolution, bounds: GridAab, viewed_face: Face6) -> Self {
+    pub fn new(resolution: Resolution, bounds: GridAab, viewed_face: Face) -> Self {
         let cube_to_pixel_scale: Scale<GridSizeCoord, Cube, ImagePixel> =
             Scale::new(resolution.into());
         let pixel_to_cube_scale: Scale<f64, ImagePixel, Cube> =
@@ -237,22 +237,22 @@ impl OrthoCamera {
             let ub = bounds.upper_bounds();
             match viewed_face {
                 // note Y flip — this is the world point that should be the top left corner of each view
-                Face6::NX => vec3(lb.x, ub.y, lb.z),
-                Face6::NY => vec3(lb.x, lb.y, ub.z),
-                Face6::NZ => vec3(ub.x, ub.y, lb.z),
-                Face6::PX => vec3(ub.x, ub.y, ub.z),
-                Face6::PY => vec3(lb.x, ub.y, lb.z),
-                Face6::PZ => vec3(lb.x, ub.y, ub.z),
+                Face::NX => vec3(lb.x, ub.y, lb.z),
+                Face::NY => vec3(lb.x, lb.y, ub.z),
+                Face::NZ => vec3(ub.x, ub.y, lb.z),
+                Face::PX => vec3(ub.x, ub.y, ub.z),
+                Face::PY => vec3(lb.x, ub.y, lb.z),
+                Face::PZ => vec3(lb.x, ub.y, ub.z),
             }
         }
         .to_f64();
         let rotation = Gridgid::from_rotation_about_origin(match viewed_face {
-            Face6::NX => Face6::PY.clockwise(),
-            Face6::NY => Face6::PX.clockwise(),
-            Face6::NZ => Face6::PY.clockwise() * Face6::PY.clockwise(), // arbitrary 180°
-            Face6::PX => Face6::PY.counterclockwise(),
-            Face6::PY => Face6::PX.counterclockwise(),
-            Face6::PZ => GridRotation::IDENTITY,
+            Face::NX => Face::PY.clockwise(),
+            Face::NY => Face::PX.clockwise(),
+            Face::NZ => Face::PY.clockwise() * Face::PY.clockwise(), // arbitrary 180°
+            Face::PX => Face::PY.counterclockwise(),
+            Face::PY => Face::PX.counterclockwise(),
+            Face::PZ => GridRotation::IDENTITY,
         })
         .to_matrix()
         .to_free();

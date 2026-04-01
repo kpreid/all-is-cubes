@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use all_is_cubes::block::{Atom, Block, Primitive, Resolution};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::math::{
-    Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridCoordinate,
+    Cube, CubeFace, Face, FaceMap, FreeCoordinate, FreePoint, GridAab, GridCoordinate,
     GridSizeCoord, GridVector, Gridgid, PositiveSign, Vol,
 };
 use all_is_cubes::space::{self, CubeTransaction, SetCubeError, Space, SpaceTransaction};
@@ -104,7 +104,7 @@ pub(crate) fn voronoi_pattern<'a>(
                 is_enqueued: false,
             };
 
-            for direction in Face6::ALL {
+            for direction in Face::ALL {
                 // The flood fill can escape the cube bounds here,
                 // but is wrapped around at lookup time (so the distance stays true).
                 let neighbor = cube + direction.normal_vector();
@@ -150,27 +150,27 @@ pub(crate) fn four_walls(bounding_box: GridAab) -> [FirstThroughFourthWall; 4] {
     [
         FirstThroughFourthWall {
             bottom_corner: Cube::from(low),
-            counterclockwise_direction: Face6::PZ,
+            counterclockwise_direction: Face::PZ,
             length: size.depth,
-            bounds_excluding_corners: interior.abut(Face6::NX, 1).unwrap(),
+            bounds_excluding_corners: interior.abut(Face::NX, 1).unwrap(),
         },
         FirstThroughFourthWall {
             bottom_corner: Cube::new(low.x, low.y, high.z),
-            counterclockwise_direction: Face6::PX,
+            counterclockwise_direction: Face::PX,
             length: size.width,
-            bounds_excluding_corners: interior.abut(Face6::PZ, 1).unwrap(),
+            bounds_excluding_corners: interior.abut(Face::PZ, 1).unwrap(),
         },
         FirstThroughFourthWall {
             bottom_corner: Cube::new(high.x, low.y, high.z),
-            counterclockwise_direction: Face6::NZ,
+            counterclockwise_direction: Face::NZ,
             length: size.depth,
-            bounds_excluding_corners: interior.abut(Face6::PX, 1).unwrap(),
+            bounds_excluding_corners: interior.abut(Face::PX, 1).unwrap(),
         },
         FirstThroughFourthWall {
             bottom_corner: Cube::new(high.x, low.y, low.z),
-            counterclockwise_direction: Face6::NX,
+            counterclockwise_direction: Face::NX,
             length: size.width,
-            bounds_excluding_corners: interior.abut(Face6::NZ, 1).unwrap(),
+            bounds_excluding_corners: interior.abut(Face::NZ, 1).unwrap(),
         },
     ]
 }
@@ -182,7 +182,7 @@ pub(crate) struct FirstThroughFourthWall {
 
     /// From outside the box, the rightward direction.
     /// From inside the box, the leftward direction.
-    pub counterclockwise_direction: Face6,
+    pub counterclockwise_direction: Face,
 
     /// The length of the wall in cubes
     /// (counted such that each wall overlaps its neighbor at the corner).
@@ -283,7 +283,7 @@ pub(crate) fn square_radius(resolution: Resolution, cube: Cube) -> [GridCoordina
 /// TODO: If useful, allow specifying style of traversal — which axis first, or longest
 /// axis first, or evenly distributed (Bresenham).
 pub(crate) fn walk(start: Cube, end: Cube) -> impl Iterator<Item = CubeFace> + Clone {
-    use Face6::*;
+    use Face::*;
     use itertools::repeat_n;
     let delta = end - start;
     let dists = delta.abs().cast::<usize>();
@@ -299,7 +299,7 @@ pub(crate) fn walk(start: Cube, end: Cube) -> impl Iterator<Item = CubeFace> + C
         // end: Cube,
         inner: I,
     }
-    impl<I: Iterator<Item = Face6>> Iterator for CubeIter<I> {
+    impl<I: Iterator<Item = Face>> Iterator for CubeIter<I> {
         type Item = CubeFace;
 
         fn next(&mut self) -> Option<Self::Item> {

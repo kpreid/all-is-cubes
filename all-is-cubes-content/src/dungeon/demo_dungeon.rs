@@ -13,7 +13,7 @@ use all_is_cubes::euclid::{Size3D, Vector3D, vec3};
 use all_is_cubes::inv::{self, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridSizeCoord,
+    Axis, Cube, Face, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridSizeCoord,
     GridVector, Vol,
 };
 use all_is_cubes::op;
@@ -131,11 +131,11 @@ impl DemoTheme {
         let mut alt_style: BoxStyle;
         let room_style = if let Some(wall_block) = wall_block {
             alt_style = self.room_style.clone();
-            alt_style[BoxPart::face(Face6::NX)] = Some(wall_block.clone());
-            alt_style[BoxPart::face(Face6::PX)] = Some(wall_block.clone());
-            alt_style[BoxPart::face(Face6::NZ)] = Some(wall_block.clone());
-            alt_style[BoxPart::face(Face6::PZ)] = Some(wall_block.clone());
-            alt_style[BoxPart::face(Face6::PY)] = Some(wall_block.clone());
+            alt_style[BoxPart::face(Face::NX)] = Some(wall_block.clone());
+            alt_style[BoxPart::face(Face::PX)] = Some(wall_block.clone());
+            alt_style[BoxPart::face(Face::NZ)] = Some(wall_block.clone());
+            alt_style[BoxPart::face(Face::PZ)] = Some(wall_block.clone());
+            alt_style[BoxPart::face(Face::PY)] = Some(wall_block.clone());
             &alt_style
         } else {
             &self.room_style
@@ -151,7 +151,7 @@ impl DemoTheme {
         ctx: &mut space::Mutation<'_, '_>,
         map: Vol<&[Option<DemoRoom>]>,
         mut room_1_position: Cube,
-        face: Face6,
+        face: Face,
         door: Door,
     ) -> Result<(), InGenError> {
         let passage_axis = face.axis();
@@ -166,11 +166,11 @@ impl DemoTheme {
         let room_1_box = self.actual_room_box(room_1_position, room_1_data);
         let room_2_box = self.actual_room_box(room_2_position, room_2_data);
 
-        let wall_parallel = Face6::PY.clockwise().transform(face);
+        let wall_parallel = Face::PY.clockwise().transform(face);
         let parallel_axis = wall_parallel.axis();
         assert!(parallel_axis != Axis::Y);
 
-        let rotate_nz_to_face = GridRotation::from_to(Face6::NZ, face, Face6::PY).unwrap();
+        let rotate_nz_to_face = GridRotation::from_to(Face::NZ, face, Face::PY).unwrap();
 
         // This box is exactly the volume which would ordinarily be impassable if this corridor.
         // were not being added.
@@ -233,9 +233,9 @@ impl DemoTheme {
                 gate_box.abut(wall_parallel, if gate_open { -1 } else { -2 }).unwrap();
             let lock_box = if gate_movable && !gate_open {
                 gate_side_1
-                    .abut(Face6::NY, -1) // one cube up from bottom
+                    .abut(Face::NY, -1) // one cube up from bottom
                     .unwrap()
-                    .abut(Face6::PY, 1) // one cube high
+                    .abut(Face::PY, 1) // one cube high
                     .unwrap()
                     .abut(wall_parallel, 1) // one cube adjacent to the pocket (centered on 3x3)
                     .unwrap()
@@ -281,7 +281,7 @@ impl DemoTheme {
     // TODO: This should be a definition in the universe, but there's no way to do that with `Tool`
     // yet.
     fn make_key_tool(&self) -> Tool {
-        let move_modifier = block::Modifier::Move(block::Move::new(Face6::NX, 0, 16));
+        let move_modifier = block::Modifier::Move(block::Move::new(Face::NX, 0, 16));
         let move_gate = op::Operation::AddModifiers([move_modifier.clone()].into());
         let unlock_unrotated = op::Operation::Neighbors(
             [
@@ -305,7 +305,7 @@ impl DemoTheme {
         // TODO: there should be an operation-modifier that means "match this against any rotation"
         // instead of this approach of making rotated copies of the operation
         let unlock = op::Operation::Alt(
-            Face6::PY
+            Face::PY
                 .clockwise()
                 .iterate()
                 .map(|r| unlock_unrotated.clone().rotate(r))
@@ -350,7 +350,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
             MazeRoomKind::Path | MazeRoomKind::OffPath => None,
             MazeRoomKind::Unoccupied => unreachable!(),
         };
-        let floor_layer = unmodified_room_box.abut(Face6::NY, 1).unwrap();
+        let floor_layer = unmodified_room_box.abut(Face::NY, 1).unwrap();
 
         match pass_index {
             0 => {
@@ -360,7 +360,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 // (TODO: revise this condition when staircase-ish rooms exist)
                 if room_data.extended_map_bounds().lower_bounds().y < 0 {
                     assert!(!room_data.corridor_only, "{room_data:?}");
-                    ctx.fill_uniform(interior.abut(Face6::NY, -1).unwrap(), &self.blocks[Spikes])?;
+                    ctx.fill_uniform(interior.abut(Face::NY, -1).unwrap(), &self.blocks[Spikes])?;
                 }
 
                 match room_data.floor {
@@ -370,7 +370,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     FloorKind::Chasm => { /* TODO: little platforms */ }
                     FloorKind::Bridge => {
                         let midpoint = Cube::containing(floor_layer.center()).unwrap();
-                        for direction in [Face6::NX, Face6::NZ, Face6::PX, Face6::PZ] {
+                        for direction in [Face::NX, Face::NZ, Face::PX, Face::PZ] {
                             if room_data.wall_features[direction] != WallFeature::Blank {
                                 let wall_cube = Cube::containing(
                                     floor_layer.abut(direction, -1).unwrap().center(),
@@ -387,7 +387,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 // Lit corridors get the magic pyramid light instead of putting a torch in your face
                 if room_data.lit && room_data.corridor_only {
                     let top_middle =
-                        Cube::containing(interior.abut(Face6::PY, -1).unwrap().center()).unwrap();
+                        Cube::containing(interior.abut(Face::PY, -1).unwrap().center()).unwrap();
                     ctx.set(top_middle, &self.blocks[CorridorLight])?;
                 }
 
@@ -395,7 +395,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 let window_y = unmodified_room_box.lower_bounds().y + 1;
                 let torch_y = unmodified_room_box.lower_bounds().y;
                 for wall in four_walls(interior.expand(FaceMap::splat(1))) {
-                    let face = Face6::PY.clockwise().transform(wall.counterclockwise_direction); // TODO: make four_walls provide this (which face of the box it is) in a nice name
+                    let face = Face::PY.clockwise().transform(wall.counterclockwise_direction); // TODO: make four_walls provide this (which face of the box it is) in a nice name
                     let midpoint = (wall.length / 2).cast_signed();
 
                     if let WallFeature::Window = room_data.wall_features[face] {
@@ -423,9 +423,9 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 }
 
                 // Ceiling light port (not handled by four_walls above)
-                if let WallFeature::Window = room_data.wall_features[Face6::PY] {
+                if let WallFeature::Window = room_data.wall_features[Face::PY] {
                     let midpoint =
-                        Cube::containing(interior.abut(Face6::PY, 1).unwrap().center()).unwrap();
+                        Cube::containing(interior.abut(Face::PY, 1).unwrap().center()).unwrap();
                     for x in WINDOW_PATTERN {
                         for z in WINDOW_PATTERN {
                             ctx.set(
@@ -438,7 +438,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 Ok(None)
             }
             1 => {
-                for face in [Face6::PX, Face6::PZ] {
+                for face in [Face::PX, Face::PZ] {
                     if let WallFeature::Passage(door) = room_data.wall_features[face] {
                         self.inside_doorway(ctx, map, room_position, face, door)?;
                     }
@@ -474,7 +474,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 if let Some(item) = room_data.grants_item.clone() {
                     // note that this is the nominal floor, not the possibly extended downward floor
                     let floor_middle =
-                        Cube::containing(floor_layer.abut(Face6::PY, 1).unwrap().center()).unwrap();
+                        Cube::containing(floor_layer.abut(Face::PY, 1).unwrap().center()).unwrap();
                     ctx.set(floor_middle, &self.item_pedestal)?;
                     ctx.set(
                         floor_middle + GridVector::new(0, 1, 0),
@@ -496,7 +496,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     ]);
 
                     // Orient towards the first room's exit.
-                    for face in Face6::ALL {
+                    for face in Face::ALL {
                         if let WallFeature::Passage { .. } = room_data.wall_features[face] {
                             spawn.set_look_direction(face.normal_vector());
                             break;
@@ -563,7 +563,7 @@ pub(crate) async fn demo_dungeon(
         room_style: BoxStyle::from_fn(|part| {
             if part == BoxPart::INTERIOR {
                 Some(AIR)
-            } else if part.is_on_face(Face6::NY) {
+            } else if part.is_on_face(Face::NY) {
                 Some(dungeon_blocks[FloorTile].clone())
             } else {
                 // TODO: add wall-tile and ceiling-tile blocks
@@ -575,7 +575,7 @@ pub(crate) async fn demo_dungeon(
             let basic_style = BoxStyle::from_fn(|part| {
                 if part == BoxPart::INTERIOR {
                     Some(AIR)
-                } else if part.is_on_face(Face6::NY) {
+                } else if part.is_on_face(Face::NY) {
                     Some(dungeon_blocks[FloorTile].clone())
                 } else {
                     // TODO: add wall-tile and ceiling-tile blocks
@@ -583,10 +583,10 @@ pub(crate) async fn demo_dungeon(
                 }
             });
 
-            let corner_block = |facing_room: Face6, left: bool| {
+            let corner_block = |facing_room: Face, left: bool| {
                 block::Composite::new(
                     dungeon_blocks[DoorwaySideMask].clone().rotate(
-                        GridRotation::from_to(Face6::PZ, facing_room, Face6::PY).unwrap()
+                        GridRotation::from_to(Face::PZ, facing_room, Face::PY).unwrap()
                             * if left {
                                 GridRotation::IDENTITY
                             } else {
@@ -607,22 +607,22 @@ pub(crate) async fn demo_dungeon(
                     // TODO: way too repetitive and unclear
                     .with(
                         BoxPart::face(axis.positive_face())
-                            .push(axis.positive_face().cross(Face6::PY).try_into().unwrap()),
+                            .push(axis.positive_face().cross(Face::PY).try_into().unwrap()),
                         Some(corner_block(axis.positive_face(), true)),
                     )
                     .with(
                         BoxPart::face(axis.positive_face())
-                            .push(axis.positive_face().cross(Face6::NY).try_into().unwrap()),
+                            .push(axis.positive_face().cross(Face::NY).try_into().unwrap()),
                         Some(corner_block(axis.positive_face(), false)),
                     )
                     .with(
                         BoxPart::face(axis.negative_face())
-                            .push(axis.negative_face().cross(Face6::PY).try_into().unwrap()),
+                            .push(axis.negative_face().cross(Face::PY).try_into().unwrap()),
                         Some(corner_block(axis.negative_face(), true)),
                     )
                     .with(
                         BoxPart::face(axis.negative_face())
-                            .push(axis.negative_face().cross(Face6::NY).try_into().unwrap()),
+                            .push(axis.negative_face().cross(Face::NY).try_into().unwrap()),
                         Some(corner_block(axis.negative_face(), false)),
                     )
             };
@@ -631,8 +631,8 @@ pub(crate) async fn demo_dungeon(
                 on_horizontal_axis(Axis::X),
                 basic_style
                     .clone()
-                    .with(BoxPart::face(Face6::NY), Some(AIR))
-                    .with(BoxPart::face(Face6::PY), Some(AIR)),
+                    .with(BoxPart::face(Face::NY), Some(AIR))
+                    .with(BoxPart::face(Face::PY), Some(AIR)),
                 on_horizontal_axis(Axis::Z),
             )
         },
@@ -769,12 +769,12 @@ fn generate_dungeon_map(
         let mut extended_bounds = GridAab::ORIGIN_CUBE;
         // Optional high ceiling
         if !corridor_only && rng.random_bool(0.25) {
-            extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::PY, 1));
+            extended_bounds = extended_bounds.expand(FaceMap::default().with(Face::PY, 1));
         }
         // Floor pit
         let floor =
             if !corridor_only && is_not_end && must_grant_item.is_none() && rng.random_bool(0.25) {
-                extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::NY, 1));
+                extended_bounds = extended_bounds.expand(FaceMap::default().with(Face::NY, 1));
                 *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
                     .choose(&mut rng)
                     .unwrap()
@@ -824,9 +824,9 @@ fn generate_dungeon_map(
                 }
 
                 // Create windows only if they look into space outside the maze
-                let have_window = if neighbor_in_bounds || corridor_only || face == Face6::NY {
+                let have_window = if neighbor_in_bounds || corridor_only || face == Face::NY {
                     false
-                } else if face == Face6::PY {
+                } else if face == Face::PY {
                     // ceilings are more common overall and we want more internally-lit ones
                     rng.random_bool(0.25)
                 } else {
@@ -856,7 +856,7 @@ fn generate_dungeon_map(
             floor,
             corridor_only,
             // Light some rooms that might be dark, particularly if they have items in them.
-            lit: wall_features[Face6::PY] == WallFeature::Blank
+            lit: wall_features[Face::PY] == WallFeature::Blank
                 && (grants_item.is_some() || rng.random_bool(0.75)),
             grants_item,
         })

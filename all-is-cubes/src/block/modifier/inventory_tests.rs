@@ -8,7 +8,7 @@ use pretty_assertions::assert_eq;
 use crate::arcstr::literal;
 use crate::block::{self, Block, Resolution::*};
 use crate::euclid::{point3, vec3};
-use crate::math::{Face6, Rgba, rgba_const};
+use crate::math::{Face, Rgba, rgba_const};
 use crate::universe::ReadTicket;
 use crate::{inv, op, time};
 
@@ -17,7 +17,7 @@ fn inventory_preserves_attributes() {
     let item_block = Block::builder()
         .display_name("Item")
         // This should be ignored
-        .activation_action(op::Operation::StartMove(block::Move::new(Face6::PX, 1, 0)))
+        .activation_action(op::Operation::StartMove(block::Move::new(Face::PX, 1, 0)))
         .color(rgba_const!(1.0, 0.0, 0.0, 1.0))
         // This should be merged
         .animation_hint(block::AnimationHint::redefinition(
@@ -25,7 +25,7 @@ fn inventory_preserves_attributes() {
         ))
         .build();
 
-    let expected_action = op::Operation::StartMove(block::Move::new(Face6::NX, 1, 0));
+    let expected_action = op::Operation::StartMove(block::Move::new(Face::NX, 1, 0));
     let iib = inv::InvInBlock::new(
         1,
         R2,

@@ -12,7 +12,7 @@ use euclid::Vector3D;
 use num_traits::float::Float as _;
 
 use crate::block::{Evoxels, Resolution};
-use crate::math::{Cube, Face6, Intensity, OpacityCategory, Rgb, Rgba, ZeroOne, rgb_const, zo32};
+use crate::math::{Cube, Face, Intensity, OpacityCategory, Rgb, Rgba, ZeroOne, rgb_const, zo32};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -174,7 +174,7 @@ impl From<Rgba> for ColorBuf {
 pub(crate) fn trace_for_eval(
     voxels: &Evoxels,
     origin: Cube,
-    direction: Face6,
+    direction: Face,
     resolution: Resolution,
 ) -> EvalTrace {
     let thickness = resolution.recip_f32();

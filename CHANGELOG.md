@@ -36,6 +36,7 @@
       Use `Aab::expand_or_shrink()` instead.
     * `universe::Universe` no longer implements `Default` and `Deserialize`; instead, `Box<Universe>` does.
 
+    * Renamed `math::Face6` to `Face`.
     * Renamed `time::Tick::delta_t()` to `delta_t_duration()`, to make room for other variations.
 
 * `all-is-cubes-render` library:

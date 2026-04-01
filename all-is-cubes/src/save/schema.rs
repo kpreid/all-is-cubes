@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::block::Block;
 use crate::math::{
-    Aab, Face6, GridAab, GridCoordinate, GridRotation, NotNan, PositiveSign, ZeroOne, ps32,
+    Aab, Face, GridAab, GridCoordinate, GridRotation, NotNan, PositiveSign, ZeroOne, ps32,
 };
 use crate::save::compress::{GzSerde, Leu16};
 use crate::time::Schedule;
@@ -118,7 +118,7 @@ pub(crate) enum RotationPlacementRuleSer {
     #[default]
     NeverV1,
     AttachV1 {
-        by: Face6,
+        by: Face,
     },
 }
 
@@ -221,7 +221,7 @@ pub(crate) enum ModifierSer<'a> {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct MoveSerV1 {
-    pub direction: Face6,
+    pub direction: Face,
     pub distance: u16,
     pub velocity: i16,
     pub schedule: Schedule,
@@ -405,7 +405,7 @@ pub(crate) enum OperationSer<'a> {
     },
     StartMoveV1(MoveSerV1),
     MoveInventoryV1 {
-        transfer_into_adjacent: Option<Face6>,
+        transfer_into_adjacent: Option<Face>,
     },
     TakeInventoryV1 {
         destroy_if_empty: bool,

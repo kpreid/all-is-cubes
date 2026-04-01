@@ -12,7 +12,7 @@ use num_traits::float::FloatCore as _;
 
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
-    Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, Octant, Vol,
+    Aab, Cube, CubeFace, Face, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, Octant, Vol,
 };
 use crate::physics::{Contact, ContactSet, POSITION_EPSILON};
 use crate::raycast::{Ray, Raycaster};
@@ -505,7 +505,7 @@ pub(crate) fn nudge_on_ray(
     if segment.direction == Vector3D::zero() {
         return segment;
     }
-    let face: Face6 = match face.try_into() {
+    let face: Face = match face.try_into() {
         Ok(f) => f,
         Err(_) => return segment,
     };
@@ -734,7 +734,7 @@ mod tests {
             let axis = step.face().axis().expect("should have an axis");
             let segment = ray.scale_direction(step.t_distance()); // TODO: this should be a function? Should aab_raycast return a special step type with these features?
             let unnudged_aab = moving_aab.translate(segment.unit_endpoint().to_vector());
-            let face_to_nudge: Face6 = Face6::try_from(step.face().opposite()).unwrap();
+            let face_to_nudge: Face = Face::try_from(step.face().opposite()).unwrap();
 
             eprintln!("\n#{case_number} with inputs:");
             eprintln!("  ray: {ray:?}");
@@ -860,7 +860,7 @@ mod tests {
                 if last_step.is_some() {
                     panic!("should not get any further steps after final Within");
                 }
-                match Face6::try_from(step.aab_face) {
+                match Face::try_from(step.aab_face) {
                     Ok(face) => {
                         let face_coordinate = step.translated_aab.face_coordinate(face);
                         assert_eq!(face_coordinate, face_coordinate.round());

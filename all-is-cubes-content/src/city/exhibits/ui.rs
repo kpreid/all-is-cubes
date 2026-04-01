@@ -85,13 +85,13 @@ fn UI_PROGRESS_BAR(ctx: Context<'_>) {
     let pb = |fraction: f64| -> vui::WidgetTree {
         vui::LayoutTree::leaf(widgets::ProgressBar::new(
             ctx.widget_theme,
-            Face6::PX,
+            Face::PX,
             listen::constant(widgets::ProgressBarState::new(fraction)),
         ))
     };
 
     let tree: vui::WidgetTree = Arc::new(vui::LayoutTree::Stack {
-        direction: Face6::PY,
+        direction: Face::PY,
         children: vec![
             Arc::new(vui::LayoutTree::Spacer(vui::LayoutRequest {
                 minimum: size3(2, 0, 1),

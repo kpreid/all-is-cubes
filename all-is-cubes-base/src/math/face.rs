@@ -1,4 +1,4 @@
-//! Axis-aligned unit vectors: the [`Face6`] and [`Face7`] types.
+//! Axis-aligned unit vectors: the [`Face`] and [`Face7`] types.
 //! This module is private but reexported by its parent.
 
 use core::fmt;
@@ -70,7 +70,7 @@ use crate::math::{
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
-pub enum Face6 {
+pub enum Face {
     /// Negative X; the face whose normal vector is `(-1, 0, 0)`.
     NX = 1,
     /// Negative Y; the face whose normal vector is `(0, -1, 0)`; downward.
@@ -88,7 +88,7 @@ pub enum Face6 {
 /// Identifies a face of a cube or an orthogonal unit vector, except for
 /// [`Within`](Face7::Within) meaning “zero distance and undefined direction”.
 ///
-/// This is essentially `Option<`[`Face6`]`>`, except with `Face`-specific methods
+/// This is essentially <code>Option&lt;[Face]&gt;</code>, except with face-specific methods
 /// provided. The two enums use the same discriminant numbering.
 ///
 #[doc = include_str!("../serde-warning.md")]
@@ -115,18 +115,11 @@ pub enum Face7 {
     PZ,
 }
 
-impl Face6 {
-    /// All the values of [`Face6`].
-    pub const ALL: [Face6; 6] = [
-        Face6::NX,
-        Face6::NY,
-        Face6::NZ,
-        Face6::PX,
-        Face6::PY,
-        Face6::PZ,
-    ];
+impl Face {
+    /// All the values of [`Face`].
+    pub const ALL: [Face; 6] = [Face::NX, Face::NY, Face::NZ, Face::PX, Face::PY, Face::PZ];
 
-    /// Inverse function of `face as u8`, converting the number to [`Face6`].
+    /// Inverse function of `face as u8`, converting the number to [`Face`].
     #[inline]
     pub const fn from_discriminant(d: u8) -> Option<Self> {
         match d {
@@ -140,7 +133,7 @@ impl Face6 {
         }
     }
 
-    /// Returns the [`Face6`] whose normal vector is closest in direction to the given
+    /// Returns the [`Face`] whose normal vector is closest in direction to the given
     /// vector.
     ///
     /// Edge cases:
@@ -163,11 +156,11 @@ impl Face6 {
         // <https://en.wikipedia.org/w/index.php?title=Sign_function&oldid=1177447019>).
         // Duplicating the calls in each branch helps avoid redundant NaN checks.
         let (neg_face, sign) = if x.abs() > y.abs() && x.abs() > z.abs() {
-            (Face6::NX, x.signum())
+            (Face::NX, x.signum())
         } else if y.abs() > z.abs() {
-            (Face6::NY, y.signum())
+            (Face::NY, y.signum())
         } else {
-            (Face6::NZ, z.signum())
+            (Face::NZ, z.signum())
         };
         Some(if sign < 0. {
             neg_face
@@ -192,10 +185,10 @@ impl Face6 {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::Face6;
+    /// use all_is_cubes::math::Face;
     ///
-    /// assert_eq!(Face6::PX.is_positive(), true);
-    /// assert_eq!(Face6::NX.is_positive(), false);
+    /// assert_eq!(Face::PX.is_positive(), true);
+    /// assert_eq!(Face::NX.is_positive(), false);
     /// ```
     #[inline]
     pub const fn is_positive(self) -> bool {
@@ -207,10 +200,10 @@ impl Face6 {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::Face6;
+    /// use all_is_cubes::math::Face;
     ///
-    /// assert_eq!(Face6::PX.is_negative(), false);
-    /// assert_eq!(Face6::NX.is_negative(), true);
+    /// assert_eq!(Face::PX.is_negative(), false);
+    /// assert_eq!(Face::NX.is_negative(), true);
     /// ```
     #[inline]
     pub fn is_negative(self) -> bool {
@@ -228,14 +221,14 @@ impl Face6 {
     /// Returns the opposite face (maps [`PX`](Self::PX) to [`NX`](Self::NX) and so on).
     #[inline]
     #[must_use]
-    pub const fn opposite(self) -> Face6 {
+    pub const fn opposite(self) -> Face {
         match self {
-            Face6::NX => Face6::PX,
-            Face6::NY => Face6::PY,
-            Face6::NZ => Face6::PZ,
-            Face6::PX => Face6::NX,
-            Face6::PY => Face6::NY,
-            Face6::PZ => Face6::NZ,
+            Face::NX => Face::PX,
+            Face::NY => Face::PY,
+            Face::NZ => Face::PZ,
+            Face::PX => Face::NX,
+            Face::PY => Face::NY,
+            Face::PZ => Face::NZ,
         }
     }
 
@@ -249,7 +242,7 @@ impl Face6 {
 
     /// Returns the axis-aligned unit vector normal to this face.
     ///
-    /// If a vector of a different length is desired, use [`Face6::vector()`] instead of
+    /// If a vector of a different length is desired, use [`Face::vector()`] instead of
     /// multiplying this.
     #[inline]
     #[must_use]
@@ -263,17 +256,17 @@ impl Face6 {
     /// Returns an axis-aligned vector normal to this face, whose magnitude, and only nonzero
     /// component, is `magnitude`.
     ///
-    /// This is mathematically equivalent to multiplying [`Face6::normal_vector()`] by `magnitude`,
+    /// This is mathematically equivalent to multiplying [`Face::normal_vector()`] by `magnitude`,
     /// but does not perform those multiplications, and may have better type inference.
     ///
     /// # Example
     ///
     /// ```rust
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::{Face6, GridVector};
+    /// use all_is_cubes::math::{Face, GridVector};
     ///
-    /// assert_eq!(Face6::PY.vector(3), GridVector::new(0, 3, 0));
-    /// assert_eq!(Face6::NY.vector(3), GridVector::new(0, -3, 0));
+    /// assert_eq!(Face::PY.vector(3), GridVector::new(0, 3, 0));
+    /// assert_eq!(Face::NY.vector(3), GridVector::new(0, -3, 0));
     /// ```
     // TODO: better name for this operation?
     #[inline]
@@ -285,12 +278,12 @@ impl Face6 {
         let zero1 = S::zero();
         let zero2 = S::zero();
         match self {
-            Face6::NX => Vector3D::new(-magnitude, zero1, zero2),
-            Face6::NY => Vector3D::new(zero1, -magnitude, zero2),
-            Face6::NZ => Vector3D::new(zero1, zero2, -magnitude),
-            Face6::PX => Vector3D::new(magnitude, zero1, zero2),
-            Face6::PY => Vector3D::new(zero1, magnitude, zero2),
-            Face6::PZ => Vector3D::new(zero1, zero2, magnitude),
+            Face::NX => Vector3D::new(-magnitude, zero1, zero2),
+            Face::NY => Vector3D::new(zero1, -magnitude, zero2),
+            Face::NZ => Vector3D::new(zero1, zero2, -magnitude),
+            Face::PX => Vector3D::new(magnitude, zero1, zero2),
+            Face::PY => Vector3D::new(zero1, magnitude, zero2),
+            Face::PZ => Vector3D::new(zero1, zero2, magnitude),
         }
     }
 
@@ -309,12 +302,12 @@ impl Face6 {
         positive: S,
     ) -> Vector3D<S, U> {
         match self {
-            Face6::NX => Vector3D::new(negative, zero, zero),
-            Face6::NY => Vector3D::new(zero, negative, zero),
-            Face6::NZ => Vector3D::new(zero, zero, negative),
-            Face6::PX => Vector3D::new(positive, zero, zero),
-            Face6::PY => Vector3D::new(zero, positive, zero),
-            Face6::PZ => Vector3D::new(zero, zero, positive),
+            Face::NX => Vector3D::new(negative, zero, zero),
+            Face::NY => Vector3D::new(zero, negative, zero),
+            Face::NZ => Vector3D::new(zero, zero, negative),
+            Face::PX => Vector3D::new(positive, zero, zero),
+            Face::PY => Vector3D::new(zero, positive, zero),
+            Face::PZ => Vector3D::new(zero, zero, positive),
         }
     }
 
@@ -323,10 +316,10 @@ impl Face6 {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::{Face6, FreeVector};
+    /// use all_is_cubes::math::{Face, FreeVector};
     ///
     /// let sample_vector = FreeVector::new(1.0, 2.0, 5.0_f64);
-    /// for face in Face6::ALL {
+    /// for face in Face::ALL {
     ///     assert_eq!(face.dot(sample_vector), face.normal_vector().dot(sample_vector));
     /// }
     /// ```
@@ -339,7 +332,7 @@ impl Face6 {
         self.into7().dot(vector)
     }
 
-    /// Returns a rotation, without reflection, which will rotate `Face6::NZ` to be `self`.
+    /// Returns a rotation, without reflection, which will rotate `Face::NZ` to be `self`.
     ///
     /// The significance of this rotation is that it may be used to obtain a set of
     /// coordinate systems for all six faces of some cube. It is arbitrary, but convenient
@@ -347,13 +340,13 @@ impl Face6 {
     #[inline]
     pub const fn rotation_from_nz(self) -> GridRotation {
         match self {
-            Face6::NX => GridRotation::RYZX,
-            Face6::NY => GridRotation::RZXY,
-            Face6::NZ => GridRotation::RXYZ,
+            Face::NX => GridRotation::RYZX,
+            Face::NY => GridRotation::RZXY,
+            Face::NZ => GridRotation::RXYZ,
             // Positives have the same axis swaps but an arbitrary choice of 180° rotation.
-            Face6::PX => GridRotation::RyZx, // PX rotates about Y.
-            Face6::PY => GridRotation::RZxy, // PY rotates about X.
-            Face6::PZ => GridRotation::RXyz, // PZ rotates about Y.
+            Face::PX => GridRotation::RyZx, // PX rotates about Y.
+            Face::PY => GridRotation::RZxy, // PY rotates about X.
+            Face::PZ => GridRotation::RXyz, // PZ rotates about Y.
         }
     }
 
@@ -361,11 +354,11 @@ impl Face6 {
     /// with x ∈ [0, scale], y ∈ [0, scale], and z = 0, converts them to points that lie
     /// on the faces of the cube with x ∈ [0, scale], y ∈ [0, scale], and z ∈ [0, scale].
     ///
-    /// Specifically, `Face6::NZ.face_transform()` is the identity and all others are
+    /// Specifically, `Face::NZ.face_transform()` is the identity and all others are
     /// consistent with that. Note that there are arbitrary choices in the rotation
     /// of all other faces. (TODO: Document those choices and test them.)
     ///
-    /// The rotations used are equal to [`Face6::rotation_from_nz()`],
+    /// The rotations used are equal to [`Face::rotation_from_nz()`],
     /// and this method is equivalent to
     /// `self.rotation_from_nz().to_positive_octant_transform(scale)`.
     // TODO: decide whether to replace this entirely with `rotation_from_nz()`
@@ -385,19 +378,19 @@ impl Face6 {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::Face6::*;
+    /// use all_is_cubes::math::Face::*;
     ///
     /// assert_eq!(PY.clockwise().transform(PX), PZ);
     /// ```
     #[inline]
     pub const fn clockwise(self) -> GridRotation {
         match self {
-            Face6::NX => GridRotation::RXzY,
-            Face6::NY => GridRotation::RzYX,
-            Face6::NZ => GridRotation::RYxZ,
-            Face6::PX => GridRotation::RXZy,
-            Face6::PY => GridRotation::RZYx,
-            Face6::PZ => GridRotation::RyXZ,
+            Face::NX => GridRotation::RXzY,
+            Face::NY => GridRotation::RzYX,
+            Face::NZ => GridRotation::RYxZ,
+            Face::PX => GridRotation::RXZy,
+            Face::PY => GridRotation::RZYx,
+            Face::PZ => GridRotation::RyXZ,
         }
     }
 
@@ -408,7 +401,7 @@ impl Face6 {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::Face6::*;
+    /// use all_is_cubes::math::Face::*;
     ///
     /// assert_eq!(PY.counterclockwise().transform(PZ), PX);
     /// ```
@@ -430,16 +423,16 @@ impl Face6 {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::Face6::*;
+    /// use all_is_cubes::math::Face::*;
     ///
     /// assert_eq!(PY.r180().transform(PX), NX);
     /// ```
     #[inline]
     pub const fn r180(self) -> GridRotation {
         match self {
-            Face6::NX | Face6::PX => GridRotation::RXyz,
-            Face6::NY | Face6::PY => GridRotation::RxYz,
-            Face6::NZ | Face6::PZ => GridRotation::RxyZ,
+            Face::NX | Face::PX => GridRotation::RXyz,
+            Face::NY | Face::PY => GridRotation::RxYz,
+            Face::NZ | Face::PZ => GridRotation::RxyZ,
         }
     }
 
@@ -447,12 +440,12 @@ impl Face6 {
     #[inline]
     pub(crate) const fn into7(self) -> Face7 {
         match self {
-            Face6::NX => Face7::NX,
-            Face6::NY => Face7::NY,
-            Face6::NZ => Face7::NZ,
-            Face6::PX => Face7::PX,
-            Face6::PY => Face7::PY,
-            Face6::PZ => Face7::PZ,
+            Face::NX => Face7::NX,
+            Face::NY => Face7::NY,
+            Face::NZ => Face7::NZ,
+            Face::PX => Face7::PX,
+            Face::PY => Face7::PY,
+            Face::PZ => Face7::PZ,
         }
     }
 }
@@ -605,7 +598,7 @@ impl Face7 {
     /// Returns the vector normal to this face. [`Within`](Self::Within) is assigned the
     /// zero vector.
     ///
-    /// If a vector of a different length is desired, use [`Face6::vector()`] instead of
+    /// If a vector of a different length is desired, use [`Face::vector()`] instead of
     /// multiplying this.
     #[inline]
     #[must_use]
@@ -699,7 +692,7 @@ impl Face7 {
     }
 }
 
-impl ops::Neg for Face6 {
+impl ops::Neg for Face {
     type Output = Self;
     #[inline]
     fn neg(self) -> Self::Output {
@@ -714,53 +707,53 @@ impl ops::Neg for Face7 {
     }
 }
 
-impl From<Face6> for Face7 {
+impl From<Face> for Face7 {
     #[inline]
-    fn from(value: Face6) -> Self {
+    fn from(value: Face) -> Self {
         value.into7()
     }
 }
-impl TryFrom<Face7> for Face6 {
+impl TryFrom<Face7> for Face {
     type Error = Faceless;
     #[inline]
-    fn try_from(value: Face7) -> Result<Face6, Self::Error> {
+    fn try_from(value: Face7) -> Result<Face, Self::Error> {
         match value {
             Face7::Within => Err(Faceless),
-            Face7::NX => Ok(Face6::NX),
-            Face7::NY => Ok(Face6::NY),
-            Face7::NZ => Ok(Face6::NZ),
-            Face7::PX => Ok(Face6::PX),
-            Face7::PY => Ok(Face6::PY),
-            Face7::PZ => Ok(Face6::PZ),
+            Face7::NX => Ok(Face::NX),
+            Face7::NY => Ok(Face::NY),
+            Face7::NZ => Ok(Face::NZ),
+            Face7::PX => Ok(Face::PX),
+            Face7::PY => Ok(Face::PY),
+            Face7::PZ => Ok(Face::PZ),
         }
     }
 }
 
-impl TryFrom<GridVector> for Face6 {
+impl TryFrom<GridVector> for Face {
     /// Returns the original vector on failure.
     /// (An error message would probably be too lacking context to be helpful.)
     type Error = GridVector;
 
-    /// Recovers a `Face6` from its corresponding unit normal vector. All other vectors
+    /// Recovers a `Face` from its corresponding unit normal vector. All other vectors
     /// are rejected.
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::{Face6, GridVector};
+    /// use all_is_cubes::math::{Face, GridVector};
     ///
-    /// // A Face6 may be converted from its normal vector.
-    /// for face in Face6::ALL {
-    ///     assert_eq!(Face6::try_from(face.normal_vector()), Ok(face));
+    /// // A Face may be converted from its normal vector.
+    /// for face in Face::ALL {
+    ///     assert_eq!(Face::try_from(face.normal_vector()), Ok(face));
     /// }
     ///
-    /// // If the vector does not correspond to any Face6, it is returned.
+    /// // If the vector does not correspond to any Face, it is returned.
     /// let v = GridVector::new(1, 2, 3);
-    /// assert_eq!(Face6::try_from(v), Err(v));
+    /// assert_eq!(Face::try_from(v), Err(v));
     /// ```
     #[inline]
     fn try_from(value: GridVector) -> Result<Self, Self::Error> {
         let f7 = Face7::try_from(value)?;
-        Face6::try_from(f7).map_err(|_| value)
+        Face::try_from(f7).map_err(|_| value)
     }
 }
 impl TryFrom<GridVector> for Face7 {
@@ -802,39 +795,39 @@ impl TryFrom<GridVector> for Face7 {
 }
 
 /// Error resulting from providing [`Face7::Within`] where a definite nonzero direction
-/// is needed, such as converting to a [`Face6`].
+/// is needed, such as converting to a [`Face`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[displaydoc("Face7::Within does not have a direction or axis")]
 #[expect(clippy::exhaustive_structs)]
 pub struct Faceless;
 
 #[cfg(feature = "rerun")]
-impl From<Face6> for re_sdk_types::view_coordinates::SignedAxis3 {
+impl From<Face> for re_sdk_types::view_coordinates::SignedAxis3 {
     #[inline]
-    fn from(face: Face6) -> Self {
+    fn from(face: Face) -> Self {
         use re_sdk_types::view_coordinates::{Axis3, Sign, SignedAxis3};
         match face {
-            Face6::NX => SignedAxis3 {
+            Face::NX => SignedAxis3 {
                 sign: Sign::Negative,
                 axis: Axis3::X,
             },
-            Face6::NY => SignedAxis3 {
+            Face::NY => SignedAxis3 {
                 sign: Sign::Negative,
                 axis: Axis3::Y,
             },
-            Face6::NZ => SignedAxis3 {
+            Face::NZ => SignedAxis3 {
                 sign: Sign::Negative,
                 axis: Axis3::Z,
             },
-            Face6::PX => SignedAxis3 {
+            Face::PX => SignedAxis3 {
                 sign: Sign::Positive,
                 axis: Axis3::X,
             },
-            Face6::PY => SignedAxis3 {
+            Face::PY => SignedAxis3 {
                 sign: Sign::Positive,
                 axis: Axis3::Y,
             },
-            Face6::PZ => SignedAxis3 {
+            Face::PZ => SignedAxis3 {
                 sign: Sign::Positive,
                 axis: Axis3::Z,
             },
@@ -842,7 +835,7 @@ impl From<Face6> for re_sdk_types::view_coordinates::SignedAxis3 {
     }
 }
 
-/// Container for values keyed by [`Face6`]s. Always holds exactly six elements.
+/// Container for values keyed by [`Face`]s. Always holds exactly six elements.
 ///
 /// # Layout
 ///
@@ -853,17 +846,17 @@ impl From<Face6> for re_sdk_types::view_coordinates::SignedAxis3 {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[repr(C)] // used `unsafe`ly for by-reference conversions
 pub struct FaceMap<V> {
-    /// The value whose key is [`Face6::NX`].
+    /// The value whose key is [`Face::NX`].
     pub nx: V,
-    /// The value whose key is [`Face6::NY`].
+    /// The value whose key is [`Face::NY`].
     pub ny: V,
-    /// The value whose key is [`Face6::NZ`].
+    /// The value whose key is [`Face::NZ`].
     pub nz: V,
-    /// The value whose key is [`Face6::PX`].
+    /// The value whose key is [`Face::PX`].
     pub px: V,
-    /// The value whose key is [`Face6::PY`].
+    /// The value whose key is [`Face::PY`].
     pub py: V,
-    /// The value whose key is [`Face6::PZ`].
+    /// The value whose key is [`Face::PZ`].
     pub pz: V,
 }
 
@@ -873,16 +866,16 @@ pub struct FaceMap<V> {
 )]
 impl<V> FaceMap<V> {
     /// Constructs a [`FaceMap`] by using the provided function to compute
-    /// a value for each [`Face6`] enum variant.
+    /// a value for each [`Face`] enum variant.
     #[inline]
-    pub fn from_fn(mut f: impl FnMut(Face6) -> V) -> Self {
+    pub fn from_fn(mut f: impl FnMut(Face) -> V) -> Self {
         Self {
-            nx: f(Face6::NX),
-            ny: f(Face6::NY),
-            nz: f(Face6::NZ),
-            px: f(Face6::PX),
-            py: f(Face6::PY),
-            pz: f(Face6::PZ),
+            nx: f(Face::NX),
+            ny: f(Face::NY),
+            nz: f(Face::NZ),
+            px: f(Face::PX),
+            py: f(Face::PY),
+            pz: f(Face::PZ),
         }
     }
 
@@ -939,36 +932,36 @@ impl<V> FaceMap<V> {
         unsafe { &mut *raw }
     }
 
-    /// Iterate over the map's key-value pairs by reference, in the same order as [`Face6::ALL`].
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Face6, &V)> + ExactSizeIterator + Clone {
-        Face6::ALL.into_iter().zip(self.as_array())
+    /// Iterate over the map's key-value pairs by reference, in the same order as [`Face::ALL`].
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Face, &V)> + ExactSizeIterator + Clone {
+        Face::ALL.into_iter().zip(self.as_array())
     }
 
-    /// Iterate over the map's key-value pairs by mutable reference, in the same order as [`Face6::ALL`].
+    /// Iterate over the map's key-value pairs by mutable reference, in the same order as [`Face::ALL`].
     pub fn iter_mut(
         &mut self,
-    ) -> impl DoubleEndedIterator<Item = (Face6, &mut V)> + ExactSizeIterator {
-        Face6::ALL.into_iter().zip(self.as_array_mut())
+    ) -> impl DoubleEndedIterator<Item = (Face, &mut V)> + ExactSizeIterator {
+        Face::ALL.into_iter().zip(self.as_array_mut())
     }
 
-    /// Iterate over the map values by reference, in the same order as [`Face6::ALL`].
+    /// Iterate over the map values by reference, in the same order as [`Face::ALL`].
     #[inline]
     pub fn values(&self) -> core::slice::Iter<'_, V> {
         self.as_array().iter()
     }
 
-    /// Iterate over the map values by mutable reference, in the same order as [`Face6::ALL`].
+    /// Iterate over the map values by mutable reference, in the same order as [`Face::ALL`].
     #[inline]
     pub fn values_mut(&mut self) -> core::slice::IterMut<'_, V> {
         self.as_array_mut().iter_mut()
     }
 
-    /// Convert to an array, whose elements are arranged in the same order as [`Face6::ALL`].
+    /// Convert to an array, whose elements are arranged in the same order as [`Face::ALL`].
     pub fn into_values(self) -> [V; 6] {
         [self.nx, self.ny, self.nz, self.px, self.py, self.pz]
     }
 
-    /// Convert to an iterator, whose items are arranged in the same order as [`Face6::ALL`].
+    /// Convert to an iterator, whose items are arranged in the same order as [`Face::ALL`].
     pub fn into_values_iter(self) -> core::array::IntoIter<V, 6> {
         self.into_values().into_iter()
     }
@@ -989,38 +982,38 @@ impl<V> FaceMap<V> {
     }
 
     /// Transform values.
-    pub fn map<U>(self, mut f: impl FnMut(Face6, V) -> U) -> FaceMap<U> {
+    pub fn map<U>(self, mut f: impl FnMut(Face, V) -> U) -> FaceMap<U> {
         FaceMap {
-            nx: f(Face6::NX, self.nx),
-            ny: f(Face6::NY, self.ny),
-            nz: f(Face6::NZ, self.nz),
-            px: f(Face6::PX, self.px),
-            py: f(Face6::PY, self.py),
-            pz: f(Face6::PZ, self.pz),
+            nx: f(Face::NX, self.nx),
+            ny: f(Face::NY, self.ny),
+            nz: f(Face::NZ, self.nz),
+            px: f(Face::PX, self.px),
+            py: f(Face::PY, self.py),
+            pz: f(Face::PZ, self.pz),
         }
     }
 
     /// Transform values, taking the input by reference.
-    pub fn map_ref<'map, U>(&'map self, mut f: impl FnMut(Face6, &'map V) -> U) -> FaceMap<U> {
+    pub fn map_ref<'map, U>(&'map self, mut f: impl FnMut(Face, &'map V) -> U) -> FaceMap<U> {
         FaceMap {
-            nx: f(Face6::NX, &self.nx),
-            ny: f(Face6::NY, &self.ny),
-            nz: f(Face6::NZ, &self.nz),
-            px: f(Face6::PX, &self.px),
-            py: f(Face6::PY, &self.py),
-            pz: f(Face6::PZ, &self.pz),
+            nx: f(Face::NX, &self.nx),
+            ny: f(Face::NY, &self.ny),
+            nz: f(Face::NZ, &self.nz),
+            px: f(Face::PX, &self.px),
+            py: f(Face::PY, &self.py),
+            pz: f(Face::PZ, &self.pz),
         }
     }
 
     /// Combine two [`FaceMap`]s using a function applied to each pair of corresponding values.
-    pub fn zip<U, R>(self, other: FaceMap<U>, mut f: impl FnMut(Face6, V, U) -> R) -> FaceMap<R> {
+    pub fn zip<U, R>(self, other: FaceMap<U>, mut f: impl FnMut(Face, V, U) -> R) -> FaceMap<R> {
         FaceMap {
-            nx: f(Face6::NX, self.nx, other.nx),
-            ny: f(Face6::NY, self.ny, other.ny),
-            nz: f(Face6::NZ, self.nz, other.nz),
-            px: f(Face6::PX, self.px, other.px),
-            py: f(Face6::PY, self.py, other.py),
-            pz: f(Face6::PZ, self.pz, other.pz),
+            nx: f(Face::NX, self.nx, other.nx),
+            ny: f(Face::NY, self.ny, other.ny),
+            nz: f(Face::NZ, self.nz, other.nz),
+            px: f(Face::PX, self.px, other.px),
+            py: f(Face::PY, self.py, other.py),
+            pz: f(Face::PZ, self.pz, other.pz),
         }
     }
 
@@ -1030,20 +1023,20 @@ impl<V> FaceMap<V> {
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::{Face6, FaceMap};
+    /// use all_is_cubes::math::{Face, FaceMap};
     ///
     /// assert_eq!(
-    ///     FaceMap::default().with(Face6::PY, 10),
+    ///     FaceMap::default().with(Face::PY, 10),
     ///     {
     ///         let mut m = FaceMap::default();
-    ///         m[Face6::PY] = 10;
+    ///         m[Face::PY] = 10;
     ///         m
     ///     },
     /// );
     /// ```
     #[inline]
     #[must_use]
-    pub fn with(mut self, face: Face6, value: V) -> Self {
+    pub fn with(mut self, face: Face, value: V) -> Self {
         self[face] = value;
         self
     }
@@ -1094,31 +1087,31 @@ impl<V: Copy> FaceMap<V> {
     }
 }
 
-impl<V> ops::Index<Face6> for FaceMap<V> {
+impl<V> ops::Index<Face> for FaceMap<V> {
     type Output = V;
     #[inline]
-    fn index(&self, face: Face6) -> &V {
+    fn index(&self, face: Face) -> &V {
         match face {
-            Face6::NX => &self.nx,
-            Face6::NY => &self.ny,
-            Face6::NZ => &self.nz,
-            Face6::PX => &self.px,
-            Face6::PY => &self.py,
-            Face6::PZ => &self.pz,
+            Face::NX => &self.nx,
+            Face::NY => &self.ny,
+            Face::NZ => &self.nz,
+            Face::PX => &self.px,
+            Face::PY => &self.py,
+            Face::PZ => &self.pz,
         }
     }
 }
 
-impl<V> ops::IndexMut<Face6> for FaceMap<V> {
+impl<V> ops::IndexMut<Face> for FaceMap<V> {
     #[inline]
-    fn index_mut(&mut self, face: Face6) -> &mut V {
+    fn index_mut(&mut self, face: Face) -> &mut V {
         match face {
-            Face6::NX => &mut self.nx,
-            Face6::NY => &mut self.ny,
-            Face6::NZ => &mut self.nz,
-            Face6::PX => &mut self.px,
-            Face6::PY => &mut self.py,
-            Face6::PZ => &mut self.pz,
+            Face::NX => &mut self.nx,
+            Face::NY => &mut self.ny,
+            Face::NZ => &mut self.nz,
+            Face::PX => &mut self.px,
+            Face::PY => &mut self.py,
+            Face::PZ => &mut self.pz,
         }
     }
 }
@@ -1199,20 +1192,20 @@ impl_binary_operator_for_facemap!(Div::div, DivAssign::div_assign);
 impl_binary_operator_for_facemap!(Rem::rem, RemAssign::rem_assign);
 
 impl<V> IntoIterator for FaceMap<V> {
-    type Item = (Face6, V);
+    type Item = (Face, V);
 
     // TODO: use a custom iterator type if this gets more than one-off use
-    type IntoIter = <[(Face6, V); 6] as IntoIterator>::IntoIter;
+    type IntoIter = <[(Face, V); 6] as IntoIterator>::IntoIter;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         [
-            (Face6::NX, self.nx),
-            (Face6::NY, self.ny),
-            (Face6::NZ, self.nz),
-            (Face6::PX, self.px),
-            (Face6::PY, self.py),
-            (Face6::PZ, self.pz),
+            (Face::NX, self.nx),
+            (Face::NY, self.ny),
+            (Face::NZ, self.nz),
+            (Face::PX, self.px),
+            (Face::PY, self.py),
+            (Face::PZ, self.pz),
         ]
         .into_iter()
     }
@@ -1277,7 +1270,7 @@ impl lines::Wireframe for CubeFace {
         aab.wireframe_points(output);
 
         // Draw an X on the face.
-        if let Ok(face) = Face6::try_from(self.face) {
+        if let Ok(face) = Face::try_from(self.face) {
             let face_transform = face.face_transform(1);
             const X_POINTS: [[GridPoint; 2]; 2] = [
                 [GridPoint::new(0, 0, 0), GridPoint::new(1, 1, 0)],
@@ -1311,9 +1304,9 @@ mod tests {
 
     #[test]
     fn from_snapped_vector_roundtrip() {
-        for face in Face6::ALL {
+        for face in Face::ALL {
             let normal = face.normal_vector();
-            let snapped = Face6::from_snapped_vector(normal);
+            let snapped = Face::from_snapped_vector(normal);
             assert_eq!(Some(face), snapped, "from {normal:?}");
         }
     }
@@ -1323,15 +1316,15 @@ mod tests {
     fn from_snapped_vector_cases() {
         let mut f = MultiFailure::new();
         for (face, vector, comment) in [
-            (Some(Face6::PZ), [0., 0., 0.], "zero tie, positive Z, positive other"),
-            (Some(Face6::PZ), [-0., -0., 0.], "zero tie, positive Z, negative other"),
-            (Some(Face6::NZ), [0., 0., -0.], "zero tie, negative Z, positive other"),
-            (Some(Face6::NZ), [-0., -0., -0.], "zero tie, negative Z, negative other"),
+            (Some(Face::PZ), [0., 0., 0.], "zero tie, positive Z, positive other"),
+            (Some(Face::PZ), [-0., -0., 0.], "zero tie, positive Z, negative other"),
+            (Some(Face::NZ), [0., 0., -0.], "zero tie, negative Z, positive other"),
+            (Some(Face::NZ), [-0., -0., -0.], "zero tie, negative Z, negative other"),
 
-            (Some(Face6::NZ), [-2., -3., -3.], "2-axis tie YZ, negative"),
-            (Some(Face6::NY), [-3., -3., -2.], "2-axis tie XY, negative"),
-            (Some(Face6::PZ), [2., 3., 3.], "2-axis tie YZ, positive"),
-            (Some(Face6::PY), [3., 3., 2.], "2-axis tie XY, positive"),
+            (Some(Face::NZ), [-2., -3., -3.], "2-axis tie YZ, negative"),
+            (Some(Face::NY), [-3., -3., -2.], "2-axis tie XY, negative"),
+            (Some(Face::PZ), [2., 3., 3.], "2-axis tie YZ, positive"),
+            (Some(Face::PY), [3., 3., 2.], "2-axis tie XY, positive"),
 
             (None, [f64::NAN, 1.0, 1.0], "NaN X"),
             (None, [1.0, f64::NAN, 1.0], "NaN Y"),
@@ -1339,7 +1332,7 @@ mod tests {
         ] {
             f.catch(|| {
                 let vector = FreeVector::from(vector);
-                assert_eq!(face, Face6::from_snapped_vector(vector), "{comment}, {vector:?}");
+                assert_eq!(face, Face::from_snapped_vector(vector), "{comment}, {vector:?}");
             });
         }
     }
@@ -1347,8 +1340,8 @@ mod tests {
     #[test]
     fn cross_6() {
         let mut f = MultiFailure::new();
-        for face1 in Face6::ALL {
-            for face2 in Face6::ALL {
+        for face1 in Face::ALL {
+            for face2 in Face::ALL {
                 f.catch(|| {
                     // Cross product of faces is identical to cross product of vectors.
                     assert_eq!(
@@ -1380,10 +1373,10 @@ mod tests {
 
     #[test]
     fn rotation_from_nz() {
-        for face in Face6::ALL {
+        for face in Face::ALL {
             let rot = face.rotation_from_nz();
             assert_eq!(
-                rot.transform(Face6::NZ),
+                rot.transform(Face::NZ),
                 face,
                 "{face:?}: {rot:?} should rotate from NZ"
             );
@@ -1393,7 +1386,7 @@ mod tests {
 
     #[test]
     fn face_transform_does_not_reflect() {
-        for face in Face6::ALL {
+        for face in Face::ALL {
             assert!(!face.face_transform(7).rotation.is_reflection());
         }
     }
@@ -1403,7 +1396,7 @@ mod tests {
     #[test]
     fn clockwise_properties() {
         let mut f = MultiFailure::new();
-        for face in Face6::ALL {
+        for face in Face::ALL {
             f.catch(|| {
                 assert_eq!(
                     face.counterclockwise(),
@@ -1512,7 +1505,7 @@ mod tests {
     #[test]
     fn face_map_iter_in_enum_order() {
         let mut map = FaceMap::from_fn(core::convert::identity);
-        let expected_both: Vec<(Face6, Face6)> = Face6::ALL.into_iter().zip(Face6::ALL).collect();
+        let expected_both: Vec<(Face, Face)> = Face::ALL.into_iter().zip(Face::ALL).collect();
 
         // FaceMap::iter()
         assert_eq!(
@@ -1528,12 +1521,12 @@ mod tests {
 
         // FaceMap::values()
         assert_eq!(
-            Face6::ALL.to_vec(),
+            Face::ALL.to_vec(),
             map.values().copied().collect::<Vec<_>>(),
         );
 
         // FaceMap::into_values()
-        assert_eq!(Face6::ALL, map.into_values());
+        assert_eq!(Face::ALL, map.into_values());
     }
 
     #[test]

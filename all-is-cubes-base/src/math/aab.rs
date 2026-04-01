@@ -11,7 +11,7 @@ use rand::RngExt as _;
 use num_traits::float::FloatCore as _;
 
 use crate::math::{
-    Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate,
+    Axis, Cube, Face, FaceMap, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate,
     Octant, PositiveSign, lines, sort_two,
 };
 
@@ -152,14 +152,14 @@ impl Aab {
     /// Note that negative faces' coordinates _are_ inverted; that is, all results
     /// will be positive if the box contains its origin.
     #[inline]
-    pub fn face_coordinate(&self, face: Face6) -> FreeCoordinate {
+    pub fn face_coordinate(&self, face: Face) -> FreeCoordinate {
         match face {
-            Face6::NX => -self.lower_bounds.x,
-            Face6::NY => -self.lower_bounds.y,
-            Face6::NZ => -self.lower_bounds.z,
-            Face6::PX => self.upper_bounds.x,
-            Face6::PY => self.upper_bounds.y,
-            Face6::PZ => self.upper_bounds.z,
+            Face::NX => -self.lower_bounds.x,
+            Face::NY => -self.lower_bounds.y,
+            Face::NZ => -self.lower_bounds.z,
+            Face::PX => self.upper_bounds.x,
+            Face::PY => self.upper_bounds.y,
+            Face::PZ => self.upper_bounds.z,
         }
     }
 

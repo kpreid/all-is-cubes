@@ -15,7 +15,7 @@ use rayon::iter::{IntoParallelRefMutIterator as _, ParallelIterator as _};
 use super::debug::LightComputeOutput;
 use crate::block::{self, EvaluatedBlock};
 use crate::math::{
-    Cube, CubeFace, Face6, Face7, FaceMap, OpacityCategory, PositiveSign, Rgb, Rgba, Vol,
+    Cube, CubeFace, Face, Face7, FaceMap, OpacityCategory, PositiveSign, Rgb, Rgba, Vol,
 };
 use crate::space::light::debug::LightUpdateRayInfo;
 use crate::space::light::{LightUpdateQueue, LightUpdateRequest, Priority, chart};
@@ -159,7 +159,7 @@ impl LightStorage {
         } else {
             self.light_needs_update(cube, Priority::NEWLY_VISIBLE);
         }
-        for face in Face6::ALL {
+        for face in Face::ALL {
             if let Some(neighbor) = cube.checked_add(face.normal_vector()) {
                 // Perform neighbor light updates if they can be affected by us
                 if !uc.get_evaluated(neighbor).opaque()[face.opposite()] {
@@ -314,7 +314,7 @@ impl LightStorage {
             change_buffer.push(SpaceChange::CubeLight { cube });
 
             // If neighbors have missing (not just stale) light values, fill them in too.
-            for dir in Face6::ALL {
+            for dir in Face::ALL {
                 let neighbor_cube = cube + dir.normal_vector();
                 let Some(neighbor_light) = self.contents.get_mut(neighbor_cube) else {
                     // neighbor is out of bounds
@@ -552,7 +552,7 @@ impl LightStorage {
                             covered = true;
                             PackedLight::OPAQUE
                         } else if this_cube_evaluated.visible_or_animated()
-                            || Face6::ALL.into_iter().any(|face| {
+                            || Face::ALL.into_iter().any(|face| {
                                 uc.get_evaluated(cube + face.normal_vector()).visible_or_animated()
                             })
                         {
@@ -567,7 +567,7 @@ impl LightStorage {
                             if covered {
                                 PackedLight::UNINITIALIZED_AND_BLACK
                             } else {
-                                self.block_sky.in_direction(Face6::PY)
+                                self.block_sky.in_direction(Face::PY)
                             }
                         } else {
                             // Not visible at all; does not interact with rays.
@@ -782,7 +782,7 @@ impl LightBuffer {
         // the former is strict “watertightness” and the latter is merely an averaged image of
         // the block. (TODO: But maybe we should always use hit_alpha anyway?)
         let face_opacity = ev_hit.opaque();
-        let hit_opaque_face: bool = match Face6::try_from(hit.face) {
+        let hit_opaque_face: bool = match Face::try_from(hit.face) {
             Ok(face) => face_opacity[face],
             Err(_) => face_opacity == FaceMap::splat(true),
         };

@@ -16,7 +16,7 @@ use all_is_cubes::euclid::{Point2D, vec3};
 use all_is_cubes::inv::{Slot, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSize,
+    Cube, Face, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSize,
     GridSizeCoord, GridVector, Gridgid, VectorOps, rgba_const,
 };
 use all_is_cubes::op::Operation;
@@ -260,9 +260,9 @@ impl<'u> State<'u> {
 
         self.space
             .bounds()
-            .abut(Face6::NZ, -3)
+            .abut(Face::NZ, -3)
             .unwrap()
-            .abut(Face6::PY, -(self.space.bounds().upper_bounds().y - 12))
+            .abut(Face::PY, -(self.space.bounds().upper_bounds().y - 12))
             .unwrap();
         vui::install_widgets(
             vui::LayoutGrant::new(logo_location),
@@ -329,7 +329,7 @@ impl<'u> State<'u> {
         self.space.mutate(self.universe.read_ticket(), |m| {
             'directions: for direction in CityPlanner::ROAD_DIRECTIONS {
                 let perpendicular: GridVector =
-                    Face6::PY.clockwise().transform(direction).normal_vector();
+                    Face::PY.clockwise().transform(direction).normal_vector();
                 for distance in (CityPlanner::LAMP_POSITION_RADIUS..self.planner.city_radius)
                     .step_by(lamp_spacing)
                 {
@@ -376,7 +376,7 @@ impl<'u> State<'u> {
                 Tool::PushPull,
                 Tool::Custom {
                     op: Operation::AddModifiers(
-                        [block::Modifier::Rotate(Face6::PY.clockwise())].into(),
+                        [block::Modifier::Rotate(Face::PY.clockwise())].into(),
                     ),
                     icon: block::Block::builder()
                         .color(rgba_const!(0.0, 0.5, 0.0, 1.0))
@@ -539,7 +539,7 @@ fn place_one_exhibit(
         );
 
         Arc::new(vui::LayoutTree::Stack {
-            direction: Face6::PZ,
+            direction: Face::PZ,
             children: vec![
                 match exhibit.placement {
                     Placement::Surface => {
@@ -576,7 +576,7 @@ fn place_one_exhibit(
         // Cut an "entranceway" into the curb and grass, or corridor wall underground
         let entranceway_height = 2; // TODO: let exhibit customize
         {
-            let front_face = plot_transform.rotation.transform(Face6::PZ);
+            let front_face = plot_transform.rotation.transform(Face::PZ);
             // Compute the surface that needs to be clear for walking
             let entrance_plane = enclosure_lower
                 .shrink(FaceMap {
@@ -586,7 +586,7 @@ fn place_one_exhibit(
                     ..enclosure_thickness
                 })
                 .unwrap()
-                .abut(Face6::PY, 0)
+                .abut(Face::PY, 0)
                 .unwrap()
                 .abut(front_face, enclosure_thickness.pz.cast_signed()) // re-add enclosure bounds
                 .unwrap()
@@ -597,11 +597,11 @@ fn place_one_exhibit(
                 .unwrap();
 
             if let Placement::Surface = exhibit.placement {
-                let walkway = entrance_plane.abut(Face6::NY, 1).unwrap();
+                let walkway = entrance_plane.abut(Face::NY, 1).unwrap();
                 m.fill_uniform(walkway, &demo_blocks[Road])?;
             }
 
-            let walking_volume = entrance_plane.abut(Face6::PY, entranceway_height).unwrap();
+            let walking_volume = entrance_plane.abut(Face::PY, entranceway_height).unwrap();
             m.fill_uniform(walking_volume, &AIR)?;
 
             planner.occupied_plots.push(walking_volume);
@@ -709,10 +709,10 @@ fn place_roads_and_tunnels(
     .set_scale(6.0);
 
     for face in CityPlanner::ROAD_DIRECTIONS {
-        let perpendicular: GridVector = Face6::PY.clockwise().transform(face).normal_vector();
-        let road_aligned_rotation = GridRotation::from_to(Face6::NZ, face, Face6::PY).unwrap();
+        let perpendicular: GridVector = Face::PY.clockwise().transform(face).normal_vector();
+        let road_aligned_rotation = GridRotation::from_to(Face::NZ, face, Face::PY).unwrap();
         let other_side_of_road =
-            GridRotation::from_basis([Face6::NX, Face6::PY, Face6::NZ]) * road_aligned_rotation;
+            GridRotation::from_basis([Face::NX, Face::PY, Face::NZ]) * road_aligned_rotation;
         let rotations = [other_side_of_road, road_aligned_rotation];
         let raycaster = all_is_cubes::raycast::AaRay::new(Cube::ORIGIN, face.into())
             .cast()
@@ -782,7 +782,7 @@ fn place_roads_and_tunnels(
                         cube + GridVector::new(0, -2, 0) + perpendicular * p,
                         demo_blocks[Sconce(true)]
                             .clone()
-                            .rotate(Face6::PY.clockwise() * rotations[side]),
+                            .rotate(Face::PY.clockwise() * rotations[side]),
                     )?;
                 }
             }
@@ -818,11 +818,11 @@ fn place_lamppost(
 ) -> Result<(), InGenError> {
     use DemoBlocks::*;
 
-    fn rot_py_to(to: Face6) -> GridRotation {
+    fn rot_py_to(to: Face) -> GridRotation {
         // TODO: make it possible to express this more elegantly
         // "rotate A to B by the shortest path possible, and if it is 180º then prefer this axis of rotation"
-        GridRotation::from_to(Face6::PY, to, Face6::PX)
-            .or_else(|| GridRotation::from_to(Face6::PY, to, Face6::PZ))
+        GridRotation::from_to(Face::PY, to, Face::PX)
+            .or_else(|| GridRotation::from_to(Face::PY, to, Face::PZ))
             .unwrap()
     }
 
@@ -830,9 +830,9 @@ fn place_lamppost(
 
     for (step1, step2) in walk(base_position, globe_position).tuple_windows() {
         // let prev_cube = step1.cube;
-        let prev_dir: Face6 = step1.face.try_into().unwrap();
+        let prev_dir: Face = step1.face.try_into().unwrap();
         let this_cube = step2.cube;
-        let next_dir: Face6 = step2.face.try_into().unwrap();
+        let next_dir: Face = step2.face.try_into().unwrap();
         let next_cube = step2.adjacent();
 
         let block = if next_cube == globe_position {
@@ -864,7 +864,7 @@ fn place_lamppost(
 /// The space's bounds extend upward from [0, 0, 0].
 fn draw_exhibit_info(read_ticket: ReadTicket<'_>, exhibit: &Exhibit) -> Result<Space, InGenError> {
     let info_widgets: vui::WidgetTree = Arc::new(vui::LayoutTree::Stack {
-        direction: Face6::NY,
+        direction: Face::NY,
         children: vec![
             vui::leaf_widget(widgets::LargeText {
                 text: exhibit.name.into(),
@@ -921,7 +921,7 @@ struct CityPlanner {
 }
 
 impl CityPlanner {
-    const ROAD_DIRECTIONS: [Face6; 4] = [Face6::PX, Face6::NX, Face6::PZ, Face6::NZ];
+    const ROAD_DIRECTIONS: [Face; 4] = [Face::PX, Face::NX, Face::PZ, Face::NZ];
     const ROAD_RADIUS: GridCoordinate = 2;
     /// Distance from the center cube to the line of cubes where lampposts are placed.
     const LAMP_POSITION_RADIUS: GridCoordinate = Self::ROAD_RADIUS + 1;
@@ -950,7 +950,7 @@ impl CityPlanner {
             [Self::ROAD_RADIUS + 1, Self::SURFACE_Y + 2, city_radius + 1],
         );
         occupied_plots.push(road);
-        occupied_plots.push(road.transform(Face6::PY.clockwise().into()).unwrap());
+        occupied_plots.push(road.transform(Face::PY.clockwise().into()).unwrap());
         Self {
             space_bounds,
             city_radius,
@@ -962,7 +962,7 @@ impl CityPlanner {
         // TODO: We'd like to resume the search from _when we left off_, but that's tricky since a
         // smaller plot might fit where a large one didn't. So, quadratic search it is for now.
         for d in 0..=self.city_radius {
-            for street_axis in Face6::PY.clockwise().iterate() {
+            for street_axis in Face::PY.clockwise().iterate() {
                 // TODO exercising opposite sides logic
                 'search: for &left_side in &[false, true] {
                     // The translation is expressed along the +X axis street, so
@@ -982,7 +982,7 @@ impl CityPlanner {
                     )) * if left_side {
                         Gridgid::IDENTITY
                     } else {
-                        (Face6::PY.r180()).to_positive_octant_transform(1)
+                        (Face::PY.r180()).to_positive_octant_transform(1)
                     };
                     // Rotate to match street
                     transform = street_axis.to_positive_octant_transform(1) * transform;
@@ -1010,7 +1010,7 @@ impl CityPlanner {
         None
     }
 
-    fn find_cube_near(&self, start_cube: Cube, directions: &[Face6]) -> Option<Cube> {
+    fn find_cube_near(&self, start_cube: Cube, directions: &[Face]) -> Option<Cube> {
         for distance in 0.. {
             let mut some_in_bounds = false;
             for &direction in directions {

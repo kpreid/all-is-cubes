@@ -35,7 +35,7 @@ use crate::fluff::Fluff;
 )]
 use crate::math::Euclid as _;
 use crate::math::{
-    Aab, Axis, Cube, Face6, Face7, FaceMap, FreeCoordinate, FreePoint, FreeVector, PositiveSign,
+    Aab, Axis, Cube, Face, Face7, FaceMap, FreeCoordinate, FreePoint, FreeVector, PositiveSign,
     notnan,
 };
 use crate::physics::{Body, BodyStepInfo, Contact, ContactSet, StopAt, Velocity};
@@ -763,8 +763,8 @@ pub(super) fn crush_if_colliding(
 
         // Find the direction which has the least penetration depth,
         // thus the smallest crush to resolve the collision.
-        let mut least_penetration_depth: Option<(Face6, FreeCoordinate)> = None;
-        for face in Face6::ALL {
+        let mut least_penetration_depth: Option<(Face, FreeCoordinate)> = None;
+        for face in Face::ALL {
             let this_depth =
                 body.occupying.face_coordinate(face) + contact_aab.face_coordinate(face.opposite());
             if this_depth >= 0. && least_penetration_depth.is_none_or(|(_, d)| this_depth < d) {

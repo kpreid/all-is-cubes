@@ -13,7 +13,7 @@ use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::euclid::{Point3D, Size3D, point3};
 use all_is_cubes::math::{
     Aab, Cube,
-    Face6::{self, *},
+    Face::{self, *},
     FaceMap, GridAab, Rgb, Rgba, zo32,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
-fn v_c<T>(position: [PosCoord; 3], face: Face6, color: [f32; 4]) -> BlockVertex<T> {
+fn v_c<T>(position: [PosCoord; 3], face: Face, color: [f32; 4]) -> BlockVertex<T> {
     BlockVertex {
         position: position.into(),
         face,
@@ -40,7 +40,7 @@ fn v_c<T>(position: [PosCoord; 3], face: Face6, color: [f32; 4]) -> BlockVertex<
 /// Shorthand for writing out an entire [`BlockVertex`] with texturing.
 fn v_t(
     position: [PosCoord; 3],
-    face: Face6,
+    face: Face,
     resolution: Resolution,
     texture: [f32; 3],
 ) -> BlockVertex<TexPoint> {

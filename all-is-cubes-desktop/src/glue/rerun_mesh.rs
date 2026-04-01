@@ -3,7 +3,7 @@
 use itertools::Itertools as _;
 
 use all_is_cubes::euclid::{Point3D, Vector3D};
-use all_is_cubes::math::{Cube, Face6, GridCoordinate};
+use all_is_cubes::math::{Cube, Face, GridCoordinate};
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::time::Deadline;
@@ -37,7 +37,7 @@ const CHUNK_SIZE: GridCoordinate = 32;
 struct Vertex {
     position: rg::components::Position3D,
     color: rg::components::Color,
-    face: Face6,
+    face: Face,
 }
 
 impl mesh::Vertex for Vertex {

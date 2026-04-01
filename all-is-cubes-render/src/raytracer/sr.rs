@@ -26,7 +26,7 @@ use all_is_cubes::camera::{Camera, GraphicsOptions, TransparencyOption};
 use all_is_cubes::camera::{FogOption, NdcPoint2};
 use all_is_cubes::euclid::{Vector3D, vec3};
 use all_is_cubes::math::{
-    Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridRotation, Rgb, Rgba, Vol,
+    Cube, Face, Face7, FreeCoordinate, FreePoint, FreeVector, GridRotation, Rgb, Rgba, Vol,
     ZeroOne, rgb_const,
 };
 use all_is_cubes::raycast::{self, Ray};
@@ -260,7 +260,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
         // Find linear interpolation coefficients based on where we are relative to
         // a half-cube-offset grid.
-        let reference_frame: GridRotation = match Face6::try_from(face) {
+        let reference_frame: GridRotation = match Face::try_from(face) {
             Ok(face) => face.rotation_from_nz(),
             Err(_) => GridRotation::IDENTITY, // doesn't matter; we shouldn't get here
         };

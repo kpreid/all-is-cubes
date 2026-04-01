@@ -2,7 +2,7 @@ use core::{fmt, ops};
 
 use euclid::{Vector3D, vec3};
 
-use crate::math::{Cube, Face6, FreeVector, GridCoordinate, GridPoint};
+use crate::math::{Cube, Face, FreeVector, GridCoordinate, GridPoint};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -250,7 +250,7 @@ impl OctantMask {
     /// Returns the [`OctantMask`] which contains the four octants that lie on the given side of
     /// the origin.
     #[inline]
-    pub const fn from_face(face: Face6) -> Self {
+    pub const fn from_face(face: Face) -> Self {
         // Optimization note: this compiles down to bitwise trickery and does not branch
         // or use an out-of-line lookup table.
         OctantMask::ALL.shift(face)
@@ -286,16 +286,16 @@ impl OctantMask {
     /// [`false`]/clear.
     #[inline]
     #[must_use]
-    pub const fn shift(self, direction: Face6) -> Self {
+    pub const fn shift(self, direction: Face) -> Self {
         let flags = self.flags;
         Self {
             flags: match direction {
-                Face6::NX => flags >> 4,
-                Face6::PX => flags << 4,
-                Face6::NY => (flags & 0b11001100) >> 2,
-                Face6::PY => (flags & 0b00110011) << 2,
-                Face6::NZ => (flags & 0b10101010) >> 1,
-                Face6::PZ => (flags & 0b01010101) << 1,
+                Face::NX => flags >> 4,
+                Face::PX => flags << 4,
+                Face::NY => (flags & 0b11001100) >> 2,
+                Face::PY => (flags & 0b00110011) << 2,
+                Face::NZ => (flags & 0b10101010) >> 1,
+                Face::PZ => (flags & 0b01010101) << 1,
             },
         }
     }
@@ -559,7 +559,7 @@ impl<T> ops::IndexMut<Octant> for OctantMap<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use Face6::*;
+    use Face::*;
     use euclid::vec3;
 
     #[test]

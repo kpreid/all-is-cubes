@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
-use core::ops::{Range};
+use core::ops::Range;
 
 use exhaust::Exhaust as _;
 use ordered_float::OrderedFloat;
@@ -11,7 +11,7 @@ use smallvec::SmallVec;
 
 use all_is_cubes::euclid::{self, Vector3D, vec3};
 use all_is_cubes::math::lines::Wireframe as _;
-use all_is_cubes::math::{Axis, Face6, FaceMap, GridRotation, lines};
+use all_is_cubes::math::{Axis, Face, FaceMap, GridRotation, lines};
 
 use crate::{
     Aabb, IndexInt, IndexSliceMut, IndexVec, MeshRel, MeshTypes, PosCoord, Position,
@@ -163,8 +163,8 @@ impl DepthOrdering {
     /// Returns whether a triangle with the given orientation may be visible from this ordering.
     ///
     /// For example, if this ordering is out of bounds in the negative X direction, then any
-    /// [`Face6::PX`] cannot possibly be visible.
-    fn face_visible_from_here(self, face: Face6) -> bool {
+    /// [`Face::PX`] cannot possibly be visible.
+    fn face_visible_from_here(self, face: Face) -> bool {
         self.0[face.axis()]
             != if face.is_negative() {
                 Rel::Higher
@@ -714,7 +714,7 @@ struct OrderedPrimitive<P> {
 }
 impl<P: Primitive> OrderedPrimitive<P> {
     #[inline(always)]
-    fn new<V: Vertex>(primitive: P, vertices: &[V], basis: Vector3D<Face6, ()>) -> Self {
+    fn new<V: Vertex>(primitive: P, vertices: &[V], basis: Vector3D<Face, ()>) -> Self {
         let midpoint = midpoint(vertices, primitive).to_vector();
         OrderedPrimitive {
             indices: primitive,
@@ -740,7 +740,7 @@ impl<P: Primitive> OrderedPrimitive<P> {
     }
 
     #[inline(always)]
-    fn min_max_on_axis<V: Vertex>(&self, vertices: &[V], direction: Face6) -> (PosCoord, PosCoord) {
+    fn min_max_on_axis<V: Vertex>(&self, vertices: &[V], direction: Face) -> (PosCoord, PosCoord) {
         // We only need to look at one of the two triangles,
         // because they have the same bounding rectangle.
         let [i0, i1, i2] = self.indices.indices_for_sorting();
@@ -999,8 +999,8 @@ mod tests {
                 m.set(center, transparent_block)?;
                 // Cover all but one face of the transparent block,
                 // so the mesh contains only that face.
-                for face in Face6::ALL {
-                    if face != Face6::PZ {
+                for face in Face::ALL {
+                    if face != Face::PZ {
                         m.set(center + face, opaque_block)?;
                     }
                 }
