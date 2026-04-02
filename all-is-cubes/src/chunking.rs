@@ -31,6 +31,8 @@ use crate::math::{
     Cube, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint, GridSizeCoord, OctantMask,
 };
 
+// -------------------------------------------------------------------------------------------------
+
 /// Unit-of-measure type for chunk positions *not* tracking the chunk size in the type.
 #[derive(Debug)]
 enum WholeChunk {}
@@ -104,6 +106,8 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Scale a cube position to obtain the containing chunk and the cube position within it.
 //---
 // Design note: these operations are combined to allow skipping some numeric overflow cases.
@@ -128,6 +132,8 @@ pub fn point_to_chunk<const CHUNK_SIZE: GridCoordinate>(
         point.map(|c| c.div_euclid(FreeCoordinate::from(CHUNK_SIZE))),
     )?))
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// A distance between two chunks, taking into consideration their entire volume.
 ///
@@ -165,6 +171,8 @@ impl fmt::Debug for Distance {
         write!(f, "{nearest_approach_squared}+{off_plane_count}")
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Precomputed information about the spherical pattern of chunks within view distance.
 ///
@@ -313,6 +321,10 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Functions related to the implementation of `ChunkChart`.
+
+/// Compute, or fetch from global cache, a new value for [`ChunkChart::octant_chunks`].
 fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -> Arc<[Ccv]> {
     #[cfg(feature = "std")]
     let mut cache = match CHUNK_CHART_CACHE.lock() {
@@ -363,6 +375,8 @@ pub fn reset_chunk_chart_cache() {
     }
 }
 
+/// Compute a new value for [`ChunkChart::octant_chunks`].
+/// This is normally cached through [`get_or_compute_chart_octant()`].
 fn compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -> Arc<[Ccv]> {
     // We're going to compute in the zero-or-positive octant, which means that the chunk origin
     // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
@@ -420,9 +434,11 @@ fn chunk_distance_squared_for_view(chunk: Ccv) -> Distance {
 #[cfg(feature = "std")]
 static CHUNK_CHART_CACHE: Mutex<BTreeMap<GridSizeCoord, Arc<[Ccv]>>> = Mutex::new(BTreeMap::new());
 
+// -------------------------------------------------------------------------------------------------
+
 /// An iterator that returns a vector and its opposite in the specified axis,
 ///
-/// Part of the implementation of [`ChunkChart`].
+/// Part of the implementation of [`ChunkChart::chunks()`].
 struct AxisMirrorIter {
     v: Ccv,
     /// Which copies are yet to be emitted.
@@ -465,6 +481,8 @@ impl DoubleEndedIterator for AxisMirrorIter {
 }
 impl ExactSizeIterator for AxisMirrorIter {}
 impl FusedIterator for AxisMirrorIter {}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
