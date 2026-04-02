@@ -170,10 +170,11 @@ impl fmt::Debug for Distance {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Precomputed information about the spherical pattern of chunks within view distance.
+/// Precomputed information about the spherical pattern of chunks within a given view distance.
 ///
 /// In order to use the same pattern for all possible view positions, the view position is
-/// rounded to enclosing chunk position.
+/// rounded to the enclosing chunk position; that is, the chunks in the chart are the chunks
+/// visible from *any point in* the starting chunk.
 #[derive(Clone, Debug, Eq, PartialEq)] // TODO: customize Debug and PartialEq
 pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
     /// The maximum view distance which this chart is designed for,
@@ -404,8 +405,12 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -> Arc<[
     // (This for loop has been measured as slightly faster than a .filter().collect().)
     for chunk_cube in candidates.iter_cubes() {
         let chunk = Ccv(chunk_cube.lower_bounds().to_vector().cast_unit());
+
+        // This comparison is < rather than <= because equality indicates a chunk which might just
+        // *touch* the view sphere, and such touching means the visible volume is zero, so there
+        // is nothing to actually render.
         if chunk_distance_squared_for_view(chunk).nearest_approach_squared
-            <= view_distance_in_squared_chunks
+            < view_distance_in_squared_chunks
         {
             octant_chunks.push(chunk);
         }
@@ -593,17 +598,14 @@ mod tests {
 
     // TODO: test for point_to_chunk
 
-    /// Zero distance means only the origin chunk.
-    /// This also tests that the origin position is added in.
+    /// Zero distance means that nothing at all is visible — not even the origin chunk.
+    /// This case is not useful but we want to test the edge cases anyway.
     #[test]
     fn chunk_chart_zero_size() {
         let chart = ChunkChart::<16>::new(0.0);
         let chunk = ChunkPos::new(1, 2, 3);
-        assert_eq!(
-            chart.chunks(chunk, OctantMask::ALL).collect::<Vec<_>>(),
-            vec![chunk]
-        );
-        assert!(dbg!(chart.count_all()) >= 1);
+        assert_eq!(chart.chunks(chunk, OctantMask::ALL).collect::<Vec<_>>(), []);
+        assert_eq!(chart.count_all(), 0);
     }
 
     /// If we look a tiny bit outside the origin chunk, there are 9³ - 1 neighbors.
@@ -707,16 +709,40 @@ mod tests {
                 chunks
             );
         }
-        assert_count(0.00, 1);
-        // All neighbor chunks
-        assert_count(0.01, 3 * 3 * 3);
-        assert_count(0.99, 3 * 3 * 3);
-        assert_count(1.00, 3 * 3 * 3);
-        // Add more distant neighbors
-        // TODO: I would think that the math would work out to add the 3×3
-        // face neighbors before any additional edge neighbors appear.
-        // Dig into the math some more...?
-        assert_count(1.01, 3 * 3 * 3 + 3 * 3 * 6 + 3 * 12);
+
+        // Zero distance, zero chunks
+        assert_count(0.00, 0);
+
+        // All neighbor chunks are in range if the distance in chunks is anywhere up to 1.
+        // Central 2D slice:
+        // ┌──┬──┬──┐
+        // │  │  │  │
+        // ├──╆━━╅──┤
+        // │  ┃  ┃  │
+        // ├──╄━━╃──┤
+        // │  │  │  │
+        // └──┴──┴──┘
+        let chunk_count_for_at_most_1 = 3 * 3 * 3;
+        assert_count(0.01, chunk_count_for_at_most_1);
+        assert_count(0.99, chunk_count_for_at_most_1);
+        assert_count(1.00, chunk_count_for_at_most_1);
+
+        // At distances in chunks over 1, we need the neighbors that touch the 6 faces, too.
+        // However, no edge/corner chunks appear until the distance is at least sqrt(2).
+        // Central 2D slice:
+        //    ┌──┬──┬──┐
+        //    │  │  │  │
+        // ┌──┼──┼──┼──┼──┐
+        // │  │  │  │  │  │
+        // ├──┼──╆━━╅──┼──┤
+        // │  │  ┃  ┃  │  │
+        // ├──┼──╄━━╃──┼──┤
+        // │  │  │  │  │  │
+        // └──┼──┼──┼──┼──┘
+        //    │  │  │  │
+        //    └──┴──┴──┘
+        let chunk_count_for_over_1 = chunk_count_for_at_most_1 + 3 * 3 * 6;
+        assert_count(1.01, chunk_count_for_over_1);
     }
 
     /// [`ChunkChart`]'s iterator should be consistent when reversed.
