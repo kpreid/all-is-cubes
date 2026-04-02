@@ -777,4 +777,30 @@ mod tests {
             );
         }
     }
+
+    /// Tests that a small chunk chart is a prefix of a large chunk chart.
+    /// This isn’t one of the properties a chunk chart needs to have for it to work as intended,
+    /// but it’s a useful property for some of the things we want to do, such as shrinking by
+    /// slicing instead of recomputing.
+    #[test]
+    #[ignore = "expensive and more of a test of the theory than the practice"]
+    fn chunk_charts_are_prefixes() {
+        let mut old_chart = ChunkChart::<16>::new(0.0);
+        for size in 0..200 {
+            let new_chart = ChunkChart::<16>::new(f64::from(size));
+
+            let old_chunks: Vec<_> =
+                old_chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect();
+            let limited_new_chunks: Vec<_> = new_chart
+                .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
+                .take(old_chunks.len())
+                .collect();
+
+            assert_eq!(old_chunks, limited_new_chunks);
+
+            old_chart = new_chart;
+        }
+
+        dbg!(old_chart.count_all());
+    }
 }
