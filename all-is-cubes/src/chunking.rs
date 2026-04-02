@@ -4,6 +4,7 @@ use all_is_cubes_base::math::{GridSize, Octant};
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::cmp::Ordering;
 use core::fmt;
 use core::iter::FusedIterator;
 use core::ops::RangeTo;
@@ -198,7 +199,6 @@ pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
     ///
     /// This vector may contain more than the desired chunks; this is done so that a small
     /// chart can reuse the work to construct a large one.
-    /// TODO: That is not actually implemented.
     octant_chunks: Arc<[Ccv]>,
 
     /// Range of elements of `octant_chunks` to actually use.
@@ -232,11 +232,36 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
 
     /// Recalculate the chart if the provided distance is different.
     pub fn resize_if_needed(&mut self, view_distance: FreeCoordinate) {
-        if Self::sanitize_and_square_distance(view_distance) != self.view_distance_in_squared_chunks
-        {
-            // TODO: If shrinking the chart, just shrink octant_range instead of
-            // recomputing
-            *self = Self::new(view_distance);
+        let new_dsc = Self::sanitize_and_square_distance(view_distance);
+        let old_dsc = self.view_distance_in_squared_chunks;
+        match new_dsc.cmp(&old_dsc) {
+            Ordering::Less => {
+                // For shrinking, we can simply find the cutoff point within the existing data.
+                // Note: The distance metric here must be identical to that used by
+                // compute_chart_octant when sorting.
+                // However, it doesn’t need to tie-break equal distances for determinism, since it
+                // is not sorting.
+                let end = self.octant_chunks.partition_point(|&v| {
+                    chunk_distance_squared_for_view(v).nearest_approach_squared < new_dsc
+                });
+
+                // Update state to use the reduced range. Careful to consider all fields.
+                {
+                    let Self {
+                        octant_chunks: _, // unchanged
+                        view_distance_in_squared_chunks,
+                        octant_range,
+                    } = self;
+                    *octant_range = ..end;
+                    *view_distance_in_squared_chunks = new_dsc;
+                }
+            }
+            Ordering::Equal => {}
+            Ordering::Greater => {
+                // We might already have the larger chart data we need, so we don't strictly need
+                // to recompute *per se*. However, the chunk chart cache will take care of that.
+                *self = Self::new(view_distance);
+            }
         }
     }
 
@@ -785,9 +810,13 @@ mod tests {
     #[test]
     #[cfg(not(miri))] // slow
     fn chunk_chart_resize() {
-        let chart1 = ChunkChart::<16>::new(200.0);
-        let mut chart2 = ChunkChart::new(300.0);
-        chart2.resize_if_needed(200.0);
+        // Test a large chart shrunk, against a small chart enlarged.
+        // They should give the same answer.
+        let mut chart1 = ChunkChart::<16>::new(15.0);
+        chart1.resize_if_needed(20.0);
+        let mut chart2 = ChunkChart::new(33.0);
+        chart2.resize_if_needed(20.0);
+
         assert_eq!(
             chart1.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>(),
             chart2.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>()
@@ -796,7 +825,7 @@ mod tests {
 
     /// As `chunk_chart_resize` but randomized for more coverage.
     #[test]
-    #[ignore = "TODO: enable this when we have cleverer resizing that might be wrong"]
+    #[cfg(not(miri))] // slow
     fn chunk_chart_resize_rand() {
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for _ in 0..50 {
