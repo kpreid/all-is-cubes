@@ -41,9 +41,6 @@ enum WholeChunk {}
 #[derive(Debug)]
 pub enum ChunkRelative {}
 
-/// Relative chunk position (coordinates in units of whole chunks)
-type Ccv = Vector3D<i32, WholeChunk>;
-
 /// Type to distinguish chunk coordinates from cube coordinates.
 ///
 /// Chunk math is generally just like cube math (hence the type of the field), but we
@@ -90,7 +87,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     /// Returns the distance between the two given chunks. See the [`Distance`] for an
     /// explanation of what that means.
     pub fn distance(self, other: Self) -> Distance {
-        chunk_distance_squared_for_view((self.0 - other.0).cast_unit())
+        chunk_distance_squared_for_view(Ccv((self.0 - other.0).cast_unit()))
     }
 
     /// Returns the squared distance along the shortest line from `origin_chunk`'s bounds
@@ -321,7 +318,19 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Functions related to the implementation of `ChunkChart`.
+// Items related to the implementation of `ChunkChart`.
+
+/// Relative chunk position (coordinates in units of whole chunks), without tracking chunk size.
+///
+/// This is a newtype rather than an alias so that it can have a single-line `Debug` impl
+/// for debugging.
+#[derive(Clone, Copy, Eq, PartialEq, derive_more::Deref)]
+struct Ccv(Vector3D<i32, WholeChunk>);
+impl fmt::Debug for Ccv {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Ccv({}, {}, {})", self.0.x, self.0.y, self.0.z)
+    }
+}
 
 /// Compute, or fetch from global cache, a new value for [`ChunkChart::octant_chunks`].
 fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -> Arc<[Ccv]> {
@@ -394,7 +403,7 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -> Arc<[
     let mut octant_chunks: Vec<Ccv> = Vec::with_capacity(candidates.volume());
     // (This for loop has been measured as slightly faster than a .filter().collect().)
     for chunk_cube in candidates.iter_cubes() {
-        let chunk = chunk_cube.lower_bounds().to_vector().cast_unit();
+        let chunk = Ccv(chunk_cube.lower_bounds().to_vector().cast_unit());
         if chunk_distance_squared_for_view(chunk).nearest_approach_squared
             <= view_distance_in_squared_chunks
         {
@@ -409,7 +418,7 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -> Arc<[
 /// Builds on [`chunk_distance_squared_for_view`] by breaking ties so the result is
 /// a stable ordering. This is the ordering that `ChunkChart::octant_chunks` contains.
 fn depth_sort_key(&chunk: &Ccv) -> (Distance, [i32; 3]) {
-    (chunk_distance_squared_for_view(chunk), chunk.into())
+    (chunk_distance_squared_for_view(chunk), chunk.0.into())
 }
 
 fn chunk_distance_squared_for_view(chunk: Ccv) -> Distance {
@@ -457,7 +466,8 @@ impl AxisMirrorIter {
 
     fn generate_and_clear(&mut self, octant: Octant) -> Ccv {
         self.todo.clear(octant);
-        octant.reflect(self.v)
+        let Ccv(v) = self.v;
+        Ccv(octant.reflect(v))
     }
 }
 impl Iterator for AxisMirrorIter {
