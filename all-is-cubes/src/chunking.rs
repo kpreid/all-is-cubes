@@ -8,8 +8,7 @@ use core::fmt;
 use core::iter::FusedIterator;
 use core::ops::RangeTo;
 
-#[cfg(feature = "std")]
-use std::sync::Mutex;
+use bevy_platform::sync::Mutex;
 
 use euclid::{Point3D, Vector3D};
 
@@ -326,7 +325,16 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
 
 /// Compute, or fetch from global cache, a new value for [`ChunkChart::octant_chunks`].
 fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -> Arc<[Ccv]> {
-    #[cfg(feature = "std")]
+    // Performance note: We're using `bevy_platform::sync::Mutex`, which sometimes falls back to
+    // being a spinlock. Holding the lock while doing the `compute_chart_octant()` is *still* an
+    // improvement over not doing that, because 1 thread computing a chart while the other spins
+    // is almost certainly an efficiency improvement over having 2 threads both computing the chart.
+    //
+    // We could reduce the amount of blocking by using a `OnceLock` per cache entry.
+    // However, this would be inferior to the planned option, which is to implement slicing of
+    // large charts into small ones, thus needing only caching of the single largest chart we have
+    // ever computed.
+
     let mut cache = match CHUNK_CHART_CACHE.lock() {
         Ok(cache) => cache,
         Err(p) => {
@@ -336,10 +344,6 @@ fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -
             cache
         }
     };
-
-    // If not on std, don't use a global cache. TODO: improve on  this
-    #[cfg(not(feature = "std"))]
-    let mut cache = BTreeMap::new();
 
     let len = cache.len();
 
@@ -366,7 +370,6 @@ fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -
 
 #[doc(hidden)] // used for benchmarks
 pub fn reset_chunk_chart_cache() {
-    #[cfg(feature = "std")]
     match CHUNK_CHART_CACHE.lock() {
         Ok(mut cache) => cache.clear(),
         Err(_) => {
@@ -431,7 +434,6 @@ fn chunk_distance_squared_for_view(chunk: Ccv) -> Distance {
 /// A cache for [`get_or_compute_chart_octant()`].
 ///
 /// Keys are `view_distance_in_squared_chunks` and values are `octant_chunks`.
-#[cfg(feature = "std")]
 static CHUNK_CHART_CACHE: Mutex<BTreeMap<GridSizeCoord, Arc<[Ccv]>>> = Mutex::new(BTreeMap::new());
 
 // -------------------------------------------------------------------------------------------------
