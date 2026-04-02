@@ -1,7 +1,6 @@
 //! Algorithms for grouping cubes into cubical batches (chunks).
 
 use all_is_cubes_base::math::{GridSize, Octant};
-use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
@@ -211,11 +210,29 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     /// This function may reuse the calculations from previous calls.
     pub fn new(view_distance: FreeCoordinate) -> Self {
         let view_distance_in_squared_chunks = Self::sanitize_and_square_distance(view_distance);
-        let octant_chunks = get_or_compute_chart_octant(view_distance_in_squared_chunks);
-        Self {
-            view_distance_in_squared_chunks,
-            octant_range: ..octant_chunks.len(),
-            octant_chunks,
+
+        let mut cache = match CHUNK_CHART_CACHE.lock() {
+            Ok(cache) => cache,
+            // poisoning can't mean anything because the cache always has either a good value or None
+            Err(p) => p.into_inner(),
+        };
+
+        if let Some(cached) = Option::as_ref(&*cache).filter(|cached: &&ChunkChart<1>| {
+            cached.view_distance_in_squared_chunks >= view_distance_in_squared_chunks
+        }) {
+            let mut new_chart = cached.clone().cast_chunk_size::<CHUNK_SIZE>();
+            new_chart.resize_if_needed(view_distance);
+            new_chart
+        } else {
+            // Cached chart is not large enough
+            let octant_chunks = compute_chart_octant(view_distance_in_squared_chunks);
+            let new_chart = Self {
+                view_distance_in_squared_chunks,
+                octant_range: ..octant_chunks.len(),
+                octant_chunks,
+            };
+            *cache = Some(new_chart.clone().cast_chunk_size::<1>());
+            new_chart
         }
     }
 
@@ -259,7 +276,10 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
             Ordering::Equal => {}
             Ordering::Greater => {
                 // We might already have the larger chart data we need, so we don't strictly need
-                // to recompute *per se*. However, the chunk chart cache will take care of that.
+                // to recompute *per se* and we could just search `self.octant_chunks`.
+                // However, going to the chunk chart cache is a better tool, because it will
+                // consolidate with whatever the biggest chart we have made is, resulting in
+                // fewer total charts in memory.
                 *self = Self::new(view_distance);
             }
         }
@@ -341,6 +361,16 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
         // TODO: this is an overcount because it doesn't allow for axis-plane chunks that aren't mirrored
         self.octant_range.end * 8
     }
+
+    /// Change the chunk size this chart is statically associated with.
+    /// The view distance is correspondingly scaled up.
+    fn cast_chunk_size<const NEW_SIZE: GridCoordinate>(self) -> ChunkChart<NEW_SIZE> {
+        ChunkChart {
+            view_distance_in_squared_chunks: self.view_distance_in_squared_chunks,
+            octant_range: self.octant_range,
+            octant_chunks: self.octant_chunks,
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -358,55 +388,10 @@ impl fmt::Debug for Ccv {
     }
 }
 
-/// Compute, or fetch from global cache, a new value for [`ChunkChart::octant_chunks`].
-fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -> Arc<[Ccv]> {
-    // Performance note: We're using `bevy_platform::sync::Mutex`, which sometimes falls back to
-    // being a spinlock. Holding the lock while doing the `compute_chart_octant()` is *still* an
-    // improvement over not doing that, because 1 thread computing a chart while the other spins
-    // is almost certainly an efficiency improvement over having 2 threads both computing the chart.
-    //
-    // We could reduce the amount of blocking by using a `OnceLock` per cache entry.
-    // However, this would be inferior to the planned option, which is to implement slicing of
-    // large charts into small ones, thus needing only caching of the single largest chart we have
-    // ever computed.
-
-    let mut cache = match CHUNK_CHART_CACHE.lock() {
-        Ok(cache) => cache,
-        Err(p) => {
-            // If poisoned, clear the cache.
-            let mut cache = p.into_inner();
-            *cache = BTreeMap::new();
-            cache
-        }
-    };
-
-    let len = cache.len();
-
-    use alloc::collections::btree_map::Entry;
-    match cache.entry(view_distance_in_squared_chunks) {
-        Entry::Occupied(e) => {
-            // eprintln!("cache hit {view_distance_in_squared_chunks}");
-            Arc::clone(e.get())
-        }
-        Entry::Vacant(e) => {
-            // eprintln!("cache miss {view_distance_in_squared_chunks} ({len} in cache)");
-            let value = compute_chart_octant(view_distance_in_squared_chunks);
-
-            // We don't expect this to happen, but don't let the cache grow too big.
-            // TODO: LRU policy instead
-            if len < 20 {
-                e.insert(Arc::clone(&value));
-            }
-
-            value
-        }
-    }
-}
-
 #[doc(hidden)] // used for benchmarks
 pub fn reset_chunk_chart_cache() {
     match CHUNK_CHART_CACHE.lock() {
-        Ok(mut cache) => cache.clear(),
+        Ok(mut cache) => *cache = None,
         Err(_) => {
             // No action needed; will be cleared on next use
         }
@@ -414,7 +399,6 @@ pub fn reset_chunk_chart_cache() {
 }
 
 /// Compute a new value for [`ChunkChart::octant_chunks`].
-/// This is normally cached through [`get_or_compute_chart_octant()`].
 fn compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -> Arc<[Ccv]> {
     // We're going to compute in the zero-or-positive octant, which means that the chunk origin
     // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
@@ -471,9 +455,8 @@ fn chunk_distance_squared_for_view(chunk: Ccv) -> Distance {
 }
 
 /// A cache for [`get_or_compute_chart_octant()`].
-///
-/// Keys are `view_distance_in_squared_chunks` and values are `octant_chunks`.
-static CHUNK_CHART_CACHE: Mutex<BTreeMap<GridSizeCoord, Arc<[Ccv]>>> = Mutex::new(BTreeMap::new());
+/// Stores the largest chunk chart computed so far.
+static CHUNK_CHART_CACHE: Mutex<Option<ChunkChart<1>>> = Mutex::new(None);
 
 // -------------------------------------------------------------------------------------------------
 
