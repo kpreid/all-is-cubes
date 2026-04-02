@@ -20,6 +20,7 @@ pub(crate) struct XtaskArgs {
 
     /// Pass the `--quiet` flag to all `cargo` build/test invocations.
     /// This hides build progress and also switches the test harness to a more concise output.
+    /// `xtask` will also not print timings or version control status in most cases.
     #[arg(long, global = true)]
     pub quiet: bool,
 }
