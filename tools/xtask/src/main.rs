@@ -96,7 +96,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             }
         }
         XtaskCommand::Test { no_run } => {
-            print_revision(config);
+            print_revision(config, false);
             do_for_all_packages(
                 config,
                 if no_run {
@@ -108,7 +108,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             )?;
         }
         XtaskCommand::TestMore { no_run } => {
-            print_revision(config);
+            print_revision(config, false);
             exhaustive_test(
                 config,
                 if no_run {
@@ -119,7 +119,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             )?;
         }
         XtaskCommand::Lint => {
-            print_revision(config);
+            print_revision(config, false);
             do_for_all_packages(config, TestOrCheck::Lint, Features::Default)?;
 
             // Build docs to verify that there are no broken doc links.
@@ -130,7 +130,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             }
         }
         XtaskCommand::CheckFeatures => {
-            print_revision(config);
+            print_revision(config, false);
             do_for_all_packages(
                 config,
                 // no Clippy for better throughput; pragmatically we care about "does it build"
@@ -197,7 +197,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
         }
         XtaskCommand::Miri { nextest_args } => {
             assert!(config.scope.includes_main_workspace());
-            print_revision(config);
+            print_revision(config, false);
 
             for features in [
                 // Test our std-using configuration.
@@ -224,7 +224,8 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             }
         }
         XtaskCommand::BinSize => {
-            print_revision(config);
+            // force print revision because we want --quiet to still be informative
+            print_revision(config, true);
             measure_binary_sizes(config)?;
         }
         XtaskCommand::RunGameServer { server_args } => {
@@ -251,7 +252,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             }
         }
         XtaskCommand::BuildWebRelease => {
-            print_revision(config);
+            print_revision(config, false);
 
             // We only generate the license file in release builds, to save time.
             generate_wasm_licenses_file(config)?;
@@ -294,7 +295,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             }
         }
         XtaskCommand::CheckDeps => {
-            print_revision(config);
+            print_revision(config, false);
             // Note when changing this command set: .github/workflows/ci.yml performs the same
             // operations but broken out into separate jobs.
             config.do_for_all_workspaces(|ws| {
@@ -380,7 +381,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
         }
         XtaskCommand::PublishAll { for_real } => {
             assert_eq!(config.scope, Scope::All);
-            print_revision(config);
+            print_revision(config, true);
 
             exhaustive_test(config, TestOrCheck::Test)?;
 
@@ -861,8 +862,8 @@ static PROJECT_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
 });
 
 /// Print the Git state, as a reminder of what the command was run on, to stderr.
-fn print_revision(config: &Config<'_>) {
-    if config.cargo_quiet {
+fn print_revision(config: &Config<'_>, force: bool) {
+    if config.cargo_quiet && !force {
         // TODO: use separate flag for this than cargo_quiet? or unify them all?
         return;
     }
