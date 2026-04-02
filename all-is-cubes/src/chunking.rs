@@ -763,17 +763,20 @@ mod tests {
             // Check the internal data, because if that's wrong then it's easier to debug
             assert_eq!(
                 &enlarged.octant_chunks[enlarged.octant_range],
-                &exact.octant_chunks[exact.octant_range]
+                &exact.octant_chunks[exact.octant_range],
+                "enlarged.octant_chunks[_] == exact.octant_chunks[_]",
             );
             assert_eq!(
                 &shrunk.octant_chunks[shrunk.octant_range],
-                &exact.octant_chunks[exact.octant_range]
+                &exact.octant_chunks[exact.octant_range],
+                "shrunk.octant_chunks[_] == exact.octant_chunks[_]",
             );
 
             // Check the public interface
             assert_eq!(
                 enlarged.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>(),
-                shrunk.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>()
+                shrunk.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>(),
+                "enlarged.chunks() == shrunk.chunks()",
             );
         }
     }
