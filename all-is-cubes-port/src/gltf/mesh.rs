@@ -36,7 +36,7 @@ where
         return None;
     }
 
-    let needs_texture = mesh.vertices().0.iter().any(GltfVertex::needs_texture_coordinates);
+    let needs_texture = mesh.vertices().0.iter().any(GltfVertex::needs_uv_mapping);
     let index_type = match mesh.indices() {
         IndexSlice::U16(_) => gltf_json::accessor::ComponentType::U16,
         IndexSlice::U32(_) => gltf_json::accessor::ComponentType::U32,
@@ -97,7 +97,7 @@ where
                 vertex_buffer_view,
                 offset_of!(GltfVertex, base_color),
                 mesh.vertices().0.iter().map(|v| {
-                    if v.needs_texture_coordinates() {
+                    if v.needs_uv_mapping() {
                         // All textured vertices have a vertex color of 1,1,1,1
                         [1.0; 4]
                     } else {

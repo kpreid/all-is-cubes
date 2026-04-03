@@ -44,8 +44,13 @@ pub struct GltfVertex {
 }
 
 impl GltfVertex {
-    /// Returns whether this vertex needs updating to contain texture coordinates.
-    pub(crate) fn needs_texture_coordinates(&self) -> bool {
+    /// * `true`: this vertex contains a plane ID and needs updating to contain texture atlas
+    ///   coordinates.
+    /// * `false`: either
+    ///     * this vertex has already been updated, or
+    ///     * this vertex contains a vertex color, and its texture coordinates should be updated
+    ///       to point to a white texel.
+    pub(crate) fn needs_uv_mapping(&self) -> bool {
         let [_r, _g, _b, a] = self.base_color;
         a == UNPROCESSED_TEXTURE_COORDINATES_MARKER
     }
@@ -53,21 +58,28 @@ impl GltfVertex {
     /// If this is a textured vertex with placeholder coordinates, as constructed by
     /// [`Self::from_block_vertex()`], then update it to have real texture coordinates as
     /// mapped by `uv_map`.
+    ///
+    /// If it is not a textured vertex, set the texture coordinates to the special white texel.
+    ///
+    /// This function is **not idempotent**; calling it on an already-updated vertex will overwrite
+    /// the texture coordinates it should have.
     pub(crate) fn update_texture_coordinates(&mut self, uv_map: &UvMap) {
-        if !self.needs_texture_coordinates() {
-            return;
+        if self.needs_uv_mapping() {
+            // Recover the plane_id encoded in the color field.
+            let [r, g, _b, _a] = self.base_color;
+            let lo = u64::from(f32::from(r).to_bits());
+            let hi = u64::from(f32::from(g).to_bits());
+            let plane_id = crate::gltf::texture::PlaneId(lo | (hi << 32));
+
+            let uv =
+                uv_map.plane_to_atlas(plane_id, Point2D::from(self.base_color_tc).map(f32::from));
+
+            self.base_color_tc = [Lef32::new(uv.x), Lef32::new(uv.y)]; // real texture coords
+            self.base_color = const { [Lef32::new(1.0); 4] }; // white
+        } else {
+            // Leave the vertex alone, but set the texture coordinates to point to the white texel.
+            self.base_color_tc = uv_map.white();
         }
-
-        // Recover the plane_id encoded in the color field.
-        let [r, g, _b, _a] = self.base_color;
-        let lo = u64::from(f32::from(r).to_bits());
-        let hi = u64::from(f32::from(g).to_bits());
-        let plane_id = crate::gltf::texture::PlaneId(lo | (hi << 32));
-
-        let uv = uv_map.plane_to_atlas(plane_id, Point2D::from(self.base_color_tc).map(f32::from));
-
-        self.base_color_tc = [Lef32::new(uv.x), Lef32::new(uv.y)]; // real texture coords
-        self.base_color = const { [Lef32::new(1.0); 4] }; // white
     }
 }
 
@@ -100,7 +112,8 @@ impl Vertex for GltfVertex {
                     Self {
                         position,
                         base_color: <[f32; 4]>::from(color.clamp()).map(Lef32::from),
-                        // TODO: We need to ensure that the texture, if present, has white allocated here — or add a rule to update these like we update other texture coordinates.
+                        // This will be overwritten by [`Self::update_texture_coordinates`]
+                        // to point to a white texel.
                         base_color_tc: [Lef32::ZERO; 2],
                     },
                     (),
@@ -153,24 +166,35 @@ mod tests {
 
     #[test]
     fn not_textured() {
-        let (mut vertex, ()) = GltfVertex::from_block_vertex(BlockVertex {
+        let (vertex, ()) = GltfVertex::from_block_vertex(BlockVertex {
             position: point3(1.0, 2.0, 3.0),
             face: Face::PX,
             coloring: Coloring::Solid(Rgba::new(0.0, 1.0, 0.0, 1.0)),
         });
 
-        assert_eq!(vertex.needs_texture_coordinates(), false);
+        assert_eq!(vertex.needs_uv_mapping(), false);
 
-        let backup = vertex;
-        vertex.update_texture_coordinates(&UvMap::new_for_testing(PlaneId(0), point2(0, 0)));
-        assert_eq!(vertex, backup, "should not be changed by update");
+        let mut updated = vertex;
+        updated.update_texture_coordinates(&UvMap::new_for_testing(
+            PlaneId(0),
+            point2(0, 0),
+            point2(123.0, 456.0),
+        ));
+        assert_eq!(
+            updated,
+            GltfVertex {
+                base_color_tc: [Lef32::new(123.0), Lef32::new(456.0)],
+                ..vertex
+            },
+            "texture coordinates should become white"
+        );
     }
 
     #[test]
     fn textured() {
         let plane_id = PlaneId(0x123456789abcdef0);
-        let uv_map = UvMap::new_for_testing(plane_id, point2(400, 500));
-        let (mut vertex, ()) = GltfVertex::from_block_vertex(BlockVertex {
+        let uv_map = UvMap::new_for_testing(plane_id, point2(400, 500), point2(-999.0, -999.0));
+        let (vertex, ()) = GltfVertex::from_block_vertex(BlockVertex {
             position: point3(1.0, 2.0, 3.0),
             face: Face::PX,
             coloring: Coloring::Texture {
@@ -182,18 +206,19 @@ mod tests {
             },
         });
 
-        assert_eq!(vertex.needs_texture_coordinates(), true);
+        assert_eq!(vertex.needs_uv_mapping(), true);
 
-        vertex.update_texture_coordinates(&uv_map);
+        let mut updated = vertex;
+        updated.update_texture_coordinates(&uv_map);
 
-        assert_eq!(vertex.needs_texture_coordinates(), false);
-        assert_eq!(vertex.base_color_tc, [Lef32::new(410.0), Lef32::new(520.0)]);
-
-        let backup = vertex;
-        vertex.update_texture_coordinates(&uv_map);
+        assert_eq!(updated.needs_uv_mapping(), false);
         assert_eq!(
-            vertex, backup,
-            "should not be changed by calling update again"
+            updated,
+            GltfVertex {
+                base_color: [Lef32::new(1.0); 4], // white vertex color
+                base_color_tc: [Lef32::new(410.0), Lef32::new(520.0)],
+                ..vertex
+            }
         );
     }
 }
