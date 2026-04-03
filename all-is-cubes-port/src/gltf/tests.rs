@@ -74,6 +74,8 @@ fn gltf_smoke_test() {
     });
 }
 
+/// Runs a snapshot test case: export glTF to a file and assert the file contents are identical
+/// to an expected file.
 async fn export_snapshot_test(
     test_name: &'static str,
     read_ticket: ReadTicket<'_>,
@@ -126,6 +128,9 @@ async fn export_block_defs() {
 
 #[macro_rules_attribute::apply(smol_macros::test)]
 async fn export_space() {
+    // TODO: Add make_some_voxel_blocks() so that this test exercises both
+    // textured and untextured blocks occurring in the same chunk mesh.
+
     let [block] = make_some_blocks();
     let mut universe = Universe::new();
     universe

@@ -11,7 +11,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::time::Duration;
-use std::{fmt, fs, io};
+use std::{fmt, fs, io, mem};
 
 use futures_core::future::BoxFuture;
 pub use gltf_json as json;
@@ -96,6 +96,17 @@ pub struct GltfWriter {
     /// Texture allocator configured to write to `buffer_dest` too.
     texture_allocator: GltfTextureAllocator,
 
+    /// When we create meshes that require textures (rather than vertex colors),
+    /// we can’t know what texture coordinates their vertices should have,
+    /// until we know the sizes of all tiles in the atlas.
+    ///
+    /// Such mesh data lives here, with special coordinates that identify the wanted tile,
+    /// until the atlas is built. Their glTF buffers and accessors are present in `root` but have
+    /// placeholder data.
+    ///
+    /// If a mesh uses vertex colors, it is not inserted here.
+    meshes_awaiting_texture_coordinates: Vec<mesh::MeshAwaitingTextureCoordinates>,
+
     /// Materials declared in `root` that will be used by the meshes.
     materials: Materials,
 
@@ -138,6 +149,7 @@ impl GltfWriter {
 
             root,
             buffer_dest,
+            meshes_awaiting_texture_coordinates: Vec::new(),
             camera: None,
             frame_states: Vec::new(),
             any_time_visible_mesh_instances: BTreeSet::new(),
@@ -212,7 +224,7 @@ impl GltfWriter {
     /// Returns an error if writing any of the buffer or image data fails.
     pub fn into_root(mut self, frame_pace: Duration) -> io::Result<gltf_json::Root> {
         if !self.texture_allocator.is_empty() {
-            let (block_texture_index, _mapping) =
+            let (block_texture_index, uv_map) =
                 texture::insert_block_texture_atlas(&mut self.root, &self.texture_allocator)?;
 
             for material in self.root.materials.iter_mut() {
@@ -225,7 +237,9 @@ impl GltfWriter {
                     });
             }
 
-            todo!("must rewrite meshes' texture coordinates");
+            for mesh in mem::take(&mut self.meshes_awaiting_texture_coordinates) {
+                mesh.finish(&uv_map, &mut self.root, &self.buffer_dest)?;
+            }
         }
 
         let mut scene_nodes: Vec<Index<gltf_json::Node>> = Vec::new();

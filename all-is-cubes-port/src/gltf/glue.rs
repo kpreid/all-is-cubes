@@ -39,7 +39,11 @@ pub(crate) struct Lef32([u8; 4]);
 
 impl Lef32 {
     /// All bits zero is also the value 'positive zero'.
-    pub const ZERO: Self = Lef32([0, 0, 0, 0]);
+    pub const ZERO: Self = Self::new(0.0);
+
+    pub const fn new(value: f32) -> Self {
+        Self(f32::to_le_bytes(value))
+    }
 
     pub(crate) fn from_vec3<U>(vector: euclid::Vector3D<f32, U>) -> [Self; 3] {
         Into::<[f32; 3]>::into(vector).map(Lef32::from)
@@ -62,7 +66,7 @@ impl PartialEq for Lef32 {
 impl From<f32> for Lef32 {
     #[inline]
     fn from(input: f32) -> Self {
-        Self(f32::to_le_bytes(input))
+        Self::new(input)
     }
 }
 

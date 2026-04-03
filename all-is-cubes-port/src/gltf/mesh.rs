@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::io;
 use std::mem::{offset_of, size_of};
 
 use gltf_json::Index;
@@ -12,7 +13,12 @@ use all_is_cubes_mesh::{IndexSlice, MeshTypes, SpaceMesh};
 use crate::gltf::glue::create_accessor;
 use crate::gltf::{GltfTextureAllocator, GltfVertex, GltfWriter};
 
+// -------------------------------------------------------------------------------------------------
+
 /// Create [`gltf_json::Mesh`] and all its parts (accessors, buffers) from a [`SpaceMesh`].
+///
+/// If the mesh requires textures, it will contain partially placeholder data until the
+/// texture atlas is finalized.
 ///
 /// If the input is empty, does nothing and returns `None`.
 pub(crate) fn add_mesh<M>(
@@ -30,42 +36,30 @@ where
         return None;
     }
 
-    let vertex_bytes = bytemuck::must_cast_slice::<GltfVertex, u8>(mesh.vertices().0);
+    let needs_texture = mesh.vertices().0.iter().any(GltfVertex::needs_texture_coordinates);
     let index_type = match mesh.indices() {
         IndexSlice::U16(_) => gltf_json::accessor::ComponentType::U16,
         IndexSlice::U32(_) => gltf_json::accessor::ComponentType::U32,
     };
+    let vertices_byte_len = bytemuck::cast_slice::<GltfVertex, u8>(mesh.vertices().0).len();
+    let indices_byte_len = mesh.indices().as_bytes().len();
+    let buffer_object_name = format!("{name} data");
+    let buffer_file_suffix = format!("mesh-{i}", i = writer.root.buffers.len());
 
-    // TODO: use the given name (sanitized) in the file name
-    let buffer_entity = writer
-        .buffer_dest
-        .write(
-            format!("{name} data"),
-            &format!("mesh-{i}", i = writer.root.buffers.len()),
-            "glbin",
-            |w| {
-                w.write_all(vertex_bytes)?;
-                // Convert index bytes to little-endian
-                match mesh.indices() {
-                    IndexSlice::U16(slice) => {
-                        for index in slice {
-                            w.write_all(&index.to_le_bytes())?;
-                        }
-                    }
-                    IndexSlice::U32(slice) => {
-                        for index in slice {
-                            w.write_all(&index.to_le_bytes())?;
-                        }
-                    }
-                }
-                Ok(())
-            },
-        )
-        .expect("buffer write error");
-    let buffer_index = writer.root.push(buffer_entity);
+    // Push the vertex & index buffer early.
+    // If we are doing texture coordinates, we need to fill this in later with texture coordinates
+    // from the texture atlas, but have the object index now.
+    let buffer_index = writer.root.push(gltf_json::Buffer {
+        byte_length: USize64::from(vertices_byte_len.strict_add(indices_byte_len)),
+        name: Some(buffer_object_name.clone()),
+        uri: None, // to be filled in later
+        extensions: Default::default(),
+        extras: Default::default(),
+    });
+
     let vertex_buffer_view = writer.root.push(gltf_json::buffer::View {
         buffer: buffer_index,
-        byte_length: USize64::from(vertex_bytes.len()),
+        byte_length: USize64::from(vertices_byte_len),
         byte_offset: None,
         byte_stride: Some(Stride(size_of::<GltfVertex>())),
         name: Some(format!("{name} vertex")),
@@ -75,9 +69,9 @@ where
     });
     let index_buffer_view = writer.root.push(gltf_json::buffer::View {
         buffer: buffer_index,
-        byte_length: USize64::from(mesh.indices().as_bytes().len()),
+        byte_length: USize64::from(indices_byte_len),
         // Indexes are packed into the same buffer, so they start at the end of the vertex bytes
-        byte_offset: Some(USize64::from(vertex_bytes.len())),
+        byte_offset: Some(USize64::from(vertices_byte_len)),
         byte_stride: None,
         name: Some(format!("{name} index")),
         // ElementArrayBuffer means index buffer
@@ -86,7 +80,7 @@ where
         extras: Default::default(),
     });
 
-    let vertex_colored_attributes = BTreeMap::from([
+    let mut attributes = BTreeMap::from([
         (
             Valid(gltf_json::mesh::Semantic::Positions),
             writer.root.push(create_accessor(
@@ -102,19 +96,72 @@ where
                 format!("{name} base color"),
                 vertex_buffer_view,
                 offset_of!(GltfVertex, base_color),
-                mesh.vertices().0.iter().map(|v| v.base_color.map(f32::from)),
-            )),
-        ),
-        (
-            Valid(gltf_json::mesh::Semantic::TexCoords(0)),
-            writer.root.push(create_accessor(
-                format!("{name} base color texcoords"),
-                vertex_buffer_view,
-                offset_of!(GltfVertex, base_color_tc),
-                mesh.vertices().0.iter().map(|v| v.base_color_tc.map(f32::from)),
+                mesh.vertices().0.iter().map(|v| {
+                    if v.needs_texture_coordinates() {
+                        // All textured vertices have a vertex color of 1,1,1,1
+                        [1.0; 4]
+                    } else {
+                        v.base_color.map(f32::from)
+                    }
+                }),
             )),
         ),
     ]);
+
+    if needs_texture {
+        let texcoord_accessor_index = writer.root.push(create_accessor(
+            format!("{name} base color texcoords"),
+            vertex_buffer_view,
+            offset_of!(GltfVertex, base_color_tc),
+            mesh.vertices().0.iter().map(|v| v.base_color_tc.map(f32::from)),
+        ));
+        attributes.insert(
+            Valid(gltf_json::mesh::Semantic::TexCoords(0)),
+            texcoord_accessor_index,
+        );
+
+        let vertices: Vec<GltfVertex> = mesh.vertices().0.to_vec();
+        let index_bytes: Vec<u8> = match mesh.indices() {
+            IndexSlice::U16(slice) => slice.iter().copied().flat_map(u16::to_le_bytes).collect(),
+            IndexSlice::U32(slice) => slice.iter().copied().flat_map(u32::to_le_bytes).collect(),
+        };
+
+        // If it contains texture coordinates, we need to save it for later processing.
+        // The buffer data won't be actually written until then.
+        writer.meshes_awaiting_texture_coordinates.push(MeshAwaitingTextureCoordinates {
+            vertices,
+            index_bytes,
+            buffer_index,
+            buffer_object_name,
+            buffer_file_suffix,
+            texcoord_accessor_index,
+        });
+    } else {
+        // If the mesh contains only vertex colors, we can write the buffer immediately.
+
+        let vertex_bytes = bytemuck::must_cast_slice::<GltfVertex, u8>(mesh.vertices().0);
+        // TODO: use the given name (sanitized) in the file name
+        writer.root.buffers[buffer_index.value()] = writer
+            .buffer_dest
+            .write(buffer_object_name, &buffer_file_suffix, "glbin", |w| {
+                w.write_all(vertex_bytes)?;
+                // Convert index bytes to little-endian
+                match mesh.indices() {
+                    IndexSlice::U16(slice) => {
+                        for index in slice {
+                            w.write_all(&index.to_le_bytes())?;
+                        }
+                    }
+                    IndexSlice::U32(slice) => {
+                        for index in slice {
+                            w.write_all(&index.to_le_bytes())?;
+                        }
+                    }
+                }
+                Ok(())
+            })
+            .expect("buffer write error"); // TODO: error propagation
+    }
 
     writer.flaws |= mesh.flaws();
 
@@ -138,7 +185,7 @@ where
             .filter_map(|(index_range, material, name)| {
                 if !index_range.is_empty() {
                     Some(gltf_json::mesh::Primitive {
-                        attributes: vertex_colored_attributes.clone(),
+                        attributes: attributes.clone(),
                         indices: Some(Index::push(
                             &mut writer.root.accessors,
                             gltf_json::Accessor {
@@ -179,6 +226,79 @@ where
 
     Some(mesh_index)
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Vertex data for a glTF mesh that does not have texture coordinates filled in yet.
+///
+/// When we create meshes that require textures (rather than vertex colors),
+/// we can’t know what texture coordinates their vertices should have,
+/// until we know the sizes of all tiles in the atlas.
+#[derive(Debug)]
+pub(in crate::gltf) struct MeshAwaitingTextureCoordinates {
+    /// Vertex data containing coordinates to be patched up, then written to the glTF asset.
+    vertices: Vec<GltfVertex>,
+
+    /// Index data to be written to the glTF asset.
+    ///
+    /// We don’t need to patch this, but we do want to write it into the same buffer, so we need
+    /// to hold onto it until then.
+    index_bytes: Vec<u8>,
+
+    /// glTF buffer entry that needs its URI updated after writing.
+    buffer_index: Index<gltf_json::Buffer>,
+
+    // Name passed to [`GltfDataDestination::write`].
+    buffer_object_name: String,
+    buffer_file_suffix: String,
+
+    /// Accessor for the texture coordinates, whose `min` & `max` must be updated.
+    texcoord_accessor_index: Index<gltf_json::Accessor>,
+}
+
+impl MeshAwaitingTextureCoordinates {
+    /// * Transform the texture coordinates according to [`UvMap`],
+    /// * write the new texture coordinates into the vertex data,
+    /// * write the vertex and index data to `buffer_dest`, and
+    /// * patch the buffer object and texture coordinates accessor object in `root`.
+    pub fn finish(
+        mut self,
+        uv_map: &crate::gltf::texture::UvMap,
+        root: &mut gltf_json::Root,
+        buffer_dest: &crate::gltf::GltfDataDestination,
+    ) -> io::Result<()> {
+        // Rewrite texture coordinates according to `uv_map`.
+        for vertex in &mut self.vertices {
+            vertex.update_texture_coordinates(uv_map);
+        }
+
+        // Update the texcoord accessor's min/max to reflect the actual UV values.
+        let [min, max] = super::glue::accessor_minmax(
+            self.vertices.iter().map(|v| v.base_color_tc.map(f32::from)),
+        );
+        let accessor = &mut root.accessors[self.texcoord_accessor_index.value()];
+        accessor.min = min;
+        accessor.max = max;
+
+        // Write the buffer data (vertices followed by indices) and replace the placeholder
+        // buffer object
+        let buffer = buffer_dest.write(
+            self.buffer_object_name,
+            &self.buffer_file_suffix,
+            "glbin",
+            |w| {
+                w.write_all(bytemuck::must_cast_slice::<GltfVertex, u8>(&self.vertices))?;
+                w.write_all(&self.index_bytes)?;
+                Ok(())
+            },
+        )?;
+        root.buffers[self.buffer_index.value()] = buffer;
+
+        Ok(())
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Collection of materials used in the glTF.
 ///
@@ -245,6 +365,8 @@ impl Materials {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

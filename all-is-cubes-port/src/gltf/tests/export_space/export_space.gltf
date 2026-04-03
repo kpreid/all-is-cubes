@@ -39,22 +39,6 @@
       "name": "'x' base color"
     },
     {
-      "bufferView": 0,
-      "byteOffset": 28,
-      "count": 24,
-      "componentType": 5126,
-      "type": "VEC2",
-      "min": [
-        0.0,
-        0.0
-      ],
-      "max": [
-        0.0,
-        0.0
-      ],
-      "name": "'x' base color texcoords"
-    },
-    {
       "bufferView": 1,
       "byteOffset": 0,
       "count": 36,
@@ -148,10 +132,9 @@
         {
           "attributes": {
             "POSITION": 0,
-            "COLOR_0": 1,
-            "TEXCOORD_0": 2
+            "COLOR_0": 1
           },
-          "indices": 3,
+          "indices": 2,
           "material": 0
         }
       ]

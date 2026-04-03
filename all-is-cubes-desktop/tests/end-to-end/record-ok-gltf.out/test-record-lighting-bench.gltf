@@ -39,22 +39,6 @@
       "name": "chunk [0, -1, 0] base color"
     },
     {
-      "bufferView": 0,
-      "byteOffset": 28,
-      "count": 1680,
-      "componentType": 5126,
-      "type": "VEC2",
-      "min": [
-        0.0,
-        0.0
-      ],
-      "max": [
-        0.0,
-        0.0
-      ],
-      "name": "chunk [0, -1, 0] base color texcoords"
-    },
-    {
       "bufferView": 1,
       "byteOffset": 0,
       "count": 2520,
@@ -99,22 +83,6 @@
         1.0
       ],
       "name": "chunk [0, 0, 0] base color"
-    },
-    {
-      "bufferView": 2,
-      "byteOffset": 28,
-      "count": 1104,
-      "componentType": 5126,
-      "type": "VEC2",
-      "min": [
-        0.0,
-        0.0
-      ],
-      "max": [
-        0.0,
-        0.0
-      ],
-      "name": "chunk [0, 0, 0] base color texcoords"
     },
     {
       "bufferView": 3,
@@ -240,10 +208,9 @@
         {
           "attributes": {
             "POSITION": 0,
-            "COLOR_0": 1,
-            "TEXCOORD_0": 2
+            "COLOR_0": 1
           },
-          "indices": 3,
+          "indices": 2,
           "material": 0
         }
       ]
@@ -253,11 +220,10 @@
       "primitives": [
         {
           "attributes": {
-            "POSITION": 4,
-            "COLOR_0": 5,
-            "TEXCOORD_0": 6
+            "POSITION": 3,
+            "COLOR_0": 4
           },
-          "indices": 7,
+          "indices": 5,
           "material": 0
         }
       ]
