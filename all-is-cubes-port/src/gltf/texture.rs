@@ -392,9 +392,10 @@ mod internal {
                             - entry.source_bounds.lower_bounds())
                         .to_u32();
                         // Index into the `texels` array at that position.
-                        let index_in_texels = (position_in_texels.x
-                            + texels_size.width * position_in_texels.y)
-                            + texels_size.height * position_in_texels.z;
+                        let index_in_texels = position_in_texels.x
+                            + texels_size.width
+                                * (position_in_texels.y
+                                    + texels_size.height * position_in_texels.z);
 
                         let texel = texels[usize::try_from(index_in_texels).unwrap()];
                         atlas_image.put_pixel(
