@@ -701,9 +701,11 @@ fn shade_uniform_volumetric(in: BlockFragmentInput) -> vec4<f32> {
 fn raymarch_volumetric(in: BlockFragmentInput) -> vec4<f32> {
     let atlas_id = get_atlas_id(in);
     // TODO(volumetric): light should be obtained from the actual raymarch position, but that is
-    // slow and  we don't actually have light interpolated on the *depth* axis yet. Fix this by
-    // computing the local lighting environment in the vertex shader, then interpolating across
-    // that data.
+    // slow. Fix this by computing the local lighting environment in the vertex shader, then
+    // interpolating across that data.
+    //
+    // Or, as a cheap improvement, we could sample the lighting at the *first hit* rather than the
+    // cube surface. (Note that doing this must incorporate the surface normal to look good.)
     let static_lighting = lighting(in);
 
     let step_length = min(0.5 / in.resolution, 1.0 / 32.0);
