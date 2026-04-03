@@ -94,19 +94,14 @@ impl UvMap {
 pub struct GltfTextureAllocator {
     destination: GltfDataDestination,
     gatherer: Gatherer,
-    enable: bool,
 }
 
 impl GltfTextureAllocator {
     /// Public access is via [`GltfWriter::texture_allocator()`].
-    ///
-    /// `enable_wip` enables the still-incomplete partial work for testing.
-    /// If false, all allocations fail.
-    pub(crate) fn new(destination: GltfDataDestination, enable_wip: bool) -> Self {
+    pub(crate) fn new(destination: GltfDataDestination) -> Self {
         Self {
             destination,
             gatherer: Gatherer::default(),
-            enable: enable_wip,
         }
     }
 
@@ -136,21 +131,17 @@ impl texture::Allocator for GltfTextureAllocator {
     fn allocate(&self, bounds: GridAab, mut channels: texture::Channels) -> Option<GltfTile> {
         assert!(!bounds.is_empty());
 
-        if self.enable {
-            // TODO: implement more channels
-            if true {
-                channels = texture::Channels::Reflectance;
-            }
-
-            Some(GltfTile {
-                bounds,
-                channels,
-                texels: TexelsCell::default(),
-                gatherer: self.gatherer.clone(),
-            })
-        } else {
-            None
+        // TODO: implement more channels
+        if true {
+            channels = texture::Channels::Reflectance;
         }
+
+        Some(GltfTile {
+            bounds,
+            channels,
+            texels: TexelsCell::default(),
+            gatherer: self.gatherer.clone(),
+        })
     }
 }
 
@@ -572,7 +563,7 @@ mod tests {
         file_base_path.push("filetest.gltf");
 
         let allocator =
-            GltfTextureAllocator::new(GltfDataDestination::new(Some(file_base_path), 0), true);
+            GltfTextureAllocator::new(GltfDataDestination::new(Some(file_base_path), 0));
         let mut tile = allocator
             .allocate(GridAab::ORIGIN_CUBE, Channels::Reflectance)
             .expect("allocation");

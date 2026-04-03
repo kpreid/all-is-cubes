@@ -144,8 +144,7 @@ impl GltfWriter {
         Self {
             materials: Materials::new(&mut root.materials),
 
-            // TODO: Once texturing actually works, enable allocation here.
-            texture_allocator: GltfTextureAllocator::new(buffer_dest.clone(), false),
+            texture_allocator: GltfTextureAllocator::new(buffer_dest.clone()),
 
             root,
             buffer_dest,

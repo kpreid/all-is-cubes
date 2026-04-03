@@ -6,7 +6,7 @@
 //! |---------------------|--------------------|-------------|:-------:|:-------:|---------|
 //! | All is Cubes native | `.alliscubesjson`  | `"native"`  | **Yes** | **Yes** | Version compatibility not yet guaranteed. |
 //! | MagicaVoxel `.vox`  | `.vox`             | `"dot-vox"` | **Yes** | **Yes** | Scene import is buggy. Materials are not exported at all. |
-//! | [glTF 2.0]          | `.gltf`            | `"gltf"`    | No      | **Yes** | Textures are not yet implemented. Output is suitable for rendering but not necessarily editing due to combined meshes. |
+//! | [glTF 2.0]          | `.gltf`            | `"gltf"`    | No      | **Yes** | Has some bugs. Output is suitable for rendering but not necessarily editing due to combined meshes. |
 //! | [STL]               | `.stl`             | `"stl"`     | No      | **Yes** | Meshes are not necessarily “manifold”/“watertight”. |
 //!
 //! [glTF 2.0]: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
