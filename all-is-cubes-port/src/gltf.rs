@@ -93,17 +93,19 @@ pub struct GltfWriter {
     /// Where to write the buffers and textures.
     buffer_dest: GltfDataDestination,
 
-    /// Testure allocator configured to write to this destination.
+    /// Texture allocator configured to write to `buffer_dest` too.
     texture_allocator: GltfTextureAllocator,
 
-    /// Materials the meshes need.
+    /// Materials declared in `root` that will be used by the meshes.
     materials: Materials,
 
     /// glTF camera entity, if created yet.
     /// Its settings are taken from the first [`Camera`] encountered.
     camera: Option<Index<gltf_json::Camera>>,
 
-    /// The state of the world in each frame of the animation.
+    /// The state of the world in each frame of an animated scene.
+    /// If its length is greater than 1, [`GltfWriter::into_root()`] will turn it into
+    /// a glTF animation that hides and shows mesh instances.
     frame_states: Vec<FrameState>,
 
     /// Every mesh appearing anywhere in `frame_states`.
