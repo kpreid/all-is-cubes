@@ -243,25 +243,24 @@ fn coarsestep(x: f32) -> f32 {
 
 // Find the smallest positive `t` such that `s + t * ds` is an integer.
 //
-// In the current implementation, `s` must be in the range 0 to 1.
-// (This is why it is called "partial".)
-//
 // If `ds` is zero, returns positive infinity; this is a useful answer because
 // it means that the less-than comparisons in the raycast algorithm will never
 // pick the corresponding axis. If any input is NaN, returns NaN.
+// (Or at least, it would if it were executing on the CPU.
+// TODO: review GPU floating point behavior considerations.)
 //
 // The canonical version of this algorithm is
 // `all_is_cubes::raycast::scale_to_integer_step`.
-fn partial_scale_to_integer_step(s_in: f32, ds_in: f32) -> f32 {
+fn scale_to_integer_step(s_in: f32, ds_in: f32) -> f32 {
     var s = s_in;
     var ds = ds_in;
-    s = clamp(s, 0.0, 1.0);  // Out of bounds may appear on triangle edges
     if sign(ds) < 0.0 {
         s = 1.0 - s;
         ds = -ds;
         // Note: This will not act on a negative zero.
         // That must be handled separately.
     }
+    s = modulo(s, 1.0);
     // problem is now s + t * ds = 1
     var result = (1.0 - s) / ds;
 
@@ -645,9 +644,9 @@ fn volumetric_thickness(in: BlockFragmentInput) -> f32 {
     
     // Run a minimal version of the same raycasting algorithm we use on the CPU side.
     let t_delta = vec3<f32>(
-        partial_scale_to_integer_step(in.position_in_cube.x, in.camera_ray_direction.x),
-        partial_scale_to_integer_step(in.position_in_cube.y, in.camera_ray_direction.y),
-        partial_scale_to_integer_step(in.position_in_cube.z, in.camera_ray_direction.z)
+        scale_to_integer_step(in.position_in_cube.x, in.camera_ray_direction.x),
+        scale_to_integer_step(in.position_in_cube.y, in.camera_ray_direction.y),
+        scale_to_integer_step(in.position_in_cube.z, in.camera_ray_direction.z)
     );
     // t_delta now represents the distance, in units of
     // length(in.camera_ray_direction), to the next cube face. Normalize this
@@ -695,9 +694,6 @@ fn shade_uniform_volumetric(in: BlockFragmentInput) -> vec4<f32> {
 }
 
 // Perform ray-marching along the path through this transparent block.
-//
-// TODO(volumetric): We should use the Amanatides & Woo algorithm to precisely step through the
-// voxels instead of using a fixed step size.
 fn raymarch_volumetric(in: BlockFragmentInput) -> vec4<f32> {
     let atlas_id = get_atlas_id(in);
     // TODO(volumetric): light should be obtained from the actual raymarch position, but that is
@@ -708,21 +704,43 @@ fn raymarch_volumetric(in: BlockFragmentInput) -> vec4<f32> {
     // cube surface. (Note that doing this must incorporate the surface normal to look good.)
     let static_lighting = lighting(in);
 
-    let step_length = min(0.5 / in.resolution, 1.0 / 32.0);
-    let march_step_in_cube = normalize(in.camera_ray_direction) * step_length;
-    let march_step_in_texture = march_step_in_cube * in.resolution;
-
     // Accumulated light along the ray's path.
     var accum_light = vec3f(0.0);
     // How much *future* light accumulation should be reduced due to absorption.
     // When this decays to zero, we have hit opacity and can stop.
     var accum_transmittance = 1.0;
-    // Point we march. Start it just slightly under the surface.
-    var march_position_in_texture = in.color_or_texture.xyz + march_step_in_texture / 256.0;
+    // Point we start the ray from. Start it just slightly under the surface so we don't trip
+    // bounds checks.
+    var initial_march_position_in_texture =
+        in.color_or_texture.xyz + in.camera_ray_direction / 1024.0;
+    // Safety step counter to avoid bugs turning into hangs.
     var step_count: u32 = 0;
 
+    // Raycasting state.
+    // This is a much more densely expressed version of the Amanatides & Woo algorithm
+    // also implemented at all-is-cubes-base/src/raycast.rs
+    var t_max: vec3f = vec3f(
+        scale_to_integer_step(initial_march_position_in_texture.x, in.camera_ray_direction.x),
+        scale_to_integer_step(initial_march_position_in_texture.y, in.camera_ray_direction.y),
+        scale_to_integer_step(initial_march_position_in_texture.z, in.camera_ray_direction.z),
+    );
+    // t_delta is, for each axis, the change in t_max which occurs as a result of moving to a new
+    // adjacent voxel in that direction.
+    // TODO: review div/0 considerations
+    let t_delta: vec3f = 1.0 / abs(in.camera_ray_direction);
+    // Scale factor converting “t” values to world space length values.
+    let scale_from_t_to_world_space = length(in.camera_ray_direction) / in.resolution;
+    // Current voxel within the texture.
+    // TODO: could be integer; should it be?
+    var current_voxel: vec3f = floor(initial_march_position_in_texture);
+    // For each axis, change to apply to `current_voxel` when we step in that axis.
+    let step_directions: vec3f = sign(in.camera_ray_direction);
+    // “t” distance along the ray as of the previous step.
+    // Used to compute how much of the material the ray trafeled through.
+    var previous_t_distance: f32 = 0.0;
+
     while accum_transmittance > 1e-4 && all(
-        (march_position_in_texture > in.clamp_min) & (march_position_in_texture < in.clamp_max)
+        (current_voxel >= in.clamp_min) & (current_voxel < in.clamp_max)
     ) {
         step_count += 1;
         if step_count > 100 {
@@ -730,13 +748,41 @@ fn raymarch_volumetric(in: BlockFragmentInput) -> vec4<f32> {
             return vec4f(1.0, 0.0, 0.0, 1.0);
         }
 
-        var material = get_material_from_texture_unfiltered(vec3i(march_position_in_texture), atlas_id);
+        // Fetch the material from the current voxel, which is the material we are passing through.
+        var material = get_material_from_texture_unfiltered(vec3i(current_voxel), atlas_id);
         if material.reflectance.a == 1.0 {
             // This is an opaque voxel, which will already have been drawn.
             // Don’t draw it again, to avoid any inconsistency with non-raymarching
             // and to be a little more efficient.
             break;
         }
+
+        // Find which axis has the next surface the ray crosses.
+        var step_axis = vec3<bool>(false, false, false);
+        if t_max.x < t_max.y {
+            if t_max.x < t_max.z {
+                step_axis.x = true;
+            } else {
+                step_axis.z = true;
+            }
+        } else {
+            if t_max.y < t_max.z {
+                step_axis.y = true;
+            } else {
+                step_axis.z = true;
+            }            
+        }
+
+        // Move in chosen direction
+        current_voxel += step_directions * vec3f(step_axis);
+        let new_t_distance: f32 = dot(t_max, vec3f(step_axis));
+        t_max += t_delta * vec3f(step_axis);
+
+        // Compute what thickness of the material we just passed through.
+        let step_length: f32 = (new_t_distance - previous_t_distance) * scale_from_t_to_world_space;
+        previous_t_distance = new_t_distance;
+
+        // Done updating the raycast state, now compute what to draw.
 
         // Apply effect of material to accumulation.
         // TODO(volumetric): Deduplicate this code with shade_uniform_volumetric().
@@ -759,7 +805,6 @@ fn raymarch_volumetric(in: BlockFragmentInput) -> vec4<f32> {
         );
         accum_transmittance *= mat_depth_transmittance;
 
-        march_position_in_texture += march_step_in_texture;
     }
 
     let alpha = 1.0 - accum_transmittance;

@@ -58,7 +58,7 @@ async fn scale_to_integer_step_test() {
                 &format!("scale_to_integer_step_test({case:?})"),
                 &frag_expr(&format!(
                     "vec4<f32>(
-                partial_scale_to_integer_step({s}, {ds})
+                scale_to_integer_step({s}, {ds})
             )",
                     s = to_wgsl(s),
                     ds = to_wgsl(ds)
