@@ -215,7 +215,9 @@ impl texture::Tile for GltfTile {
     }
 
     fn grid_to_texcoord_3d(&self, _: TilePoint) -> Self::Point {
-        unimplemented!()
+        unimplemented!(
+            "GltfTextureAllocator::SUPPORTS_3D is false; this function should not have been called"
+        )
     }
 }
 
