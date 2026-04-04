@@ -38,8 +38,8 @@ jobs:
 
   update:
     # TODO: enable this when we enable pushing
-    # permissions:
-    #   contents: write
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     needs: find-branches
     strategy:
@@ -93,5 +93,4 @@ jobs:
       env:
         NEXTNAME: "${{ matrix.nextname }}"
       run: |
-        # TODO: make this actually take effect (remove "echo"), and make it --force, when the rest of the logic is confirmed working
-        echo git push origin "HEAD:next-auto/$NEXTNAME"
+        git push origin "HEAD:next-auto/$NEXTNAME" --force-with-lease
