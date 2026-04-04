@@ -165,64 +165,73 @@ where
 
     writer.flaws |= mesh.flaws();
 
-    let mesh_index = Index::push(
-        &mut writer.root.meshes,
-        gltf_json::Mesh {
-            name: Some(format!("{name} mesh")),
-            primitives: [
-                (
-                    mesh.opaque_range(),
-                    writer.materials.opaque_vertex_colored,
-                    format!("{name} opaque index"),
-                ),
-                (
-                    mesh.transparent_range(all_is_cubes_mesh::DepthOrdering::ALL_UNSORTED),
-                    writer.materials.transparent_vertex_colored,
-                    format!("{name} transparent index"),
-                ),
-            ]
-            .into_iter()
-            .filter_map(|(index_range, material, name)| {
-                if !index_range.is_empty() {
-                    Some(gltf_json::mesh::Primitive {
-                        attributes: attributes.clone(),
-                        indices: Some(Index::push(
-                            &mut writer.root.accessors,
-                            gltf_json::Accessor {
-                                buffer_view: Some(index_buffer_view),
-                                byte_offset: Some(USize64::from(
-                                    index_range.start * index_type.size(),
-                                )),
-                                count: USize64::from(index_range.len()),
-                                component_type: Valid(gltf_json::accessor::GenericComponentType(
-                                    index_type,
-                                )),
-                                extensions: Default::default(),
-                                extras: Default::default(),
-                                type_: Valid(gltf_json::accessor::Type::Scalar),
-                                min: None,
-                                max: None,
-                                name: Some(name),
-                                normalized: false,
-                                sparse: None,
-                            },
+    // Kludge: this only works because we have at most one texture so we know its index.
+    // If we have multiple textures (e.g. for emission) we will need to fix up
+    // texture indices or texture objects.
+    let use_texture = needs_texture.then_some(Index::new(0));
+
+    let mesh_object = gltf_json::Mesh {
+        name: Some(format!("{name} mesh")),
+        primitives: [
+            (
+                mesh.opaque_range(),
+                MaterialKey {
+                    transparent: false,
+                    use_texture,
+                },
+                format!("{name} opaque index"),
+            ),
+            (
+                mesh.transparent_range(all_is_cubes_mesh::DepthOrdering::ALL_UNSORTED),
+                MaterialKey {
+                    transparent: true,
+                    use_texture,
+                },
+                format!("{name} transparent index"),
+            ),
+        ]
+        .into_iter()
+        .filter_map(|(index_range, material_key, name)| {
+            if index_range.is_empty() {
+                return None;
+            }
+
+            let material_index = writer.intern_material(material_key);
+
+            Some(gltf_json::mesh::Primitive {
+                attributes: attributes.clone(),
+                indices: Some(Index::push(
+                    &mut writer.root.accessors,
+                    gltf_json::Accessor {
+                        buffer_view: Some(index_buffer_view),
+                        byte_offset: Some(USize64::from(index_range.start * index_type.size())),
+                        count: USize64::from(index_range.len()),
+                        component_type: Valid(gltf_json::accessor::GenericComponentType(
+                            index_type,
                         )),
-                        mode: Valid(gltf_json::mesh::Mode::Triangles),
-                        material: Some(material),
-                        targets: None,
                         extensions: Default::default(),
                         extras: Default::default(),
-                    })
-                } else {
-                    None
-                }
+                        type_: Valid(gltf_json::accessor::Type::Scalar),
+                        min: None,
+                        max: None,
+                        name: Some(name),
+                        normalized: false,
+                        sparse: None,
+                    },
+                )),
+                mode: Valid(gltf_json::mesh::Mode::Triangles),
+                material: Some(material_index),
+                targets: None,
+                extensions: Default::default(),
+                extras: Default::default(),
             })
-            .collect(),
-            weights: None,
-            extensions: Default::default(),
-            extras: Default::default(),
-        },
-    );
+        })
+        .collect(),
+        weights: None,
+        extensions: Default::default(),
+        extras: Default::default(),
+    };
+    let mesh_index = Index::push(&mut writer.root.meshes, mesh_object);
 
     Some(mesh_index)
 }
@@ -300,68 +309,84 @@ impl MeshAwaitingTextureCoordinates {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Collection of materials used in the glTF.
+/// Identifier of one of the materials that we may or may not use in a glTF export.
 ///
-/// TODO: Each should be optional and created only if required.
-#[derive(Debug)]
-pub(crate) struct Materials {
-    pub opaque_vertex_colored: Index<gltf_json::Material>,
-    pub transparent_vertex_colored: Index<gltf_json::Material>,
+/// Each such material is only reified as a glTF object if it is needed.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(in crate::gltf) struct MaterialKey {
+    pub transparent: bool,
+    pub use_texture: Option<Index<gltf_json::Texture>>,
 }
 
-impl Materials {
-    pub fn new(materials_json: &mut Vec<gltf_json::Material>) -> Self {
+impl MaterialKey {
+    pub fn to_material_definition(self) -> gltf_json::Material {
+        let Self {
+            transparent,
+            use_texture,
+        } = self;
+
+        let name = format!(
+            "all-is-cubes {tr} {tex}",
+            tr = if transparent { "transparent" } else { "opaque" },
+            tex = if use_texture.is_some() {
+                "textured"
+            } else {
+                "untextured"
+            }
+        );
+
         let pbr_metallic_roughness = gltf_json::material::PbrMetallicRoughness {
             // Per glTF 2.0 § 3.9.2, the base_color_factor will be
             // multiplied by the vertex color.
             base_color_factor: gltf_json::material::PbrBaseColorFactor([1.0, 1.0, 1.0, 1.0]),
-            base_color_texture: None,
+            base_color_texture: use_texture.map(|index| gltf_json::texture::Info {
+                index,
+                tex_coord: 0,
+                extensions: Default::default(),
+                extras: Default::default(),
+            }),
             metallic_factor: gltf_json::material::StrengthFactor(0.0),
             roughness_factor: gltf_json::material::StrengthFactor(1.0),
             ..<_>::default()
         };
-        Self {
-            opaque_vertex_colored: {
-                let value = gltf_json::Material {
-                    name: Some("aic-vertex-opaque".into()),
-                    alpha_mode: Valid(gltf_json::material::AlphaMode::Opaque),
-                    double_sided: false,
-                    pbr_metallic_roughness: pbr_metallic_roughness.clone(),
-                    ..gltf_json::Material::default()
-                };
-                Index::push(materials_json, value)
-            },
-            transparent_vertex_colored: {
-                let value = gltf_json::Material {
-                    name: Some("aic-vertex-transparent".into()),
-                    alpha_mode: Valid(gltf_json::material::AlphaMode::Blend),
-                    double_sided: false,
-                    pbr_metallic_roughness,
-                    extensions: Some(gltf_json::extensions::material::Material {
-                        volume: None,
-                        // TODO: Reenable this when attenuation_distance serialization bug is fixed.
-                        // https://github.com/gltf-rs/gltf/issues/364
-                        // Some(gltf_json::extensions::material::Volume {
-                        //     thickness_factor: gltf_json::extensions::material::ThicknessFactor(1.0),
-                        //     thickness_texture: None,
-                        //     attenuation_distance:
-                        //         gltf_json::extensions::material::AttenuationDistance::default(),
-                        //     attenuation_color:
-                        //         gltf_json::extensions::material::AttenuationColor::default(),
-                        //     extras: Void::default(),
-                        // }),
-                        transmission: Some(gltf_json::extensions::material::Transmission {
-                            transmission_factor:
-                                gltf_json::extensions::material::TransmissionFactor::default(),
-                            transmission_texture: None,
-                            extras: Default::default(), // feature-variable type
-                        }),
-                        ..Default::default() // feature-variable additional fields
+
+        if !transparent {
+            gltf_json::Material {
+                name: Some(name),
+                alpha_mode: Valid(gltf_json::material::AlphaMode::Opaque),
+                double_sided: false,
+                pbr_metallic_roughness,
+                ..gltf_json::Material::default()
+            }
+        } else {
+            gltf_json::Material {
+                name: Some(name),
+                alpha_mode: Valid(gltf_json::material::AlphaMode::Blend),
+                double_sided: false,
+                pbr_metallic_roughness,
+                extensions: Some(gltf_json::extensions::material::Material {
+                    volume: None,
+                    // TODO: Reenable this when attenuation_distance serialization bug is fixed.
+                    // https://github.com/gltf-rs/gltf/issues/364
+                    // Some(gltf_json::extensions::material::Volume {
+                    //     thickness_factor: gltf_json::extensions::material::ThicknessFactor(1.0),
+                    //     thickness_texture: None,
+                    //     attenuation_distance:
+                    //         gltf_json::extensions::material::AttenuationDistance::default(),
+                    //     attenuation_color:
+                    //         gltf_json::extensions::material::AttenuationColor::default(),
+                    //     extras: Void::default(),
+                    // }),
+                    transmission: Some(gltf_json::extensions::material::Transmission {
+                        transmission_factor:
+                            gltf_json::extensions::material::TransmissionFactor::default(),
+                        transmission_texture: None,
+                        extras: Default::default(), // feature-variable type
                     }),
-                    ..gltf_json::Material::default()
-                };
-                Index::push(materials_json, value)
-            },
+                    ..Default::default() // feature-variable additional fields
+                }),
+                ..gltf_json::Material::default()
+            }
         }
     }
 }

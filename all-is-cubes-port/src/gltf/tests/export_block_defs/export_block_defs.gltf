@@ -326,7 +326,27 @@
     {
       "alphaMode": "OPAQUE",
       "doubleSided": false,
-      "name": "aic-vertex-opaque",
+      "name": "all-is-cubes opaque untextured",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 1.0
+      },
+      "emissiveFactor": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "alphaMode": "OPAQUE",
+      "doubleSided": false,
+      "name": "all-is-cubes opaque textured",
       "pbrMetallicRoughness": {
         "baseColorFactor": [
           1.0,
@@ -346,35 +366,6 @@
         0.0,
         0.0
       ]
-    },
-    {
-      "alphaMode": "BLEND",
-      "doubleSided": false,
-      "name": "aic-vertex-transparent",
-      "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "baseColorTexture": {
-          "index": 0,
-          "texCoord": 0
-        },
-        "metallicFactor": 0.0,
-        "roughnessFactor": 1.0
-      },
-      "emissiveFactor": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "extensions": {
-        "KHR_materials_transmission": {
-          "transmissionFactor": 0.0
-        }
-      }
     }
   ],
   "meshes": [
@@ -414,7 +405,7 @@
             "TEXCOORD_0": 8
           },
           "indices": 9,
-          "material": 0
+          "material": 1
         }
       ]
     },
@@ -428,7 +419,7 @@
             "TEXCOORD_0": 12
           },
           "indices": 13,
-          "material": 0
+          "material": 1
         }
       ]
     }

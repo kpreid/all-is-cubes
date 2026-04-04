@@ -8,7 +8,7 @@
 
 #![expect(clippy::module_name_repetitions)] // TODO: review all the naming in this module
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::time::Duration;
 use std::{fmt, fs, io, mem};
@@ -35,7 +35,7 @@ use buffer::create_buffer_and_accessor;
 mod animation;
 use animation::FrameState;
 mod mesh;
-use mesh::Materials;
+use mesh::MaterialKey;
 mod glue;
 use glue::{convert_quaternion, empty_node};
 mod texture;
@@ -107,8 +107,8 @@ pub struct GltfWriter {
     /// If a mesh uses vertex colors, it is not inserted here.
     meshes_awaiting_texture_coordinates: Vec<mesh::MeshAwaitingTextureCoordinates>,
 
-    /// Materials declared in `root` that will be used by the meshes.
-    materials: Materials,
+    /// Interned materials.
+    materials: HashMap<MaterialKey, Index<gltf_json::Material>>,
 
     /// glTF camera entity, if created yet.
     /// Its settings are taken from the first [`Camera`] encountered.
@@ -130,7 +130,7 @@ pub struct GltfWriter {
 impl GltfWriter {
     /// `buffer_dest`: Where to write auxiliary data (vertex buffers, textures).
     pub fn new(buffer_dest: GltfDataDestination) -> Self {
-        let mut root = gltf_json::Root {
+        let root = gltf_json::Root {
             asset: gltf_json::Asset {
                 generator: Some(String::from("all-is-cubes")),
                 ..gltf_json::Asset::default()
@@ -142,13 +142,12 @@ impl GltfWriter {
         };
 
         Self {
-            materials: Materials::new(&mut root.materials),
-
             texture_allocator: GltfTextureAllocator::new(buffer_dest.clone()),
 
             root,
             buffer_dest,
             meshes_awaiting_texture_coordinates: Vec::new(),
+            materials: HashMap::new(),
             camera: None,
             frame_states: Vec::new(),
             any_time_visible_mesh_instances: BTreeSet::new(),
@@ -226,15 +225,11 @@ impl GltfWriter {
             let (block_texture_index, uv_map) =
                 texture::insert_block_texture_atlas(&mut self.root, &self.texture_allocator)?;
 
-            for material in self.root.materials.iter_mut() {
-                material.pbr_metallic_roughness.base_color_texture =
-                    Some(gltf_json::texture::Info {
-                        index: block_texture_index,
-                        tex_coord: 0,
-                        extensions: Default::default(),
-                        extras: Default::default(),
-                    });
-            }
+            debug_assert_eq!(
+                block_texture_index,
+                Index::new(0),
+                "if we have multiple textures, then materials need work"
+            );
 
             for mesh in mem::take(&mut self.meshes_awaiting_texture_coordinates) {
                 mesh.finish(&uv_map, &mut self.root, &self.buffer_dest)?;
@@ -383,6 +378,17 @@ impl GltfWriter {
         }
 
         Ok(self.root)
+    }
+
+    fn intern_material(&mut self, key: MaterialKey) -> Index<gltf_json::Material> {
+        use std::collections::hash_map::Entry;
+        match self.materials.entry(key) {
+            Entry::Occupied(oe) => *oe.get(),
+            Entry::Vacant(ve) => *ve.insert(Index::push(
+                &mut self.root.materials,
+                key.to_material_definition(),
+            )),
+        }
     }
 }
 

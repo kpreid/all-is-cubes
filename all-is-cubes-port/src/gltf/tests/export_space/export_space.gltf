@@ -82,7 +82,7 @@
     {
       "alphaMode": "OPAQUE",
       "doubleSided": false,
-      "name": "aic-vertex-opaque",
+      "name": "all-is-cubes opaque untextured",
       "pbrMetallicRoughness": {
         "baseColorFactor": [
           1.0,
@@ -98,31 +98,6 @@
         0.0,
         0.0
       ]
-    },
-    {
-      "alphaMode": "BLEND",
-      "doubleSided": false,
-      "name": "aic-vertex-transparent",
-      "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          1.0,
-          1.0,
-          1.0,
-          1.0
-        ],
-        "metallicFactor": 0.0,
-        "roughnessFactor": 1.0
-      },
-      "emissiveFactor": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "extensions": {
-        "KHR_materials_transmission": {
-          "transmissionFactor": 0.0
-        }
-      }
     }
   ],
   "meshes": [
