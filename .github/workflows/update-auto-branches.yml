@@ -58,19 +58,37 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
     
-    - name: Rebase
-      # If the rebase has a merge conflict, we’ll be left with an incomplete state,
-      # but also, the job will be stopped, so it doesn’t matter.
-      # TODO: We need to handle merge conflicts in Cargo.lock to make this more reliably useful.
-      run: git rebase origin/main
-    
-    - name: Update
-      # Note that this doesn’t take care of updating to new incompatible versions, which would be ideal.
-      # But in most cases, we’ll have patched in `git` or similar anyway.
+    - name: Rebase and update
       run: |
-        cargo xtask update
-        git commit --allow-empty --message='Deps: `xtask update` for experimental branch.' Cargo.lock "*/Cargo.lock"
+        if git rebase origin/main; then
+          echo 'Rebased without conflict. Updates will be a second commit.'
+          
+          # Note that this doesn’t take care of updating to new incompatible versions, which would be ideal;
+          # but in most cases, we’ll have patched in `git` or similar anyway.
+          # We're using `cargo update` instead of `xtask` to avoid needing to compile xtask.
+          cargo update
+          (cd all-is-cubes-wasm && cargo update)
+          (cd fuzz && cargo update)
+
+          git commit --allow-empty --message='Deps: Update to latest for experimental branch.' Cargo.lock "*/Cargo.lock"
+
+        else
+          echo 'Rebased with conflict. Regenerating lockfiles.'
+          # A conflict occured in the rebase. It's likely to be the lockfiles. Regenerate them from scratch.
+          cargo generate-lockfile
+          (cd all-is-cubes-wasm && cargo generate-lockfile)
+          (cd fuzz && cargo generate-lockfile)
+
+          git add "Cargo.lock" "*/Cargo.lock"
+
+          # This will fail if there are still merge conflicts unrelated to the lockfiles.
+          echo 'Attempting to continue rebase.'
+          EDITOR=true git rebase --continue
+        fi
     
+    - name: Show log
+      run: git log --patch origin/main..
+
     - name: Push
       env:
         NEXTNAME: "${{ matrix.nextname }}"
