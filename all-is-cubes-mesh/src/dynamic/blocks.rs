@@ -1,8 +1,8 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::fmt;
 use core::num::NonZeroU32;
 use core::time::Duration;
-use core::{fmt};
 
 use futures_channel::oneshot::Canceled;
 

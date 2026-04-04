@@ -3,7 +3,6 @@
 use alloc::boxed::Box;
 use core::num::NonZero;
 
-
 use all_is_cubes::block::{self, AIR, Block};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{BoxStyle, free_editing_starter_inventory};

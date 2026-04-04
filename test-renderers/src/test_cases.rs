@@ -13,8 +13,8 @@ use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::euclid::{Point2D, Size2D, Size3D, Vector3D, point3, size2, size3, vec2, vec3};
 use all_is_cubes::listen;
 use all_is_cubes::math::{
-    Axis, Cube, Face, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
-    GridVector, Rgb, Rgb01, Rgba, Vol, ps32, ps64, rgb_const, rgba_const, zo32,
+    Axis, Cube, Face, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector,
+    Rgb, Rgb01, Rgba, Vol, ps32, ps64, rgb_const, rgba_const, zo32,
 };
 use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::transaction::{self, Merge, Transaction as _};

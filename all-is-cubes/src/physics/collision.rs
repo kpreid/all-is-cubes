@@ -871,7 +871,10 @@ mod tests {
                 }
             }
 
-            assert!(last_step.is_some(), "should have a last step that is Within");
+            assert!(
+                last_step.is_some(),
+                "should have a last step that is Within"
+            );
             // TODO: make assertions about the properties of the last step
         }
     }

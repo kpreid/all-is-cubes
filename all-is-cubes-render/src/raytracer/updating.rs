@@ -140,10 +140,7 @@ where
             // TODO: need to listen to the options sources for accurate change detection
             let graphics_options = &*self.graphics_options.get();
             let custom_options = &*self.custom_options.get();
-            let options = RtOptionsRef::new(
-                graphics_options,
-                custom_options,
-            );
+            let options = RtOptionsRef::new(graphics_options, custom_options);
 
             let block_data_slice = space.block_data();
             if block_data_slice.len() > self.state.blocks.len() {
