@@ -88,8 +88,20 @@ jobs:
     
     - name: Show log
       run: git log --patch origin/main..
+    
+    - id: diff
+      name: Check for difference with existing auto branch
+      env:
+        NEXTNAME: "${{ matrix.nextname }}"
+      run: |
+        set +e
+        git diff --exit-code "origin/next-auto/$NEXTNAME" HEAD
+        echo "has_diff=$?" >> "$GITHUB_OUTPUT"
 
     - name: Push
+      # Note that we push on *any* error from git diff; in particular, we push on
+      # "nonexistent branch" (code 128) as well as "there are differences" (code 1).
+      if: ${{ steps.diff.outputs.has_diff != '0' }}
       env:
         NEXTNAME: "${{ matrix.nextname }}"
       run: |
