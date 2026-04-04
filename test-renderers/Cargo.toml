@@ -23,13 +23,31 @@ bench = false
 
 [[test]]
 # Note: This test has its dependencies disabled and thus doesn’t compile.
-# It has its dependencies disabled because it was written for Bevy 0.16.0 and we don’t want both
-# newer and older Bevy crates to end up in the lock file.
-# TODO: Figure out what’s wrong and improve it.
+# It has its dependencies disabled because, for now, it isn’t suffciently complete that we care to
+# pay the cost of adding Bevy to our dependencies. In particular, it needs:
+# * rendering of non-uniform skies
+# * glTF export of light emission
 #
 # Dependencies we would have if this were runnable:
-# bevy = { version = "0.16.0", optional = true, default-features = false, features = ["bevy_animation", "bevy_core_pipeline", "bevy_gltf", "bevy_pbr", "bevy_render", "bevy_scene", "bevy_window", "dynamic_linking", "multi_threaded", "png"]}
-# bevy_gltf = { version = "0.16.0", features = ["bevy_animation"] }
+# bevy = { version = "0.18.1", optional = true, default-features = false, features = [
+#     "bevy_animation",
+#     "bevy_core_pipeline",
+#     "bevy_gltf",
+#     "bevy_light",
+#     "bevy_pbr",
+#     "bevy_post_process",
+#     "bevy_render",
+#     "bevy_scene",
+#     "bevy_window",
+#     "debug",
+#     "dynamic_linking",
+#     "multi_threaded",
+#     "png",
+#     "reflect_auto_register",
+# ]}
+# bevy_gltf = { version = "0.18.1", features = ["bevy_animation"] }
+# half = { workspace = true, optional = true }
+# manyfmt = { workspace = true, optional = true }
 name = "gltf-render"
 doctest = false
 harness = false
@@ -81,11 +99,9 @@ all-is-cubes-ui = { workspace = true, features = ["session"] }
 anyhow = { workspace = true }
 async_fn_traits = { workspace = true }
 bytemuck = { workspace = true, optional = true }
-# Using clap for parsing test command-line arguments
 clap = { workspace = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
-#futures-channel = { workspace = true, optional = true }
 futures-util = { workspace = true, features = ["std"] }
 image = { workspace = true, features = ["png"] }
 imgref = { workspace = true }

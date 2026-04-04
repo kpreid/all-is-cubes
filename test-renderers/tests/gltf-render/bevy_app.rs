@@ -3,11 +3,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use bevy::camera::RenderTarget;
 use bevy::image::BevyDefault as _;
+use bevy::post_process::bloom;
 use bevy::prelude as b;
 use bevy::prelude::StandardMaterial;
-use bevy::render::camera::RenderTarget;
 use bevy::render::render_resource as wgpu;
+use bevy::render::view::window::screenshot::ScreenshotCaptured;
 use half::f16;
 use tokio::sync::mpsc;
 
@@ -104,10 +106,8 @@ pub(crate) async fn bevy_app_actor(
                     ))
                     .observe({
                         let label = label.clone();
-                        move |trigger: b::Trigger<
-                            bevy::render::view::window::screenshot::ScreenshotCaptured,
-                        >| {
-                            let captured_image = &trigger.event().0;
+                        move |trigger: b::On<ScreenshotCaptured>| {
+                            let captured_image: &ScreenshotCaptured = &trigger.event();
                             let rendering = Rendering {
                                 size: <[u32; 2]>::from(captured_image.size()).into(),
                                 data: bytemuck::cast_vec(
@@ -145,7 +145,7 @@ fn init_plugins(app: &mut b::App) {
         b::WindowPlugin {
             primary_window: None,
             exit_condition: bevy::window::ExitCondition::DontExit,
-            close_when_requested: false,
+            ..Default::default()
         },
         //
         b::AssetPlugin {
@@ -156,13 +156,16 @@ fn init_plugins(app: &mut b::App) {
         //
         bevy::transform::TransformPlugin::default(),
         bevy::scene::ScenePlugin::default(),
+        bevy::render::RenderPlugin::default(),
+        bevy::camera::CameraPlugin::default(),
+        bevy::mesh::MeshPlugin::default(),
         bevy::gltf::GltfPlugin::default(),
         //
-        bevy::render::RenderPlugin::default(),
         b::ImagePlugin::default(),
         bevy::render::pipelined_rendering::PipelinedRenderingPlugin::default(),
         bevy::core_pipeline::CorePipelinePlugin::default(),
         bevy::pbr::PbrPlugin::default(),
+        bevy::light::LightPlugin::default(),
     ));
 
     app.finish();
@@ -179,18 +182,16 @@ fn init_entities_and_resources(app: &mut bevy::app::App, viewport: Viewport) -> 
     // at least partially
     app.world_mut().spawn((
         b::Camera3d::default(),
-        b::Camera {
-            target: render_target.clone(),
-            ..Default::default()
-        },
+        b::Camera::default(),
+        render_target.clone(),
         bevy::core_pipeline::tonemapping::Tonemapping::None, // TODO: link up tonemapping
-        bevy::core_pipeline::bloom::Bloom {
+        bloom::Bloom {
             intensity: 0.0,
             low_frequency_boost: 0.0,
             low_frequency_boost_curvature: 0.0,
             high_pass_frequency: 1.0,
-            composite_mode: bevy::core_pipeline::bloom::BloomCompositeMode::EnergyConserving,
-            prefilter: bevy::core_pipeline::bloom::BloomPrefilter {
+            composite_mode: bloom::BloomCompositeMode::EnergyConserving,
+            prefilter: bloom::BloomPrefilter {
                 threshold: 0.0,
                 threshold_softness: 0.0,
             },
@@ -246,13 +247,13 @@ fn load_transfer_system(
     mut images: b::ResMut<b::Assets<b::Image>>,
     old_scene_root: b::Query<b::Entity, b::With<SceneTag>>,
     mut clear_color: b::ResMut<b::ClearColor>,
-    mut ambient_light: b::ResMut<b::AmbientLight>,
+    mut ambient_light: b::ResMut<b::GlobalAmbientLight>,
     mut bevy_camera: b::Single<
         (
             &mut b::Projection,
             &mut b::Transform,
             &mut b::Msaa,
-            &mut bevy::core_pipeline::bloom::Bloom,
+            &mut bloom::Bloom,
             &mut bevy::pbr::DistanceFog,
         ),
         b::With<b::Camera3d>,
@@ -320,6 +321,7 @@ fn load_transfer_system(
             aspect_ratio: aic_camera.viewport().nominal_aspect_ratio() as f32,
             near: aic_camera.near_plane_distance().into_inner() as f32,
             far: view_distance,
+            ..Default::default()
         });
         **bevy_transform = b::Transform {
             translation,
@@ -332,7 +334,7 @@ fn load_transfer_system(
             | all_is_cubes_render::camera::AntialiasingOption::Always => b::Msaa::Sample4,
             _ => todo!(),
         };
-        **bloom = bevy::core_pipeline::bloom::Bloom {
+        **bloom = bloom::Bloom {
             intensity: aic_camera.options().bloom_intensity.into_inner() * 4.0,
             ..Default::default()
         };
@@ -382,7 +384,7 @@ fn convert_volumetric_light(
 
     // TODO: Fill in all uninitialized light values with nearest neighbor.
 
-    // See https://docs.rs/bevy/0.16.1/bevy/pbr/irradiance_volume/index.html for information on
+    // See https://docs.rs/bevy/0.18.1/bevy/pbr/irradiance_volume/ for information on
     // the data layout we are constructing here.
     let texture_bounds = GridAab::from_lower_size(
         // scrambled axes because the ordering should be X-major but isn't
@@ -417,7 +419,7 @@ fn convert_volumetric_light(
             rotation: b::Quat::default(),
             scale: <[f32; 3]>::from(bounds.size().to_f32()).into(),
         },
-        bevy::pbr::irradiance_volume::IrradianceVolume {
+        bevy::light::IrradianceVolume {
             voxels: images.add(b::Image::new(
                 wgpu::Extent3d {
                     // unswizzle axes
