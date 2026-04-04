@@ -1,0 +1,78 @@
+# This workflow automatically updates experimental branches to keep them up to date with:
+#
+# * the latest code on the `main` branch, and
+# * their dependencies (which might be e.g. Git repositories or otherwise patched).
+#
+# The manually created experimental branches are named `next/*`.
+# Their automatically-managed parallel branches are named `next-auto/*`.
+# Each `next-auto/<name>` contains `next/<name>` rebased onto main, then a lockfile update.
+#
+# In the event that the automatic rebase starts failing, or a maintainer wishes to accept the
+# automated changes, they can reset `next/<name>` to be equal to `next-auto/<name>`.
+
+name: Update next-auto Branches
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  # TODO: enable schedule when bugs are fixed
+  # schedule:
+  #   - cron: '43 14 * * 1'
+
+jobs:
+  # Find all the branches that curretly exist and are named "next/*".
+  find-branches:
+    runs-on: ubuntu-latest
+    outputs:
+      nextnamesjson: ${{ steps.list.outputs.nextnamesjson }} 
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0 # supposedly will fetch all branches. TODO: we really only need to list them, and this might be better as a GitHub API call?
+    - id: list
+      # For each ref in refs/foo, put "foo" in a JSON array
+      run: |
+        echo "nextnamesjson=$(git for-each-ref --format='%(refname:lstrip=4)' 'refs/remotes/origin/next/*' | jq --raw-input --null-input '[inputs]')" >> "$GITHUB_OUTPUT"
+
+  update:
+    # TODO: enable this when we enable pushing
+    # permissions:
+    #   contents: write
+    runs-on: ubuntu-latest
+    needs: find-branches
+    strategy:
+      fail-fast: false
+      matrix:
+        nextname: ${{ fromJson(needs.find-branches.outputs.nextnamesjson) }}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        ref: "next/${{ matrix.nextname }}"
+        fetch-depth: 0 # need branches to perform rebase
+    
+    - name: Configure git
+      run: |
+        # These specific values are not required, but recommended.
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+    
+    - name: Rebase
+      # If the rebase has a merge conflict, we’ll be left with an incomplete state,
+      # but also, the job will be stopped, so it doesn’t matter
+      run: git rebase origin/main
+    
+    - name: Update
+      # Note that this doesn’t take care of updating to new incompatible versions, which would be ideal.
+      # But in most cases, we’ll have patched in `git` or similar anyway.
+      run: |
+        cargo xtask update
+        git commit --allow-empty --message='Deps: `xtask update` for experimental branch.' Cargo.lock "*/Cargo.lock"
+    
+    - name: Push
+      env:
+        NEXTNAME: "${{ matrix.nextname }}"
+      run: |
+        # TODO: make this actually take effect (remove "echo"), and make it --force, when the rest of the logic is confirmed working
+        echo git push origin "HEAD:next-auto/$NEXTNAME"
