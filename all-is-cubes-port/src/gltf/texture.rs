@@ -424,6 +424,13 @@ impl Gatherer {
         for (&rect_id, &((), slice_location_in_atlas)) in placements.packed_locations() {
             match rect_id {
                 RectId::White => {
+                    // Draw the white texel into the texture.
+                    atlas_image.put_pixel(
+                        slice_location_in_atlas.x(),
+                        slice_location_in_atlas.y(),
+                        image::Rgba([255; 4]),
+                    );
+
                     // Compute the single UV value at the middle of the white texel
                     uv_of_white = Some(
                         scale
