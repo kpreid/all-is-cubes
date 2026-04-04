@@ -414,7 +414,6 @@ impl Gatherer {
                 entry.source_texels.get().expect("image texels not set -- TODO propagate error");
 
             // Copy slice from 3D `texels` into 2D atlas image.
-            // TODO: Something is wrong in this code causing skewed outputs; not yet diagnosed.
             for y in 0..rotated_size.height {
                 for x in 0..rotated_size.width {
                     // Zero-offset position in the rotated-to-flat slice.
