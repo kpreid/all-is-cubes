@@ -435,34 +435,49 @@ pub(crate) fn export_gltf(
 
         // TODO: deduplicate these two extremely similar loops
 
-        for (mut p, (name, evaluation)) in
-            block_def_progress.split_evenly(block_evaluations.len()).zip(block_evaluations)
         {
-            p.set_label(&name);
-            p.progress(0.01).await;
+            let mut block_nodes: Vec<Index<gltf_json::Node>> =
+                Vec::with_capacity(block_evaluations.len());
+            for (index, (mut p, (name, evaluation))) in block_def_progress
+                .split_evenly(block_evaluations.len())
+                .zip(block_evaluations)
+                .enumerate()
             {
-                let mesh = SpaceMesh::<GltfMt>::from(&BlockMesh::new(
-                    &evaluation,
-                    &writer.texture_allocator(),
-                    &mesh_options,
-                ));
+                p.set_label(&name);
+                p.progress(0.01).await;
+                {
+                    let mesh = SpaceMesh::<GltfMt>::from(&BlockMesh::new(
+                        &evaluation,
+                        &writer.texture_allocator(),
+                        &mesh_options,
+                    ));
 
-                let mesh_index = writer.add_mesh(&name, &mesh);
-                // TODO: if the mesh is empty/None, should we include the node anyway or not?
-                let mesh_node = writer.root.push(gltf_json::Node {
-                    mesh: mesh_index,
-                    ..empty_node(Some(name.to_string()))
-                });
+                    let mesh_index = writer.add_mesh(&name, &mesh);
+                    // TODO: if the mesh is empty/None, should we include the node anyway or not?
+                    let mesh_node = writer.root.push(gltf_json::Node {
+                        mesh: mesh_index,
+                        // translate each block so they are spaced out evenly for viewing
+                        translation: Some([index as f32 * 2.0, 0.0, 0.0]),
+                        ..empty_node(Some(name.to_string()))
+                    });
 
+                    block_nodes.push(mesh_node);
+                }
+
+                p.finish().await;
+            }
+
+            // A scene that can be used to view all blocks.
+            // (Using multiple scenes would be less opinionated, but in my experience, glTF viewers
+            // often do not support viewing multiple scenes at all.)
+            if !block_nodes.is_empty() {
                 writer.root.scenes.push(json::Scene {
-                    name: Some(format!("{name} block display scene")),
-                    nodes: vec![mesh_node],
+                    name: Some("block preview scene".into()),
+                    nodes: block_nodes,
                     extensions: None,
                     extras: Default::default(),
                 });
             }
-
-            p.finish().await;
         }
 
         for (mut p, (name, mesh, translation)) in

@@ -103,9 +103,11 @@ async fn export_snapshot_test(
 #[macro_rules_attribute::apply(smol_macros::test)]
 async fn export_block_defs() {
     let mut universe = Universe::new();
-    let blocks: [Block; 2] = make_some_voxel_blocks(&mut universe);
-    let block_defs: Vec<Handle<BlockDef>> = blocks
+    let blocks1: [Block; 2] = make_some_blocks();
+    let blocks2: [Block; 2] = make_some_voxel_blocks(&mut universe);
+    let block_defs: Vec<Handle<BlockDef>> = blocks1
         .into_iter()
+        .chain(blocks2)
         .enumerate()
         .map(|(i, block)| {
             // TODO: should be able to construct `Name` better here
