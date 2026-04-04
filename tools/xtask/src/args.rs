@@ -44,6 +44,14 @@ pub(crate) enum XtaskCommand {
         quiet_tasks: bool,
     },
 
+    /// Work with Debian packages required to compile `all-is-cubes-desktop`.
+    ///
+    /// This command is not useful outside of Linux distros descended from Debian.
+    SystemPackages {
+        #[clap(subcommand)]
+        package_command: SystemPackagesCommand,
+    },
+
     /// Run all tests (and some builds without tests) with default features.
     Test {
         /// Build test executables, but don't run them.
@@ -132,6 +140,18 @@ pub(crate) enum XtaskCommand {
         #[arg(long = "for-real")]
         for_real: bool,
     },
+}
+
+#[derive(Debug, clap::Subcommand)]
+pub enum SystemPackagesCommand {
+    /// Print the list of packages, one per line.
+    Print,
+
+    /// Run `sudo apt-get -y install` to install packages.
+    ///
+    /// This option is intended for non-interactive use in CI and VMs which offer
+    /// passwordless sudo.
+    SudoInstall,
 }
 
 /// Mode for [`XtaskCommand::Update`]

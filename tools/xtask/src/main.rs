@@ -98,6 +98,39 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
                 build_web(config, Profile::Dev)?; // includes installing wasm tools
             }
         }
+        XtaskCommand::SystemPackages { package_command } => {
+            if cfg!(target_os = "linux") {
+                // TODO: Check that we’re on Ubuntu or other Debian, not just Linux
+
+                // When updating this list, also update the list in all-is-cubes-desktop/README.md
+                const SYS_PACKAGES: &[&str] = &[
+                    // Needed for windowing.
+                    "libxrandr-dev",
+                    "xorg-dev",
+                    "libx11-xcb-dev",
+                    "libwayland-dev", // provides the library called `wayland-client`
+                    // Needed for audio via `kira`
+                    "libasound2-dev",
+                    // Needed for gamepad input via `gilrs`
+                    "libudev-dev",
+                    // Needed for rendering
+                    "mesa-vulkan-drivers",
+                ];
+
+                match package_command {
+                    args::SystemPackagesCommand::Print => {
+                        for package in SYS_PACKAGES {
+                            println!("{package}");
+                        }
+                    }
+                    args::SystemPackagesCommand::SudoInstall => {
+                        cmd!(config.sh, "sudo apt-get -y install").args(SYS_PACKAGES).run()?;
+                    }
+                }
+            } else {
+                anyhow::bail!("the system-packages command only applies to Debian-descended Linux");
+            }
+        }
         XtaskCommand::Test { no_run } => {
             print_revision(config, false);
             do_for_all_packages(
