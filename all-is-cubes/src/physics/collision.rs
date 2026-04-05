@@ -2,6 +2,7 @@
 
 use alloc::vec::Vec;
 
+use descriptive_unwrap::OptionExt as _;
 use euclid::Vector3D;
 
 /// Acts as polyfill for float methods
@@ -9,9 +10,10 @@ use euclid::Vector3D;
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
-use crate::block::{self, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
+use crate::block::{self, EvaluatedBlock, Evoxel, Resolution};
 use crate::math::{
-    Aab, Cube, CubeFace, Face, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, Octant,
+    Aab, Cube, CubeFace, Face, Face7, FaceMap, FreeCoordinate, FreePoint, FreeVector, GridAab,
+    Octant,
 };
 use crate::physics::{Contact, ContactSet, POSITION_EPSILON};
 use crate::raycast::{Ray, Raycaster};
@@ -121,29 +123,25 @@ where
         "Attempting to collide_along_ray a very long distance: {ray:?}"
     );
 
-    // Note: no `.within()` because that would not work when the leading corner is not
-    // within the bounds. We could expand the bounds slightly (while considering overflow
-    // cases), but this would be an optimization which only affects the unusual case of
-    // being out of bounds, so it's not worth doing unless we specifically expect to have
-    // many bodies outside a space and occasionally inside.
-    'ray_step: for ray_step in aab_raycast(aab, ray, false) {
-        let offset_segment = nudge_on_ray(
-            aab,
-            ray.scale_direction(ray_step.t_distance()),
-            ray_step.face().opposite(),
-            R1,
-            false,
-        );
-        let step_aab = aab.translate(offset_segment.unit_endpoint().to_vector());
-        if ray_step.t_distance() >= 1.0 {
-            // Movement is unobstructed in this timestep.
-            break;
-        }
+    let (iter, last_aab_step) =
+        new_aab_raycast(aab.translate(ray.origin.to_vector()), ray.direction, false);
+    'ray_step: for aab_step in iter {
+        // Compute the AAB that *definitely intersects* the cubes we need to test for collision,
+        // rather than just abutting them.
+        const EPSILON: f64 = Resolution::MAX.recip_f64() * 0.5;
+        let collision_test_aab = if let Ok(face) = Face::try_from(aab_step.aab_face) {
+            aab_step
+                .translated_aab
+                .expand_or_shrink(FaceMap::default().with(face, EPSILON))
+                .none_is_unreachable() // TODO: give Aab a single-face infallible expand
+        } else {
+            aab_step.translated_aab
+        };
 
-        // Compute the AAB of the potential intersection, excluding the exterior of the
-        // space.
+        // Compute the grid AAB of the potential intersection, excluding the exterior of the
+        // space; this contains exactly the cubes we are going to test.
         let Some(potential_intersection_bounds) =
-            step_aab.round_up_to_grid().intersection_cubes(space.bounds())
+            collision_test_aab.round_up_to_grid().intersection_cubes(space.bounds())
         else {
             continue 'ray_step;
         };
@@ -156,14 +154,14 @@ where
         'potential_collision: for cube in potential_intersection_bounds.interior_iter() {
             let cell = space.get_cell(cube);
             let full_cube_end = CollisionRayEnd {
-                t_distance: ray_step.t_distance(),
+                t_distance: aab_step.t_distance,
                 // note: unlike `step_aab`, this AAB is not “nudged”.
                 translated_aab: aab.translate(
-                    ray.scale_direction(ray_step.t_distance()).unit_endpoint().to_vector(),
+                    ray.scale_direction(aab_step.t_distance).unit_endpoint().to_vector(),
                 ),
                 contact: Some(Contact::Block(CubeFace {
                     cube,
-                    face: ray_step.face(),
+                    face: aab_step.aab_face.opposite(),
                 })),
             };
             let found_end @ CollisionRayEnd {
@@ -184,7 +182,7 @@ where
                         aab,
                         ray,
                         cell,
-                        match (stop_at, ray_step.face()) {
+                        match (stop_at, aab_step.aab_face) {
                             // If we are checking the initial position (face == Face7::Within),
                             // then don't recursively ignore initial collisions, but report them
                             // so that we can add to already_collising.
@@ -235,14 +233,11 @@ where
         }
     }
 
-    // We reach here if the loop reached the end of the line without finding a `stop_at`
-    // point, *or* if the line is zero length (in which case `aab_raycast` stops).
-    //
-    // TODO: When we’ve switched to `new_aab_raycast()`, we will be able to, and should,
-    // stop synthesizing an AAB that’s not the AAB we actually collision tested with.
+    // We reach here if the loop reached the end of the proposed line segment of movement without
+    // finding a collision.
     CollisionRayEnd {
-        t_distance: 1.0,
-        translated_aab: aab.translate(ray.unit_endpoint().to_vector()),
+        t_distance: last_aab_step.t_distance,
+        translated_aab: last_aab_step.translated_aab,
         contact: None,
     }
 }
@@ -423,10 +418,6 @@ pub(crate) fn aab_raycast(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaste
 /// and corresponds to the completion of a movement without collision.
 /// (It is not returned as part of the iterator so that callers can depend on it always existing
 /// and treat it specially.)
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "TODO(crush): replace aab_raycast() with this")
-)]
 pub(crate) fn new_aab_raycast(
     absolute_aab: Aab,
     translation: FreeVector,
