@@ -1,7 +1,6 @@
 //! Algorithms for collision detection with [`Space`](crate::space::Space)s.
 
 use alloc::vec::Vec;
-use core::iter;
 
 use euclid::Vector3D;
 
@@ -394,13 +393,14 @@ pub(crate) fn aab_raycast(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaste
 /// size of the produced AAB may not be identical to the original AAB’s size.
 /// Thus, this function does the best it can to produce AABs useful for exact collision detection.
 ///
-/// However, the first and last steps are special:
+/// The first returned step always has a `t_distance` of 0.
+/// It may be used for detecting “already intersecting” situations.
 ///
-/// * The first returned step always has a `t_distance` of 0.
-///   It may be used for detecting “already intersecting” situations.
-/// * The last returned step always has a `t_distance` of 1,
-///   even if this position is not a new intersection.
-///   This corresponds to the completion of a movement without collision.
+/// The second element of the returned tuple is the special “last” step,
+/// which always has a `t_distance` of 1,
+/// and corresponds to the completion of a movement without collision.
+/// (It is not returned as part of the iterator so that callers can depend on it always existing
+/// and treat it specially.)
 #[cfg_attr(
     not(test),
     expect(dead_code, reason = "TODO(crush): replace aab_raycast() with this")
@@ -409,7 +409,7 @@ pub(crate) fn new_aab_raycast(
     absolute_aab: Aab,
     translation: FreeVector,
     reversed: bool,
-) -> impl Iterator<Item = AabRaycastStep> {
+) -> (impl Iterator<Item = AabRaycastStep>, AabRaycastStep) {
     // Find which corner of the AAB is the one adjacent to all of the forward-moving faces
     // (or the backward-moving faces if `reversed`), because that corner’s raycast steps correspond
     // to the steps we’re computing for the whole AAB.
@@ -440,7 +440,7 @@ pub(crate) fn new_aab_raycast(
         }
     };
 
-    leading_corner_ray
+    let iterator = leading_corner_ray
         .cast()
         .take_while(|ray_step| ray_step.t_distance() < 1.0)
         .map(move |ray_step| {
@@ -467,11 +467,11 @@ pub(crate) fn new_aab_raycast(
                 },
                 translated_aab,
             }
-        })
-        .chain(iter::once(last_step))
+        });
+    (iterator, last_step)
 }
 
-/// Output of [`new_aab_raycast()`].
+/// Step output of [`new_aab_raycast()`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AabRaycastStep {
     /// The distance traveled so far, in multiples of `direction.length()`.
@@ -794,6 +794,17 @@ mod tests {
         }
     }
 
+    fn new_aab_raycast_collect(
+        (iterator, last): (impl Iterator<Item = AabRaycastStep>, AabRaycastStep),
+    ) -> (Vec<AabRaycastStep>, AabRaycastStep) {
+        const LIMIT: usize = 101;
+        let steps: Vec<AabRaycastStep> = iterator.take(LIMIT).collect();
+        if steps.len() == LIMIT {
+            panic!("too many items");
+        }
+        (steps, last)
+    }
+
     /// Non-randomized test of a concrete example of what [`new_aab_raycast()`] is supposed to do,
     /// with simple numbers instead of ones that will provoke rounding errors.
     #[test]
@@ -803,29 +814,31 @@ mod tests {
         let translation = vec3(2.0, 0.0, 0.0);
 
         pretty_assertions::assert_eq!(
-            new_aab_raycast(absolute_aab, translation, false).take(10).collect::<Vec<_>>(),
-            vec![
-                AabRaycastStep {
-                    t_distance: 0.0,
-                    aab_face: Face7::Within,
-                    translated_aab: absolute_aab,
-                },
-                AabRaycastStep {
-                    t_distance: 1. / 8.,
-                    aab_face: Face7::PX,
-                    translated_aab: aab.translate(vec3(0.75, 0.5, 0.5)),
-                },
-                AabRaycastStep {
-                    t_distance: 5. / 8.,
-                    aab_face: Face7::PX,
-                    translated_aab: aab.translate(vec3(1.75, 0.5, 0.5)),
-                },
+            new_aab_raycast_collect(new_aab_raycast(absolute_aab, translation, false)),
+            (
+                vec![
+                    AabRaycastStep {
+                        t_distance: 0.0,
+                        aab_face: Face7::Within,
+                        translated_aab: absolute_aab,
+                    },
+                    AabRaycastStep {
+                        t_distance: 1. / 8.,
+                        aab_face: Face7::PX,
+                        translated_aab: aab.translate(vec3(0.75, 0.5, 0.5)),
+                    },
+                    AabRaycastStep {
+                        t_distance: 5. / 8.,
+                        aab_face: Face7::PX,
+                        translated_aab: aab.translate(vec3(1.75, 0.5, 0.5)),
+                    },
+                ],
                 AabRaycastStep {
                     t_distance: 1.0,
                     aab_face: Face7::Within,
                     translated_aab: aab.translate(vec3(2.5, 0.5, 0.5)),
                 },
-            ]
+            )
         );
     }
 
@@ -843,7 +856,8 @@ mod tests {
             eprintln!("\n#{case_number} with inputs:");
             eprintln!("  translation: {translation:?}");
 
-            let mut iter = new_aab_raycast(absolute_aab, translation, reversed).take(100);
+            let (iter, last) = new_aab_raycast(absolute_aab, translation, reversed);
+            let mut iter = iter.take(100);
 
             let first_step = iter.next().expect("should have at least one step");
             assert_eq!(first_step.t_distance, 0.0);
@@ -854,28 +868,20 @@ mod tests {
                 assert_eq!(first_step.translated_aab, absolute_aab);
             }
 
-            let mut last_step = None;
             for step in iter {
                 std::dbg!(step);
-                if last_step.is_some() {
-                    panic!("should not get any further steps after final Within");
-                }
-                match Face::try_from(step.aab_face) {
-                    Ok(face) => {
-                        let face_coordinate = step.translated_aab.face_coordinate(face);
-                        assert_eq!(face_coordinate, face_coordinate.round());
-                    }
-                    Err(_) => {
-                        last_step = Some(step);
-                    }
-                }
+                let face = Face::try_from(step.aab_face).expect("should see no more Within");
+                let face_coordinate = step.translated_aab.face_coordinate(face);
+                assert_eq!(face_coordinate, face_coordinate.round());
             }
 
-            assert!(
-                last_step.is_some(),
+            assert_eq!(
+                last.aab_face,
+                Face7::Within,
                 "should have a last step that is Within"
             );
-            // TODO: make assertions about the properties of the last step
+            // TODO: make assertions about the properties of the last step, such as that it does not
+            // touch any new cubes.
         }
     }
 }
