@@ -18,7 +18,7 @@ use all_is_cubes::content::palette;
 use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::{
     Face, FreeCoordinate, GridCoordinate, GridPoint, GridSize, PositiveSign, Rgb, Rgba, ZeroOne,
-    lines::Wireframe as _,
+    lines::Wireframe as _, range_len,
 };
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
@@ -707,8 +707,8 @@ impl SpaceRenderer {
 
             // Record draw command for all instances using this mesh
             let instance_range = first_instance_index..(first_instance_index + count);
-            blocks_drawn += instance_range.len();
-            triangles_drawn += (meta.opaque_range().len() / 3) * instance_range.len();
+            blocks_drawn += range_len(&instance_range);
+            triangles_drawn += (range_len(&meta.opaque_range()) / 3) * range_len(&instance_range);
             render_pass.draw_indexed(
                 to_wgpu_index_range(meta.opaque_range()),
                 0,

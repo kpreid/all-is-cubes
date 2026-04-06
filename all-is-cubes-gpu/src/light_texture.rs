@@ -9,15 +9,12 @@ use rayon::{
     slice::ParallelSliceMut as _,
 };
 
+use all_is_cubes::euclid::{Box3D, Point3D, Size3D, Vector3D, vec3};
 use all_is_cubes::math::{
     Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord,
-    PositiveSign,
+    PositiveSign, VectorOps as _,
 };
 use all_is_cubes::space;
-use all_is_cubes::{
-    euclid::{Box3D, Point3D, Size3D, Vector3D, vec3},
-    math::VectorOps,
-};
 use all_is_cubes_render::camera::Camera;
 
 use crate::common::Identified;
@@ -368,10 +365,12 @@ impl LightTexture {
         buffer.clear();
         cfg_if::cfg_if! {
             if #[cfg(feature = "auto-threads")] {
+                use all_is_cubes::math::range_len;
+
                 buffer.resize(volume, [0; Self::COMPONENTS]);
 
-                let x_chunk_size = region.x_range().len();
-                let xy_chunk_size = x_chunk_size * region.y_range().len();
+                let x_chunk_size = range_len(&region.x_range());
+                let xy_chunk_size = x_chunk_size * range_len(&region.y_range());
                 region
                     .z_range()
                     .into_par_iter()

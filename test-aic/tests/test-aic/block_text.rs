@@ -21,7 +21,7 @@ fn plane_to_text(voxels: Vol<&[block::Evoxel]>) -> Vec<String> {
     }
 
     let z = voxels.bounds().lower_bounds().z;
-    assert_eq!(voxels.bounds().z_range().len(), 1);
+    assert_eq!(voxels.bounds().size().depth, 1);
     voxels
         .bounds()
         .y_range()

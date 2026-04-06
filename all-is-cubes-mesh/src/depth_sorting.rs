@@ -11,7 +11,7 @@ use smallvec::SmallVec;
 
 use all_is_cubes::euclid::{self, Vector3D, vec3};
 use all_is_cubes::math::lines::Wireframe as _;
-use all_is_cubes::math::{Axis, Face, FaceMap, GridRotation, lines};
+use all_is_cubes::math::{Axis, Face, FaceMap, GridRotation, lines, range_len};
 
 use crate::{
     Aabb, IndexInt, IndexSliceMut, IndexVec, MeshRel, MeshTypes, PosCoord, Position,
@@ -425,7 +425,7 @@ pub(crate) fn store_transparent_indices<M: MeshTypes, I: IndexInt>(
             debug_assert!(!index_range.is_empty());
             *meta = TransparentMeta {
                 // Always dynamically sort everything.
-                dynamic_sub_ranges: SmallVec::from([0..index_range.len()]),
+                dynamic_sub_ranges: SmallVec::from([0..range_len(&index_range)]),
                 // Haven't performed any sorting yet, so there is no region of validity.
                 depth_sort_validity: Aabb::EMPTY,
                 index_range,
@@ -528,7 +528,7 @@ fn static_sort<V: Vertex, P: Primitive>(
                     group_upper_bound = qmax;
                 } else {
                     // Primitive does not overlap; finish the current group and start a new one.
-                    if prim_group.len() > 1 {
+                    if range_len(&prim_group) > 1 {
                         meta.dynamic_sub_ranges
                             .push((prim_group.start * P::LEN)..(prim_group.end * P::LEN));
                     }
@@ -537,7 +537,7 @@ fn static_sort<V: Vertex, P: Primitive>(
                 }
             }
             // Write the last group
-            if prim_group.len() > 1 {
+            if range_len(&prim_group) > 1 {
                 meta.dynamic_sub_ranges
                     .push((prim_group.start * P::LEN)..(prim_group.end * P::LEN));
             }
@@ -693,7 +693,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         // not just the ones the dynamic sort touched.
         result.changed = Some(meta.index_range.clone());
 
-        result.info.elements_sorted += meta.index_range.len();
+        result.info.elements_sorted += range_len(&meta.index_range);
         result.info.static_groups_sorted += 1;
     }
     result
@@ -1014,8 +1014,8 @@ mod tests {
         let position_with_nothing = Position::new(0.5, 0.5, 10.0);
         assert_eq!(
             (
-                space_mesh.transparent_range(ordering_with_face).len(),
-                space_mesh.transparent_range(ordering_with_nothing).len()
+                range_len(&space_mesh.transparent_range(ordering_with_face)),
+                range_len(&space_mesh.transparent_range(ordering_with_nothing))
             ),
             (6, 0),
             "expected culling did not occur; test is invalid"
@@ -1054,7 +1054,7 @@ mod tests {
         let ordering = DepthOrdering(vec3(Rel::Lower, Rel::Within, Rel::Within));
         let position = Position::new(-10.5, 0.5, 0.5);
         assert_eq!(
-            space_mesh.transparent_range(ordering).len(),
+            range_len(&space_mesh.transparent_range(ordering)),
             6 * 3,
             "expected 3 rects",
         );

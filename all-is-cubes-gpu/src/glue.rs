@@ -8,7 +8,7 @@ use core::ops::Range;
 use bytemuck::Pod;
 
 use all_is_cubes::euclid::{Box3D, Point3D, Size2D, Size3D};
-use all_is_cubes::math::{GridSize, Rgba};
+use all_is_cubes::math::{GridSize, Rgba, range_len};
 use all_is_cubes_mesh::IndexSlice;
 use num_traits::NumCast;
 
@@ -157,12 +157,12 @@ pub fn write_part_of_slice_to_part_of_buffer(
     )..(byte_range.end.next_multiple_of(ALIGN));
     debug_assert!(mapping_range.start <= byte_range.start);
     debug_assert!(mapping_range.end >= byte_range.end);
-    debug_assert!(mapping_range.len().is_multiple_of(ALIGN));
+    debug_assert!(range_len(&mapping_range).is_multiple_of(ALIGN));
 
     let mut staging = bwp.reborrow().write_buffer(
         destination,
         mapping_range.start as u64,
-        wgpu::BufferSize::new(mapping_range.len() as u64).unwrap(),
+        wgpu::BufferSize::new(range_len(&mapping_range) as u64).unwrap(),
     );
 
     // Note that we must not overrun the end of `source`, so we can't just use `mapping_range`;

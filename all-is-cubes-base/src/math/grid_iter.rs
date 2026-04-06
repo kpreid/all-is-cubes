@@ -4,7 +4,7 @@ use core::ops::Range;
 
 use euclid::point2;
 
-use crate::math::{Cube, GridAab, GridCoordinate, GridPoint};
+use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, range_len};
 
 /// Iterator produced by [`GridAab::interior_iter()`].
 #[derive(Clone, Debug)]
@@ -116,9 +116,9 @@ impl Iterator for GridIter {
                 (0, Some(0))
             }
             Ok(planes_remaining) => {
-                let rows_remaining = planes_remaining * self.y_range.len()
+                let rows_remaining = planes_remaining * range_len(&self.y_range)
                     + usize::try_from((self.y_range.end - self.cube.y) - 1).unwrap_or(0);
-                let cubes_remaining = rows_remaining * self.z_range.len()
+                let cubes_remaining = rows_remaining * range_len(&self.z_range)
                     + usize::try_from(self.z_range.end - self.cube.z).unwrap();
 
                 (cubes_remaining, Some(cubes_remaining))

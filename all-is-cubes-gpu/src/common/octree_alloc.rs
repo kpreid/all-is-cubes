@@ -3,7 +3,8 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
-use core::ops::{self, Range};
+use core::ops;
+use core::ops::Range;
 
 use all_is_cubes::euclid::{Box3D, Point3D, Size3D, Translation3D};
 use all_is_cubes::math::{

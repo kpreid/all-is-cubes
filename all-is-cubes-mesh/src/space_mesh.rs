@@ -8,7 +8,7 @@ use exhaust::Exhaust;
 use itertools::izip;
 use smallvec::SmallVec;
 
-use all_is_cubes::math::{Cube, Face, FaceMap, GridAab, Vol};
+use all_is_cubes::math::{Cube, Face, FaceMap, GridAab, Vol, range_len};
 use all_is_cubes::space::{self, BlockIndex, Space};
 use all_is_cubes_render::Flaws;
 
@@ -944,7 +944,7 @@ impl TransparentMeta {
 
         for (i, sub_range) in dynamic_sub_ranges.iter().enumerate() {
             assert!(
-                !sub_range.is_empty() && sub_range.end <= index_range.len(),
+                !sub_range.is_empty() && sub_range.end <= range_len(index_range),
                 "sub-range {i} of {range_count}, {sub_range:?}, \
                 is empty or does not fit in index range {index_range:?}",
                 range_count = dynamic_sub_ranges.len(),

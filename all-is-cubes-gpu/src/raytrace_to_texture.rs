@@ -1,6 +1,5 @@
 //! Runs the software raytracer and writes the results into a texture.
 
-use all_is_cubes::util::{ConciseDebug, Refmt};
 use alloc::sync::Arc;
 // TODO: if not using threads, don't even use a Mutex as it's entirely wasted
 use alloc::boxed::Box;
@@ -19,8 +18,9 @@ use web_time::{Duration, Instant};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::{Box2D, point2, point3, vec2, vec3};
 use all_is_cubes::listen;
-use all_is_cubes::math::{OpacityCategory, VectorOps as _};
+use all_is_cubes::math::{OpacityCategory, VectorOps as _, range_len};
 use all_is_cubes::universe::ReadTicket;
+use all_is_cubes::util::{ConciseDebug, Refmt};
 use all_is_cubes_render::camera::{
     Camera, ImagePixel, ImageSize, Layers, StandardCameras, Viewport,
 };
@@ -876,10 +876,10 @@ impl PixelPicker {
 
         // There are two cyclic iterators interleaved, so the overall cycle length is
         // twice the longest individual cycle length.
-        let cycle_length = inner_range.len().max(outer_range.len()) * 2;
+        let cycle_length = range_len(&inner_range).max(range_len(&outer_range)) * 2;
 
         PixelPicker {
-            iter: ((inner_range).cycle()).interleave(outer_range.cycle()),
+            iter: ((inner_range).into_iter().cycle()).interleave(outer_range.into_iter().cycle()),
             viewport,
             sorted_pixels,
             cycle_length,
