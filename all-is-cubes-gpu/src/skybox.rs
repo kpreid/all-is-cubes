@@ -138,7 +138,8 @@ fn compute_and_write_skybox(queue: &wgpu::Queue, texture: &wgpu::Texture, sky: &
 /// Convert a [`Sky`] to skybox texture data.
 ///
 /// The output has 6 × `resolution`² elements.
-fn compute_skybox(sky: &Sky, resolution: u32) -> impl Iterator<Item = Rgb> {
+#[doc(hidden)] // pub for reuse in testing
+pub fn compute_skybox(sky: &Sky, resolution: u32) -> impl Iterator<Item = Rgb> {
     // convert texel coordinates to ray coordinates
     let res_scale = 2.0 / f64::from(resolution);
     let scaler = move |texel| (f64::from(texel) + 0.5).mul_add(res_scale, -1.0);

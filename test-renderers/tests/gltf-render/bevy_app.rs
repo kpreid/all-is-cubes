@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use bevy::camera::RenderTarget;
+use bevy::core_pipeline::Skybox;
 use bevy::image::BevyDefault as _;
 use bevy::post_process::bloom;
 use bevy::prelude as b;
@@ -178,6 +179,28 @@ fn init_entities_and_resources(app: &mut bevy::app::App, viewport: Viewport) -> 
         .run_system_cached_with(create_render_target, viewport)
         .expect("create_render_target failed");
 
+    // `Skybox` breaks if created with default values; create a valid cubemap to be replaced.
+    // <https://github.com/bevyengine/bevy/issues/23688>
+    // Alternatively we could not create the `Skybox` until the first time we have an image,
+    // but that would make `load_transfer_system` more complex.
+    let skybox_dummy_image = app.world_mut().resource_mut::<b::Assets<b::Image>>().add(b::Image {
+        texture_view_descriptor: Some(wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::Cube),
+            ..Default::default()
+        }),
+        ..b::Image::new(
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 6,
+            },
+            bevy::render::render_resource::TextureDimension::D2,
+            vec![0; 6 * 2 * 4], // 6 pixels of dummy data
+            bevy::render::render_resource::TextureFormat::Rgba16Float,
+            bevy::asset::RenderAssetUsages::RENDER_WORLD,
+        )
+    });
+
     // TODO: instead of spawning our own camera we should pass the camera through glTF,
     // at least partially
     app.world_mut().spawn((
@@ -200,6 +223,11 @@ fn init_entities_and_resources(app: &mut bevy::app::App, viewport: Viewport) -> 
         bevy::pbr::DistanceFog::default(),
         // This transform should get overwritten.
         b::Transform::from_xyz(5., 5., 5.).looking_at(b::Vec3::new(0.0, 0.3, 0.0), b::Vec3::Y),
+        // This skybox should get overwritten.
+        Skybox {
+            image: skybox_dummy_image,
+            ..Skybox::default()
+        },
     ));
 
     app.world_mut()
@@ -237,6 +265,7 @@ fn create_render_target(
     RenderTarget::Image(render_target_image_handle.into())
 }
 
+/// Component identifying the root entity of the loaded glTF scene.
 #[derive(b::Component)]
 struct SceneTag;
 
@@ -255,6 +284,7 @@ fn load_transfer_system(
             &mut b::Msaa,
             &mut bloom::Bloom,
             &mut bevy::pbr::DistanceFog,
+            &mut Skybox,
         ),
         b::With<b::Camera3d>,
     >,
@@ -294,13 +324,16 @@ fn load_transfer_system(
         asset_server.load::<b::Gltf>(gltf_path).untyped()
     };
 
-    // Update sky and ensure ambient light is disabled.
+    // Compute sky color.
+    // The clear color shouldn’t have any effect, but we do use the sky color for fog.
     let sky_color = convert_color(sky.mean().with_alpha_one());
     *clear_color = b::ClearColor(sky_color);
+
+    // Ensure default ambient light is disabled.
     ambient_light.brightness = 0.0;
 
     // Update camera
-    let (bevy_projection, bevy_transform, msaa, bloom, fog) = &mut *bevy_camera;
+    let (bevy_projection, bevy_transform, msaa, bloom, fog, skybox) = &mut *bevy_camera;
     {
         // Convert translation
         let translation: b::Vec3 = <[f32; 3]>::from(aic_camera.view_position().to_f32()).into();
@@ -364,6 +397,35 @@ fn load_transfer_system(
                 }
             }
             _ => unimplemented!("missing FogOption {fog:?}"),
+        };
+
+        // Convert skybox
+        let skybox_image = b::Image {
+            texture_view_descriptor: Some(wgpu::TextureViewDescriptor {
+                dimension: Some(wgpu::TextureViewDimension::Cube),
+                ..Default::default()
+            }),
+            ..b::Image::new(
+                wgpu::Extent3d {
+                    width: 256,
+                    height: 256,
+                    depth_or_array_layers: 6,
+                },
+                bevy::render::render_resource::TextureDimension::D2,
+                // Kludge: Bevy seems to be treating the image as sRGB encoded even if we pass
+                // Rgb16Float, so encode it as simple 8-bit sRGB.
+                // TODO: Investigate Bevy’s intent and whether there is a bug here.
+                all_is_cubes_gpu::compute_skybox(&sky, 256)
+                    .flat_map(|rgb| rgb.with_alpha_one().to_srgb8())
+                    .collect(),
+                bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+                bevy::asset::RenderAssetUsages::RENDER_WORLD,
+            )
+        };
+        **skybox = Skybox {
+            image: images.add(skybox_image),
+            brightness: BRIGHTNESS_MAGIC_NUMBER,
+            rotation: b::Quat::IDENTITY,
         };
     }
 
@@ -438,7 +500,7 @@ fn convert_volumetric_light(
                 bevy::asset::RenderAssetUsages::RENDER_WORLD,
             )),
             // TODO: empirically chosen to match; justify this number
-            intensity: 1024.0,
+            intensity: BRIGHTNESS_MAGIC_NUMBER,
             affects_lightmapped_meshes: false,
         },
         b::LightProbe,
@@ -508,3 +570,7 @@ fn convert_color(color: Rgba) -> b::Color {
     let [r, g, b, a] = color.into();
     b::Color::linear_rgba(r, g, b, a)
 }
+
+/// Empirically determined "brightness"/"intensity" value for Bevy lighting and skybox to make them
+/// match our expected output.
+const BRIGHTNESS_MAGIC_NUMBER: f32 = 1000.0;

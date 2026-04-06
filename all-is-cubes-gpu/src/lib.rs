@@ -51,6 +51,8 @@ mod rerun_image;
 pub mod shader_testing;
 mod shaders;
 mod skybox;
+#[doc(hidden)]
+pub use skybox::compute_skybox;
 mod space;
 use space::SpaceRenderer;
 mod surface;
