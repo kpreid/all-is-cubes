@@ -5,9 +5,12 @@ use alloc::vec::Vec;
 use half::f16;
 
 use all_is_cubes::euclid::vec3;
+use all_is_cubes::math::Rgb;
 use all_is_cubes::space::Sky;
 
 use crate::Identified;
+
+// -------------------------------------------------------------------------------------------------
 
 /// GPU resources to render a [`Sky`].
 #[derive(Debug)]
@@ -37,7 +40,7 @@ impl Skybox {
             self.texture_view = create_skybox_texture_view(&self.texture_label, &self.texture);
         }
 
-        compute_skybox(queue, &self.texture, sky);
+        compute_and_write_skybox(queue, &self.texture, sky);
     }
 
     fn resolution(&self) -> u32 {
@@ -100,7 +103,7 @@ const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 const CHANNELS: usize = 4;
 type Component = f16;
 
-fn compute_skybox(queue: &wgpu::Queue, texture: &wgpu::Texture, sky: &Sky) {
+fn compute_and_write_skybox(queue: &wgpu::Queue, texture: &wgpu::Texture, sky: &Sky) {
     let resolution = texture.width();
     let wanted_resolution = resolution_for(sky);
     if resolution != wanted_resolution {
@@ -109,31 +112,13 @@ fn compute_skybox(queue: &wgpu::Queue, texture: &wgpu::Texture, sky: &Sky) {
         );
     }
 
-    // convert texel coordinates to ray coordinates
-    let res_scale = 2.0 / f64::from(resolution);
-    let scaler = |texel| (f64::from(texel) + 0.5).mul_add(res_scale, -1.0);
-
-    let data: Vec<[Component; CHANNELS]> = itertools::iproduct!(0..6, 0..resolution, 0..resolution)
-        .map(|(layer, y, x)| {
-            let x = scaler(x);
-            let y = scaler(y);
-            let ray = match layer {
-                // TODO: this mapping was constructed empirically.
-                // Would be nice to have a spec citation.
-                0 => vec3(1.0, -y, -x),
-                1 => vec3(-1.0, -y, x),
-                2 => vec3(x, 1.0, y),
-                3 => vec3(x, -1.0, -y),
-                4 => vec3(x, -y, 1.0),
-                5 => vec3(-x, -y, -1.0),
-                _ => unreachable!(),
-            };
-            let value = sky.sample(ray).with_alpha_one();
+    let data: Vec<[Component; CHANNELS]> = compute_skybox(sky, resolution)
+        .map(|rgb| {
             [
-                f16::from_f32(value.red().into_inner()),
-                f16::from_f32(value.green().into_inner()),
-                f16::from_f32(value.blue().into_inner()),
-                f16::from_f32(value.alpha().into_inner()),
+                f16::from_f32(rgb.red().into_inner()),
+                f16::from_f32(rgb.green().into_inner()),
+                f16::from_f32(rgb.blue().into_inner()),
+                f16::from_f32(1.0),
             ]
         })
         .collect();
@@ -148,4 +133,30 @@ fn compute_skybox(queue: &wgpu::Queue, texture: &wgpu::Texture, sky: &Sky) {
         },
         texture.size(),
     );
+}
+
+/// Convert a [`Sky`] to skybox texture data.
+///
+/// The output has 6 × `resolution`² elements.
+fn compute_skybox(sky: &Sky, resolution: u32) -> impl Iterator<Item = Rgb> {
+    // convert texel coordinates to ray coordinates
+    let res_scale = 2.0 / f64::from(resolution);
+    let scaler = move |texel| (f64::from(texel) + 0.5).mul_add(res_scale, -1.0);
+
+    itertools::iproduct!(0..6, 0..resolution, 0..resolution).map(move |(layer, y, x)| {
+        let x = scaler(x);
+        let y = scaler(y);
+        let ray = match layer {
+            // TODO: this mapping was constructed empirically.
+            // Would be nice to have a spec citation.
+            0 => vec3(1.0, -y, -x),
+            1 => vec3(-1.0, -y, x),
+            2 => vec3(x, 1.0, y),
+            3 => vec3(x, -1.0, -y),
+            4 => vec3(x, -y, 1.0),
+            5 => vec3(-x, -y, -1.0),
+            _ => unreachable!(),
+        };
+        sky.sample(ray)
+    })
 }
