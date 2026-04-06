@@ -51,7 +51,7 @@ pub(crate) fn to_space(
         } else {
             let mut p = space::SpacePhysics::default();
             p.light = space::LightPhysics::Rays {
-                maximum_distance: u8::try_from(bounds.y_range().len()).unwrap_or(u8::MAX),
+                maximum_distance: u8::try_from(bounds.size().height).unwrap_or(u8::MAX),
             };
             p
         })

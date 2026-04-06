@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use itertools::Itertools as _;
+use itertools::{Itertools as _, izip};
 
 use all_is_cubes::block::Resolution;
 use all_is_cubes::space::{self, Space};
@@ -115,11 +115,11 @@ async fn export_space_as_scene(
     let [convert_blocks_progress, convert_space_progress] = progress.split(0.5);
 
     let mut block_index_to_model_index: HashMap<space::BlockIndex, u32> = HashMap::new();
-    for ((mut p, block_data), block_index) in convert_blocks_progress
-        .split_evenly(space.block_data().len())
-        .zip(space.block_data())
-        .zip(0..=space::BlockIndex::MAX)
-    {
+    for (mut p, block_data, block_index) in izip!(
+        convert_blocks_progress.split_evenly(space.block_data().len()),
+        space.block_data(),
+        0..=space::BlockIndex::MAX
+    ) {
         p.set_label(format!("Exporting block model {block_index}"));
         p.progress(0.0).await;
 

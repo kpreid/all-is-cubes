@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use core::fmt;
+use core::iter;
 
 use itertools::Itertools;
 
@@ -121,15 +122,17 @@ impl Analysis {
     /// Index 0 is depth 0 (the surface of the block volume), index 1 is one voxel
     /// deeper, and so on.
     pub fn occupied_planes(&self, face: Face) -> impl Iterator<Item = (GridCoordinate, Rect)> + '_ {
-        (0..GridCoordinate::from(self.resolution))
-            .zip(self.occupied_planes[face])
-            .filter_map(move |(i, pbox)| {
-                if pbox.is_empty() {
-                    None
-                } else {
-                    Some((i, self.pbox_to_rect(face, pbox)))
-                }
-            })
+        iter::zip(
+            0..GridCoordinate::from(self.resolution),
+            self.occupied_planes[face],
+        )
+        .filter_map(move |(i, pbox)| {
+            if pbox.is_empty() {
+                None
+            } else {
+                Some((i, self.pbox_to_rect(face, pbox)))
+            }
+        })
     }
 
     #[cfg(feature = "rerun")]

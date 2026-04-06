@@ -5,6 +5,7 @@
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use core::iter;
 
 use all_is_cubes::block::{Atom, Block, Primitive, Resolution};
 use all_is_cubes::euclid::vec3;
@@ -332,7 +333,7 @@ where
     B: Into<alloc::borrow::Cow<'b, Block>>,
 {
     let origin = origin.into();
-    for (y, block) in (0..).zip(blocks) {
+    for (y, block) in iter::zip(0.., blocks) {
         m.set(origin + GridVector::new(0, y, 0), block)?;
     }
     Ok(())

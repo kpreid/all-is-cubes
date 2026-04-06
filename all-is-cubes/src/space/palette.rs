@@ -10,6 +10,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::Cell;
 use core::fmt;
+use core::iter;
 use core::sync::atomic::Ordering;
 
 use bevy_ecs::change_detection::DetectChangesMut as _;
@@ -120,7 +121,7 @@ impl Palette {
         };
 
         let mut remapping = hashbrown::HashMap::new();
-        for (original_index, block) in (0..=BlockIndex::MAX).zip(blocks) {
+        for (original_index, block) in iter::zip(0..=BlockIndex::MAX, blocks) {
             let new_index = new_self
                 .ensure_index(
                     &mut EvaluationMethod::Ticket(read_ticket),

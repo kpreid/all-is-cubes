@@ -7,6 +7,7 @@ use anyhow::Context as _;
 use crossterm::QueueableCommand as _;
 use crossterm::cursor::{self, MoveTo};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
+use itertools::izip;
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm;
@@ -434,8 +435,7 @@ impl TerminalState {
                     .split(toolbar_rect);
 
                 let selected_slots = ui_frame.inventory.selected_slots;
-                for ((&rect, i), slot) in slot_rects.iter().zip(0..).zip(&ui_frame.inventory.slots)
-                {
+                for (&rect, i, slot) in izip!(slot_rects.iter(), 0.., &ui_frame.inventory.slots) {
                     let slot_info: Vec<Span<'_>> = vec![
                         if selected_slots[0] == i {
                             SELECTED_0

@@ -3,6 +3,7 @@
 #![expect(clippy::unused_async)]
 #![expect(clippy::cast_possible_wrap)]
 
+use std::iter;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -808,7 +809,7 @@ async fn icons(mut context: RenderTestContext) {
             FreeCoordinate::from(bounds.size().height) * 1.5,
         ))
         .build_and_mutate(|m| {
-            for (index, block) in (0i32..).zip(all_blocks) {
+            for (index, block) in iter::zip(0i32.., all_blocks) {
                 m.set(
                     [
                         index.rem_euclid(row_length),
@@ -1520,9 +1521,9 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
             // Front air space
             m.fill_uniform(bounds.abut(Face::PZ, -1).unwrap(), &AIR).unwrap();
 
-            for (i, luminance) in (0i32..).zip(luminance_ramp) {
+            for (i, luminance) in iter::zip(0i32.., luminance_ramp) {
                 let x = i * x_spacing;
-                for (j, color) in (0i32..).zip(colors) {
+                for (j, color) in iter::zip(0i32.., colors) {
                     let y = j * y_spacing;
                     let light_source_block = Block::builder()
                         .color(Rgba::WHITE)

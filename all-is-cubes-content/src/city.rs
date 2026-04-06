@@ -2,8 +2,9 @@
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
 use alloc::{sync::Arc, vec::Vec};
+use core::iter;
 
-use itertools::Itertools;
+use itertools::Itertools as _;
 use rand::{RngExt as _, SeedableRng as _};
 
 use all_is_cubes::arcstr::literal;
@@ -718,7 +719,7 @@ fn place_roads_and_tunnels(
             .cast()
             .within(m.bounds(), false);
         let curb_y = vec3(0, 1, 0);
-        for (i, step) in (0i32..).zip(raycaster) {
+        for (i, step) in iter::zip(0i32.., raycaster) {
             let cube = step.cube_ahead();
             let road_not_ended = i < planner.city_radius;
 

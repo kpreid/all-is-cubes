@@ -385,7 +385,7 @@ impl LightTexture {
                             // Not parallelizing this deepest level because in the typical case,
                             // we're updating either a volume or a plane, which will have at least
                             // one of a long Y axis or a long Z axis.
-                            for (x, light_value) in region.x_range().zip(x_chunk.iter_mut()) {
+                            for (x, light_value) in core::iter::zip(region.x_range(), x_chunk.iter_mut()) {
                                 *light_value = space.get_lighting([x, y, z]).as_texel();
                             }
                         });

@@ -17,6 +17,7 @@ use futures_core::future::BoxFuture;
 pub use gltf_json as json;
 use gltf_json::Index;
 use gltf_json::validation::Checked::Valid;
+use itertools::izip;
 
 use all_is_cubes::block;
 use all_is_cubes::universe::{Name, ReadTicket};
@@ -443,11 +444,11 @@ pub(crate) fn export_gltf(
         {
             let mut block_nodes: Vec<Index<gltf_json::Node>> =
                 Vec::with_capacity(block_evaluations.len());
-            for (index, (mut p, (name, evaluation))) in block_def_progress
-                .split_evenly(block_evaluations.len())
-                .zip(block_evaluations)
-                .enumerate()
-            {
+            for (index, mut p, (name, evaluation)) in izip!(
+                0..,
+                block_def_progress.split_evenly(block_evaluations.len()),
+                block_evaluations,
+            ) {
                 p.set_label(&name);
                 p.progress(0.01).await;
                 {

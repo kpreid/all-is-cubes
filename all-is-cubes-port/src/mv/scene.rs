@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use itertools::izip;
+
 use all_is_cubes::block::{self, Block, Resolution};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::free_editing_starter_inventory;
@@ -60,8 +62,8 @@ pub(crate) async fn scene_to_space(
         .try_build()
         .map_err(|e| mv::DotVoxConversionError::Unexpected(InGenError::from(e)))?;
 
-    for (leaf_index, (leaf, mut leaf_progress)) in
-        leaves.iter().zip(progress.split_evenly(leaves.len())).enumerate()
+    for (leaf_index, leaf, mut leaf_progress) in
+        izip!(0.., &leaves, progress.split_evenly(leaves.len()))
     {
         leaf_progress.set_label(format!("Placing model #{leaf_index}/{n}", n = leaves.len()));
         leaf_progress.progress(0.0).await;

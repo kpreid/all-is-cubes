@@ -155,7 +155,9 @@ impl ToolbarController {
             .iter()
             .chain(iter::repeat(&block::AIR));
 
-        for ((slot_index, stack), icon_block) in slot_range.zip(contents_iter).zip(icons_iter) {
+        for (slot_index, stack, icon_block) in
+            itertools::izip!(slot_range, contents_iter, icons_iter)
+        {
             let icon_cube = self.slot_position(slot_index);
             let info_cube = icon_cube + GridVector::new(-1, 0, 0);
 

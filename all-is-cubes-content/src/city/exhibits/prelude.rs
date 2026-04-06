@@ -5,9 +5,11 @@ pub(super) use alloc::sync::Arc;
 pub(super) use alloc::vec::Vec;
 pub(super) use core::convert::{TryFrom as _, identity};
 pub(super) use core::f64::consts::PI;
+pub(super) use core::iter;
 pub(super) use core::num::NonZero;
 
 pub(super) use exhaust::Exhaust as _;
+pub(super) use itertools::izip;
 pub(super) use rand::SeedableRng as _;
 
 pub(super) use all_is_cubes::arcstr::{self, literal};

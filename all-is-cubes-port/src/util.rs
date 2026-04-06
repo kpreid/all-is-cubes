@@ -8,6 +8,8 @@
     )
 )]
 
+use core::iter;
+
 use all_is_cubes::util::YieldProgress;
 
 /// Basic not-optimized version of running a blocking operation from an async context.
@@ -42,7 +44,7 @@ pub(crate) async fn maybe_parallelize<T: Send, U: Send + 'static>(
     {
         let mut outputs: Vec<U> = Vec::new();
         let split_p = progress.split_evenly(items.len());
-        for (item, mut p) in items.zip(split_p) {
+        for (item, mut p) in iter::zip(items, split_p) {
             p.set_label(label_function(&item));
             p.progress(0.0).await; // make label visible
             outputs.push(work_function(item));
@@ -57,9 +59,7 @@ pub(crate) async fn maybe_parallelize<T: Send, U: Send + 'static>(
 
         spawn_blocking(move || {
             let split_p = progress.split_evenly_concurrent(items.len());
-            let items_and_progresses = items
-                .into_iter()
-                .zip(split_p)
+            let items_and_progresses = iter::zip(items, split_p)
                 .map(|(item, mut p)| {
                     p.set_label(label_function(&item));
                     p.progress_without_yield(0.0); // cause label to be published

@@ -2,6 +2,7 @@
 //! This module is private but reexported by its parent.
 
 use core::fmt;
+use core::iter;
 use core::ops;
 
 use euclid::Vector3D;
@@ -934,14 +935,14 @@ impl<V> FaceMap<V> {
 
     /// Iterate over the map's key-value pairs by reference, in the same order as [`Face::ALL`].
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = (Face, &V)> + ExactSizeIterator + Clone {
-        Face::ALL.into_iter().zip(self.as_array())
+        iter::zip(Face::ALL, self.as_array())
     }
 
     /// Iterate over the map's key-value pairs by mutable reference, in the same order as [`Face::ALL`].
     pub fn iter_mut(
         &mut self,
     ) -> impl DoubleEndedIterator<Item = (Face, &mut V)> + ExactSizeIterator {
-        Face::ALL.into_iter().zip(self.as_array_mut())
+        iter::zip(Face::ALL, self.as_array_mut())
     }
 
     /// Iterate over the map values by reference, in the same order as [`Face::ALL`].
@@ -1505,7 +1506,7 @@ mod tests {
     #[test]
     fn face_map_iter_in_enum_order() {
         let mut map = FaceMap::from_fn(core::convert::identity);
-        let expected_both: Vec<(Face, Face)> = Face::ALL.into_iter().zip(Face::ALL).collect();
+        let expected_both: Vec<(Face, Face)> = iter::zip(Face::ALL, Face::ALL).collect();
 
         // FaceMap::iter()
         assert_eq!(

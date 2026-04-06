@@ -4,6 +4,7 @@ use alloc::borrow::ToOwned as _;
 use alloc::format;
 use core::fmt;
 use core::hash::Hash;
+use core::iter;
 
 use exhaust::Exhaust;
 
@@ -48,7 +49,7 @@ impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St>
         let mut shape_txn = self.shape[state.clone()].create_box(grant.bounds);
 
         // Composite label and shape
-        for (x, label_block) in (0..).zip(self.label.blocks(grant.gravity)) {
+        for (x, label_block) in iter::zip(0.., self.label.blocks(grant.gravity)) {
             // TODO: centered in case the button is larger
             let cube = Cube::from(grant.bounds.lower_bounds() + vec3(x, 0, 0));
 

@@ -9,6 +9,8 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use itertools::izip;
+
 use crate::Identified;
 use crate::queries::{Queries, Query};
 
@@ -200,7 +202,7 @@ impl<const N: usize> Pipelines<N> {
                     binding: 0,
                     resource: wgpu::BindingResource::Sampler(&self.sampler),
                 }]);
-                for (i, b) in (0..N).zip(0..const { N as u32 }) {
+                for (i, b) in izip!(0..N, 0..const { N as u32 }) {
                     entries.extend([
                         wgpu::BindGroupEntry {
                             binding: PREVIOUS_STAGE_BINDING_BASE + b,

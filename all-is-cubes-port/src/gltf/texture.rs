@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::io;
+use std::iter;
 use std::mem;
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -374,7 +375,7 @@ impl Gatherer {
                 sliced_bounds,
                 rotation,
             },
-        ) in (0..).zip(entries.iter())
+        ) in iter::zip(0.., entries.iter())
         {
             let size = sliced_bounds
                     .transform(rotation.into())

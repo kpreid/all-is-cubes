@@ -49,6 +49,7 @@ futures-task = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
 hashbrown = { workspace = true, optional = true, features = ["serde"] }
 indoc = { workspace = true }
+itertools = { workspace = true }
 log = { workspace = true }
 macro_rules_attribute = { workspace = true }
 mutants = { workspace = true }

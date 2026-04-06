@@ -1,10 +1,11 @@
 //! Functions for transferring monospaced fonts and text to the GPU to be efficiently rendered.
 
-use all_is_cubes::drawing::embedded_graphics::prelude::Size;
+use core::iter;
+
 use itertools::iproduct;
 
 use all_is_cubes::drawing::embedded_graphics::{
-    self as eg, Drawable as _, geometry::Point, transform::Transform as _,
+    self as eg, Drawable as _, geometry::Point, prelude::Size, transform::Transform as _,
 };
 use all_is_cubes::euclid::{Size2D, Vector2D, point2, size2};
 use all_is_cubes_render::camera::{ImageSize, Viewport};
@@ -121,7 +122,7 @@ pub(crate) fn generate_texture_atlas(
 
     // Write characters into atlas
     let mut string_buf: [u8; 4] = [0; 4];
-    for (character, (y, x)) in ('\u{00}'..='\u{FF}').zip(iproduct!(0..16, 0..16)) {
+    for (character, (y, x)) in iter::zip('\u{00}'..='\u{FF}', iproduct!(0..16, 0..16)) {
         let string = character.encode_utf8(&mut string_buf);
 
         let position = Point::new(

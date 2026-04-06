@@ -1,4 +1,6 @@
-use core::{fmt, ops};
+use core::fmt;
+use core::iter;
+use core::ops;
 
 use euclid::{Vector3D, vec3};
 
@@ -509,7 +511,7 @@ impl<T> OctantMap<T> {
     /// The order of iteration is not currently guarateed.
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = (Octant, &T)> + '_ {
-        Octant::ALL.into_iter().zip(self.0.iter())
+        iter::zip(Octant::ALL, self.0.iter())
     }
 
     /// Returns an iterator over all elements by reference.
@@ -525,7 +527,7 @@ impl<T> OctantMap<T> {
     /// The order of iteration is not currently guarateed.
     #[inline]
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Octant, &mut T)> + '_ {
-        Octant::ALL.into_iter().zip(self.0.iter_mut())
+        iter::zip(Octant::ALL, self.0.iter_mut())
     }
 }
 

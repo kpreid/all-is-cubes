@@ -2,10 +2,11 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::ops::Range;
 use core::{fmt, mem, ops};
-use smallvec::SmallVec;
 
 use bitvec::vec::BitVec;
 use exhaust::Exhaust;
+use itertools::izip;
+use smallvec::SmallVec;
 
 use all_is_cubes::math::{Cube, Face, FaceMap, GridAab, Vol};
 use all_is_cubes::space::{self, BlockIndex, Space};
@@ -845,7 +846,7 @@ impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
         impl fmt::Debug for OrderingAsKey<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 let mut dm = f.debug_map();
-                for (i, (value, key)) in self.0.iter().zip(DepthOrdering::exhaust()).enumerate() {
+                for (i, value, key) in izip!(0.., self.0, DepthOrdering::exhaust()) {
                     debug_assert_eq!(key.to_index(), i);
                     dm.entry(&key, &value);
                 }

@@ -4,6 +4,8 @@
 //! Note: This is *not* a code sample to be imitated, as it uses unstable/pseudo-private APIs.
 //! It is listed as an “example” because it is a program that only makes sense to run manually.
 
+use core::iter;
+
 use all_is_cubes::block::Resolution::{self, R8};
 use all_is_cubes::math::{Aab, FreeVector, GridAab, GridVector};
 use all_is_cubes::raycast::{Ray, Raycaster};
@@ -52,7 +54,7 @@ fn show(
     recurse: Recurse,
 ) {
     let mut previous_point = None;
-    for (i, step) in (0..1000).zip(raycaster) {
+    for (i, step) in iter::zip(0..1000, raycaster) {
         destination.stream.set_time_sequence("global_step", *global_t);
         *global_t += 1;
 
