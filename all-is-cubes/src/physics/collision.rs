@@ -853,6 +853,10 @@ mod tests {
             let direction: FreeVector = rand_distr::UnitSphere.sample(&mut rng).into();
             let translation: FreeVector = direction * 5.0; // must be shorter than the take()
 
+            // recomputing leading corner because it's not part of the algorithm's own outputs -- TODO dubious
+            let leading_corner: Octant =
+                Octant::from_vector(if reversed { -translation } else { translation });
+
             eprintln!("\n#{case_number} with inputs:");
             eprintln!("  translation: {translation:?}");
 
@@ -862,11 +866,10 @@ mod tests {
             let first_step = iter.next().expect("should have at least one step");
             assert_eq!(first_step.t_distance, 0.0);
             assert_eq!(first_step.aab_face, Face7::Within);
-            // TODO: This assertion fails, but a similar one with the leading corner only wouldn't.
-            // Should we expose the choice of leading corner so it can be made?
-            if false {
-                assert_eq!(first_step.translated_aab, absolute_aab);
-            }
+            assert_eq!(
+                first_step.translated_aab.corner_point(leading_corner),
+                absolute_aab.corner_point(leading_corner)
+            );
 
             for step in iter {
                 std::dbg!(step);
