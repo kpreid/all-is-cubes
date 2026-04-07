@@ -10,7 +10,7 @@ use gltf_json::validation::Checked::Valid;
 
 use all_is_cubes::block::Evoxel;
 use all_is_cubes::euclid::{Point2D, Point3D, Scale, Vector2D, point2};
-use all_is_cubes::math::{Axis, Cube, GridAab, GridRotation, Vol};
+use all_is_cubes::math::{Axis, Cube, GridAab, GridRotation, Gridgid, Vol};
 use all_is_cubes_mesh::texture::{self, TilePoint};
 
 use crate::gltf::GltfDataDestination;
@@ -406,6 +406,10 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
         Texture(PlaneId),
     }
 
+    // Number of pixels to add to tiles to avoid bleeding (sampling texels outside the bounds
+    // of a tile).
+    let anti_bleed_padding: u32 = 2;
+
     // Step 1: compute `rects_to_place` which is the input to the `rectangle_pack` library.
 
     // TODO: add anti-bleed borders to atlas
@@ -433,13 +437,17 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
         rects_to_place.push_rect(
             RectId::Texture(PlaneId(i)),
             None,
-            rp::RectToInsert::new(size.width, size.height, size.depth),
+            rp::RectToInsert::new(
+                size.width + anti_bleed_padding * 2,
+                size.height + anti_bleed_padding * 2,
+                size.depth,
+            ),
         );
     }
 
     // Step 2: attempt rectangle packing, with increasing texture sizes until one succeeds.
 
-    let mut texture_size = 1;
+    let mut texture_size = 8;
     let placements: rp::RectanglePackOk<RectId, ()> = loop {
         // "Bins" correspond to multiple textures. We will use one bin,
         // because our goal is to fit everything into one texture rather than
@@ -456,7 +464,15 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
                 break placements;
             }
             Err(rp::RectanglePackError::NotEnoughBinSpace) => {
-                texture_size = texture_size.checked_mul(2).unwrap();
+                // Approximately double the area by scaling the side length by 7/5,
+                // approximately sqrt(2).
+                let new_texture_size = texture_size.wrapping_mul(7).wrapping_div(5);
+                if new_texture_size > texture_size {
+                    texture_size = new_texture_size;
+                } else {
+                    // We don’t expect to ever hit this but it guards against looping infinitely
+                    panic!("numeric overflow while attempting to find fitting texture size");
+                }
             }
         }
     };
@@ -466,13 +482,13 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
 
     let mut atlas_image = image::RgbaImage::new(texture_size, texture_size);
     let mut uv_of_white: Option<[Lef32; 2]> = None;
-    for (&rect_id, &((), slice_location_in_atlas)) in placements.packed_locations() {
+    for (&rect_id, &((), location_in_atlas)) in placements.packed_locations() {
         match rect_id {
             RectId::White => {
                 // Draw the white texel into the texture.
                 atlas_image.put_pixel(
-                    slice_location_in_atlas.x(),
-                    slice_location_in_atlas.y(),
+                    location_in_atlas.x(),
+                    location_in_atlas.y(),
                     image::Rgba([255; 4]),
                 );
 
@@ -480,8 +496,7 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
                 uv_of_white = Some(
                     scale
                         .transform_point(
-                            point2(slice_location_in_atlas.x(), slice_location_in_atlas.y())
-                                .map(f64::from)
+                            point2(location_in_atlas.x(), location_in_atlas.y()).map(f64::from)
                                 + Vector2D::splat(0.5),
                         )
                         .to_f32()
@@ -492,9 +507,10 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
             RectId::Texture(plane_id) => {
                 let entry = &entries[plane_id.0 as usize];
 
+                // By "rotated" we mean atlas coordinates and "unrotated" we mean original
+                // `GltfTile` coordinates.
                 let rotated_slice_bounds = entry.rotated_slice_bounds();
-                let rotated_size = rotated_slice_bounds.size();
-                let unrotate = entry.rotation.inverse();
+                let unrotate = Gridgid::from(entry.rotation.inverse());
                 let texels_size = entry.source_bounds.size();
                 let texels = entry
                     .source_texels
@@ -502,30 +518,36 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
                     .expect("image texels not set -- TODO propagate error");
 
                 // Copy slice from 3D `texels` into 2D atlas image.
-                for y in 0..rotated_size.height {
-                    for x in 0..rotated_size.width {
-                        // Zero-offset position in the rotated-to-flat slice.
-                        let pixel_position = Point3D::new(x, y, 0).cast::<i32>();
-                        // Position in the rotated-to-flat slice's coordinates.
+                //
+                // (x_in_rect, y_in_rect) are in terms of the padded rectangle and thus are larger
+                // than the `GltfAtlasPlane`.
+                for y_in_rect in 0..location_in_atlas.height() {
+                    for x_in_rect in 0..location_in_atlas.width() {
+                        // Remove padding to get positions within the `GltfAtlasPlane`
+                        // (but not yet unrotated).
+                        // cast_signed(): given that packing succeeded, these will be in bounds
+                        let pixel_position = Point3D::new(
+                            x_in_rect.cast_signed() - anti_bleed_padding.cast_signed(),
+                            y_in_rect.cast_signed() - anti_bleed_padding.cast_signed(),
+                            0,
+                        );
+
+                        // Position in the rotated-to-flat slice's coordinates, which are
+                        // relative to the allocated `GltfTile`.
                         let position_in_rotated_slice = Cube::from(
                             pixel_position + rotated_slice_bounds.lower_bounds().to_vector(),
                         );
-                        // TODO: this single cube is a kludge to simplify off-by-1 problems with
-                        // rotation. We should have transform helpers instead of computing twice
-                        // as many coordinates.
-                        let cube_in_rotated_slice = position_in_rotated_slice.grid_aab();
+                        let cube_in_rotated_slice = position_in_rotated_slice;
 
                         // Position in the original requested slice's coordinates.
-                        let unrotated = cube_in_rotated_slice.transform(unrotate.into()).unwrap();
-                        assert!(
-                            entry.sliced_bounds.contains_box(unrotated),
-                            "{pixel_position:?} in {rotated_size:?} -> {unrotated:?} \
-                            in {sliced_bounds:?}",
-                            sliced_bounds = entry.sliced_bounds
-                        );
+                        let unrotated = unrotate.transform_cube(cube_in_rotated_slice);
 
-                        // Position within tile bounds.
-                        let position_in_texels = (unrotated.lower_bounds()
+                        // Clamp the position to the tile bounds; this causes the `tile_padding` to
+                        // be filled with copies instead of being out of bounds.
+                        let clamped_unrotated = entry.sliced_bounds.clamp_cube(unrotated).unwrap();
+
+                        // Position relative to 3D tile bounds.
+                        let position_in_texels = (clamped_unrotated.lower_bounds()
                             - entry.source_bounds.lower_bounds())
                         .to_u32();
                         // Index into the `texels` array at that position.
@@ -536,8 +558,8 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
 
                         let texel = texels[usize::try_from(index_in_texels).unwrap()];
                         atlas_image.put_pixel(
-                            slice_location_in_atlas.x() + x,
-                            slice_location_in_atlas.y() + y,
+                            location_in_atlas.x() + x_in_rect,
+                            location_in_atlas.y() + y_in_rect,
                             image::Rgba(texel),
                         );
                     }
@@ -556,7 +578,10 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
                 if let RectId::Texture(plane_id) = rect_id {
                     Some((
                         plane_id,
-                        point2(slice_location_in_atlas.x(), slice_location_in_atlas.y()),
+                        point2(
+                            slice_location_in_atlas.x() + anti_bleed_padding,
+                            slice_location_in_atlas.y() + anti_bleed_padding,
+                        ),
                     ))
                 } else {
                     None

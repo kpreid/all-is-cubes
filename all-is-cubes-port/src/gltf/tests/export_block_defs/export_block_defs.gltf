@@ -137,12 +137,12 @@
       "componentType": 5126,
       "type": "VEC2",
       "min": [
-        0.0,
-        0.0
+        0.01834862306714058,
+        0.01834862306714058
       ],
       "max": [
-        1.0,
-        0.75
+        0.8990825414657593,
+        0.3486238420009613
       ],
       "name": "'block2' base color texcoords"
     },
@@ -199,12 +199,12 @@
       "componentType": 5126,
       "type": "VEC2",
       "min": [
-        0.0,
-        0.25
+        0.01834862306714058,
+        0.20183485746383667
       ],
       "max": [
-        1.0,
-        1.0
+        0.7155963182449341,
+        0.8990825414657593
       ],
       "name": "'block3' base color texcoords"
     },
@@ -243,7 +243,7 @@
       "uri": "export_block_defs-mesh-3.glbin"
     },
     {
-      "byteLength": 1972,
+      "byteLength": 2442,
       "name": "texture",
       "uri": "export_block_defs-texture.png"
     }
@@ -307,7 +307,7 @@
     },
     {
       "buffer": 4,
-      "byteLength": 1972,
+      "byteLength": 2442,
       "name": "block texture"
     }
   ],
