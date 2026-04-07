@@ -401,13 +401,18 @@ pub(crate) fn export_gltf(
     mut source: ExportSet,
     destination: PathBuf,
 ) -> Result<BoxFuture<'static, Result<(), ExportError>>, ExportError> {
-    let &ExportOptions {} = options;
+    let &ExportOptions {
+        gltf_maximum_inline_bytes,
+    } = options;
 
     let block_defs = source.contents.extract_type::<block::BlockDef>();
     let spaces = source.contents.extract_type::<all_is_cubes::space::Space>();
     source.reject_unsupported(Format::Gltf)?;
 
-    let mut writer = GltfWriter::new(GltfDataDestination::new(Some(destination.clone()), 2000));
+    let mut writer = GltfWriter::new(GltfDataDestination::new(
+        Some(destination.clone()),
+        gltf_maximum_inline_bytes.unwrap_or(usize::MAX),
+    ));
     let mesh_options = MeshOptions::new(&GraphicsOptions::default());
 
     // Fetch data from `source` synchronously.

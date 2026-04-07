@@ -229,7 +229,11 @@ impl Default for ExportSet {
 /// If the export is not to that format, their values are ignored.
 #[derive(Debug, Default)]
 #[non_exhaustive]
-pub struct ExportOptions {}
+pub struct ExportOptions {
+    /// [`Format::Gltf`]: Maximum size, in bytes, of data which is embedded in the glTF JSON text
+    /// rather than a separate file. If [`None`], then unlimited.
+    pub gltf_maximum_inline_bytes: Option<usize>,
+}
 
 // -------------------------------------------------------------------------------------------------
 

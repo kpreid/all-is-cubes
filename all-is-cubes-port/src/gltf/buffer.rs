@@ -28,7 +28,7 @@ struct Inner {
     discard: bool,
 
     /// Buffers whose byte length is less than or equal to this will be inlined as `data:` URLs.
-    maximum_inline_length: usize,
+    maximum_inline_bytes: usize,
 
     /// Path (possibly with extension which will be stripped) to use as a base name for data files
     /// beside the glTF file.
@@ -47,7 +47,7 @@ impl GltfDataDestination {
     pub(crate) fn null() -> GltfDataDestination {
         Self(Arc::new(Inner {
             discard: true,
-            maximum_inline_length: 0,
+            maximum_inline_bytes: 0,
             file_base_path: None,
             suffix_uses: Mutex::new(HashSet::new()),
         }))
@@ -64,7 +64,7 @@ impl GltfDataDestination {
     /// # Panics
     ///
     /// Panics if `file_base_path` does not contain a file name.
-    pub fn new(file_base_path: Option<PathBuf>, maximum_inline_length: usize) -> Self {
+    pub fn new(file_base_path: Option<PathBuf>, maximum_inline_bytes: usize) -> Self {
         if let Some(file_base_path) = &file_base_path {
             assert!(
                 file_base_path.file_stem().is_some(),
@@ -75,7 +75,7 @@ impl GltfDataDestination {
 
         Self(Arc::new(Inner {
             discard: false,
-            maximum_inline_length,
+            maximum_inline_bytes,
             file_base_path,
             suffix_uses: Mutex::new(HashSet::new()),
         }))
@@ -159,14 +159,14 @@ impl GltfDataDestination {
 
             SwitchingWriter::Memory {
                 buffer: Vec::new(),
-                limit: self.0.maximum_inline_length,
+                limit: self.0.maximum_inline_bytes,
                 path: Some(buffer_file_path),
                 future_file_uri: Some(relative_url),
             }
         } else {
             SwitchingWriter::Memory {
                 buffer: Vec::new(),
-                limit: self.0.maximum_inline_length,
+                limit: self.0.maximum_inline_bytes,
                 path: None,
                 future_file_uri: None,
             }
