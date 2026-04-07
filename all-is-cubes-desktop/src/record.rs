@@ -10,7 +10,7 @@ use anyhow::Context;
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
-use all_is_cubes_port::{ExportSet, Format};
+use all_is_cubes_port::{self as port, ExportSet, Format};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{Layers, StandardCameras};
 use all_is_cubes_render::raytracer::RtRenderer;
@@ -243,11 +243,12 @@ impl Recorder {
                 // TODO: This should probably be done at the *end* of any specified recording
                 // period, the last frame, not the first frame.
                 if let Some(export_set) = export_set.take() {
-                    let export_task = all_is_cubes_port::export_to_path(
+                    let export_task = port::export_to_path(
                         // TODO: hook up a progress bar
                         crate::glue::make_yield_progress().build(),
                         read_ticket,
                         export_format,
+                        &port::ExportOptions::default(),
                         export_set,
                         options.output_path.clone(),
                     );

@@ -129,7 +129,6 @@ impl mesh::MeshTypes for StlMt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ExportSet, Format};
     use all_is_cubes::block::{Block, BlockDef};
     use all_is_cubes::content::make_some_voxel_blocks;
     use all_is_cubes::content::testing::lighting_bench_space;
@@ -172,8 +171,9 @@ mod tests {
         crate::export_to_path(
             yield_progress_for_testing(),
             universe.read_ticket(),
-            Format::Stl,
-            ExportSet::from_block_defs(block_defs),
+            crate::Format::Stl,
+            &crate::ExportOptions::default(),
+            crate::ExportSet::from_block_defs(block_defs),
             destination,
         )
         .await

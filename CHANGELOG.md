@@ -19,6 +19,10 @@
     * `time::Clock::phase()`, returns the clock’s phase, which was previously only obtainable through `Tick`.
     * `time::Tick::{delta_t_f64, delta_t_ps64}()`, convenience for common conversions.
 
+* `all-is-cubes-port` library:
+    * glTF exports now include textures.
+    * `ExportOptions`, allows customizing export behavior.
+
 * `all-is-cubes-render` library:
     * `camera::Viewport::scale()`
 
@@ -38,6 +42,9 @@
 
     * Renamed `math::Face6` to `Face`.
     * Renamed `time::Tick::delta_t()` to `delta_t_duration()`, to make room for other variations.
+
+* `all-is-cubes-port` library:
+    * `export_to_path()` takes an additional parameter of type `ExportOptions`.
 
 * `all-is-cubes-render` library:
     * Split `camera::LightingOption::Smooth` to two variants `Linear` and `Smoothstep`, which precisely select the behaviors that used to vary depending on renderer.

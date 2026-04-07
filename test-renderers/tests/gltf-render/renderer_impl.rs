@@ -75,6 +75,7 @@ impl HeadlessRenderer for GltfBevyRenderer {
             all_is_cubes::util::yield_progress_for_testing(),
             read_tickets.world,
             port::Format::Gltf,
+            &port::ExportOptions::default(),
             port::ExportSet::from_spaces(
                 world_space.iter().cloned().collect::<Vec<Handle<Space>>>(),
             ),

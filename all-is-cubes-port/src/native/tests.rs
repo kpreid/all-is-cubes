@@ -47,6 +47,7 @@ async fn import_export_native_format() {
         yield_progress_for_testing(),
         universe.read_ticket(),
         crate::Format::AicJson,
+        &crate::ExportOptions::default(),
         ExportSet::all_of_universe(&universe),
         destination.clone(),
     )

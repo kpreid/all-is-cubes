@@ -88,6 +88,9 @@ async fn export_snapshot_test(
         yield_progress_for_testing(),
         read_ticket,
         Format::Gltf,
+        &crate::ExportOptions {
+            ..Default::default()
+        },
         export_set,
         PathBuf::from(&destination),
     )
@@ -172,6 +175,7 @@ async fn export_character_not_supported() {
         yield_progress_for_testing(),
         universe.read_ticket(),
         Format::Gltf,
+        &crate::ExportOptions::default(),
         ExportSet::all_of_universe(&universe),
         destination,
     )

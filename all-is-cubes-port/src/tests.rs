@@ -25,6 +25,7 @@ async fn port_whence_load_then_save() {
             yield_progress_for_testing(),
             init_universe.read_ticket(),
             Format::AicJson,
+            &crate::ExportOptions::default(),
             ExportSet::all_of_universe(&init_universe),
             path.clone(),
         )

@@ -15,6 +15,8 @@ use crate::Format;
 #[allow(unused_imports)]
 use crate::util::spawn_blocking;
 
+// -------------------------------------------------------------------------------------------------
+
 /// Export data specified by an [`ExportSet`] to a file or files on disk.
 ///
 /// If the format requires multiple files, then they will be named with hyphenated suffixes
@@ -43,6 +45,7 @@ pub fn export_to_path(
     progress: YieldProgress,
     read_ticket: ReadTicket<'_>,
     format: Format,
+    options: &ExportOptions,
     source: ExportSet,
     destination: PathBuf,
 ) -> impl Future<Output = Result<(), ExportError>> + use<> {
@@ -51,6 +54,7 @@ pub fn export_to_path(
         progress: YieldProgress,
         read_ticket: ReadTicket<'_>,
         format: Format,
+        options: &ExportOptions,
         source: ExportSet,
         destination: PathBuf,
     ) -> Result<BoxFuture<'static, Result<(), ExportError>>, ExportError> {
@@ -80,7 +84,9 @@ pub fn export_to_path(
                 }))
             }
             #[cfg(feature = "gltf")]
-            Format::Gltf => crate::gltf::export_gltf(progress, read_ticket, source, destination)?,
+            Format::Gltf => {
+                crate::gltf::export_gltf(progress, read_ticket, options, source, destination)?
+            }
             #[cfg(feature = "stl")]
             Format::Stl => crate::stl::export_stl(progress, read_ticket, source, &destination)?,
             #[allow(unreachable_patterns)]
@@ -97,11 +103,13 @@ pub fn export_to_path(
         })
     }
 
-    match inner(progress, read_ticket, format, source, destination) {
+    match inner(progress, read_ticket, format, options, source, destination) {
         Ok(future) => future,
         Err(error) => Box::pin(ready(Err(error))),
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Selection of the data to be exported.
 #[derive(Clone, Debug)]
@@ -213,6 +221,18 @@ impl Default for ExportSet {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
+/// Controls the behavior of [`export_to_path()`].
+///
+/// Many of the fields of this struct are format-specific.
+/// If the export is not to that format, their values are ignored.
+#[derive(Debug, Default)]
+#[non_exhaustive]
+pub struct ExportOptions {}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Fatal errors that may be encountered during an export operation.
 ///
 /// TODO: Define non-fatal export flaws reporting, and link to it here.
@@ -278,6 +298,8 @@ pub enum ExportError {
     },
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,6 +314,7 @@ mod tests {
     fn _export_to_path_future_is_send() {
         #![expect(unreachable_code, clippy::diverging_sub_expression)]
         all_is_cubes::util::assert_send_future(export_to_path(
+            unreachable!(),
             unreachable!(),
             unreachable!(),
             unreachable!(),

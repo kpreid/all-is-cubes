@@ -26,7 +26,7 @@ use all_is_cubes_mesh::{BlockMesh, MeshOptions, MeshTypes, SpaceMesh, block_mesh
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform};
 
-use crate::{ExportError, ExportSet, Format};
+use crate::{ExportError, ExportOptions, ExportSet, Format};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -397,9 +397,12 @@ impl GltfWriter {
 pub(crate) fn export_gltf(
     progress: YieldProgress,
     read_ticket: ReadTicket<'_>,
+    options: &ExportOptions,
     mut source: ExportSet,
     destination: PathBuf,
 ) -> Result<BoxFuture<'static, Result<(), ExportError>>, ExportError> {
+    let &ExportOptions {} = options;
+
     let block_defs = source.contents.extract_type::<block::BlockDef>();
     let spaces = source.contents.extract_type::<all_is_cubes::space::Space>();
     source.reject_unsupported(Format::Gltf)?;
