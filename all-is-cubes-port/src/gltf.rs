@@ -126,11 +126,18 @@ pub struct GltfWriter {
 
     /// All flaws encountered so far.
     flaws: Flaws,
+
+    /// Minification filter for the block texture.
+    min_filter: gltf_json::texture::MinFilter,
 }
 
 impl GltfWriter {
-    /// `buffer_dest`: Where to write auxiliary data (vertex buffers, textures).
-    pub fn new(buffer_dest: GltfDataDestination) -> Self {
+    /// * `buffer_dest`: Where to write auxiliary data (vertex buffers, textures).
+    /// * `min_filter`: The minification filter to use in the texture sampler.
+    pub fn new(
+        buffer_dest: GltfDataDestination,
+        min_filter: gltf_json::texture::MinFilter,
+    ) -> Self {
         let root = gltf_json::Root {
             asset: gltf_json::Asset {
                 generator: Some(String::from("all-is-cubes")),
@@ -153,6 +160,7 @@ impl GltfWriter {
             frame_states: Vec::new(),
             any_time_visible_mesh_instances: BTreeSet::new(),
             flaws: Flaws::empty(),
+            min_filter,
         }
     }
 
@@ -223,8 +231,11 @@ impl GltfWriter {
     /// Returns an error if writing any of the buffer or image data fails.
     pub fn into_root(mut self, frame_pace: Duration) -> io::Result<gltf_json::Root> {
         if !self.texture_allocator.is_empty() {
-            let (block_texture_index, uv_map) =
-                texture::insert_block_texture_atlas(&mut self.root, &self.texture_allocator)?;
+            let (block_texture_index, uv_map) = texture::insert_block_texture_atlas(
+                &mut self.root,
+                &self.texture_allocator,
+                self.min_filter,
+            )?;
 
             debug_assert_eq!(
                 block_texture_index,
@@ -403,16 +414,24 @@ pub(crate) fn export_gltf(
 ) -> Result<BoxFuture<'static, Result<(), ExportError>>, ExportError> {
     let &ExportOptions {
         gltf_maximum_inline_bytes,
+        gltf_min_linear,
     } = options;
 
     let block_defs = source.contents.extract_type::<block::BlockDef>();
     let spaces = source.contents.extract_type::<all_is_cubes::space::Space>();
     source.reject_unsupported(Format::Gltf)?;
 
-    let mut writer = GltfWriter::new(GltfDataDestination::new(
-        Some(destination.clone()),
-        gltf_maximum_inline_bytes.unwrap_or(usize::MAX),
-    ));
+    let mut writer = GltfWriter::new(
+        GltfDataDestination::new(
+            Some(destination.clone()),
+            gltf_maximum_inline_bytes.unwrap_or(usize::MAX),
+        ),
+        if gltf_min_linear {
+            gltf_json::texture::MinFilter::Linear
+        } else {
+            gltf_json::texture::MinFilter::Nearest
+        },
+    );
     let mesh_options = MeshOptions::new(&GraphicsOptions::default());
 
     // Fetch data from `source` synchronously.

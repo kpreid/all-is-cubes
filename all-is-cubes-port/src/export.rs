@@ -233,6 +233,10 @@ pub struct ExportOptions {
     /// [`Format::Gltf`]: Maximum size, in bytes, of data which is embedded in the glTF JSON text
     /// rather than a separate file. If [`None`], then unlimited.
     pub gltf_maximum_inline_bytes: Option<usize>,
+
+    /// [`Format::Gltf`]: Whether to use linear blending (`LINEAR`) or single samples (`NEAREST`)
+    /// for textures when they are displayed at a scale smaller than 1 texel per image pixel.
+    pub gltf_min_linear: bool,
 }
 
 // -------------------------------------------------------------------------------------------------

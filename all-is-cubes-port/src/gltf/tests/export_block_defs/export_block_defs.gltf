@@ -465,7 +465,7 @@
   "samplers": [
     {
       "magFilter": 9728,
-      "minFilter": 9729,
+      "minFilter": 9728,
       "name": "block texture",
       "wrapS": 33071,
       "wrapT": 33071

@@ -401,6 +401,7 @@ mod tests {
     use all_is_cubes::block;
     use all_is_cubes::math::GridAab;
     use all_is_cubes::space::Space;
+    use gltf_json::texture::MinFilter;
     use std::time::Duration;
 
     #[test]
@@ -409,7 +410,7 @@ mod tests {
             .filled_with(block::from_color!(0., 0., 0., 0.5))
             .build();
 
-        let mut writer = GltfWriter::new(GltfDataDestination::null());
+        let mut writer = GltfWriter::new(GltfDataDestination::null(), MinFilter::Nearest);
         let (_, mesh_index) = gltf_mesh(&space, &mut writer);
         let mesh_index = mesh_index.unwrap();
         let root = writer.into_root(Duration::ZERO).unwrap();
@@ -454,7 +455,7 @@ mod tests {
     fn empty_mesh() {
         let space = Space::empty_positive(1, 1, 1);
 
-        let mut writer = GltfWriter::new(GltfDataDestination::null());
+        let mut writer = GltfWriter::new(GltfDataDestination::null(), MinFilter::Nearest);
         let (_, mesh_index) = gltf_mesh(&space, &mut writer);
 
         assert!(mesh_index.is_none());

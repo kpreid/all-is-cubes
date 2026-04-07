@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use gltf_json::Index;
+use gltf_json::texture::MinFilter;
 use gltf_json::validation::Validate;
 
 use all_is_cubes::block::{AIR, Block, BlockDef, Resolution};
@@ -50,7 +51,7 @@ fn gltf_smoke_test() {
         .filled_with(recursive_block)
         .build();
 
-    let mut writer = GltfWriter::new(GltfDataDestination::null());
+    let mut writer = GltfWriter::new(GltfDataDestination::null(), MinFilter::Linear);
     let (_, mesh_index) = gltf_mesh(&outer_space, &mut writer);
     let mesh_index = mesh_index.unwrap();
     writer.add_frame(

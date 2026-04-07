@@ -144,10 +144,14 @@ impl Recorder {
                 let (scene_sender, scene_receiver) =
                     mpsc::sync_channel::<write_gltf::MeshRecordMsg>(1);
 
-                let writer = GltfWriter::new(GltfDataDestination::new(
-                    Some(options.output_path.clone()),
-                    2000,
-                ));
+                let writer = GltfWriter::new(
+                    GltfDataDestination::new(Some(options.output_path.clone()), 2000),
+                    if cameras.graphics_options().antialiasing.is_msaa() {
+                        port::gltf::json::texture::MinFilter::Linear
+                    } else {
+                        port::gltf::json::texture::MinFilter::Nearest
+                    },
+                );
                 let tex = writer.texture_allocator();
 
                 // TODO: implement options.save_all

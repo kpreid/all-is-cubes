@@ -285,6 +285,7 @@ pub struct GltfAtlasPoint {
 pub(super) fn insert_block_texture_atlas(
     root: &mut gltf_json::Root,
     allocator: &GltfTextureAllocator,
+    min_filter: gltf_json::texture::MinFilter,
 ) -> Result<(gltf_json::Index<gltf_json::Texture>, UvMap), io::Error> {
     let (block_texture_buffer, atlas_mapping) = allocator.write_png_atlas()?;
     let block_texture_len = block_texture_buffer.byte_length;
@@ -301,7 +302,7 @@ pub(super) fn insert_block_texture_atlas(
     });
     let block_texture_sampler = root.push(gltf_json::texture::Sampler {
         mag_filter: Some(Valid(gltf_json::texture::MagFilter::Nearest)),
-        min_filter: Some(Valid(gltf_json::texture::MinFilter::Linear)),
+        min_filter: Some(Valid(min_filter)),
         name: Some("block texture".into()),
         wrap_s: Valid(gltf_json::texture::WrappingMode::ClampToEdge),
         wrap_t: Valid(gltf_json::texture::WrappingMode::ClampToEdge),
