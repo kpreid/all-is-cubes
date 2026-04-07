@@ -682,6 +682,30 @@ impl GridAab {
         }
     }
 
+    /// Given a cube, return the cube that is nearest to it within `self`.
+    ///
+    /// Returns [`None`] if `self` is empty.
+    #[inline]
+    pub fn clamp_cube(&self, cube: Cube) -> Option<Cube> {
+        #[inline]
+        fn clamp1(
+            val: GridCoordinate,
+            min: GridCoordinate,
+            max_plus_one: GridCoordinate,
+        ) -> Option<GridCoordinate> {
+            if max_plus_one > min {
+                Some(val.clamp(min, max_plus_one - 1))
+            } else {
+                None
+            }
+        }
+        Some(Cube::new(
+            clamp1(cube.x, self.lower_bounds.x, self.upper_bounds.x)?,
+            clamp1(cube.y, self.lower_bounds.y, self.upper_bounds.y)?,
+            clamp1(cube.z, self.lower_bounds.z, self.upper_bounds.z)?,
+        ))
+    }
+
     /// Creates a [`Vol`] with `self` as the bounds and no data.
     ///
     /// This introduces a particular linear ordering of the cubes in the volume.
