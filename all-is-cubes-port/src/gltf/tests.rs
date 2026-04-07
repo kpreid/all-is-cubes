@@ -89,6 +89,8 @@ async fn export_snapshot_test(
         read_ticket,
         Format::Gltf,
         &crate::ExportOptions {
+            // Use separate files so that e.g. the PNG can be inspected easily.
+            gltf_maximum_inline_bytes: Some(0),
             ..Default::default()
         },
         export_set,
