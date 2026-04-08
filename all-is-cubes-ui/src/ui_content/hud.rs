@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use all_is_cubes::inv::Icons;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen;
-use all_is_cubes::math::Face;
+use all_is_cubes::math::{Face, Rgba};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
@@ -74,6 +74,7 @@ pub(super) fn new_hud_page(
     vui::Page {
         tree: hud_widget_tree,
         layout: vui::PageLayout::Hud,
+        backdrop: Rgba::TRANSPARENT,
         focus_on_ui: false,
     }
 }

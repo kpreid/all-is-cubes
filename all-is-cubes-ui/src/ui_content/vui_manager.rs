@@ -10,7 +10,6 @@ use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::inv::{EphemeralOpaque, Tool, ToolError, ToolInput};
 use all_is_cubes::listen::{self, Notifier};
-use all_is_cubes::math::Rgba;
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
@@ -279,7 +278,7 @@ impl Vui {
                 graphics_options.fov_y.into_inner(),
             ),
             space: Some(next_space),
-            backdrop: Rgba::TRANSPARENT, // TODO: hook this up so the page can set it
+            backdrop: next_page.page().backdrop,
             graphics_options,
         };
 

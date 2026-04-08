@@ -2,19 +2,19 @@ use alloc::sync::Arc;
 use alloc::vec;
 
 use all_is_cubes::arcstr::ArcStr;
-use all_is_cubes::block::{self, AIR, Block, Resolution, text};
+use all_is_cubes::block::{AIR, Block, Resolution, text};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{Size2D, size2};
 use all_is_cubes::math::{
-    Cube, Face, FreeCoordinate, FreeVector, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba,
+    Cube, Face, FreeCoordinate, FreeVector, GridAab, GridCoordinate, GridSize, Rgba,
 };
 use all_is_cubes::space::{self, Space, SpacePhysics};
 use all_is_cubes::universe::{Handle, ReadTicket, StrongHandle, Universe};
 use all_is_cubes_render::camera::{self, ViewTransform};
 
 use crate::vui::{
-    self, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest, LayoutTree, Layoutable,
-    Widget, WidgetTree, install_widgets, widgets,
+    self, Align, Gravity, InstallVuiError, LayoutGrant, LayoutTree, Layoutable, Widget, WidgetTree,
+    install_widgets, widgets,
 };
 
 /// Bounds for UI display; a choice of scale and aspect ratio based on the viewport size
@@ -102,6 +102,9 @@ pub(crate) struct Page {
     /// How the tree should be presented on screen.
     pub layout: PageLayout,
 
+    /// Color to be displayed behind the widgets and in front of the world.
+    pub backdrop: Rgba,
+
     /// Whether, when this page is displayed,
     ///
     /// * mouselook is cancelled
@@ -114,6 +117,7 @@ impl Page {
         Self {
             tree: LayoutTree::empty(),
             layout: PageLayout::Hud,
+            backdrop: Rgba::TRANSPARENT,
             focus_on_ui: false,
         }
     }
@@ -139,46 +143,29 @@ impl Page {
         corner_button: Option<WidgetTree>,
         contents: WidgetTree,
     ) -> Self {
-        let tree = Arc::new(LayoutTree::Stack {
-            direction: Face::PZ,
-            children: vec![
-                Arc::new(LayoutTree::Spacer(LayoutRequest {
-                    // magic number 2 allows us to fill the edges of the viewport, ish
-                    // TODO: PageLayout should give us the option of "overscan",
-                    // where all edges of the space spill off the window.
-                    minimum: GridSize::new(
-                        0,
-                        0,
-                        GridSizeCoord::from(UiSize::DEPTH_BEHIND_VIEW_PLANE) + 2,
-                    ),
-                })),
-                vui::leaf_widget(widgets::Frame::with_block(block::from_color!(
-                    0., 0., 0., 0.7
-                ))),
-                Arc::new(LayoutTree::Shrink(
-                    theme.dialog_background().as_background_of(Arc::new(LayoutTree::Stack {
-                        direction: Face::NY,
-                        children: vec![
-                            Arc::new(LayoutTree::Stack {
-                                direction: Face::PX,
-                                children: if let Some(corner_button) = corner_button {
-                                    // TODO: arrange so that title text is centered if possible
-                                    // (need a new LayoutTree variant or to generalize Stack, but it might help with our HUD too)
-                                    vec![corner_button, title_widget]
-                                } else {
-                                    vec![title_widget]
-                                },
-                            }),
-                            contents,
-                        ],
-                    })),
-                )),
-            ],
-        });
+        let tree = Arc::new(LayoutTree::Shrink(
+            theme.dialog_background().as_background_of(Arc::new(LayoutTree::Stack {
+                direction: Face::NY,
+                children: vec![
+                    Arc::new(LayoutTree::Stack {
+                        direction: Face::PX,
+                        children: if let Some(corner_button) = corner_button {
+                            // TODO: arrange so that title text is centered if possible
+                            // (need a new LayoutTree variant or to generalize Stack, but it might help with our HUD too)
+                            vec![corner_button, title_widget]
+                        } else {
+                            vec![title_widget]
+                        },
+                    }),
+                    contents,
+                ],
+            })),
+        ));
 
         Page {
             tree,
             layout: PageLayout::Dialog,
+            backdrop: Rgba::new(0., 0., 0., 0.7),
             focus_on_ui: true,
         }
     }
@@ -396,14 +383,16 @@ pub(crate) mod parts {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::math::GridSizeCoord;
     use alloc::vec::Vec;
 
     fn make_page_with_size(min_w: GridSizeCoord, min_h: GridSizeCoord) -> Page {
         Page {
-            tree: Arc::new(LayoutTree::Spacer(LayoutRequest {
+            tree: Arc::new(LayoutTree::Spacer(vui::LayoutRequest {
                 minimum: GridSize::new(min_w, min_h, 1),
             })),
             layout: PageLayout::Hud,
+            backdrop: Rgba::TRANSPARENT,
             focus_on_ui: false,
         }
     }
