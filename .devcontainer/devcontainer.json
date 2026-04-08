@@ -9,5 +9,5 @@
             ]
         }
     },
-    "postCreateCommand": "rustup install && cargo install wasm-pack && cargo xtask init"
+    "postCreateCommand": "rustup install && cargo install wasm-pack && cargo xtask system-packages sudo-install && cargo xtask init"
 }
