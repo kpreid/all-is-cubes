@@ -3,7 +3,7 @@ use core::fmt;
 
 use all_is_cubes::character::{Character, Cursor, cursor_raycast};
 use all_is_cubes::listen;
-use all_is_cubes::math::FreeCoordinate;
+use all_is_cubes::math::{FreeCoordinate, Rgba};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, HandleError, ReadTicket, StrongHandle, Universe};
 
@@ -102,7 +102,8 @@ pub struct StandardCameras {
 
     ui_source: listen::DynSource<Arc<UiViewState>>,
     ui_dirty: listen::Flag,
-    ui_space: Option<Handle<Space>>,
+    /// Cached copy of `ui_source`’s latest value.
+    ui_state: Arc<UiViewState>,
 
     viewport_source: listen::DynSource<Viewport>,
     viewport_dirty: listen::Flag,
@@ -148,7 +149,7 @@ impl StandardCameras {
             character: None, // update() will fix these up
             world_space: listen::Cell::new(None),
 
-            ui_space: ui_state.space.clone(),
+            ui_state,
             ui_dirty: listen::Flag::listening(true, &ui_source),
             ui_source,
 
@@ -196,17 +197,18 @@ impl StandardCameras {
         let ui_dirty = self.ui_dirty.get_and_clear();
         if ui_dirty || options_dirty {
             anything_changed = true;
-            let UiViewState {
-                space,
-                view_transform: ui_transform,
-                graphics_options: ui_options,
-            } = if self.graphics_options.get().show_ui {
-                (*self.ui_source.get()).clone()
+            self.ui_state = if self.graphics_options.get().show_ui {
+                self.ui_source.get()
             } else {
-                UiViewState::default()
+                Arc::new(UiViewState::default())
             };
-            self.ui_space = space;
-            self.cameras.ui.set_options((*ui_options).clone());
+            let UiViewState {
+                space: _,
+                view_transform: ui_transform,
+                backdrop: _,
+                graphics_options: ref ui_options,
+            } = *self.ui_state;
+            self.cameras.ui.set_options(GraphicsOptions::clone(ui_options));
             self.cameras.ui.set_view_transform(ui_transform);
         }
 
@@ -309,7 +311,17 @@ impl StandardCameras {
     ///
     /// TODO: Make this also a [`listen::DynSource`]
     pub fn ui_space(&self) -> Option<&Handle<Space>> {
-        self.ui_space.as_ref()
+        self.ui_state.space.as_ref()
+    }
+
+    /// Returns the current [`UiViewState`], specifying what UI should be drawn over the world.
+    ///
+    // ---
+    // TODO: unclear if good API; added so that we can get Source access to the graphics options,
+    // and *something* of the sort should be public, but I don't know if exposing UiViewState
+    // directly, as opposed to a source of a Camera, is right.
+    pub fn ui_view_state(&self) -> &Arc<UiViewState> {
+        &self.ui_state
     }
 
     // TODO: unclear if good API; added so that we can get Source access to the graphics options,
@@ -347,7 +359,7 @@ impl StandardCameras {
         read_tickets: Layers<ReadTicket<'_>>,
         ndc_pos: NdcPoint2,
     ) -> Result<Option<Cursor>, HandleError> {
-        if let Some(ui_space_handle) = self.ui_space.as_ref() {
+        if let Some(ui_space_handle) = self.ui_space() {
             let ray = self.cameras.ui.project_ndc_into_world(ndc_pos);
             if let res @ (Ok(Some(_)) | Err(_)) = cursor_raycast(
                 read_tickets.ui,
@@ -432,6 +444,9 @@ pub struct UiViewState {
     /// The viewpoint to render the `space` from.
     pub view_transform: ViewTransform,
 
+    /// Solid color painted on top of the world and below the UI.
+    pub backdrop: Rgba,
+
     /// The graphics options to render the `space` with.
     //---
     // Design note: This is an `Arc` not because it strongly needs to be,
@@ -446,6 +461,7 @@ impl Default for UiViewState {
         Self {
             space: Default::default(),
             view_transform: ViewTransform::identity(),
+            backdrop: Rgba::TRANSPARENT,
             graphics_options: Default::default(),
         }
     }

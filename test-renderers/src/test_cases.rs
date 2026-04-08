@@ -869,6 +869,7 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
         listen::constant(Arc::new(UiViewState {
             space: Some(ui_space),
             view_transform: ViewTransform::identity(),
+            backdrop: Rgba::TRANSPARENT, // TODO: exercise backdrop
             graphics_options: Arc::new(options),
         })),
     );
@@ -915,6 +916,7 @@ async fn layers_ui_only(mut context: RenderTestContext) {
         listen::constant(Arc::new(UiViewState {
             space: Some(ui_space),
             view_transform: ViewTransform::identity(),
+            backdrop: Rgba::TRANSPARENT, // TODO: exercise backdrop
             graphics_options: Arc::new(GraphicsOptions::UNALTERED_COLORS),
         })),
     );
