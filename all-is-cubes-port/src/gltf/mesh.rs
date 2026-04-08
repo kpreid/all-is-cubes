@@ -9,6 +9,7 @@ use gltf_json::validation::Checked::Valid;
 use gltf_json::validation::USize64;
 
 use all_is_cubes::math::range_len;
+use all_is_cubes_mesh::texture::Channels;
 use all_is_cubes_mesh::{IndexSlice, MeshTypes, SpaceMesh};
 
 use crate::gltf::glue::create_accessor;
@@ -37,7 +38,8 @@ where
         return None;
     }
 
-    let needs_texture = mesh.vertices().0.iter().any(GltfVertex::needs_uv_mapping);
+    let channels_used = mesh.texture_channels_used();
+    let needs_texture = channels_used.is_some();
     let index_type = match mesh.indices() {
         IndexSlice::U16(_) => gltf_json::accessor::ComponentType::U16,
         IndexSlice::U32(_) => gltf_json::accessor::ComponentType::U32,
@@ -166,10 +168,15 @@ where
 
     writer.flaws |= mesh.flaws();
 
-    // Kludge: this only works because we have at most one texture so we know its index.
-    // If we have multiple textures (e.g. for emission) we will need to fix up
-    // texture indices or texture objects.
-    let use_texture = needs_texture.then_some(Index::new(0));
+    // Kludge: this only works because we have at most one texture atlas so we know the indices
+    // of the 1 or 2 textures that will be present. If we get a more complex texture situation,
+    // we will need to fixup these indices later, instead.
+    let use_texture: Option<(Index<gltf_json::Texture>, Option<Index<gltf_json::Texture>>)> =
+        match channels_used {
+            Some(Channels::ReflectanceEmission) => Some((Index::new(0), Some(Index::new(1)))),
+            Some(Channels::Reflectance) => Some((Index::new(0), None)),
+            None => None,
+        };
 
     let mesh_object = gltf_json::Mesh {
         name: Some(format!("{name} mesh")),
@@ -316,7 +323,7 @@ impl MeshAwaitingTextureCoordinates {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(in crate::gltf) struct MaterialKey {
     pub transparent: bool,
-    pub use_texture: Option<Index<gltf_json::Texture>>,
+    pub use_texture: Option<(Index<gltf_json::Texture>, Option<Index<gltf_json::Texture>>)>,
 }
 
 impl MaterialKey {
@@ -329,18 +336,18 @@ impl MaterialKey {
         let name = format!(
             "all-is-cubes {tr} {tex}",
             tr = if transparent { "transparent" } else { "opaque" },
-            tex = if use_texture.is_some() {
-                "textured"
-            } else {
-                "untextured"
-            }
+            tex = match use_texture {
+                None => "untextured",
+                Some((_, None)) => "reflective",
+                Some((_, Some(_))) => "reflective+emissive",
+            },
         );
 
         let pbr_metallic_roughness = gltf_json::material::PbrMetallicRoughness {
             // Per glTF 2.0 § 3.9.2, the base_color_factor will be
             // multiplied by the vertex color.
             base_color_factor: gltf_json::material::PbrBaseColorFactor([1.0, 1.0, 1.0, 1.0]),
-            base_color_texture: use_texture.map(|index| gltf_json::texture::Info {
+            base_color_texture: use_texture.map(|(index, _)| gltf_json::texture::Info {
                 index,
                 tex_coord: 0,
                 extensions: Default::default(),
@@ -351,12 +358,31 @@ impl MaterialKey {
             ..<_>::default()
         };
 
+        let (emissive_factor, emissive_texture) =
+            if let Some((_, Some(emission_index))) = use_texture {
+                // TODO: for full emission range we need KHR_materials_emissive_strength too,
+                // and ideally a float texture
+                (
+                    gltf_json::material::EmissiveFactor([1.0, 1.0, 1.0]),
+                    Some(gltf_json::texture::Info {
+                        index: emission_index,
+                        tex_coord: 0,
+                        extensions: Default::default(),
+                        extras: Default::default(),
+                    }),
+                )
+            } else {
+                (gltf_json::material::EmissiveFactor([0.0, 0.0, 0.0]), None)
+            };
+
         if !transparent {
             gltf_json::Material {
                 name: Some(name),
                 alpha_mode: Valid(gltf_json::material::AlphaMode::Opaque),
                 double_sided: false,
                 pbr_metallic_roughness,
+                emissive_factor,
+                emissive_texture,
                 ..gltf_json::Material::default()
             }
         } else {
@@ -365,6 +391,8 @@ impl MaterialKey {
                 alpha_mode: Valid(gltf_json::material::AlphaMode::Blend),
                 double_sided: false,
                 pbr_metallic_roughness,
+                emissive_factor,
+                emissive_texture,
                 extensions: Some(gltf_json::extensions::material::Material {
                     volume: None,
                     // TODO: Reenable this when attenuation_distance serialization bug is fixed.

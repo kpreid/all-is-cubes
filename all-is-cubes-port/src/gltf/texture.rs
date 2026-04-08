@@ -110,9 +110,34 @@ impl GltfTextureAllocator {
         self.gatherer.is_empty()
     }
 
-    pub(crate) fn write_png_atlas(&self) -> Result<(gltf_json::Buffer, UvMap), io::Error> {
-        let (image, mapping): (image::RgbaImage, UvMap) = self.gatherer.build_atlas();
-        let buffer = self.destination.write(String::from("texture"), "texture", "png", |w| {
+    pub(crate) fn write_png_atlas(&self) -> Result<Atlas<gltf_json::Buffer>, io::Error> {
+        let Atlas {
+            reflectance,
+            emission,
+            uv_map,
+        } = self.gatherer.build_atlas();
+
+        // Store image data to glTF buffers
+        // TODO: add error context
+        let reflectance = self.write_one_image(&reflectance)?;
+        let emission = if let Some(emission) = emission {
+            Some(self.write_one_image(&emission)?)
+        } else {
+            None
+        };
+
+        Ok(Atlas {
+            reflectance,
+            emission,
+            uv_map,
+        })
+    }
+
+    fn write_one_image(
+        &self,
+        image: &image::ImageBuffer<image::Rgba<u8>, Vec<u8>>,
+    ) -> Result<gltf_json::Buffer, io::Error> {
+        self.destination.write(String::from("texture"), "texture", "png", |w| {
             // `image` wants `Write + Seek` but `w` is not currently `Seek`
             let mut tmp = io::Cursor::new(Vec::new());
             image
@@ -120,8 +145,7 @@ impl GltfTextureAllocator {
                 .expect("failed to write image to in-memory buffer");
             w.write_all(tmp.into_inner().as_slice())?;
             Ok(())
-        })?;
-        Ok((buffer, mapping))
+        })
     }
 }
 
@@ -129,18 +153,16 @@ impl texture::Allocator for GltfTextureAllocator {
     type Tile = GltfTile;
     type Point = GltfAtlasPoint;
 
-    fn allocate(&self, bounds: GridAab, mut channels: texture::Channels) -> Option<GltfTile> {
+    fn allocate(&self, bounds: GridAab, channels: texture::Channels) -> Option<GltfTile> {
         assert!(!bounds.is_empty());
-
-        // TODO: implement more channels
-        if true {
-            channels = texture::Channels::Reflectance;
-        }
 
         Some(GltfTile {
             bounds,
-            channels,
-            texels: TexelsCell::default(),
+            reflectance: TexelsCell::default(),
+            emission: match channels {
+                texture::Channels::Reflectance => None,
+                texture::Channels::ReflectanceEmission => Some(TexelsCell::default()),
+            },
             gatherer: self.gatherer.clone(),
         })
     }
@@ -156,14 +178,20 @@ impl texture::Allocator for GltfTextureAllocator {
 #[derive(Clone, Debug, PartialEq)]
 pub struct GltfTile {
     bounds: GridAab,
-    channels: texture::Channels,
 
     /// When we are sliced, we report the slice to the gatherer so that it can be placed in the
     /// texture atlas.
     gatherer: Gatherer,
 
-    /// Actual texel storage
-    texels: TexelsCell,
+    // Actual texel storage
+    reflectance: TexelsCell,
+    emission: Option<TexelsCell>,
+}
+
+impl GltfTile {
+    fn allocate_texels(&self) -> Vec<[u8; 4]> {
+        vec![[0, 0, 0, 0]; self.bounds.volume().unwrap()]
+    }
 }
 
 impl texture::Tile for GltfTile {
@@ -175,11 +203,25 @@ impl texture::Tile for GltfTile {
     fn write(&mut self, data: Vol<&[Evoxel]>) {
         assert_eq!(data.bounds(), self.bounds());
 
-        let mut buffer = vec![[0, 0, 0, 0]; self.bounds().volume().unwrap()];
-        texture::copy_voxels_into_xmaj_texture(data, &mut buffer, None);
+        let mut reflectance_buffer = self.allocate_texels();
+        let mut emission_buffer = self.emission.is_some().then(|| self.allocate_texels());
+        texture::copy_voxels_into_xmaj_texture(
+            data,
+            &mut reflectance_buffer,
+            emission_buffer.as_deref_mut(),
+        );
 
         // OK to panic on failure because if we do, the caller ignored Self::REUSABLE.
-        self.texels.set(buffer).expect("cannot overwrite glTF textures")
+        self.reflectance
+            .set(reflectance_buffer)
+            .expect("cannot overwrite glTF textures");
+        if let Some(emission_buffer) = emission_buffer {
+            self.emission
+                .as_mut()
+                .unwrap()
+                .set(emission_buffer)
+                .expect("cannot overwrite glTF textures");
+        }
     }
 
     fn bounds(&self) -> GridAab {
@@ -187,7 +229,10 @@ impl texture::Tile for GltfTile {
     }
 
     fn channels(&self) -> texture::Channels {
-        self.channels
+        match self.emission {
+            Some(_) => texture::Channels::ReflectanceEmission,
+            None => texture::Channels::Reflectance,
+        }
     }
 
     #[track_caller]
@@ -202,7 +247,8 @@ impl texture::Tile for GltfTile {
         };
 
         let plane_id = self.gatherer.insert(AtlasEntry {
-            source_texels: self.texels.clone(),
+            reflectance_texels: self.reflectance.clone(),
+            emission_texels: self.emission.clone(),
             source_bounds: self.bounds,
             sliced_bounds,
             rotation,
@@ -281,26 +327,19 @@ pub struct GltfAtlasPoint {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Generate the atlas texture and necessary glTF entities.
+/// Generates the atlas textures and necessary glTF entities.
 pub(super) fn insert_block_texture_atlas(
     root: &mut gltf_json::Root,
     allocator: &GltfTextureAllocator,
     min_filter: gltf_json::texture::MinFilter,
-) -> Result<(gltf_json::Index<gltf_json::Texture>, UvMap), io::Error> {
-    let (block_texture_buffer, atlas_mapping) = allocator.write_png_atlas()?;
-    let block_texture_len = block_texture_buffer.byte_length;
-    let block_texture_buffer = root.push(block_texture_buffer);
-    let block_texture_buffer_view = root.push(gltf_json::buffer::View {
-        buffer: block_texture_buffer,
-        byte_length: block_texture_len,
-        byte_offset: None,
-        byte_stride: None,
-        name: Some("block texture".into()),
-        target: None,
-        extensions: None,
-        extras: Default::default(),
-    });
-    let block_texture_sampler = root.push(gltf_json::texture::Sampler {
+) -> Result<Atlas<gltf_json::Index<gltf_json::Texture>>, io::Error> {
+    let Atlas {
+        reflectance,
+        emission,
+        uv_map,
+    } = allocator.write_png_atlas()?;
+
+    let sampler = root.push(gltf_json::texture::Sampler {
         mag_filter: Some(Valid(gltf_json::texture::MagFilter::Nearest)),
         min_filter: Some(Valid(min_filter)),
         name: Some("block texture".into()),
@@ -309,22 +348,51 @@ pub(super) fn insert_block_texture_atlas(
         extensions: None,
         extras: Default::default(),
     });
+    let reflectance = insert_one_image(root, "reflectance", reflectance, sampler);
+    let emission = emission.map(|emission| insert_one_image(root, "emission", emission, sampler));
+
+    Ok(Atlas {
+        reflectance,
+        emission,
+        uv_map,
+    })
+}
+
+/// Starting with a `Buffer` of texture data, inserts all the entities for a `Texture`.
+fn insert_one_image(
+    root: &mut gltf_json::Root,
+    name: &'static str,
+    image_buffer: gltf_json::Buffer,
+    sampler: gltf_json::Index<gltf_json::texture::Sampler>,
+) -> gltf_json::Index<gltf_json::Texture> {
+    let block_texture_len = image_buffer.byte_length;
+    let block_texture_buffer = root.push(image_buffer);
+    let block_texture_buffer_view = root.push(gltf_json::buffer::View {
+        buffer: block_texture_buffer,
+        byte_length: block_texture_len,
+        byte_offset: None,
+        byte_stride: None,
+        name: Some(name.into()),
+        target: None,
+        extensions: None,
+        extras: Default::default(),
+    });
     let block_texture_image = root.push(gltf_json::Image {
         buffer_view: Some(block_texture_buffer_view),
         mime_type: Some(gltf_json::image::MimeType("image/png".into())),
-        name: Some("block texture".into()),
+        name: Some(name.into()),
         uri: None,
         extensions: None,
         extras: Default::default(),
     });
-    let block_texture = root.push(gltf_json::Texture {
+
+    root.push(gltf_json::Texture {
         name: None,
-        sampler: Some(block_texture_sampler),
+        sampler: Some(sampler),
         source: block_texture_image,
         extensions: None,
         extras: Default::default(),
-    });
-    Ok((block_texture, atlas_mapping))
+    })
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -351,7 +419,7 @@ impl Gatherer {
     ///
     /// After this method is called, the allocator is no longer in a usable state
     /// because the data has been removed.
-    pub(crate) fn build_atlas(&self) -> (image::RgbaImage, UvMap) {
+    pub(crate) fn build_atlas(&self) -> Atlas<image::RgbaImage> {
         let entries: Vec<AtlasEntry> =
             mem::take(&mut self.0.lock().expect("mutex in atlas gatherer"));
 
@@ -368,9 +436,9 @@ impl PartialEq for Gatherer {
 /// Details of one piece of texture that must be included in the generated texture atlas.
 #[derive(Debug)]
 pub(super) struct AtlasEntry {
-    /// Texels to extract.
-    pub(super) source_texels: TexelsCell,
-    /// Bounds of the 3D region containing `source_texels`.
+    pub(super) reflectance_texels: TexelsCell,
+    pub(super) emission_texels: Option<TexelsCell>,
+    /// Bounds of the 3D region containing `*_texels`.
     pub(super) source_bounds: GridAab,
     /// Bounds of the 2D region sliced out of `source_bounds`.
     /// Must have at least one axis of size 1.
@@ -388,13 +456,26 @@ impl AtlasEntry {
 /// Storage shared by [`GltfTile`]s for writing and [`Gatherer::build_atlas()`] for reading.
 type TexelsCell = Arc<OnceLock<Vec<[u8; 4]>>>;
 
+/// Data structure for a built texture atlas, and its image data, or a reference to its image data,
+/// in some form `I`.
+pub(crate) struct Atlas<I> {
+    pub reflectance: I,
+    pub emission: Option<I>,
+    pub uv_map: UvMap,
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Arranges and generates the texture atlas, given all the allocated tiles and planes.
 ///
+/// Returns:
+/// * reflectance image
+/// * emission image (if it is to have any content)
+/// * UV map for updating texture coordinates
+///
 /// Use this function via [`Gatherer::build_atlas()`].
 #[allow(clippy::needless_pass_by_value, reason = "semantically, is consumed")]
-fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
+fn build_atlas_impl(entries: Vec<AtlasEntry>) -> Atlas<image::RgbaImage> {
     use rectangle_pack as rp;
 
     /// Identifier of one of the things we will ask `rectangle_pack` to place.
@@ -414,11 +495,13 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
 
     // TODO: add anti-bleed borders to atlas
     let mut rects_to_place: rp::GroupedRectsToPlace<RectId, ()> = rp::GroupedRectsToPlace::new();
+    let mut has_emission = false;
     rects_to_place.push_rect(RectId::White, None, rp::RectToInsert::new(1, 1, 1));
     for (
         i,
         &AtlasEntry {
-            source_texels: _,
+            reflectance_texels: _,
+            ref emission_texels,
             source_bounds: _,
             sliced_bounds,
             rotation,
@@ -443,6 +526,9 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
                 size.depth,
             ),
         );
+        if emission_texels.is_some() {
+            has_emission = true;
+        }
     }
 
     // Step 2: attempt rectangle packing, with increasing texture sizes until one succeeds.
@@ -480,17 +566,26 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
 
     // Step 3: build the atlas image using the chosen `placements`.
 
-    let mut atlas_image = image::RgbaImage::new(texture_size, texture_size);
+    let new_image = || image::RgbaImage::new(texture_size, texture_size);
+    let mut reflectance_image = new_image();
+    let mut emission_image = has_emission.then(new_image);
     let mut uv_of_white: Option<[Lef32; 2]> = None;
     for (&rect_id, &((), location_in_atlas)) in placements.packed_locations() {
         match rect_id {
             RectId::White => {
                 // Draw the white texel into the texture.
-                atlas_image.put_pixel(
+                reflectance_image.put_pixel(
                     location_in_atlas.x(),
                     location_in_atlas.y(),
                     image::Rgba([255; 4]),
                 );
+                if let Some(ref mut emission_image) = emission_image {
+                    emission_image.put_pixel(
+                        location_in_atlas.x(),
+                        location_in_atlas.y(),
+                        image::Rgba([0; 4]),
+                    );
+                }
 
                 // Compute the single UV value at the middle of the white texel
                 uv_of_white = Some(
@@ -507,62 +602,21 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
             RectId::Texture(plane_id) => {
                 let entry = &entries[plane_id.0 as usize];
 
-                // By "rotated" we mean atlas coordinates and "unrotated" we mean original
-                // `GltfTile` coordinates.
-                let rotated_slice_bounds = entry.rotated_slice_bounds();
-                let unrotate = Gridgid::from(entry.rotation.inverse());
-                let texels_size = entry.source_bounds.size();
-                let texels = entry
-                    .source_texels
-                    .get()
-                    .expect("image texels not set -- TODO propagate error");
-
-                // Copy slice from 3D `texels` into 2D atlas image.
-                //
-                // (x_in_rect, y_in_rect) are in terms of the padded rectangle and thus are larger
-                // than the `GltfAtlasPlane`.
-                for y_in_rect in 0..location_in_atlas.height() {
-                    for x_in_rect in 0..location_in_atlas.width() {
-                        // Remove padding to get positions within the `GltfAtlasPlane`
-                        // (but not yet unrotated).
-                        // cast_signed(): given that packing succeeded, these will be in bounds
-                        let pixel_position = Point3D::new(
-                            x_in_rect.cast_signed() - anti_bleed_padding.cast_signed(),
-                            y_in_rect.cast_signed() - anti_bleed_padding.cast_signed(),
-                            0,
-                        );
-
-                        // Position in the rotated-to-flat slice's coordinates, which are
-                        // relative to the allocated `GltfTile`.
-                        let position_in_rotated_slice = Cube::from(
-                            pixel_position + rotated_slice_bounds.lower_bounds().to_vector(),
-                        );
-                        let cube_in_rotated_slice = position_in_rotated_slice;
-
-                        // Position in the original requested slice's coordinates.
-                        let unrotated = unrotate.transform_cube(cube_in_rotated_slice);
-
-                        // Clamp the position to the tile bounds; this causes the `tile_padding` to
-                        // be filled with copies instead of being out of bounds.
-                        let clamped_unrotated = entry.sliced_bounds.clamp_cube(unrotated).unwrap();
-
-                        // Position relative to 3D tile bounds.
-                        let position_in_texels = (clamped_unrotated.lower_bounds()
-                            - entry.source_bounds.lower_bounds())
-                        .to_u32();
-                        // Index into the `texels` array at that position.
-                        let index_in_texels = position_in_texels.x
-                            + texels_size.width
-                                * (position_in_texels.y
-                                    + texels_size.height * position_in_texels.z);
-
-                        let texel = texels[usize::try_from(index_in_texels).unwrap()];
-                        atlas_image.put_pixel(
-                            location_in_atlas.x() + x_in_rect,
-                            location_in_atlas.y() + y_in_rect,
-                            image::Rgba(texel),
-                        );
-                    }
+                copy_texels_to_atlas_images(
+                    entry,
+                    &entry.reflectance_texels,
+                    anti_bleed_padding,
+                    &mut reflectance_image,
+                    location_in_atlas,
+                );
+                if let Some(ref emission_texels) = entry.emission_texels {
+                    copy_texels_to_atlas_images(
+                        entry,
+                        emission_texels,
+                        anti_bleed_padding,
+                        emission_image.as_mut().expect("emission image"),
+                        location_in_atlas,
+                    );
                 }
             }
         }
@@ -570,7 +624,7 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
 
     // Step 4: Save the placements in a `UvMap` for use by the texture coordinate rewriting step.
 
-    let mappings = UvMap {
+    let uv_map = UvMap {
         positioning: placements
             .packed_locations()
             .iter()
@@ -592,7 +646,71 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> (image::RgbaImage, UvMap) {
         white: uv_of_white.unwrap(),
     };
 
-    (atlas_image, mappings)
+    Atlas {
+        reflectance: reflectance_image,
+        emission: emission_image,
+        uv_map,
+    }
+}
+
+fn copy_texels_to_atlas_images(
+    entry: &AtlasEntry, // used only for its dimensions
+    texels_cell: &TexelsCell,
+    anti_bleed_padding: u32,
+    atlas_image: &mut image::ImageBuffer<image::Rgba<u8>, Vec<u8>>,
+    location_in_atlas: rectangle_pack::PackedLocation,
+) {
+    // By "rotated" we mean atlas coordinates and "unrotated" we mean original
+    // `GltfTile` coordinates.
+    let rotated_slice_bounds = entry.rotated_slice_bounds();
+    let unrotate = Gridgid::from(entry.rotation.inverse());
+    let texels_size = entry.source_bounds.size();
+    let texels = texels_cell.get().expect("image texels not set -- TODO propagate error");
+
+    // Copy slice from 3D `texels` into 2D atlas image.
+    //
+    // (x_in_rect, y_in_rect) are in terms of the padded rectangle and thus are larger
+    // than the `GltfAtlasPlane`.
+    for y_in_rect in 0..location_in_atlas.height() {
+        for x_in_rect in 0..location_in_atlas.width() {
+            // Remove padding to get positions within the `GltfAtlasPlane`
+            // (but not yet unrotated).
+            // cast_signed(): given that packing succeeded, these will be in bounds
+            let pixel_position = Point3D::new(
+                x_in_rect.cast_signed() - anti_bleed_padding.cast_signed(),
+                y_in_rect.cast_signed() - anti_bleed_padding.cast_signed(),
+                0,
+            );
+
+            // Position in the rotated-to-flat slice's coordinates, which are
+            // relative to the allocated `GltfTile`.
+            let position_in_rotated_slice =
+                Cube::from(pixel_position + rotated_slice_bounds.lower_bounds().to_vector());
+            let cube_in_rotated_slice = position_in_rotated_slice;
+
+            // Position in the original requested slice's coordinates.
+            let unrotated = unrotate.transform_cube(cube_in_rotated_slice);
+
+            // Clamp the position to the tile bounds; this causes the `tile_padding` to
+            // be filled with copies instead of being out of bounds.
+            let clamped_unrotated = entry.sliced_bounds.clamp_cube(unrotated).unwrap();
+
+            // Position relative to 3D tile bounds.
+            let position_in_texels =
+                (clamped_unrotated.lower_bounds() - entry.source_bounds.lower_bounds()).to_u32();
+            // Index into the `texels` array at that position.
+            let index_in_texels = position_in_texels.x
+                + texels_size.width
+                    * (position_in_texels.y + texels_size.height * position_in_texels.z);
+
+            let texel = texels[usize::try_from(index_in_texels).unwrap()];
+            atlas_image.put_pixel(
+                location_in_atlas.x() + x_in_rect,
+                location_in_atlas.y() + y_in_rect,
+                image::Rgba(texel),
+            );
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

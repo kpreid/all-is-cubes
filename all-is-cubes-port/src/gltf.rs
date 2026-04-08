@@ -231,16 +231,19 @@ impl GltfWriter {
     /// Returns an error if writing any of the buffer or image data fails.
     pub fn into_root(mut self, frame_pace: Duration) -> io::Result<gltf_json::Root> {
         if !self.texture_allocator.is_empty() {
-            let (block_texture_index, uv_map) = texture::insert_block_texture_atlas(
+            let texture::Atlas {
+                reflectance,
+                emission,
+                uv_map,
+            } = texture::insert_block_texture_atlas(
                 &mut self.root,
                 &self.texture_allocator,
                 self.min_filter,
             )?;
 
-            debug_assert_eq!(
-                block_texture_index,
-                Index::new(0),
-                "if we have multiple textures, then materials need work"
+            debug_assert!(
+                reflectance == Index::new(0) && emission.is_none_or(|e| e == Index::new(1)),
+                "texture IDs are currently assumed to be 0 and 1 by the materials"
             );
 
             for mesh in mem::take(&mut self.meshes_awaiting_texture_coordinates) {

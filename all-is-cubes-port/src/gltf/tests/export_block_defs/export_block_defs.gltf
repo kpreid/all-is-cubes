@@ -246,6 +246,11 @@
       "byteLength": 2442,
       "name": "texture",
       "uri": "export_block_defs-texture.png"
+    },
+    {
+      "byteLength": 816,
+      "name": "texture",
+      "uri": "export_block_defs-texture-2.png"
     }
   ],
   "bufferViews": [
@@ -308,7 +313,12 @@
     {
       "buffer": 4,
       "byteLength": 2442,
-      "name": "block texture"
+      "name": "reflectance"
+    },
+    {
+      "buffer": 5,
+      "byteLength": 816,
+      "name": "emission"
     }
   ],
   "extensionsUsed": [
@@ -319,7 +329,12 @@
     {
       "bufferView": 8,
       "mimeType": "image/png",
-      "name": "block texture"
+      "name": "reflectance"
+    },
+    {
+      "bufferView": 9,
+      "mimeType": "image/png",
+      "name": "emission"
     }
   ],
   "materials": [
@@ -346,7 +361,7 @@
     {
       "alphaMode": "OPAQUE",
       "doubleSided": false,
-      "name": "all-is-cubes opaque textured",
+      "name": "all-is-cubes opaque reflective+emissive",
       "pbrMetallicRoughness": {
         "baseColorFactor": [
           1.0,
@@ -361,10 +376,14 @@
         "metallicFactor": 0.0,
         "roughnessFactor": 1.0
       },
+      "emissiveTexture": {
+        "index": 1,
+        "texCoord": 0
+      },
       "emissiveFactor": [
-        0.0,
-        0.0,
-        0.0
+        1.0,
+        1.0,
+        1.0
       ]
     }
   ],
@@ -486,6 +505,10 @@
     {
       "sampler": 0,
       "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
     }
   ]
 }
