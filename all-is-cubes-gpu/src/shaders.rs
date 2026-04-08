@@ -14,77 +14,61 @@ use all_is_cubes::listen;
 use crate::Identified;
 use crate::reloadable::{Reloadable, reloadable_str};
 
-/// All shaders that are built into the source code of this crate.
-pub(crate) struct Shaders {
-    pub(crate) blocks_and_lines: ReloadableShader,
-    pub(crate) resampling: ReloadableShader,
-    pub(crate) rt_copy: ReloadableShader,
-    pub(crate) postprocess: ReloadableShader,
+macro_rules! shaders {
+    ($( $(#[cfg $cfg:tt])* $name:ident = $path:literal, )*) => {
+        /// All shaders that are built into the source code of this crate.
+        pub(crate) struct Shaders {
+            $( $(#[cfg $cfg])* pub(crate) $name: ReloadableShader, )*
+
+            modules_changed: listen::Notifier<()>,
+        }
+
+        impl Shaders {
+            pub fn new(device: &wgpu::Device) -> Self {
+                Self {
+                    $(
+                        $(#[cfg $cfg])*
+                        $name: {
+                            static STATIC: Lazy<Reloadable> = Lazy::new(|| reloadable_str!($path));
+                            ReloadableShader::new(device, stringify!($name), STATIC.as_source())
+                        },
+                    )*
+
+                    modules_changed: listen::Notifier::new(),
+                }
+            }
+
+            pub fn update(&mut self, device: &wgpu::Device) {
+                // TODO: use a shared dirty flag to reduce work?
+
+                let Self {
+                    $( $(#[cfg $cfg])* $name, )*
+                    modules_changed,
+                } = self;
+                let mut changed = false;
+
+                    $( $(#[cfg $cfg])* {
+                        changed |= $name.update(device);
+                    } )*
+
+                if changed {
+                    modules_changed.notify(&());
+                }
+            }
+        }
+    }
+}
+
+shaders! {
+    blocks_and_lines = "src/shaders/blocks-and-lines.wgsl",
+    resampling = "src/shaders/resampling.wgsl",
+    rt_copy = "src/shaders/rt-copy.wgsl",
+    postprocess = "src/shaders/postprocess.wgsl",
     #[cfg(feature = "rerun")]
-    pub(crate) rerun_copy: ReloadableShader,
-
-    modules_changed: listen::Notifier<()>,
+    rerun_copy = "src/shaders/rerun-copy.wgsl",
 }
 
-static BLOCKS_AND_LINES: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/shaders/blocks-and-lines.wgsl"));
-static RESAMPLING: Lazy<Reloadable> = Lazy::new(|| reloadable_str!("src/shaders/resampling.wgsl"));
-static RT_COPY: Lazy<Reloadable> = Lazy::new(|| reloadable_str!("src/shaders/rt-copy.wgsl"));
-static POSTPROCESS: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/shaders/postprocess.wgsl"));
-#[cfg(feature = "rerun")]
-static RERUN_COPY: Lazy<Reloadable> = Lazy::new(|| reloadable_str!("src/shaders/rerun-copy.wgsl"));
-
-impl Shaders {
-    pub fn new(device: &wgpu::Device) -> Self {
-        Self {
-            blocks_and_lines: ReloadableShader::new(
-                device,
-                "blocks_and_lines".into(),
-                BLOCKS_AND_LINES.as_source(),
-            ),
-            resampling: ReloadableShader::new(device, "resampling".into(), RESAMPLING.as_source()),
-            rt_copy: ReloadableShader::new(device, "rt_copy".into(), RT_COPY.as_source()),
-            postprocess: ReloadableShader::new(
-                device,
-                "postprocess".into(),
-                POSTPROCESS.as_source(),
-            ),
-            #[cfg(feature = "rerun")]
-            rerun_copy: ReloadableShader::new(device, "rerun_copy".into(), RERUN_COPY.as_source()),
-
-            modules_changed: listen::Notifier::new(),
-        }
-    }
-
-    pub fn update(&mut self, device: &wgpu::Device) {
-        // TODO: use a shared dirty flag to reduce work?
-
-        let Self {
-            blocks_and_lines,
-            resampling,
-            rt_copy,
-            postprocess,
-            #[cfg(feature = "rerun")]
-            rerun_copy,
-            modules_changed,
-        } = self;
-        let mut changed = false;
-
-        changed |= blocks_and_lines.update(device);
-        changed |= resampling.update(device);
-        changed |= rt_copy.update(device);
-        changed |= postprocess.update(device);
-        #[cfg(feature = "rerun")]
-        {
-            changed |= rerun_copy.update(device);
-        }
-
-        if changed {
-            modules_changed.notify(&());
-        }
-    }
-}
+impl Shaders {}
 
 impl listen::Listen for Shaders {
     type Msg = ();
@@ -106,16 +90,20 @@ pub(crate) struct ReloadableShader {
 }
 
 impl ReloadableShader {
-    fn new(device: &wgpu::Device, label: String, wgsl_source: listen::DynSource<Arc<str>>) -> Self {
+    fn new(
+        device: &wgpu::Device,
+        label: &'static str,
+        wgsl_source: listen::DynSource<Arc<str>>,
+    ) -> Self {
         let dirty = listen::Flag::listening(false, &wgsl_source);
         let current_module =
             Identified::new(device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some(&label),
+                label: Some(label),
                 source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*wgsl_source.get())),
             }));
 
         Self {
-            label,
+            label: String::from(label),
             source: wgsl_source,
             dirty,
             current_module,
