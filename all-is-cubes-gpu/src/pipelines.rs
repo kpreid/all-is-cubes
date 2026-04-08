@@ -2,6 +2,7 @@
 
 use alloc::sync::Arc;
 use core::mem;
+use core::num::NonZeroU64;
 
 use wgpu::util::DeviceExt;
 
@@ -63,6 +64,10 @@ pub(crate) struct Pipelines {
     /// Pipeline for drawing the skybox; similar to the block pipelines, but generates its own
     /// geometry instead of using vertex buffers.
     pub(crate) skybox_render_pipeline: wgpu::RenderPipeline,
+
+    pub(crate) backdrop_bind_group_layout: wgpu::BindGroupLayout,
+    /// Pipeline for drawing the backdrop (a uniform, but possibly transparent, color).
+    pub(crate) backdrop_render_pipeline: wgpu::RenderPipeline,
 
     /// Bind group layout for the `rt-copy` shader's inputs.
     pub(crate) rt_frame_copy_layout: wgpu::BindGroupLayout,
@@ -528,6 +533,62 @@ impl Pipelines {
                 ],
             });
 
+        let backdrop_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: { const { NonZeroU64::new(16) } },
+                    },
+                    count: None,
+                }],
+            });
+        let backdrop_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Pipelines::backdrop_render_pipeline"),
+                layout: Some(
+                    &device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                        label: Some("Pipelines::backdrop_render_pipeline_layout"),
+                        bind_group_layouts: &[Some(&backdrop_bind_group_layout)],
+                        immediate_size: 0, // this would be a great use for immediates but support is not wide enough yet
+                    }),
+                ),
+                vertex: wgpu::VertexState {
+                    module: shaders.uniform_color.get(),
+                    entry_point: Some("full_screen_vertex"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    buffers: &[],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: shaders.uniform_color.get(),
+                    entry_point: Some("uniform_color_fragment"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: fb.linear_scene_texture_format(),
+                        blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    ..<_>::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: FramebufferTextures::DEPTH_FORMAT,
+                    depth_write_enabled: Some(false),
+                    depth_compare: Some(wgpu::CompareFunction::Always),
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample,
+                multiview_mask: None,
+                cache,
+            });
+
         let rt_frame_copy_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("Pipelines::rt_frame_copy_pipeline"),
@@ -803,6 +864,8 @@ impl Pipelines {
             transparent_overdraw_render_pipeline,
             depthless_overdraw_render_pipeline,
             skybox_render_pipeline,
+            backdrop_bind_group_layout,
+            backdrop_render_pipeline,
             rt_frame_copy_layout,
             rt_frame_copy_pipeline,
             rt_reproject_pipeline,

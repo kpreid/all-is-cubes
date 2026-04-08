@@ -8,6 +8,7 @@ use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::pixelcolor::Gray8;
 use all_is_cubes::euclid::{Size2D, Vector2D};
+use all_is_cubes::math::Rgba;
 use all_is_cubes::time;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::Executor;
@@ -38,6 +39,8 @@ use crate::{RerunFilter, rerun_image};
 // -------------------------------------------------------------------------------------------------
 
 pub(super) type InfoTextTexture = DrawableTexture<Gray8, u8>;
+
+type BackdropUniforms = [f32; 4];
 
 /// All the state, both CPU and GPU-side, that is needed for drawing a complete
 /// scene and UI, but not the surface it's drawn on.
@@ -73,6 +76,10 @@ pub(super) struct EverythingRenderer {
     /// Number of vertices currently in `lines_buffer`.
     lines_vertex_count: u32,
 
+    // TODO: Consider consolidating all our “camera”-ish buffers into a single buffer (will need some refactoring)
+    backdrop_uniform_buffer: wgpu::Buffer,
+    backdrop_bind_group: wgpu::BindGroup,
+
     postprocess: postprocess::PostprocessResources,
 
     /// Time spent on the most recent [`Self::add_info_text_and_postprocess()`].
@@ -107,6 +114,8 @@ impl fmt::Debug for EverythingRenderer {
             rt: _,
             lines_buffer: _,
             lines_vertex_count,
+            backdrop_uniform_buffer: _,
+            backdrop_bind_group: _,
             postprocess: _,
             previous_postprocess_time,
             queries,
@@ -202,6 +211,21 @@ impl EverythingRenderer {
         );
         let block_texture = AtlasAllocator::new("EverythingRenderer", &device.limits());
 
+        let backdrop_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("EverythingRenderer::backdrop_uniform_buffer"),
+            size: const { buffer_size_of::<BackdropUniforms>().get() },
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let backdrop_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &pipelines.backdrop_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: backdrop_uniform_buffer.as_entire_binding(),
+            }],
+        });
+
         log::debug!("device features {:?}", device.features());
 
         let mut new_self = EverythingRenderer {
@@ -234,6 +258,9 @@ impl EverythingRenderer {
 
             lines_buffer: ResizingBuffer::default(),
             lines_vertex_count: 0,
+
+            backdrop_uniform_buffer,
+            backdrop_bind_group,
 
             postprocess: postprocess::PostprocessResources::new(&device),
             previous_postprocess_time: time::Duration::ZERO,
@@ -463,6 +490,30 @@ impl EverythingRenderer {
 
         let lines_to_submit_time = time::Instant::now();
 
+        // Store backdrop buffer.
+        bwp.write_buffer(
+            &self.backdrop_uniform_buffer,
+            0,
+            const { buffer_size_of::<BackdropUniforms>() },
+        )
+        .copy_from_slice(&{
+            let color: Rgba = if should_raytrace(&self.cameras) {
+                // If we are raytracing, both world and UI currently get drawn in the world pass,
+                // and the raytracer adds the backdrop, so we shouldn’t add another one on top.
+                Rgba::TRANSPARENT
+            } else {
+                self.cameras.ui_view_state().backdrop
+            };
+            let premultiplied_rgb = color.to_rgb() * color.alpha();
+            let final_rgba: BackdropUniforms = [
+                premultiplied_rgb.red().into_inner(),
+                premultiplied_rgb.green().into_inner(),
+                premultiplied_rgb.blue().into_inner(),
+                color.alpha().into_inner(),
+            ];
+            bytemuck::must_cast::<BackdropUniforms, [u8; 16]>(final_rgba)
+        });
+
         // Do raytracing
         if should_raytrace(&self.cameras) {
             self.rt.prepare_frame(
@@ -628,6 +679,11 @@ impl EverythingRenderer {
             }),
             ..Default::default()
         });
+
+        // Draw backdrop.
+        ui_render_pass.set_pipeline(&self.pipelines.backdrop_render_pipeline);
+        ui_render_pass.set_bind_group(0, Some(&self.backdrop_bind_group), &[]);
+        ui_render_pass.draw(0..3, 0..1); // fullscreen triangle
 
         let lines_to_ui_time = time::Instant::now();
         let ui_draw_info = if !is_raytracing {

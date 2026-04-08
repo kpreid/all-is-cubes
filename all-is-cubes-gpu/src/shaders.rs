@@ -64,6 +64,7 @@ shaders! {
     resampling = "src/shaders/resampling.wgsl",
     rt_copy = "src/shaders/rt-copy.wgsl",
     postprocess = "src/shaders/postprocess.wgsl",
+    uniform_color = "src/shaders/uniform-color.wgsl",
     #[cfg(feature = "rerun")]
     rerun_copy = "src/shaders/rerun-copy.wgsl",
 }
