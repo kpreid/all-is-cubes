@@ -16,7 +16,7 @@ use crate::camera::{
     Camera, GraphicsOptions, Layers, Ndc, NdcPoint2, StandardCameras, Viewport, area_usize,
 };
 use crate::raytracer::{
-    Accumulate, ColorBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer,
+    self, Accumulate, ColorBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer,
     UpdatingSpaceRaytracer,
 };
 use crate::{Flaws, RenderError, Rendering};
@@ -230,11 +230,26 @@ where
         cameras.world.set_viewport(viewport);
         cameras.ui.set_viewport(viewport);
 
+        let backdrop = self.cameras.ui_view_state().backdrop;
+
         RtScene {
             rts: self
                 .rts
                 .as_refs()
                 .map(|opt_urt| opt_urt.as_ref().map(UpdatingSpaceRaytracer::get)),
+            backdrop: (backdrop != Rgba::TRANSPARENT).then(|| {
+                (
+                    ColorBuf::from(self.cameras.ui_view_state().backdrop),
+                    P::BlockData::exception(
+                        raytracer::Exception::Backdrop,
+                        RtOptionsRef {
+                            graphics_options: cameras.ui.options(),
+                            custom_options: &self.custom_options_cache.ui,
+                        },
+                    ),
+                )
+            }),
+
             cameras,
             custom_options: &self.custom_options_cache,
         }
@@ -352,33 +367,38 @@ pub struct RtScene<'a, P: Accumulate> {
     rts: Layers<Option<&'a SpaceRaytracer<P::BlockData>>>,
     /// Cameras *with* `size_policy` applied.
     cameras: Layers<Camera>,
+    /// Data for rendering the backdrop (color layer between UI and world).
+    backdrop: Option<(ColorBuf, P::BlockData)>,
     /// Custom options for `P`, per layer.
     custom_options: &'a CustomOptionsValues<P::BlockData>,
 }
 
-impl<P: Accumulate> fmt::Debug for RtScene<'_, P>
+impl<P> fmt::Debug for RtScene<'_, P>
 where
-    <P::BlockData as RtBlockData>::Options: fmt::Debug,
+    P: Accumulate<BlockData: fmt::Debug + RtBlockData<Options: fmt::Debug>>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             rts,
             cameras,
+            backdrop,
             custom_options,
         } = self;
         f.debug_struct("RtScene")
             .field("rts", rts)
             .field("cameras", cameras)
+            .field("backdrop", backdrop)
             .field("custom_options", custom_options)
             .finish()
     }
 }
 
-impl<P: Accumulate> Clone for RtScene<'_, P> {
+impl<P: Accumulate<BlockData: Clone>> Clone for RtScene<'_, P> {
     fn clone(&self) -> Self {
         Self {
             rts: self.rts,
             cameras: self.cameras.clone(),
+            backdrop: self.backdrop.clone(),
             custom_options: self.custom_options,
         }
     }
@@ -432,6 +452,15 @@ impl<P: Accumulate + Default> RtScene<'_, P> {
     fn trace_ray_through_layers(&self, info: &mut RaytraceInfo, accum: &mut P, point: NdcPoint2) {
         if let Some(ui) = self.rts.ui {
             *info += ui.trace_ray(self.cameras.ui.project_ndc_into_world(point), accum, false);
+        }
+        if let Some((surface, ref block)) = self.backdrop {
+            accum.add(raytracer::Hit {
+                exception: Some(raytracer::Exception::Backdrop),
+                surface,
+                t_distance: None,
+                block,
+                position: None,
+            });
         }
         if let Some(world) = self.rts.world {
             *info += world.trace_ray(

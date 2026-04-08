@@ -69,6 +69,10 @@ pub enum Exception {
     /// The ray exited the space and is considered to have hit the sky.
     Sky,
 
+    /// The ray has exited the UI layer and will enter the world (game content) layer.
+    /// This hit has a color intended as a background for the UI or a fade-to-black of the world.
+    Backdrop,
+
     /// For external reasons such as computational limits,
     /// the trace is being terminated and the the result will be incomplete.
     Incomplete,
