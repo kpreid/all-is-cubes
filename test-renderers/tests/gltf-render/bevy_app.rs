@@ -415,7 +415,7 @@ fn load_transfer_system(
                 // Kludge: Bevy seems to be treating the image as sRGB encoded even if we pass
                 // Rgb16Float, so encode it as simple 8-bit sRGB.
                 // TODO: Investigate Bevy’s intent and whether there is a bug here.
-                all_is_cubes_gpu::compute_skybox(&sky, 256)
+                all_is_cubes_gpu::compute_skybox(&sky, 256, true)
                     .flat_map(|rgb| rgb.with_alpha_one().to_srgb8())
                     .collect(),
                 bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,

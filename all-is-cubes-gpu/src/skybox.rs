@@ -112,7 +112,7 @@ fn compute_and_write_skybox(queue: &wgpu::Queue, texture: &wgpu::Texture, sky: &
         );
     }
 
-    let data: Vec<[Component; CHANNELS]> = compute_skybox(sky, resolution)
+    let data: Vec<[Component; CHANNELS]> = compute_skybox(sky, resolution, false)
         .map(|rgb| {
             [
                 f16::from_f32(rgb.red().into_inner()),
@@ -139,15 +139,17 @@ fn compute_and_write_skybox(queue: &wgpu::Queue, texture: &wgpu::Texture, sky: &
 ///
 /// The output has 6 × `resolution`² elements.
 #[doc(hidden)] // pub for reuse in testing
-pub fn compute_skybox(sky: &Sky, resolution: u32) -> impl Iterator<Item = Rgb> {
+pub fn compute_skybox(sky: &Sky, resolution: u32, flip_z: bool) -> impl Iterator<Item = Rgb> {
     // convert texel coordinates to ray coordinates
     let res_scale = 2.0 / f64::from(resolution);
     let scaler = move |texel| (f64::from(texel) + 0.5).mul_add(res_scale, -1.0);
 
+    let flip_z = if flip_z { -1.0 } else { 1.0 };
+
     itertools::iproduct!(0..6, 0..resolution, 0..resolution).map(move |(layer, y, x)| {
         let x = scaler(x);
         let y = scaler(y);
-        let ray = match layer {
+        let mut ray = match layer {
             // TODO: this mapping was constructed empirically.
             // Would be nice to have a spec citation.
             0 => vec3(1.0, -y, -x),
@@ -158,6 +160,7 @@ pub fn compute_skybox(sky: &Sky, resolution: u32) -> impl Iterator<Item = Rgb> {
             5 => vec3(-x, -y, -1.0),
             _ => unreachable!(),
         };
+        ray.z *= flip_z;
         sky.sample(ray)
     })
 }
