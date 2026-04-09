@@ -20,6 +20,11 @@
     * `time::Clock::phase()`, returns the clock’s phase, which was previously only obtainable through `Tick`.
     * `time::Tick::{delta_t_f64, delta_t_ps64}()`, convenience for common conversions.
 
+* `all-is-cubes-mesh` library:
+    * `Channels::union()`.
+    * `MeshMeta::textures_used()`.
+    * `MeshMeta::texture_channels_used()`.
+
 * `all-is-cubes-port` library:
     * glTF exports now include textures.
     * `ExportOptions`, allows customizing export behavior.

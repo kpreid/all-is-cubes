@@ -12,12 +12,14 @@ use all_is_cubes::math::{Cube, Face, FaceMap, GridAab, Vol, range_len};
 use all_is_cubes::space::{self, BlockIndex, Space};
 use all_is_cubes_render::Flaws;
 
-#[cfg(doc)]
-use crate::texture;
+use crate::texture::Channels;
 use crate::{
     Aabb, Aabbs, BlockMesh, DepthOrdering, IndexSlice, IndexVec, IndexVecDeque, MeshOptions,
     MeshRel, MeshTypes, Position, Vertex, depth_sorting,
 };
+
+#[cfg(doc)]
+use crate::texture;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -786,6 +788,20 @@ impl<M: MeshTypes> MeshMeta<M> {
         tm.needs_static_sort() || !tm.depth_sort_validity.contains(view_position)
     }
 
+    /// Returns every texture allocation used by this mesh.
+    pub fn textures_used(&self) -> &[M::Tile] {
+        &self.textures_used
+    }
+
+    /// Returns the union of [`Channels`] that are [reported by][crate::texture::Tile::channels]
+    /// the texture allocations used by this mesh.
+    pub fn texture_channels_used(&self) -> Option<Channels> {
+        self.textures_used()
+            .iter()
+            .map(crate::texture::Tile::channels)
+            .reduce(Channels::union)
+    }
+
     /// Overwrite `self` with [`MeshMeta::default()`].
     fn clear(&mut self) {
         let Self {
@@ -1007,6 +1023,7 @@ mod tests {
     use crate::{BlockVertex, block_meshes_for_space};
     use all_is_cubes::block;
     use all_is_cubes::math::{Aab, Rgba};
+    use all_is_cubes::universe::Universe;
     use all_is_cubes_render::camera::GraphicsOptions;
 
     type TestMesh = SpaceMesh<TextureMt>;
@@ -1309,6 +1326,8 @@ mod tests {
         assert_eq!(mesh.indices(), IndexSlice::U16(&[]));
         assert_eq!(mesh.opaque_range(), 0..0);
         assert_eq!(mesh.transparent_range(DepthOrdering::WITHIN), 0..0);
+        assert_eq!(mesh.textures_used(), &[]);
+        assert_eq!(mesh.texture_channels_used(), None);
         assert_eq!(dbg!(mesh.total_byte_size()), size_of::<TestMesh>());
     }
 
@@ -1320,6 +1339,8 @@ mod tests {
         let (_, _, mesh) = mesh_blocks_and_space(&space);
 
         assert_eq!(mesh.indices().len(), 6 /* faces */ * 6 /* vertices */);
+        assert_eq!(mesh.textures_used(), &[]);
+        assert_eq!(mesh.texture_channels_used(), None);
 
         let expected_data_size = size_of_val::<[BlockVertex<TexPoint>]>(mesh.vertices().0)
             + mesh.indices().as_bytes().len();
@@ -1327,6 +1348,33 @@ mod tests {
         let actual_size = dbg!(mesh.total_byte_size());
         assert!(actual_size > size_of::<TestMesh>() + expected_data_size);
         assert!(actual_size <= size_of::<TestMesh>() + expected_data_size * 3);
+    }
+
+    #[test]
+    fn textured_properties() {
+        let universe = &mut Universe::new();
+        let [block] = all_is_cubes::content::make_some_voxel_blocks(universe);
+        assert_eq!(
+            crate::texture::needed_channels(
+                block.evaluate(universe.read_ticket()).unwrap().voxels()
+            ),
+            Channels::ReflectanceEmission,
+            "sanity check that the input data has emission"
+        );
+        let space = Space::builder(GridAab::ORIGIN_CUBE)
+            .read_ticket(universe.read_ticket())
+            .filled_with(block)
+            .build();
+
+        let (_, _, mesh) = mesh_blocks_and_space(&space);
+
+        assert_eq!(mesh.indices().len(), 6 /* faces */ * 6 /* vertices */);
+        assert_eq!(mesh.textures_used().len(), 1);
+        assert_eq!(
+            mesh.texture_channels_used(),
+            // make_some_voxel_blocks() includes emission
+            Some(Channels::ReflectanceEmission)
+        );
     }
 
     #[test]

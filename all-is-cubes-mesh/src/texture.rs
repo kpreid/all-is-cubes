@@ -10,6 +10,8 @@ use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{Axis, Cube, GridAab, GridSizeCoord, Rgb, Vol};
 use all_is_cubes::util::{ConciseDebug, Fmt};
 
+// -------------------------------------------------------------------------------------------------
+
 /// Numeric type used to calculate texture coordinates and store them in [`BlockVertex`].
 ///
 /// Note that this type is only exposed publicly within [`texture::Tile::grid_to_texcoord()`];
@@ -27,6 +29,8 @@ pub enum TexelUnit {}
 /// Note that this uses float, not integer, coordinates; but fractional values refer to
 /// fractions of texels.
 pub type TilePoint = Point3D<TextureCoordinate, TexelUnit>;
+
+// -------------------------------------------------------------------------------------------------
 
 /// Allocator of 3D regions (“tiles”) in a texture atlas to paint block voxels into.
 /// Implement this trait using the target graphics API's 3D texture type.
@@ -146,6 +150,8 @@ pub trait Plane: Clone {
     fn grid_to_texcoord(&self, in_tile_grid: TilePoint) -> Self::Point;
 }
 
+// -------------------------------------------------------------------------------------------------
+
 impl<T: Allocator> Allocator for &T {
     type Tile = T::Tile;
     type Point = T::Point;
@@ -171,11 +177,13 @@ impl<T: Allocator> Allocator for alloc::rc::Rc<T> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Specifies a combination of data stored per texel that may be requested of an [`Allocator`].
 ///
 /// Design note: This is an `enum` rather than a bitmask so that allocators and shaders do not
 /// have to support a large number of cases, but only typical ones.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
 #[expect(clippy::exhaustive_enums)]
 pub enum Channels {
     /// RGBA color (or perhaps RGB if the target does not support transparency) representing
@@ -203,7 +211,20 @@ impl Channels {
             Channels::ReflectanceEmission => true,
         }
     }
+
+    /// Returns the set of all channels either input contains.
+    #[must_use]
+    pub const fn union(self, other: Self) -> Self {
+        match (self, other) {
+            (Channels::ReflectanceEmission, _) | (_, Channels::ReflectanceEmission) => {
+                Channels::ReflectanceEmission
+            }
+            (Channels::Reflectance, Channels::Reflectance) => Channels::Reflectance,
+        }
+    }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Validate that the argument to [`Tile::slice()`] is within bounds, and thickness
 /// 1 on some axis.
@@ -294,6 +315,8 @@ pub fn copy_voxels_into_xmaj_texture(
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Null [`Allocator`]; rejects all allocations.
 ///
 /// Used for generating textureless meshes. TODO: Modify triangulator to actually
@@ -361,5 +384,29 @@ impl Plane for NoTexture {
 impl Fmt<ConciseDebug> for NoTexture {
     fn fmt(&self, _: &mut fmt::Formatter<'_>, _: &ConciseDebug) -> fmt::Result {
         match *self {}
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use exhaust::Exhaust as _;
+
+    #[test]
+    fn channels_union() {
+        for value in Channels::exhaust() {
+            assert_eq!(value.union(value), value);
+        }
+
+        assert_eq!(
+            Channels::Reflectance.union(Channels::ReflectanceEmission),
+            Channels::ReflectanceEmission,
+        );
+        assert_eq!(
+            Channels::ReflectanceEmission.union(Channels::Reflectance),
+            Channels::ReflectanceEmission,
+        );
     }
 }
