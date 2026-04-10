@@ -10,7 +10,6 @@ use all_is_cubes::behavior::BehaviorSetTransaction;
 use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::listen;
 use all_is_cubes::space::{self, SpaceBehaviorAttachment, SpaceTransaction};
-use all_is_cubes::transaction::Merge;
 use all_is_cubes::{linking, universe};
 
 use crate::vui;
@@ -91,20 +90,23 @@ impl CommonController {
         })
     }
 
-    /// Step forward and return whether the button should currently display a ‘pressed’ state.
+    /// Step forward and return whether the button state has changed and should be drawn.
     fn step(&mut self) -> ButtonActivity {
-        let counter = self
+        let previous_counter = self
             .recently_pressed
             .update(Relaxed, Relaxed, |counter| counter.saturating_sub(1));
 
-        ButtonActivity {
-            changed: counter == Self::PRESSED_TIMER_DURATION || counter == 1,
-            // TODO: once cursor/click system supports mousedown and up, use that instead
-            // of this crude animation behavior (but maybe *also* have a post-press
-            // animation, possibly based on block tick_actions instead).
-            state: ButtonVisualState {
-                pressed: counter > 1,
-            },
+        let changed = previous_counter == Self::PRESSED_TIMER_DURATION || previous_counter == 1;
+        let state = self.state();
+        ButtonActivity { changed, state }
+    }
+
+    fn state(&self) -> ButtonVisualState {
+        // TODO: once cursor/click system supports mousedown and up, use that instead
+        // of this crude animation behavior (but maybe *also* have a post-press
+        // animation, possibly based on block tick_actions instead).
+        ButtonVisualState {
+            pressed: self.recently_pressed.load(Relaxed) > 0,
         }
     }
 }
@@ -144,16 +146,10 @@ impl vui::WidgetController for ActionButtonController {
     ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         let grant = self.definition.common.shrink_bounds(*context.grant());
 
-        // TODO: we never draw the pressed state
-        let draw = self.txns[ButtonVisualState { pressed: false }].clone();
-        let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
+        Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             SpaceBehaviorAttachment::new(grant.bounds),
             self.common.make_activation_behavior(self.definition.action.clone()),
-        ));
-        draw.merge(activatable).map_err(|error| vui::InstallVuiError::Conflict {
-            error,
-            widget: self.definition.clone(),
-        })
+        )))
     }
 
     fn step(
@@ -161,17 +157,22 @@ impl vui::WidgetController for ActionButtonController {
         context: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::StepSuccess, vui::StepError> {
         let activity = self.common.step();
-        let mut txn = if activity.changed {
-            self.draw_txn(activity.state)
-        } else {
-            SpaceTransaction::default()
-        };
+        if activity.changed {
+            context.request_draw();
+        }
+        let mut txn = vui::WidgetTransaction::default();
         activity.add_fluff(context, &mut txn);
-        Ok((
-            txn,
-            // TODO: use waking
-            vui::Then::Step,
-        ))
+
+        // TODO: use waking
+        Ok((txn, vui::Then::Step))
+    }
+
+    fn draw(
+        &mut self,
+        _context: &vui::WidgetContext<'_, '_>,
+        _from_scratch: bool,
+    ) -> vui::WidgetTransaction {
+        self.draw_txn(self.common.state())
     }
 }
 
@@ -184,16 +185,10 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
     ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         let grant = self.definition.common.shrink_bounds(*context.grant());
 
-        let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
+        Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             SpaceBehaviorAttachment::new(grant.bounds),
             self.common.make_activation_behavior(self.definition.action.clone()),
-        ));
-        self.draw_txn(ButtonVisualState::default()).merge(activatable).map_err(|error| {
-            vui::InstallVuiError::Conflict {
-                error,
-                widget: self.definition.clone(),
-            }
-        })
+        )))
     }
 
     fn step(
@@ -201,17 +196,22 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
         context: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::StepSuccess, vui::StepError> {
         let activity = self.common.step();
-        let mut txn = if self.todo.get_and_clear() || activity.changed {
-            self.draw_txn(activity.state)
-        } else {
-            SpaceTransaction::default()
-        };
+        if self.todo.get_and_clear() || activity.changed {
+            context.request_draw();
+        }
+        let mut txn = vui::WidgetTransaction::default();
         activity.add_fluff(context, &mut txn);
-        Ok((
-            txn,
-            // TODO: use waking
-            vui::Then::Step,
-        ))
+
+        // TODO: use waking
+        Ok((txn, vui::Then::Step))
+    }
+
+    fn draw(
+        &mut self,
+        _context: &vui::WidgetContext<'_, '_>,
+        _from_scratch: bool,
+    ) -> vui::WidgetTransaction {
+        self.draw_txn(self.common.state())
     }
 }
 

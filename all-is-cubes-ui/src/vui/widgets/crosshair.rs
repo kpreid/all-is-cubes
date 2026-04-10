@@ -52,26 +52,34 @@ impl vui::WidgetController for CrosshairController {
         &mut self,
         context: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::StepSuccess, vui::StepError> {
-        let Some(position) = context.grant().shrink_to_cube() else {
+        let Some(_position) = context.grant().shrink_to_cube() else {
             return Ok((vui::WidgetTransaction::default(), vui::Then::Drop));
         };
 
-        let txn = if self.todo.get_and_clear() {
-            let d = &*self.definition;
+        // TODO: waking
+        Ok((vui::WidgetTransaction::default(), vui::Then::Step))
+    }
+
+    fn draw(
+        &mut self,
+        context: &vui::WidgetContext<'_, '_>,
+        from_scratch: bool,
+    ) -> vui::WidgetTransaction {
+        if let Some(position) = context.grant().shrink_to_cube()
+            && (self.todo.get_and_clear() || from_scratch)
+        {
             SpaceTransaction::set_cube(
                 position,
                 None,
-                Some(if d.mouselook_mode.get() {
-                    d.icon.clone()
+                Some(if self.definition.mouselook_mode.get() {
+                    self.definition.icon.clone()
                 } else {
                     AIR
                 }),
             )
         } else {
-            SpaceTransaction::default()
-        };
-
-        Ok((txn, vui::Then::Step))
+            vui::WidgetTransaction::default()
+        }
     }
 }
 

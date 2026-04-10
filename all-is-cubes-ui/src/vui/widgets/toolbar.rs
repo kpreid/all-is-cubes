@@ -327,6 +327,8 @@ impl WidgetController for ToolbarController {
         // TODO: Use Then::Sleep and a waker
         Ok((slots_txn.merge(pointers_txn).unwrap(), vui::Then::Step))
     }
+
+    // TODO: implement WidgetController::draw() instead of drawing from step()
 }
 
 impl universe::VisitHandles for ToolbarController {

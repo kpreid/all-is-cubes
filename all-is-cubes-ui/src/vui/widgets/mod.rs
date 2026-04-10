@@ -42,6 +42,7 @@ pub use voxels::*;
 pub use all_is_cubes::content::BoxStyle;
 
 /// Generic widget controller that only does something on `initialize()`.
+// TODO: With the addition of `WidgetController::draw()` and expecting widgets to be redrawable, this being actually one-shot no longer makes sense
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[expect(clippy::exhaustive_structs)]
 pub struct OneshotController(pub Option<vui::WidgetTransaction>);

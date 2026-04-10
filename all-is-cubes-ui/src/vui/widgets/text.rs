@@ -251,8 +251,24 @@ struct TextBoxController {
     grant: LayoutGrant,
 }
 
-impl TextBoxController {
-    fn draw_txn(&self) -> vui::WidgetTransaction {
+impl WidgetController for TextBoxController {
+    fn step(
+        &mut self,
+        context: &vui::WidgetContext<'_, '_>,
+    ) -> Result<vui::StepSuccess, vui::StepError> {
+        if self.todo.get_and_clear() {
+            context.request_draw();
+        }
+
+        // TODO: use waking
+        Ok((vui::WidgetTransaction::default(), vui::Then::Step))
+    }
+
+    fn draw(
+        &mut self,
+        _: &vui::WidgetContext<'_, '_>,
+        _from_scratch: bool,
+    ) -> vui::WidgetTransaction {
         draw_text_txn(
             &text_for_widget(
                 self.definition.text_source.get(),
@@ -264,27 +280,6 @@ impl TextBoxController {
             &self.grant,
             false, // overwrite any previous text
         )
-    }
-}
-
-impl WidgetController for TextBoxController {
-    fn initialize(
-        &mut self,
-        _: &vui::WidgetContext<'_, '_>,
-    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
-        Ok(self.draw_txn())
-    }
-
-    fn step(&mut self, _: &vui::WidgetContext<'_, '_>) -> Result<vui::StepSuccess, vui::StepError> {
-        Ok((
-            if self.todo.get_and_clear() {
-                self.draw_txn()
-            } else {
-                SpaceTransaction::default()
-            },
-            // TODO: use waking
-            vui::Then::Step,
-        ))
     }
 }
 
