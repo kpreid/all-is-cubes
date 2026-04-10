@@ -193,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // slow, unlikely to uncover problems
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn grid_iter_size_hint() {
         let b = GridAab::from_lower_size([0, 0, 0], [12, 34, 56]);
         let expected_size = b.volume().unwrap();
@@ -256,7 +256,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // slow, unlikely to uncover problems
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn next_and_fold_are_equivalent() {
         let b = GridAab::from_lower_size([0, -1, 7], [3, 3, 3]);
         println!("Aab = {b:?}");

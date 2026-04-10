@@ -842,7 +842,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(miri))] // slow, boring
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     #[rstest::rstest]
     fn aab_raycast_aligned_with_grid(#[values(false, true)] reversed: bool) {
         // not-round-in-base-2 numbers to provoke rounding misbehavior

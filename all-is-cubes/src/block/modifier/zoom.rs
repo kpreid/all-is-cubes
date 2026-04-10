@@ -201,7 +201,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // slow
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn evaluation() {
         let mut universe = Universe::new();
         let [original_block] = make_some_voxel_blocks(&mut universe);

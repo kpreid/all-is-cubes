@@ -459,7 +459,7 @@ fn intersection_point_positive_face() {
 
 /// Tests [`RaycastStep::intersection_point()`]’s properties with random rays.
 #[test]
-#[cfg(not(miri))] // slow, boring
+#[cfg_attr(miri, ignore = "slow under Miri")]
 fn intersection_point_random_test() {
     // A one-cube box, so that all possible rays should either intersect
     // exactly this cube, or none at all.

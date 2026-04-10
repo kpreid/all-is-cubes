@@ -407,7 +407,7 @@ mod tests {
     ///
     /// TODO: A more thorough test would be to double the resolution of a non-uniform block,
     /// though that might have rounding error.
-    #[cfg(not(miri))] // Miri adds unrealistic *nondeterministic* error. TODO: Can we avoid the ops in question?
+    #[cfg_attr(miri, ignore = "Miri adds unrealistic *nondeterministic* error. TODO: Can we avoid the ops in question?")]
     #[rstest::rstest]
     fn solid_block_equivalent_at_any_resolution(
         #[values(

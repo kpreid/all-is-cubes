@@ -559,7 +559,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // Miri has technically-allowed-to-be-nondeterministic trig functions
+    #[cfg_attr(miri, ignore = "Miri has technically-allowed-to-be-nondeterministic trig functions")]
     fn look_direction() {
         let do_test = |direction: [f64; 3], yaw, pitch| {
             let mut body = Body::new_minimal([10., 0., 0.], Aab::ZERO);

@@ -1043,7 +1043,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // slow, boring
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn ps_exhaustive() {
         for f in f32::exhaust() {
             match PositiveSign::<f32>::try_from(f) {
@@ -1135,7 +1135,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // slow, boring
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn zo_exhaustive() {
         for f in f32::exhaust() {
             match ZeroOne::<f32>::try_from(f) {

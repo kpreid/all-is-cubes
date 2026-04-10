@@ -167,7 +167,7 @@ fn falling_collision() {
 }
 
 #[test]
-#[cfg(not(miri))] // slow, boring
+#[cfg_attr(miri, ignore = "slow under Miri")]
 fn falling_collision_partial_block() {
     const RES: Resolution = Resolution::R4;
     let x_velocity = 0.2;
@@ -296,7 +296,7 @@ fn push_out_voxels() {
 }
 
 #[test]
-#[cfg(not(miri))] // slow, boring
+#[cfg_attr(miri, ignore = "slow under Miri")]
 fn no_passing_through_blocks() {
     // Construct cubical box. TODO: worldgen utilities for this?
     let [wall_block] = make_some_blocks();

@@ -699,7 +699,7 @@ mod tests {
         )
     }
     #[test]
-    #[cfg(not(miri))] // depends on sqrt() being well behaved
+    #[cfg_attr(miri, ignore = "depends on sqrt() being well behaved")]
     fn chunk_chart_radius_break_points() {
         fn assert_count(distance_in_chunks: FreeCoordinate, count: usize) {
             let chart = ChunkChart::<16>::new(distance_in_chunks * 16.);
@@ -765,7 +765,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // slow
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn chunk_chart_sorting() {
         // Caution: O(n^6) in the chart radius...
         let chart = ChunkChart::<16>::new(4.0 * 16.);
@@ -791,7 +791,7 @@ mod tests {
     /// Test a large chart shrunk, against a small chart enlarged.
     /// They should give the same answer.
     #[test]
-    #[cfg(not(miri))] // slow
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn chunk_chart_resize() {
         // Test a large chart shrunk, against a small chart enlarged.
         // They should give the same answer.
@@ -808,7 +808,7 @@ mod tests {
 
     /// As `chunk_chart_resize` but randomized for more coverage.
     #[test]
-    #[cfg(not(miri))] // slow
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn chunk_chart_resize_rand() {
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for _ in 0..50 {

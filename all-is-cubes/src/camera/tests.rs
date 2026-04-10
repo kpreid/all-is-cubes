@@ -71,7 +71,7 @@ fn projection_depth() {
 }
 
 #[test]
-#[cfg(not(miri))] // TODO: add approximate comparison and this will pass
+#[cfg_attr(miri, ignore = "TODO: add approximate comparison and this will pass")]
 fn view_frustum() {
     let camera = Camera::new(
         GraphicsOptions {

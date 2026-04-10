@@ -175,7 +175,7 @@ mod tests {
     /// This test does NOT test the *choice* of exposure (that is, it does not test
     /// [`compute_target_exposure`]), just how it's updated in a [`Character`].
     #[test]
-    #[cfg(not(miri))] // slow
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn e2e() {
         // Put a character in a uniformly lit box.
         let mut universe = Universe::new();

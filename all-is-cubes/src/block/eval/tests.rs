@@ -267,7 +267,7 @@ fn voxels_checked_individually() {
 /// Test that light emission from voxels doesn't depend on resolution, or rather, the emission
 /// is taken as an intensive property rather than an extensive property.
 #[rstest]
-#[cfg(not(miri))]
+#[cfg_attr(miri, ignore = "slow under Miri")]
 fn voxels_emission_equivalence(
     #[values(Rgba::TRANSPARENT, Rgba::new(0.0, 0.5, 1.0, 0.5))] reflectance: Rgba,
     #[values(R1, R2, R4, R32)] resolution: Resolution,
@@ -435,7 +435,7 @@ fn voxels_partial_not_filling() {
 
 /// Tests that the `offset` field of `Primitive::Recur` is respected.
 #[test]
-#[cfg(not(miri))] // slow, probably no interesting code coverage
+#[cfg_attr(miri, ignore = "slow under Miri")]
 fn recur_with_offset() {
     let resolution = R4;
     let resolution_g = u32::from(resolution);

@@ -1278,7 +1278,7 @@ mod tests {
 
     /// Test that [`Rgba::from_srgb8`] agrees with [`Rgba::to_srgb8`].
     #[test]
-    #[cfg(not(miri))] // slow, unlikely to uncover problems
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn srgb_round_trip() {
         let srgb_figures = [
             0x00, 0x05, 0x10, 0x22, 0x33, 0x44, 0x55, 0x77, 0x7f, 0xDD, 0xFF,
@@ -1319,7 +1319,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // slow, boring
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn check_const_srgb_table() {
         let generated_table: Vec<f32> =
             (0..=u8::MAX).map(component_from_srgb8_arithmetic).collect();

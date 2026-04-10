@@ -709,7 +709,7 @@ mod tests {
     /// Check that the effect of composing two rotations with the `*` operator is equal to
     /// the effect of applying both.
     #[test]
-    #[cfg(not(miri))] // slow, boring
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn composition_consistency() {
         let mut f = MultiFailure::new();
         for first in GridRotation::ALL {
@@ -727,7 +727,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // slow, boring
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn is_reflection_consistency() {
         for a in GridRotation::ALL {
             for b in GridRotation::ALL {
@@ -830,7 +830,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // slow, unlikely to uncover problems
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn regenerate_multiplication_table() {
         let mut failed = false;
         println!(indoc::indoc! {

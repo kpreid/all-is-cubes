@@ -445,7 +445,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(miri))] // needs more cases than reasonable
+    #[cfg_attr(miri, ignore = "slow under Miri")]
     fn equivalent_inverse() {
         let mut rng = Xoshiro256Plus::seed_from_u64(0xca9bd0d289b4700e);
         let mut nontrivial = 0;
