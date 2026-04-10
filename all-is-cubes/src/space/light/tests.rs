@@ -102,8 +102,8 @@ fn out_of_bounds_light_is_sky(#[values(0.0, 0.5, 1.0)] opacity: f32) {
     }
 }
 
-#[test]
-fn step() {
+#[rstest::rstest]
+fn step(#[values(false, true)] paused: bool) {
     let mut universe = Universe::new();
     let color = Rgb::new(1.0, 0.0, 0.0);
     let space = universe
@@ -131,7 +131,7 @@ fn step() {
         assert_eq!(space.get_lighting([2, 0, 0]), PackedLight::NO_RAYS);
     }
 
-    let info = universe.step(false, time::Deadline::Whenever);
+    let info = universe.step(paused, time::Deadline::Whenever);
     assert_eq!(
         info.space_step.light,
         LightUpdatesInfo {

@@ -41,7 +41,7 @@ pub(crate) struct SpaceUpdateSet;
 
 /// Install systems related to `Space`s.
 pub(crate) fn add_space_systems(world: &mut ecs::World) {
-    // TODO(ecs): large portions of space updating are currently hardcoded in `Universe::step()`
+    // TODO(ecs): space behavior stepping is currently hardcoded in `Universe::step()`, not here
 
     // Must be the same list of resources in `collect_space_step_info()`.
     InfoCollector::<TimeStats, palette::PaletteStatsTag>::register(world);
@@ -52,9 +52,17 @@ pub(crate) fn add_space_systems(world: &mut ecs::World) {
     let mut schedules = world.resource_mut::<ecs::Schedules>();
     schedules.add_systems(
         time::schedule::Step,
-        (update_light_system, execute_tick_actions_system)
-            .chain()
-            .in_set(SpaceUpdateSet),
+        execute_tick_actions_system.in_set(SpaceUpdateSet),
+    );
+    // Light updates should:
+    // * happen after changes to the world so the user sees the freshest light, and
+    // * still happen if time is paused,
+    // and putting them in `AfterStep` satisfies those requirements.
+    // (In the long run, we want to be doing light updates asynchronously in parallel with
+    // everything else, but that will require cleverer data management.)
+    schedules.add_systems(
+        time::schedule::AfterStep,
+        update_light_system.in_set(SpaceUpdateSet),
     );
 
     palette::add_palette_systems(world);
