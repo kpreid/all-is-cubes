@@ -54,14 +54,14 @@ impl Sky {
     pub fn for_blocks(&self) -> BlockSky {
         BlockSky {
             faces: match *self {
-                Sky::Uniform(color) => FaceMap::splat(PackedLight::from(color)),
+                Sky::Uniform(color) => FaceMap::splat(PackedLight::some(color)),
                 Sky::Octants(_) => FaceMap::from_fn(|face| {
                     let transform = face.rotation_from_nz();
                     // Take four samples from rays into the correct octants.
                     // The rays start out exiting the NZ face and are transformed.
                     // We could calculate which octants to use directly, but that would be more
                     // error-prone.
-                    PackedLight::from(
+                    PackedLight::some(
                         [
                             vec3(-1, -1, -1),
                             vec3(-1, 1, -1),
@@ -75,7 +75,7 @@ impl Sky {
                     )
                 }),
             },
-            mean: PackedLight::from(self.mean()),
+            mean: PackedLight::some(self.mean()),
         }
     }
 }

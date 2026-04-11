@@ -260,13 +260,6 @@ impl fmt::Debug for PackedLight {
     }
 }
 
-impl From<Rgb> for PackedLight {
-    #[inline]
-    fn from(value: Rgb) -> Self {
-        PackedLight::some(value)
-    }
-}
-
 #[cfg(feature = "save")]
 impl From<PackedLight> for crate::save::schema::LightSerV1 {
     fn from(p: PackedLight) -> Self {

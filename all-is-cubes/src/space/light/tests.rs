@@ -114,7 +114,7 @@ fn step(#[values(false, true)] paused: bool) {
                 .build(),
         )
         .unwrap();
-    let sky_light = PackedLight::from(color);
+    let sky_light = PackedLight::some(color);
 
     universe
         .execute_1(
@@ -223,7 +223,7 @@ fn light_source_self_illumination_transparent() {
         .build();
 
     let space = light_source_test_space(block);
-    assert_eq!(space.get_lighting([1, 1, 1]), light.into());
+    assert_eq!(space.get_lighting([1, 1, 1]), PackedLight::some(light));
 }
 
 #[test]
@@ -235,7 +235,7 @@ fn light_source_self_illumination_opaque() {
         .build();
 
     let space = light_source_test_space(block);
-    assert_eq!(space.get_lighting([1, 1, 1]), light.into());
+    assert_eq!(space.get_lighting([1, 1, 1]), PackedLight::some(light));
     let adjacents = FaceMap::from_fn(|face| {
         space.get_lighting(GridPoint::new(1, 1, 1) + face.normal_vector()).value()
     });
