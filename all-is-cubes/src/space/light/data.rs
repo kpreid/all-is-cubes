@@ -68,7 +68,6 @@ impl PackedLight {
     const LOG_SCALE: f32 = 10.0;
     const LOG_OFFSET: f32 = 144.0;
 
-    // pub(crate) const ZERO: Self = Self::none(LightStatus::Visible);
     pub(crate) const OPAQUE: Self = Self::none(LightStatus::Opaque);
     pub(crate) const NO_RAYS: Self = Self::none(LightStatus::NoRays);
     pub(crate) const UNINITIALIZED_AND_BLACK: Self = Self::none(LightStatus::Uninitialized);
@@ -80,15 +79,20 @@ impl PackedLight {
         }
     };
 
-    pub(crate) fn some(value: Rgb) -> Self {
+    /// Private general constructor that can construct arbitrary combos of value and status.
+    fn from_value_and_status(value: Rgb, status: LightStatus) -> Self {
         PackedLight {
             value: Vector3D::new(
                 Self::scalar_in(value.red()),
                 Self::scalar_in(value.green()),
                 Self::scalar_in(value.blue()),
             ),
-            status: LightStatus::Visible,
+            status,
         }
+    }
+
+    pub(crate) fn some(value: Rgb) -> Self {
+        Self::from_value_and_status(value, LightStatus::Visible)
     }
 
     pub(crate) const fn none(status: LightStatus) -> Self {
@@ -99,14 +103,7 @@ impl PackedLight {
     }
 
     pub(crate) fn guess(value: Rgb) -> Self {
-        PackedLight {
-            value: Vector3D::new(
-                Self::scalar_in(value.red()),
-                Self::scalar_in(value.green()),
-                Self::scalar_in(value.blue()),
-            ),
-            status: LightStatus::Uninitialized,
-        }
+        Self::from_value_and_status(value, LightStatus::Uninitialized)
     }
 
     /// Returns the light level.
@@ -128,7 +125,13 @@ impl PackedLight {
     /// inside an opaque block or in empty unlit air (in which case [`Self::value`]
     /// always returns zero).
     pub fn valid(self) -> bool {
-        self.status == LightStatus::Visible
+        match self.status {
+            // TODO: now that Uninitialized can be a guess, this disagrees with the documentation; but what *should* this method return? Does it need splitting up?
+            LightStatus::Uninitialized => false,
+            LightStatus::NoRays => false,
+            LightStatus::Opaque => false,
+            LightStatus::Visible => true,
+        }
     }
 
     /// RGB color plus a fourth component which is a “weight” value which indicates how
