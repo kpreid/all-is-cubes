@@ -91,7 +91,11 @@ pub trait Widget: Layoutable + Debug + Send + Sync {
 pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     /// Write the initial state of the widget to the space.
     /// This is called at most once.
-    #[expect(clippy::missing_errors_doc, reason = "TODO: error type is too broad")]
+    #[expect(
+        clippy::missing_errors_doc,
+        reason = "TODO: error type is too broad \
+        and allows widgets to fill in fields that should be context"
+    )]
     fn initialize(
         &mut self,
         context: &WidgetContext<'_, '_>,
@@ -174,14 +178,14 @@ impl WidgetBehavior {
     /// Returns a transaction which adds the given widget controller to the space,
     /// or an error if the controller's `initialize()` fails.
     pub(crate) fn installation(
-        widget: Positioned<Arc<dyn Widget>>,
+        positioned_widget: Positioned<Arc<dyn Widget>>,
         mut controller: Box<dyn WidgetController>,
         read_ticket: ReadTicket<'_>,
     ) -> Result<SpaceTransaction, InstallVuiError> {
         let init_txn = match controller.initialize(&WidgetContext {
             read_ticket,
             behavior_context: None,
-            grant: &widget.position,
+            grant: &positioned_widget.position,
         }) {
             Ok(t) => t,
             Err(e) => {
@@ -193,15 +197,18 @@ impl WidgetBehavior {
         };
         let add_txn = behavior::BehaviorSetTransaction::insert(
             // TODO: widgets should be rotatable and that should go here
-            space::SpaceBehaviorAttachment::new(widget.position.bounds),
+            space::SpaceBehaviorAttachment::new(positioned_widget.position.bounds),
             Arc::new(WidgetBehavior {
-                widget,
+                widget: positioned_widget.clone(),
                 controller: Mutex::new(controller),
             }),
         );
-        init_txn
-            .merge(SpaceTransaction::behaviors(add_txn))
-            .map_err(|error| InstallVuiError::Conflict { error })
+        init_txn.merge(SpaceTransaction::behaviors(add_txn)).map_err(|error| {
+            InstallVuiError::Conflict {
+                error,
+                widget: positioned_widget.value,
+            }
+        })
     }
 }
 
@@ -293,16 +300,16 @@ pub enum InstallVuiError {
     },
 
     /// A transaction conflict arose between two widgets or parts of a widget's installation.
-    #[displaydoc("transaction conflict involving a widget")]
+    #[displaydoc("transaction conflict from widget {widget:?}")]
     #[non_exhaustive]
     Conflict {
-        // TODO: Include the widget(s) involved, once `Arc<dyn Widget>` is piped around everywhere
-        // and not just sometimes Widget or sometimes WidgetController.
-        //
         // TODO: Now that `ExecuteError` contains conflicts, we should consider making this a
         // sub-case of `ExecuteInstallation`.
         #[allow(missing_docs)]
         error: space::SpaceTransactionConflict,
+
+        /// The widget.
+        widget: Arc<dyn Widget>,
     },
 
     /// The widget attempted to modify space outside its assigned bounds.
@@ -338,7 +345,7 @@ impl Error for InstallVuiError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             InstallVuiError::WidgetInitialization { error, .. } => Some(error),
-            InstallVuiError::Conflict { error } => Some(error),
+            InstallVuiError::Conflict { error, .. } => Some(error),
             InstallVuiError::OutOfBounds { .. } => None,
             InstallVuiError::ExecuteInstallation { error } => Some(error),
         }

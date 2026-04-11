@@ -151,8 +151,10 @@ impl vui::WidgetController for ActionButtonController {
             SpaceBehaviorAttachment::new(grant.bounds),
             self.common.make_activation_behavior(self.definition.action.clone()),
         ));
-        draw.merge(activatable)
-            .map_err(|error| vui::InstallVuiError::Conflict { error })
+        draw.merge(activatable).map_err(|error| vui::InstallVuiError::Conflict {
+            error,
+            widget: self.definition.clone(),
+        })
     }
 
     fn step(
@@ -187,9 +189,12 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
             SpaceBehaviorAttachment::new(grant.bounds),
             self.common.make_activation_behavior(self.definition.action.clone()),
         ));
-        self.draw_txn(ButtonVisualState::default())
-            .merge(activatable)
-            .map_err(|error| vui::InstallVuiError::Conflict { error })
+        self.draw_txn(ButtonVisualState::default()).merge(activatable).map_err(|error| {
+            vui::InstallVuiError::Conflict {
+                error,
+                widget: self.definition.clone(),
+            }
+        })
     }
 
     fn step(

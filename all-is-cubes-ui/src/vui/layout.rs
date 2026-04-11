@@ -483,16 +483,22 @@ impl LayoutTree<Positioned<Arc<dyn Widget>>> {
         read_ticket: ReadTicket<'_>,
     ) -> Result<SpaceTransaction, InstallVuiError> {
         let mut txn = SpaceTransaction::default();
-        for positioned_widget @ Positioned { value, position } in self.leaves() {
-            let widget = value.clone();
+        for positioned_widget @ Positioned {
+            value: widget,
+            position,
+        } in self.leaves()
+        {
             let controller_installation = WidgetBehavior::installation(
                 positioned_widget.clone(),
-                widget.controller(position),
+                widget.clone().controller(position),
                 read_ticket,
             )?;
-            validate_widget_transaction(value, &controller_installation, position)?;
+            validate_widget_transaction(widget, &controller_installation, position)?;
             txn.merge_from(controller_installation)
-                .map_err(|error| InstallVuiError::Conflict { error })?;
+                .map_err(|error| InstallVuiError::Conflict {
+                    error,
+                    widget: widget.clone(),
+                })?;
         }
         Ok(txn)
     }
