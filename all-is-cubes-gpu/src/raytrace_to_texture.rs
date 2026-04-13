@@ -584,11 +584,7 @@ impl Inner {
     }
 
     fn do_some_tracing(&mut self) {
-        #![allow(
-            unknown_lints,
-            clippy::duration_suboptimal_units,
-            reason = "using consistent units; TODO: remove unknown_lints after Rust 1.95"
-        )]
+        #![expect(clippy::duration_suboptimal_units, reason = "using consistent units")]
 
         type Trace = (Point, [f16; 4], f32);
 
