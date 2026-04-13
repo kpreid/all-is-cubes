@@ -369,11 +369,9 @@ impl Key {
             }
         }
 
-        let id = ID_COUNTER
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |counter| {
-                counter.checked_add(1)
-            })
-            .expect("behavior id overflow");
+        let id = ID_COUNTER.update(Ordering::Relaxed, Ordering::Relaxed, |counter| {
+            counter.checked_add(1).expect("behavior id overflow")
+        });
 
         Self(id.try_into().unwrap()) // try_into because of usize-to-u64 case
     }

@@ -95,8 +95,7 @@ impl CommonController {
     fn step(&mut self) -> ButtonActivity {
         let counter = self
             .recently_pressed
-            .fetch_update(Relaxed, Relaxed, |counter| Some(counter.saturating_sub(1)))
-            .unwrap();
+            .update(Relaxed, Relaxed, |counter| counter.saturating_sub(1));
 
         ButtonActivity {
             changed: counter == Self::PRESSED_TIMER_DURATION || counter == 1,

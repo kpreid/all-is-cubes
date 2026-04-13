@@ -98,15 +98,14 @@ impl texture::Allocator for Allocator {
     fn allocate(&self, bounds: GridAab, channels: texture::Channels) -> Option<Self::Tile> {
         assert!(!bounds.is_empty());
         self.count_allocated
-            .fetch_update(SeqCst, SeqCst, |count| {
+            .try_update(SeqCst, SeqCst, |count| {
                 if count < self.capacity {
                     Some(count + 1)
                 } else {
                     None
                 }
             })
-            .ok()
-            .map(drop)?;
+            .ok()?;
         Some(Tile { bounds, channels })
     }
 }

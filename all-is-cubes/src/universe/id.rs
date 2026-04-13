@@ -27,11 +27,9 @@ impl UniverseId {
 
         static UNIVERSE_ID_COUNTER: AtomicUpTo64 = AtomicUpTo64::new(1);
 
-        let id = from_atomic_value(
-            UNIVERSE_ID_COUNTER
-                .fetch_update(Relaxed, Relaxed, |counter| counter.checked_add(1))
-                .expect("universe id overflow"),
-        )
+        let id = from_atomic_value(UNIVERSE_ID_COUNTER.update(Relaxed, Relaxed, |counter| {
+            counter.checked_add(1).expect("universe id overflow")
+        }))
         .expect("uncaught universe id overflow??");
 
         Self(id)
