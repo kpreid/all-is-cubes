@@ -1,7 +1,7 @@
 //! Options controlling recording.
 
-use std::ops::RangeInclusive;
 use std::path::PathBuf;
+use std::range::RangeInclusive;
 use std::time::Duration;
 
 use all_is_cubes_render::camera::{self, Viewport};
@@ -57,6 +57,7 @@ impl RecordOptions {
             None => 0..=0,
             Some(animation) => 1..=animation.frame_count,
         }
+        .into()
     }
 }
 
