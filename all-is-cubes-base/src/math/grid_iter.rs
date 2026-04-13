@@ -137,7 +137,7 @@ impl Iterator for GridIter {
         // First, if the iterator has already been partly advanced (this is atypical),
         // advance it until the remaining elements form an AAB.
         if !self.remaining_elements_form_box() {
-            cold_path();
+            core::hint::cold_path();
             loop {
                 let Some(cube) = self.next() else {
                     return state;
@@ -165,12 +165,6 @@ impl Iterator for GridIter {
 
 impl ExactSizeIterator for GridIter {}
 impl FusedIterator for GridIter {}
-
-// Replace this with `core::hint::cold_path()` when that becomes stable.
-// <https://github.com/rust-lang/rust/pull/151576>
-#[cold]
-#[inline]
-fn cold_path() {}
 
 #[cfg(test)]
 mod tests {
