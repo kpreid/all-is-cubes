@@ -27,7 +27,7 @@ dependencies = [
  "exhaust",
  "flate2",
  "futures-core",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.0",
  "itertools",
  "libm",
  "log",
@@ -78,7 +78,7 @@ dependencies = [
  "either",
  "exhaust",
  "futures-core",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.0",
  "itertools",
  "log",
  "macro_rules_attribute",
@@ -105,7 +105,7 @@ dependencies = [
  "futures-util",
  "gloo-timers",
  "half",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.0",
  "itertools",
  "log",
  "num-traits",
@@ -135,7 +135,7 @@ dependencies = [
  "flume",
  "futures-channel",
  "futures-util",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.0",
  "indoc",
  "itertools",
  "log",
@@ -180,7 +180,7 @@ dependencies = [
  "displaydoc",
  "embedded-graphics",
  "futures-core",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.0",
  "imgref",
  "indoc",
  "itertools",
@@ -207,7 +207,7 @@ dependencies = [
  "futures-core",
  "futures-task",
  "futures-util",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.0",
  "indoc",
  "itertools",
  "log",
@@ -1031,8 +1031,6 @@ checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 dependencies = [
  "equivalent",
  "foldhash 0.2.0",
- "serde",
- "serde_core",
 ]
 
 [[package]]
@@ -1040,6 +1038,11 @@ name = "hashbrown"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f467dd6dccf739c208452f8014c75c18bb8301b050ad1cfb27153803edb0f51"
+dependencies = [
+ "foldhash 0.2.0",
+ "serde",
+ "serde_core",
+]
 
 [[package]]
 name = "heapless"
