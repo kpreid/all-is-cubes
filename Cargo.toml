@@ -74,7 +74,7 @@ all-is-cubes-server = { path = "all-is-cubes-server", version = "0.10.0", defaul
 all-is-cubes-ui = { path = "all-is-cubes-ui", version = "0.10.0", default-features = false }
 allocation-counter = { version = "0.8.1", default-features = false }
 # Only used in std-using packages, so default features enabled
-anyhow = "1.0.72"
+anyhow = "1.0.102"
 # Each use should be { optional = true }.
 arbitrary = { version = "1.4.1", features = ["derive"] }
 arrayvec = { version = "0.7.6", default-features = false }
@@ -86,9 +86,9 @@ async_fn_traits = { version = "0.1.1", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bevy_ecs = { version = "0.18.0", default-features = false }
 bevy_platform = { version = "0.18.0", default-features = false, features = ["alloc"] }
-bitflags = { version = "2.10.0", default-features = false }
+bitflags = { version = "2.11.1", default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
-bytemuck = { version = "1.24.0", default-features = false, features = ["derive", "must_cast"] }
+bytemuck = { version = "1.25.0", default-features = false, features = ["derive", "must_cast"] }
 # When upgrading clap, beware text output changes causing integration tests to fail.
 clap = { version = "4.5", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
 criterion = { version = "0.8.0", features = ["async", "cargo_bench_support", "html_reports"] }
@@ -108,7 +108,7 @@ futures-util = { version = "0.3.31", default-features = false, features = ["allo
 # TODO: evaluate which gilrs features should be enabled
 gilrs = { version = "0.11.0" }
 gloo-timers = { version = "0.4.0", default-features = false }
-half = { version = "2.6.0", default-features = false, features = ["bytemuck"] }
+half = { version = "2.7.1", default-features = false, features = ["bytemuck"] }
 hashbrown = { version = "0.17.0", default-features = false, features = ["default-hasher", "inline-more"] }
 image = { version = "0.25.10", default-features = false }
 imgref = { version = "1.10.1", default-features = false }
@@ -159,14 +159,14 @@ snapbox = "1.0.0" # keep in sync with `trycmd`
 strum = { version = "0.28.0", default-features = false, features = ["derive"] }
 sync_wrapper = { version = "1.0.2", default-features = false }
 tempfile = { version = "3.23.0", default-features = false }
-thiserror = { version = "2.0.17", default-features = false }
+thiserror = { version = "2.0.18", default-features = false }
 time = { version = "0.3.37", default-features = false }
 # Used for HTML templating and escaping.
 # We choose it mainly because it is already in our deps via `criterion`.
 tinytemplate = { version = "1.2.1" }
 # Tokio is used for certain binaries.
 # The library crates do not require Tokio.
-tokio = { version = "1.47.1", default-features = false }
+tokio = { version = "1.50.0", default-features = false }
 trycmd = "1.0.0" # keep in sync with `snapbox`
 unicode-segmentation = { version = "1.10.1", default-features = false }
 unicode-width = { version = "0.2", default-features = false }
