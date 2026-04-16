@@ -23,6 +23,7 @@ use all_is_cubes::space::{self, SetCubeError, Sky};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
+use crate::alg::array_of_random;
 use crate::alg::{NoiseFnExt, array_of_noise, scale_color, voronoi_pattern_stretch};
 use crate::{palette, tree};
 
@@ -227,11 +228,10 @@ pub async fn install_landscape_blocks(
         atom.collision = BlockCollision::None;
     }
 
-    let blade_color_noise = {
-        let blade_color_noise_v = noise::Value::new(0x2e240365);
-        move |cube: Cube| blade_color_noise_v.at_grid(cube.lower_bounds()) * 0.12 + 1.0
-    };
-    let overhang_noise = array_of_noise(resolution, &noise::Value::new(0), |value| {
+    let blade_color_noise = array_of_random(resolution, 0x2e240365, -1.0..=1.0, move |value| {
+        value * 0.12 + 1.0
+    });
+    let overhang_noise = array_of_random(resolution, 0x0, -1.0..=1.0, |value| {
         value * 2.5 + f64::from(resolution) * 0.75
     });
     #[allow(clippy::missing_panics_doc)]
@@ -292,7 +292,7 @@ pub async fn install_landscape_blocks(
                     cube_for_lookup.y = 0;
                     cube_for_lookup += noise_section;
                     if f64::from(cube.y - height_index) < blade_noise[cube_for_lookup] {
-                        scale_color(grass_blade_atom.clone(), blade_color_noise(cube), 0.02)
+                        scale_color(grass_blade_atom.clone(), blade_color_noise[cube], 0.02)
                     } else {
                         AIR
                     }
@@ -311,8 +311,8 @@ pub async fn install_landscape_blocks(
                 .attributes(attributes_from(&colors[Grass])?)
                 .ambient_sound(grass_sound.clone())
                 .voxels_fn(resolution, |cube| {
-                    if f64::from(cube.y) >= overhang_noise[cube] {
-                        scale_color(colors[Grass].clone(), blade_color_noise(cube), 0.02)
+                    if f64::from(cube.y) >= overhang_noise[Cube { y: 0, ..cube }] {
+                        scale_color(colors[Grass].clone(), blade_color_noise[cube], 0.02)
                     } else {
                         dirt_pattern(cube).clone()
                     }

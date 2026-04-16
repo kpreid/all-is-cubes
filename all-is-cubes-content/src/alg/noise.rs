@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 
 use noise::NoiseFn;
+use rand::{RngExt, SeedableRng as _};
 
 use all_is_cubes::block::Resolution;
 use all_is_cubes::math::{Cube, GridAab, GridPoint, Vol};
@@ -19,6 +20,28 @@ pub(crate) fn array_of_noise<O>(
 ) -> Vol<Box<[O]>> {
     Vol::from_fn(GridAab::for_block(resolution), |cube| {
         postprocess(noise_fn.get(cube.center().into()))
+    })
+}
+
+/// Generate a [`Block`]-shape of random values.
+//---
+// (Strictly speaking, this isn't noise, but it is used in places where we used to abuse
+// value noise.)
+#[inline(never)]
+#[allow(clippy::needless_pass_by_value)]
+pub(crate) fn array_of_random<T, U, R>(
+    resolution: Resolution,
+    seed: u64,
+    range: R,
+    mut postprocess: impl FnMut(T) -> U,
+) -> Vol<Box<[U]>>
+where
+    T: rand::distr::uniform::SampleUniform,
+    R: rand::distr::uniform::SampleRange<T> + Clone,
+{
+    let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
+    Vol::from_fn(GridAab::for_block(resolution), |_| {
+        postprocess(rng.random_range(range.clone()))
     })
 }
 

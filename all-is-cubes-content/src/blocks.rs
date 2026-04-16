@@ -29,7 +29,7 @@ use all_is_cubes::time;
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
-use crate::alg::{NoiseFnExt as _, gradient_lookup, scale_color, square_radius};
+use crate::alg::{gradient_lookup, scale_color, square_radius};
 use crate::landscape::install_landscape_blocks;
 use crate::load_block as lb;
 use crate::load_image::{block_from_image, default_srgb, include_image, space_from_image};
@@ -121,8 +121,10 @@ fn demo_blocks_generator(
     let center_point_doubled = (one_diagonal * resolution_g).to_point();
 
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();
-    let road_noise_v = noise::Value::new(0x52b19f6a);
-    let road_noise = move |cube: Cube| road_noise_v.at_grid(cube.lower_bounds()) * 0.12 + 1.0;
+    let road_noise =
+        crate::alg::array_of_random(resolution, 0x52b19f6a, -1.0..=1.0, move |value| {
+            value * 0.12 + 1.0
+        });
 
     let curb_fn = move |cube: Cube| {
         let width = resolution_g / 3;
@@ -131,7 +133,7 @@ fn demo_blocks_generator(
             .square_length()
             < width.pow(2)
         {
-            scale_color(curb_color.clone(), road_noise(cube), 0.02)
+            scale_color(curb_color.clone(), road_noise[cube], 0.02)
         } else {
             AIR
         }
