@@ -23,7 +23,7 @@ use all_is_cubes::space::{self, SetCubeError, Sky};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
-use crate::alg::{NoiseFnExt, array_of_noise, scale_color, voronoi_pattern};
+use crate::alg::{NoiseFnExt, array_of_noise, scale_color, voronoi_pattern_stretch};
 use crate::{palette, tree};
 
 // -------------------------------------------------------------------------------------------------
@@ -250,12 +250,8 @@ pub async fn install_landscape_blocks(
             scale_color(colors[Stone].clone(), rng.random_range(0.9..1.1), 0.02),
         )
     }));
-    let stone_pattern = voronoi_pattern(
-        resolution,
-        true,
-        |offset| offset.component_mul(vec3(1.0, 2.0, 1.0)).square_length(),
-        &*stone_points,
-    );
+    let stone_pattern =
+        voronoi_pattern_stretch(resolution, true, vec3(1.0, 2.0, 1.0), &*stone_points);
 
     // TODO: give dirt a palette of varying hue and saturation
     let dirt_points: Box<[_; 1024]> = Box::new(array::from_fn(|_| {
@@ -264,7 +260,8 @@ pub async fn install_landscape_blocks(
             scale_color(colors[Dirt].clone(), rng.random_range(0.9..1.1), 0.02),
         )
     }));
-    let dirt_pattern = voronoi_pattern(resolution, true, FreeVector::square_length, &*dirt_points);
+    let dirt_pattern =
+        voronoi_pattern_stretch(resolution, true, FreeVector::splat(1.0), &*dirt_points);
 
     let grass_sound = sound::Ambient::noise_at_frequency(ps32(0.01), ps32(2000.0));
 
@@ -344,12 +341,8 @@ pub async fn install_landscape_blocks(
                         scale_color(color_block.clone(), rng.random_range(0.6..1.5), 0.2),
                     )
                 }));
-                let bark_pattern = voronoi_pattern(
-                    resolution,
-                    true,
-                    |d| d.component_mul(vec3(16.0, 4.0, 16.0)).square_length(),
-                    &*bark_points,
-                );
+                let bark_pattern =
+                    voronoi_pattern_stretch(resolution, true, vec3(16.0, 4.0, 16.0), &*bark_points);
                 Block::builder()
                     .attributes(attributes_from(color_block)?)
                     .voxels_fn(resolution, |cube| {

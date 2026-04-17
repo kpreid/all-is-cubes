@@ -1,4 +1,4 @@
-use crate::alg::voronoi_pattern;
+use crate::alg::voronoi_pattern_stretch;
 
 use super::prelude::*;
 
@@ -62,12 +62,8 @@ fn generate_destruction_mask(
             },
         )
     });
-    let pattern = voronoi_pattern(
-        resolution,
-        false,
-        FreeVector::square_length,
-        points.as_slice(),
-    );
+    let pattern =
+        voronoi_pattern_stretch(resolution, false, FreeVector::splat(1.0), points.as_slice());
 
     Ok(Block::builder()
         .voxels_fn(resolution, pattern)?

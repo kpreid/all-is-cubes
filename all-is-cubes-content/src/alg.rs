@@ -17,6 +17,25 @@ use all_is_cubes::space::{self, CubeTransaction, SetCubeError, Space, SpaceTrans
 mod noise;
 pub(crate) use noise::*;
 
+/// [`voronoi_pattern()`] for the common case of Euclidean distance, possibly with a stretch/squash.
+///
+/// For no transform, pass `splat(1)`.
+#[cfg_attr(feature = "_special_testing", visibility::make(pub))] // used by benchmark
+#[inline(never)] // avoid pointless code duplication
+pub(crate) fn voronoi_pattern_stretch<'a>(
+    resolution: Resolution,
+    wrapping: bool,
+    distance_transform: FreeVector,
+    points: &'a [(FreePoint, Block)],
+) -> impl Fn(Cube) -> &'a Block + use<'a> {
+    voronoi_pattern(
+        resolution,
+        wrapping,
+        move |offset| offset.component_mul(distance_transform).square_length(),
+        points,
+    )
+}
+
 /// Create a function to define texture in a block, based on a set of points
 /// to form a 3D [Voronoi diagram], optionally wrapping around the boundaries for
 /// seamless tiling.
@@ -42,8 +61,6 @@ pub(crate) use noise::*;
 ///
 /// [Voronoi diagram]: https://en.wikipedia.org/wiki/Voronoi_diagram
 /// [metric space]: https://en.wikipedia.org/wiki/Metric_space
-#[cfg_attr(feature = "_special_testing", visibility::make(pub))] // used by benchmark
-#[inline(never)] // slow and not greatly useful to specialize
 pub(crate) fn voronoi_pattern<'a, D>(
     resolution: Resolution,
     wrapping: bool,

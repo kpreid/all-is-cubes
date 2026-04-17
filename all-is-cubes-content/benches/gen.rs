@@ -96,10 +96,10 @@ fn component_benches(c: &mut criterion::Criterion) {
             };
 
             b.iter_with_large_drop(|| {
-                content::voronoi_pattern(
+                content::voronoi_pattern_stretch(
                     black_box(block::Resolution::R16),
                     black_box(wrap),
-                    FreeVector::square_length,
+                    FreeVector::splat(1.0),
                     black_box(points.as_slice()),
                 )
             });
