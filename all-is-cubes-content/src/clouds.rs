@@ -1,10 +1,12 @@
 //! Cloud generation.
 
+use noise_functions::Noise as _;
+
 use all_is_cubes::block::{AIR, Block, BlockCollision};
 use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, Rgb01, zo32};
 use all_is_cubes::space::{self, SetCubeError};
 
-use crate::alg::NoiseFnExt as _;
+use crate::alg::NoiseExt as _;
 
 /// Fill the [`AIR`] portions of `region` in `space` with clouds made up of various
 /// transparent blocks.
@@ -17,15 +19,11 @@ pub fn clouds(
     m: &mut space::Mutation<'_, '_>,
     density: f32,
 ) -> Result<(), SetCubeError> {
-    let large_noise = noise::ScaleBias::new(
-        noise::ScalePoint::new(noise::OpenSimplex::new(0x357352b8)).set_scale(0.04),
-    )
-    .set_scale(10.0);
-    let small_noise = noise::ScaleBias::new(
-        noise::ScalePoint::new(noise::OpenSimplex::new(0xc509f313)).set_scale(0.3),
-    )
-    .set_scale(4.0);
-    let combined_noise = noise::Add::new(large_noise, small_noise);
+    let combined_noise = noise_functions::OpenSimplex2
+        .seed(0x357352b8)
+        .frequency(0.02)
+        .fbm(3, 0.75, 4.0)
+        .mul(10.0);
 
     fn cloud_block(alpha: f32) -> Block {
         let alpha = alpha * 0.2;

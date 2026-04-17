@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use exhaust::Exhaust;
+use noise_functions::Noise as _;
 
 use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, AIR, Block, Resolution, RotationPlacementRule, Zoom};
@@ -17,7 +18,7 @@ use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 use crate::Fire;
-use crate::alg::{array_of_noise, scale_color};
+use crate::alg::scale_color;
 use crate::load_block as lb;
 use crate::load_image::include_image;
 
@@ -143,13 +144,18 @@ pub(in crate::atrium) async fn install_atrium_blocks(
         .map(|x| scale_color(STONE_BASE.clone(), 1.0 + x as f64 * 0.08, 0.02))
         .collect();
 
-    // increased resolution to support brick offset patterning
-    let stone_base_array = array_of_noise(
-        RESOLUTION,
-        &noise::ScalePoint::new(noise::OpenSimplex::new(0x2e240365))
-            .set_scale(4.0 / f64::from(RESOLUTION_G)),
-        |value| &stone_range[(value * 8.0 + 2.5).round().clamp(0.0, 4.0) as usize],
-    );
+    // This noise is used many times, so compute its blocks once.
+    let stone_base_array: Vol<Box<[&Block]>> = {
+        let noise_fn = noise_functions::OpenSimplex2
+            .seed(0x2e240315)
+            .frequency(2.0 * RESOLUTION.recip_f32())
+            .mul(0.5);
+        Vol::from_fn(GridAab::for_block(RESOLUTION), |cube| {
+            let point = cube.center().to_f32().to_array();
+            let value = noise_fn.sample3(point);
+            &stone_range[(value * 8.0 + 2.5).round().clamp(0.0, 4.0) as usize]
+        })
+    };
 
     let brick_pattern = |mut p: Cube, grooves: bool| {
         if (p.x.rem_euclid(RESOLUTION_G) > RESOLUTION_G / 2)

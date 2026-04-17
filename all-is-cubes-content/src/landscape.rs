@@ -5,6 +5,7 @@ use core::array;
 use core::fmt;
 
 use exhaust::Exhaust;
+use noise_functions::Noise as _;
 use rand::{RngExt as _, SeedableRng as _};
 
 use all_is_cubes::arcstr;
@@ -23,8 +24,7 @@ use all_is_cubes::space::{self, SetCubeError, Sky};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
-use crate::alg::array_of_random;
-use crate::alg::{NoiseFnExt, array_of_noise, scale_color, voronoi_pattern_stretch};
+use crate::alg::{NoiseExt as _, array_of_random, scale_color, voronoi_pattern_stretch};
 use crate::{palette, tree};
 
 // -------------------------------------------------------------------------------------------------
@@ -234,14 +234,7 @@ pub async fn install_landscape_blocks(
     let overhang_noise = array_of_random(resolution, 0x0, -1.0..=1.0, |value| {
         value * 2.5 + f64::from(resolution) * 0.75
     });
-    #[allow(clippy::missing_panics_doc)]
-    let blade_noise = array_of_noise(
-        // TODO: instead of increasing the resolution, make separately seeded noise fns/arrays
-        // for each of the grass blade blocks.
-        resolution.double().unwrap(),
-        &noise::ScalePoint::new(noise::OpenSimplex::new(0x7af8c181)).set_y_scale(0.1),
-        |value| value * (f64::from(resolution) * 1.7) + (f64::from(resolution) * -0.4),
-    );
+    let blade_noise = noise_functions::OpenSimplex2.seed(0x7af8c181).mul(0.3);
 
     // boxed to avoid the async fn future being huge
     let stone_points: Box<[_; 240]> = Box::new(array::from_fn(|_| {
@@ -291,7 +284,17 @@ pub async fn install_landscape_blocks(
                     let mut cube_for_lookup = cube;
                     cube_for_lookup.y = 0;
                     cube_for_lookup += noise_section;
-                    if f64::from(cube.y - height_index) < blade_noise[cube_for_lookup] {
+
+                    let blade_noise_value = blade_noise.sample3(
+                        cube_for_lookup
+                            .center()
+                            .to_f32()
+                            .to_vector()
+                            .component_mul(vec3(1.0, 0.1, 1.0)),
+                    ) * (f32::from(resolution) * 1.7)
+                        + (f32::from(resolution) * -0.4);
+
+                    if ((cube.y - height_index) as f32) < blade_noise_value {
                         scale_color(grass_blade_atom.clone(), blade_color_noise[cube], 0.02)
                     } else {
                         AIR
@@ -471,12 +474,11 @@ pub(crate) fn fill_with_height_function<'b, Aux>(
 
 /// Returns a noise function that can be used to decide where to place grass blades.
 pub(crate) fn grass_placement_function(seed: u32) -> impl Fn(Cube) -> Option<GrassHeightAndRot> {
-    let grass_noise = noise::ScalePoint::new(
-        noise::ScaleBias::new(noise::OpenSimplex::new(seed))
-            .set_bias(1.0) // grass rather than nongrass
-            .set_scale(15.0), // height variation
-    )
-    .set_scale(0.25);
+    let grass_noise = noise_functions::OpenSimplex2
+        .seed(seed.cast_signed())
+        .mul(15.0) // height variation
+        .add(1.0) // grass rather than nongrass
+        .frequency(0.125);
 
     move |cube| {
         let noise_value = grass_noise.at_cube(cube);

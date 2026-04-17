@@ -47,7 +47,7 @@ hashbrown = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 macro_rules_attribute = { workspace = true }
-noise = { workspace = true } # TODO: not no_std compatible (fixable)
+noise-functions = { workspace = true }
 paste = { workspace = true }
 petgraph = { workspace = true }
 rand = { workspace = true }

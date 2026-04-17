@@ -156,6 +156,12 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.0.3 -> 0.0.4"
 
+[[audits.noise-functions]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.8.4"
+notes = "This audit is conditional on the SIMD functionality (enabled using the `nightly-simd` feature) not being used, because it is unsound (minor, fixable); the internal `floor_to_int()` function assumes the provided coordinates fit in an integer. Reported as <https://github.com/bluurryy/noise-functions/issues/13>."
+
 [[audits.ordered-float]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"

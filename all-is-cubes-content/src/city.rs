@@ -5,6 +5,7 @@ use alloc::{sync::Arc, vec::Vec};
 use core::iter;
 
 use itertools::Itertools as _;
+use noise_functions::Noise as _;
 use rand::{RngExt as _, SeedableRng as _};
 
 use all_is_cubes::arcstr::literal;
@@ -30,7 +31,7 @@ use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::vui::Layoutable as _;
 use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
 
-use crate::alg::{NoiseFnExt as _, space_to_space_copy, walk};
+use crate::alg::{NoiseExt as _, space_to_space_copy, walk};
 use crate::landscape;
 use crate::{DemoBlocks, LandscapeBlocks, clouds::clouds};
 use crate::{LandscapeBlocksAndVariants, TemplateParameters};
@@ -196,8 +197,7 @@ impl<'u> State<'u> {
         &self,
     ) -> impl Fn(Point2D<GridCoordinate, Cube>) -> (GridCoordinate, ()) + use<> {
         let start_terrain_radius = FreeCoordinate::from(self.planner.city_radius) - 2.5;
-        let terrain_noise_fn =
-            noise::ScalePoint::new(noise::OpenSimplex::new(0x2e24bb62)).set_scale(0.1);
+        let terrain_noise_fn = noise_functions::OpenSimplex2.seed(0x2e24bb62).frequency(0.05);
         let distance_to_landscape_quadrant = FreeCoordinate::from(-CityPlanner::PLOT_FRONT_RADIUS);
 
         move |xz_cube| {
@@ -224,7 +224,8 @@ impl<'u> State<'u> {
             let noise_value = terrain_noise_fn.at_cube(Cube::new(xz_cube.x, 0, xz_cube.y));
 
             // adding radial_scale creates surrounding wall of mountains
-            let output = 1 + (scale * noise_value + radial_scale).round() as GridCoordinate;
+            let output =
+                1 + (scale * f64::from(noise_value) * 0.5 + radial_scale).round() as GridCoordinate;
 
             (output, ())
         }
@@ -704,10 +705,8 @@ fn place_roads_and_tunnels(
 ) -> Result<(), InGenError> {
     use DemoBlocks::*;
 
-    let crate_pile_noise_fn = noise::ScaleBias::new(
-        noise::ScalePoint::new(noise::OpenSimplex::new(0x2e24bb63)).set_scale(0.1),
-    )
-    .set_scale(6.0);
+    let crate_pile_noise_fn =
+        noise_functions::OpenSimplex2.add_seed(0x2e24bb93).frequency(0.2).mul(4.0);
 
     for face in CityPlanner::ROAD_DIRECTIONS {
         let perpendicular: GridVector = Face::PY.clockwise().transform(face).normal_vector();

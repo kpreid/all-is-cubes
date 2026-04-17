@@ -131,7 +131,7 @@ dependencies = [
  "itertools 0.14.0",
  "log",
  "macro_rules_attribute",
- "noise",
+ "noise-functions",
  "paste",
  "petgraph",
  "pretty_assertions",
@@ -3817,14 +3817,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
-name = "noise"
-version = "0.9.0"
+name = "noise-functions"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6da45c8333f2e152fc665d78a380be060eb84fad8ca4c9f7ac8ca29216cff0cc"
+checksum = "5b65565075a0591f411299e354c96a62c96e12fc61e116165a6a21fca1b0ba4c"
 dependencies = [
- "num-traits",
- "rand 0.8.5",
- "rand_xorshift",
+ "libm",
 ]
 
 [[package]]
@@ -4844,15 +4842,6 @@ checksum = "4d431c2703ccf129de4d45253c03f49ebb22b97d6ad79ee3ecfc7e3f4862c1d8"
 dependencies = [
  "num-traits",
  "rand 0.10.1",
-]
-
-[[package]]
-name = "rand_xorshift"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d25bf25ec5ae4a3f1b92f929810509a2f53d7dca2f50b794ff57e3face536c8f"
-dependencies = [
- "rand_core 0.6.4",
 ]
 
 [[package]]
