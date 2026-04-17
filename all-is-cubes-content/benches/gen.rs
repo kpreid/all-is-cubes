@@ -12,7 +12,7 @@ use rand::SeedableRng as _;
 use strum::IntoEnumIterator as _;
 
 use all_is_cubes::block;
-use all_is_cubes::math::Cube;
+use all_is_cubes::math::{Cube, FreeVector};
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::{YieldProgress, yield_progress_for_testing};
 use all_is_cubes_content::{self as content, TemplateParameters, UniverseTemplate};
@@ -99,6 +99,7 @@ fn component_benches(c: &mut criterion::Criterion) {
                 content::voronoi_pattern(
                     black_box(block::Resolution::R16),
                     black_box(wrap),
+                    FreeVector::square_length,
                     black_box(points.as_slice()),
                 )
             });

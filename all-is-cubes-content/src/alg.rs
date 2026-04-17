@@ -8,9 +8,8 @@ use alloc::vec::Vec;
 use core::iter;
 
 use all_is_cubes::block::{Atom, Block, Primitive, Resolution};
-use all_is_cubes::euclid::vec3;
 use all_is_cubes::math::{
-    Cube, CubeFace, Face, FaceMap, FreeCoordinate, FreePoint, GridAab, GridCoordinate,
+    Cube, CubeFace, Face, FaceMap, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate,
     GridSizeCoord, GridVector, Gridgid, PositiveSign, Vol,
 };
 use all_is_cubes::space::{self, CubeTransaction, SetCubeError, Space, SpaceTransaction};
@@ -19,11 +18,20 @@ mod noise;
 pub(crate) use noise::*;
 
 /// Create a function to define texture in a block, based on a set of points
-/// to form a 3D Voronoi diagram, optionally wrapping around the boundaries for
+/// to form a 3D [Voronoi diagram], optionally wrapping around the boundaries for
 /// seamless tiling.
 ///
-/// The points' coordinates should be in the range 0 to 1.
-/// There must be at least one point.
+/// * `resolution`: Resolution of the voxel volume to generate.
+/// * `wrapping`: Whether to treat the volume as wrapping around at the edges.
+/// * `distance_function`: Function defining the distance between points.
+///   Using different functions reshapes the resulting Voronoi cells.
+///   Only the relative magnitudes of distances matter, so, for example, squared Euclidean distance
+///   is a valid distance function for this application, even though it doesn’t make a
+///   [metric space].
+/// * `points`:
+///   Seeds of the Voronoi diagram; each has a [`Block`] value which its cell is filled with.
+///   The points' coordinates should be in the range 0 to 1.
+///   There must be at least one point.
 ///
 /// TODO: Once we have better composable tools than `impl Fn(Cube)`, allow
 /// each point to refer to a pattern of its own to delegate to.
@@ -31,14 +39,21 @@ pub(crate) use noise::*;
 /// # Panics
 ///
 /// Panics if there is not at least one point.
+///
+/// [Voronoi diagram]: https://en.wikipedia.org/wiki/Voronoi_diagram
+/// [metric space]: https://en.wikipedia.org/wiki/Metric_space
 #[cfg_attr(feature = "_special_testing", visibility::make(pub))] // used by benchmark
 #[inline(never)] // slow and not greatly useful to specialize
-pub(crate) fn voronoi_pattern<'a>(
+pub(crate) fn voronoi_pattern<'a, D>(
     resolution: Resolution,
     wrapping: bool,
+    distance_function: D,
     // This could be more general but fits all of its current uses
     points: &'a [(FreePoint, Block)],
-) -> impl Fn(Cube) -> &'a Block + use<'a> {
+) -> impl Fn(Cube) -> &'a Block + use<'a, D>
+where
+    D: Fn(FreeVector) -> FreeCoordinate + 'a,
+{
     // We use the strategy of flood-filling each point up front, because for
     // large numbers of points that's much cheaper than evaluating every cube
     // against every point. (An alternative would be to build a spatial index
@@ -56,14 +71,8 @@ pub(crate) fn voronoi_pattern<'a>(
     let wrap =
         |cube: Cube| -> Cube { cube.map(|component| component.rem_euclid(resolution.into())) };
 
-    let calculate_distance_squared = |region_point: FreePoint, cube: Cube| -> FreeCoordinate {
-        // Point with which we are checking the distance to region_point.
-        let test_point: FreePoint = cube.center();
-        let offset = test_point - region_point;
-        // TODO: add ability to muck with the distance metric in custom ways
-        // instead of this hardcoded one.
-        let offset = offset.component_mul(vec3(1.0, 2.0, 1.0));
-        offset.square_length()
+    let calculate_distance = move |region_point: FreePoint, cube: Cube| -> FreeCoordinate {
+        distance_function(cube.center() - region_point)
     };
 
     // Take first point specially because it will always fill the whole volume.
@@ -80,7 +89,7 @@ pub(crate) fn voronoi_pattern<'a>(
         let &(first_point, ref first_block) = points.next().expect("must be at least one point");
 
         Vol::from_fn(GridAab::for_block(resolution), |cube| PatternCell {
-            nearest: calculate_distance_squared(first_point, cube),
+            nearest: calculate_distance(first_point, cube),
             block: first_block,
             is_enqueued: false,
         })
@@ -100,7 +109,7 @@ pub(crate) fn voronoi_pattern<'a>(
 
         while let Some(cube) = to_fill.pop() {
             pattern[wrap(cube)] = PatternCell {
-                nearest: calculate_distance_squared(region_point, cube),
+                nearest: calculate_distance(region_point, cube),
                 block,
                 is_enqueued: false,
             };
@@ -118,7 +127,7 @@ pub(crate) fn voronoi_pattern<'a>(
                 // good enough. Doing the test before the insert rather than after the removal
                 // causes some redundant distance calculation, but is cheaper because it requires
                 // fewer insertions.
-                let distance_squared = calculate_distance_squared(region_point, neighbor);
+                let distance_squared = calculate_distance(region_point, neighbor);
                 let neighbor_cell = &mut pattern[wrap(neighbor)];
                 if distance_squared < neighbor_cell.nearest && !neighbor_cell.is_enqueued {
                     // TODO: I tried filtering to

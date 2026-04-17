@@ -62,7 +62,12 @@ fn generate_destruction_mask(
             },
         )
     });
-    let pattern = voronoi_pattern(resolution, false, points.as_slice());
+    let pattern = voronoi_pattern(
+        resolution,
+        false,
+        FreeVector::square_length,
+        points.as_slice(),
+    );
 
     Ok(Block::builder()
         .voxels_fn(resolution, pattern)?
