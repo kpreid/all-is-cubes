@@ -215,7 +215,7 @@ pub async fn install_landscape_blocks(
 ) -> Result<(), GenError> {
     use LandscapeBlocks::*;
     let colors = BlockProvider::<LandscapeBlocks>::default();
-    let rng = &mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(123890483921741);
+    let rng = &mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(123890483921742);
 
     let mut grass_blade_atom = colors[GrassBlades {
         height: GrassHeight::H4,
@@ -265,12 +265,6 @@ pub async fn install_landscape_blocks(
         )
     }));
     let dirt_pattern = voronoi_pattern(resolution, true, FreeVector::square_length, &*dirt_points);
-
-    // TODO: needs a tiling and abruptly-changing pattern -- perhaps a coordinate-streched voronoi noise instead
-    let bark_noise = {
-        let noise = noise::ScalePoint::new(noise::Value::new(0x28711937)).set_y_scale(1. / 4.);
-        move |cube: Cube| noise.at_grid(cube.lower_bounds()) * 0.4 + 0.7
-    };
 
     let grass_sound = sound::Ambient::noise_at_frequency(ps32(0.01), ps32(2000.0));
 
@@ -344,14 +338,26 @@ pub async fn install_landscape_blocks(
                     [mid + radius, mid + radius, mid + radius],
                 );
                 let color_block = &colors[key];
+                let bark_points: Box<[_; 480]> = Box::new(array::from_fn(|_| {
+                    (
+                        Cube::ORIGIN.aab().random_point(rng),
+                        scale_color(color_block.clone(), rng.random_range(0.6..1.5), 0.2),
+                    )
+                }));
+                let bark_pattern = voronoi_pattern(
+                    resolution,
+                    true,
+                    |d| d.component_mul(vec3(16.0, 4.0, 16.0)).square_length(),
+                    &*bark_points,
+                );
                 Block::builder()
                     .attributes(attributes_from(color_block)?)
                     .voxels_fn(resolution, |cube| {
                         if trunk_box.contains_cube(cube) {
                             // TODO: separate bark from inner wood
-                            scale_color(color_block.clone(), bark_noise(cube), 0.05)
+                            bark_pattern(cube)
                         } else {
-                            AIR
+                            &AIR
                         }
                     })?
                     .build_txn(txn)

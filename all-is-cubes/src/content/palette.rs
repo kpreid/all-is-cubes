@@ -86,8 +86,8 @@ palette! {
     DIRT: Rgb01 = srgb[0x6C 0x50 0x44];
     /// Generic unspecified some-kind-of-stone...
     STONE: Rgb01 = srgb[0xD9 0xD7 0xD5];
-    /// TODO: Not actually exercised in demo content yet
-    TREE_BARK: Rgb01 = srgb[0x93 0x5C 0x32];
+    ///
+    TREE_BARK: Rgb01 = srgb[0x83 0x5C 0x42];
     /// TODO: Not actually exercised in demo content yet
     TREE_LEAVES: Rgb01 = srgb[0x61 0xAA 0x31];
     /// Some kind of metallic structure.
