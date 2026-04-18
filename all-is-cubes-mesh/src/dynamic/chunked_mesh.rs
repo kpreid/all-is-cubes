@@ -549,12 +549,13 @@ where
 
             state
         };
-        #[cfg(feature = "auto-threads")]
-        let to_put_back = ParallelBridge::par_bridge(chunk_update_iterator)
-            .map(chunk_updater)
-            .collect::<Vec<_>>();
-        #[cfg(not(feature = "auto-threads"))]
-        let to_put_back = chunk_update_iterator.map(chunk_updater).collect::<Vec<_>>();
+
+        let to_put_back = cfg_select! {
+            feature = "auto-threads" => ParallelBridge::par_bridge(chunk_update_iterator),
+            _ => chunk_update_iterator
+        }
+        .map(chunk_updater)
+        .collect::<Vec<_>>();
 
         // Put updated chunks back in the maps
         let mut chunk_mesh_generation_times = TimeStats::default();

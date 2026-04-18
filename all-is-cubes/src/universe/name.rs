@@ -135,20 +135,18 @@ impl<T> MbOnceLock<T> {
     }
 
     pub fn set(&self, value: T) -> Result<(), T> {
-        #[cfg(feature = "std")]
-        self.0.set(value)?;
-        #[cfg(not(feature = "std"))]
-        self.0.set(Box::new(value)).map_err(|boxed| *boxed)?;
-
-        Ok(())
+        cfg_select! {
+            feature = "std" => self.0.set(value),
+            _ => self.0.set(Box::new(value)).map_err(|boxed| *boxed),
+        }
     }
 
     pub fn from_optional_value(option: Option<T>) -> Self {
         match option {
-            #[cfg(feature = "std")]
-            Some(value) => Self(std::sync::OnceLock::from(value)),
-            #[cfg(not(feature = "std"))]
-            Some(value) => Self(once_cell::race::OnceBox::with_value(Box::new(value))),
+            Some(value) => Self(cfg_select! {
+                feature = "std" => std::sync::OnceLock::from(value),
+                _ => once_cell::race::OnceBox::with_value(Box::new(value)),
+            }),
 
             None => Self::new(),
         }

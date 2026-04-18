@@ -80,18 +80,18 @@ pub async fn try_create_adapter_for_test(
     mut log: impl FnMut(std::fmt::Arguments<'_>),
 ) -> Option<wgpu::Adapter> {
     // For WebGL we need a Surface.
-    #[cfg(target_family = "wasm")]
-    let surface = {
-        // size shouldn't matter; use a funny noticeable number in case it turns out to
-        let canvas = web_sys::OffscreenCanvas::new(143, 217).unwrap();
-        match instance.create_surface(wgpu::SurfaceTarget::OffscreenCanvas(canvas)) {
-            Ok(surface) => Some(surface),
-            // If we can't make a surface then we can't make an adapter.
-            Err(_) => return None,
-        }
+    let surface = cfg_select! {
+        target_family = "wasm" => {{
+            // size shouldn't matter; use a funny noticeable number in case it turns out to
+            let canvas = web_sys::OffscreenCanvas::new(143, 217).unwrap();
+            match instance.create_surface(wgpu::SurfaceTarget::OffscreenCanvas(canvas)) {
+                Ok(surface) => Some(surface),
+                // If we can't make a surface then we can't make an adapter.
+                Err(_) => return None,
+            }
+        }}
+        _ => None
     };
-    #[cfg(not(target_family = "wasm"))]
-    let surface = None;
 
     // Pick an adapter.
     // TODO: Replace this with

@@ -187,14 +187,18 @@ pub fn assert_send_future<T: Send + Future>(_: T) {
 }
 
 // Assert `Send + Sync` only if the `std` feature is active.
-#[cfg(feature = "std")]
-#[doc(hidden)] // for use in internal tests only
-#[allow(clippy::missing_inline_in_public_items)]
-pub fn assert_conditional_send_sync<T: Send + Sync>() {}
-#[cfg(not(feature = "std"))]
-#[doc(hidden)] // for use in internal tests only
-#[allow(clippy::missing_inline_in_public_items)]
-pub fn assert_conditional_send_sync<T>() {}
+cfg_select! {
+    feature = "std" => {
+        #[doc(hidden)] // for use in internal tests only
+        #[allow(clippy::missing_inline_in_public_items)]
+        pub fn assert_conditional_send_sync<T: Send + Sync>() {}
+    }
+    _ => {
+        #[doc(hidden)] // for use in internal tests only
+        #[allow(clippy::missing_inline_in_public_items)]
+        pub fn assert_conditional_send_sync<T>() {}
+    }
+}
 
 #[cfg(test)]
 mod tests {

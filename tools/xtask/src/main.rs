@@ -275,16 +275,16 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
                 .arg("--")
                 .args(server_args);
 
-            #[cfg(unix)]
-            {
-                // exec instead of spawn cooperates better with bacon.
-                // Though really I think bacon should be defaulting to TERM instead of KILL.
-                let error = std::os::unix::process::CommandExt::exec(&mut cmd);
-                return Err(error.into());
-            }
-            #[cfg(not(unix))]
-            {
-                cmd.spawn()?.wait()?;
+            cfg_select! {
+                unix => {
+                    // exec instead of spawn cooperates better with bacon.
+                    // Though really I think bacon should be defaulting to TERM instead of KILL.
+                    let error = std::os::unix::process::CommandExt::exec(&mut cmd);
+                    return Err(error.into());
+                }
+                _ => {
+                    cmd.spawn()?.wait()?;
+                }
             }
         }
         XtaskCommand::BuildWebRelease => {
