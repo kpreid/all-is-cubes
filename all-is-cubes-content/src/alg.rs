@@ -7,6 +7,11 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::iter;
 
+/// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
+use num_traits::float::Float as _;
+
 use all_is_cubes::block::{Atom, Block, Primitive, Resolution};
 use all_is_cubes::math::{
     Cube, CubeFace, Face, FaceMap, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate,

@@ -29,6 +29,9 @@ arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary"]
 # Causes reloading a `UniverseTemplate` to spawn a subprocess to load the template using freshly
 # compiled code, for development purposes. Only takes effect if running using `cargo run`.
 lukewarm-reload = ["dep:tempfile", "all-is-cubes/save", "dep:all-is-cubes-port"]
+# Uses math functions from `std`.
+# Omitting this feature does not change behavior but may reduce performance.
+std = ["all-is-cubes/std", "noise-functions/std"]
 # Makes certain internal items public.
 # This feature is intended only for use when developing All is Cubes,
 # to compile certain fuzzing, benchmark, and example targets.
@@ -48,6 +51,7 @@ itertools = { workspace = true }
 log = { workspace = true }
 macro_rules_attribute = { workspace = true }
 noise-functions = { workspace = true }
+num-traits = { workspace = true }
 paste = { workspace = true }
 petgraph = { workspace = true }
 rand = { workspace = true }

@@ -9,6 +9,11 @@ use core::num::NonZeroU16;
 use exhaust::Exhaust;
 use rand::{RngExt as _, SeedableRng as _};
 
+/// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
+use num_traits::float::Float as _;
+
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::block::{
     self, AIR, AnimationHint, Block, BlockCollision, BlockDef, Resolution::*,

@@ -83,6 +83,7 @@ dependencies = [
  "log",
  "macro_rules_attribute",
  "noise-functions",
+ "num-traits",
  "paste",
  "petgraph",
  "rand 0.10.1",

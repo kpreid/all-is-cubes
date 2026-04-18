@@ -12,6 +12,11 @@ pub(super) use exhaust::Exhaust as _;
 pub(super) use itertools::izip;
 pub(super) use rand::SeedableRng as _;
 
+/// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
+pub(super) use num_traits::float::Float as _;
+
 pub(super) use all_is_cubes::arcstr::{self, literal};
 pub(super) use all_is_cubes::block::{
     self, AIR, Block, BlockCollision, Composite, CompositeOperator, Move,

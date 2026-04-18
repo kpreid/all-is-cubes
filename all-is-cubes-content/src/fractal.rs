@@ -3,6 +3,11 @@ use core::iter;
 
 use either::Either;
 
+/// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
+use num_traits::float::Float as _;
+
 use all_is_cubes::block::Block;
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::free_editing_starter_inventory;

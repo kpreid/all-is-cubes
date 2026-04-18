@@ -5,6 +5,11 @@ use core::fmt;
 use exhaust::Exhaust;
 use noise_functions::Noise as _;
 
+/// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
+use num_traits::float::Float as _;
+
 use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, AIR, Block, Resolution, RotationPlacementRule, Zoom};
 use all_is_cubes::content::palette;

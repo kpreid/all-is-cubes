@@ -5,6 +5,11 @@ use petgraph::visit::EdgeRef as _;
 use rand::RngExt as _;
 use rand::seq::{IndexedRandom as _, SliceRandom as _};
 
+/// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
+use num_traits::float::Float as _;
+
 use all_is_cubes::block::{self, AIR, Block};
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::math::{

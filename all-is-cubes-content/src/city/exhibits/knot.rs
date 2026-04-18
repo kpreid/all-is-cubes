@@ -1,3 +1,5 @@
+use core::f64::consts::FRAC_1_SQRT_2;
+
 use super::prelude::*;
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -37,7 +39,7 @@ fn KNOT(ctx: Context<'_>) {
 
                 let angle_if_within_strand = |offset: Vector2D<f64, Cube>| {
                     let knot_center = rotated_cross_section
-                        .component_mul(Vector2D::new(1.0, 2.0_f64.sqrt().recip()))
+                        .component_mul(Vector2D::new(1.0, FRAC_1_SQRT_2))
                         + offset;
                     if knot_center.length() < strand_radius {
                         // Add center angle to add twist relative to the strands.
@@ -54,7 +56,8 @@ fn KNOT(ctx: Context<'_>) {
                         angle_if_within_strand(Vector2D::new(knot_split_radius, 0.)).map(|a| a + PI)
                     })
                 {
-                    let unit_range = (strand_radial_angle / (PI * 2.)).rem_euclid(1.0);
+                    #[expect(clippy::modulo_arithmetic, reason = "no_std; adding 1 suffices here")]
+                    let unit_range = ((strand_radial_angle / (PI * 2.)) + 1.0) % 1.0;
                     Some(if unit_range < 0.25 {
                         &paint2
                     } else if (0.5..0.75).contains(&unit_range) {

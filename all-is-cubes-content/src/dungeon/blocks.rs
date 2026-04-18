@@ -2,6 +2,11 @@
 
 use core::f64::consts::TAU;
 
+/// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
+use num_traits::float::Float as _;
+
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule};
 use all_is_cubes::content::load_image::include_image;

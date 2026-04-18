@@ -9,6 +9,11 @@ use futures_core::future::BoxFuture;
 use macro_rules_attribute::macro_rules_derive;
 use paste::paste;
 
+/// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
+use num_traits::float::Float as _;
+
 use all_is_cubes::block::Block;
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::euclid::Point3D;

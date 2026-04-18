@@ -132,6 +132,7 @@ dependencies = [
  "log",
  "macro_rules_attribute",
  "noise-functions",
+ "num-traits",
  "paste",
  "petgraph",
  "pretty_assertions",

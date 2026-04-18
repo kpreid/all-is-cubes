@@ -65,15 +65,15 @@ rerun = [
 # TODO: Define a feature with which to turn off windowing & GPU support.
 
 [dependencies]
-all-is-cubes = { workspace = true, features = ["auto-threads", "save"] }
+all-is-cubes = { workspace = true, features = ["auto-threads", "save", "std"] }
 # TODO: make template support an optional feature, and this dependency with it
-all-is-cubes-content = { workspace = true }
+all-is-cubes-content = { workspace = true, features = ["std"] }
 all-is-cubes-gpu = { workspace = true, features = ["auto-threads", "wgpu"] }
 all-is-cubes-mesh = { workspace = true, optional = true, features = ["dynamic"] }
 # TODO: make all file access an optional feature
 all-is-cubes-port = { workspace = true, features = ["auto-threads", "import", "native"] }
 # TODO: make raytracer optional
-all-is-cubes-render = { workspace = true, features = ["raytracer"] }
+all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
 all-is-cubes-ui = { workspace = true, features = ["session"] }
 async_fn_traits = { workspace = true }
 async-channel = { workspace = true }
