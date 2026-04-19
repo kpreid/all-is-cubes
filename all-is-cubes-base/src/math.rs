@@ -152,23 +152,14 @@ pub fn sort_two<T: PartialOrd>(a: &mut T, b: &mut T) {
 
 /// Does the same thing as `core::ops::Range::len()` does,
 /// but which `core::range::Range` has no equivalent to.
-///
-/// This function is part of our preparation to migrate to the new (currently unstable) range types;
-/// it will make it easier to use the new range types, and also easier to maintain the experimental
-/// branch which uses them before they have been stabilized.
-///
-/// TODO: When `core::range::Range` is stable and we switch to it, this function’s parameter type
-/// should become `core::range::Range`
 #[inline]
-pub fn range_len<T>(range: &core::ops::Range<T>) -> usize
+pub fn range_len<T>(range: core::range::Range<T>) -> usize
 where
     core::ops::Range<T>: ExactSizeIterator,
 {
-    // TODO: When `core::range::Range` is stable and we switch to it, use this implementation —
-    // or, better, implement it without reference to `ExactSizeIterator`.
-    // core::ops::Range::from(range).len()
-
-    range.len()
+    // TODO: explicitly panic on overflow.
+    // TODO: implement without reference to `ExactSizeIterator`.
+    core::ops::Range::from(range).len()
 }
 
 /// Returns the length of the vector in [Chebyshev distance].

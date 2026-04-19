@@ -650,7 +650,7 @@ fn transparency_split() {
     // 2 cubes...
     assert_eq!(space_rendered.vertices().0.len(), 6 * 4 * 2);
     // ...one of which is opaque...
-    assert_eq!(range_len(&space_rendered.opaque_range()), 6 * 6);
+    assert_eq!(range_len(space_rendered.opaque_range()), 6 * 6);
     // ...and one of which is transparent
     for ordering in DepthOrdering::exhaust() {
         let num_visible_faces = match ordering.within_on_axes() {
@@ -661,7 +661,7 @@ fn transparency_split() {
             _ => unreachable!(),
         };
         assert_eq!(
-            range_len(&space_rendered.transparent_range(ordering)),
+            range_len(space_rendered.transparent_range(ordering)),
             6 * num_visible_faces
         );
     }

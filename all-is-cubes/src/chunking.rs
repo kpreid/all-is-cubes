@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
 use core::iter::FusedIterator;
-use core::ops::RangeTo;
+use core::ops::RangeTo; // TODO: When possible, change this to core::range::RangeTo
 
 use bevy_platform::sync::Mutex;
 

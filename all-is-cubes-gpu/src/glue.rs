@@ -3,7 +3,7 @@
 use alloc::alloc::Layout;
 use alloc::string::String;
 use core::marker::PhantomData;
-use core::ops::Range;
+use core::range::Range;
 
 use bytemuck::Pod;
 
@@ -50,9 +50,9 @@ pub fn to_wgpu_index_format(slice: IndexSlice<'_>) -> wgpu::IndexFormat {
 }
 
 #[track_caller]
-pub fn to_wgpu_index_range(range: Range<usize>) -> Range<u32> {
+pub fn to_wgpu_index_range(range: Range<usize>) -> core::ops::Range<u32> {
     match (range.start.try_into(), range.end.try_into()) {
-        (Ok(start), Ok(end)) => start..end,
+        (Ok(start), Ok(end)) => core::ops::Range { start, end },
         _ => panic!("index range {range:?} too large for u32"),
     }
 }
@@ -151,18 +151,19 @@ pub fn write_part_of_slice_to_part_of_buffer(
     // Widen the range to ensure the alignment is acceptable to wgpu.
     // (This is okay because the only reason we are picking a range
     // less than the entire buffer is to avoid copying unchanged data.)
-    let mapping_range: Range<usize> = (
+    let mapping_range: Range<usize> = Range {
         // Like next_multiple_of() but rounding down — mask off the low bits.
-        byte_range.start & !(ALIGN - 1)
-    )..(byte_range.end.next_multiple_of(ALIGN));
+        start: byte_range.start & !(ALIGN - 1),
+        end: byte_range.end.next_multiple_of(ALIGN),
+    };
     debug_assert!(mapping_range.start <= byte_range.start);
     debug_assert!(mapping_range.end >= byte_range.end);
-    debug_assert!(range_len(&mapping_range).is_multiple_of(ALIGN));
+    debug_assert!(range_len(mapping_range).is_multiple_of(ALIGN));
 
     let mut staging = bwp.reborrow().write_buffer(
         destination,
         mapping_range.start as u64,
-        wgpu::BufferSize::new(range_len(&mapping_range) as u64).unwrap(),
+        wgpu::BufferSize::new(range_len(mapping_range) as u64).unwrap(),
     );
 
     // Note that we must not overrun the end of `source`, so we can't just use `mapping_range`;
@@ -503,8 +504,10 @@ mod tests {
             (5u8, 4..5),
             (6u8, 12..16),
         ] {
+            let range = Range::from(range);
+
             // Add new data to write.
-            source_data[range.clone()].fill(value);
+            source_data[range].fill(value);
 
             // Ask for the data to be written.
             let mut encoder =

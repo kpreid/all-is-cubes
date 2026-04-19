@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
 use core::ops;
-use core::ops::Range;
+use core::range::Range;
 
 use all_is_cubes::euclid::{Box3D, Point3D, Size3D, Translation3D};
 use all_is_cubes::math::{
@@ -298,8 +298,6 @@ impl AlloctreeNode {
         low_corner_of_node: Point3D<TreeCoord, A>,
         request: GridAab,
     ) -> Option<AlloctreeHandle<A>> {
-        #![expect(clippy::single_range_in_vec_init)]
-
         // eprintln!(
         //     "allocate(2^{} = {}, {:?})",
         //     size_exponent,
@@ -344,7 +342,9 @@ impl AlloctreeNode {
                         // Modify the tree only once create_handle succeeds.
                         *self = AlloctreeNode::Sliced {
                             axis,
-                            occupied: vec![0..TreeCoord::try_from(request.size()[axis]).unwrap()],
+                            occupied: vec![Range::from(
+                                0..TreeCoord::try_from(request.size()[axis]).unwrap(),
+                            )],
                         };
                         Some(handle)
                     } else {
@@ -383,7 +383,7 @@ impl AlloctreeNode {
                 let node_size = expsize(size_exponent);
                 let request_size_on_axis = TreeCoord::try_from(request.size()[axis]).unwrap();
                 let (insert_index, relative_offset): (usize, TreeCoord) = 'pos: {
-                    let occupied_iter = occupied.iter().cloned();
+                    let occupied_iter = occupied.iter().copied();
                     // Iterate over adjacent pairs, including off the beginning and off the end
                     // represented by placeholder empty ranges
                     for (
@@ -398,10 +398,10 @@ impl AlloctreeNode {
                                 end: _,
                             },
                         ),
-                    ) in [0..0]
+                    ) in [Range::from(0..0)]
                         .into_iter()
                         .chain(occupied_iter.clone())
-                        .zip(occupied_iter.chain([node_size..node_size]))
+                        .zip(occupied_iter.chain([Range::from(node_size..node_size)]))
                         .enumerate()
                     {
                         if request_size_on_axis <= (start2 - end1) {
@@ -411,7 +411,8 @@ impl AlloctreeNode {
                     return None;
                 };
 
-                let new_range = relative_offset..(relative_offset + request_size_on_axis);
+                let new_range =
+                    Range::from(relative_offset..(relative_offset + request_size_on_axis));
                 //log::trace!("slice search succeeded; inserting {new_range:?} into {occupied:?} at {insert_index}");
 
                 let mut low_corner_of_slice = low_corner_of_node;

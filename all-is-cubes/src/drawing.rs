@@ -18,7 +18,7 @@
 use alloc::borrow::{Borrow, Cow};
 use alloc::vec::Vec;
 use core::marker::PhantomData;
-use core::ops::Range;
+use core::range::Range;
 
 use embedded_graphics::geometry::{Dimensions, Point, Size};
 use embedded_graphics::pixelcolor::{PixelColor, Rgb888};
@@ -338,12 +338,13 @@ impl<'a> VoxelBrush<'a> {
     }
 
     /// Makes a [`VoxelBrush`] which paints the specified block within the specified Z-axis range.
-    pub fn with_thickness<B>(block: B, range: Range<GridCoordinate>) -> Self
+    // TODO: remove Into when std::range syntax is stable
+    pub fn with_thickness<B>(block: B, range: impl Into<Range<GridCoordinate>>) -> Self
     where
         B: Into<Cow<'a, Block>>,
     {
         let block = block.into();
-        Self::new(range.map(|z| (GridVector::new(0, 0, z), block.clone())))
+        Self::new(range.into().into_iter().map(|z| (GridVector::new(0, 0, z), block.clone())))
     }
 
     /// Copies each of the brush's blocks into `m` relative to the given origin
