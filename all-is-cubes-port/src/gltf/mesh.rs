@@ -213,7 +213,7 @@ where
                     gltf_json::Accessor {
                         buffer_view: Some(index_buffer_view),
                         byte_offset: Some(USize64::from(index_range.start * index_type.size())),
-                        count: USize64::from(range_len(&index_range)),
+                        count: USize64::from(range_len(index_range)),
                         component_type: Valid(gltf_json::accessor::GenericComponentType(
                             index_type,
                         )),

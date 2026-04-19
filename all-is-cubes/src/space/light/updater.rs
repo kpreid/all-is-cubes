@@ -542,7 +542,7 @@ impl LightStorage {
         for x in bounds.x_range() {
             for z in bounds.z_range() {
                 let mut covered = false;
-                for y in bounds.y_range().rev() {
+                for y in bounds.y_range().into_iter().rev() {
                     let cube = Cube::new(x, y, z);
                     let index = self.contents.index(cube).unwrap();
 

@@ -216,7 +216,13 @@ impl IconRow {
     ///
     /// Panics if `slot_range` has `end` less than `start`.
     #[track_caller]
-    pub fn new(slot_range: core::ops::Range<Ix>, origin: GridPoint, stride: GridVector) -> Self {
+    // TODO: impl Into is for core::ops→core::range migration and should be removed after
+    pub fn new(
+        slot_range: impl Into<core::range::Range<Ix>>,
+        origin: GridPoint,
+        stride: GridVector,
+    ) -> Self {
+        let slot_range = slot_range.into();
         Self {
             first_slot: slot_range.start,
             count: slot_range

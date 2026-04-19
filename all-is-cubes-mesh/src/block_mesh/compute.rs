@@ -261,9 +261,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             // TODO: It would make sense to move this calculation to block evaluation, which
             // already has to do 99% of the work.
             if layer == 0 {
-                if occupied_rect.x_range() != (0..resolution_g)
-                    || occupied_rect.y_range() != (0..resolution_g)
-                {
+                let full_range: core::ops::Range<GridCoordinate> = 0..resolution_g;
+                if occupied_rect.x_range() != full_range || occupied_rect.y_range() != full_range {
                     // Not full coverage
                     face_mesh.fully_opaque = false;
                 } else {

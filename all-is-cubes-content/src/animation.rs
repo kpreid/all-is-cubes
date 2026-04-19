@@ -132,7 +132,7 @@ impl Fire {
         let bounds = self.fire_state.bounds();
         let y0 = bounds.lower_bounds().y;
         for z in bounds.z_range() {
-            for y in bounds.y_range().rev() {
+            for y in bounds.y_range().into_iter().rev() {
                 for x in bounds.x_range() {
                     let cube = Cube::new(x, y, z);
                     self.fire_state[cube] = if y == y0 {
