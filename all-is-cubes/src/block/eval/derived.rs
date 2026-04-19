@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use core::{fmt, ops};
 
 use euclid::Vector3D;
-use itertools::Itertools;
+use itertools::{Itertools as _, iproduct};
 
 use crate::block::{
     self,
@@ -115,24 +115,25 @@ pub(in crate::block::eval) fn compute_derived(voxels: &block::Evoxels) -> Derive
             let transform = face.face_transform(resolution.into());
             let rotated_voxel_range = data_bounds.transform(transform.inverse()).unwrap();
 
-            let face_sum: VoxSum = Itertools::cartesian_product(
-                rotated_voxel_range.y_range(),
-                rotated_voxel_range.x_range(),
-            )
-            .map(|(v, u)| {
-                let cube: Cube =
-                    transform.transform_cube(Cube::new(u, v, rotated_voxel_range.z_range().start));
-                debug_assert!(
-                    data_bounds.contains_cube(cube) || data_bounds.is_empty(),
-                    "bad transform; bounds {data_bounds:?} cube {cube:?}",
-                );
-                cube
-            })
-            .map(|cube| trace_for_eval(voxels, cube, face.opposite(), resolution))
-            .fold(VoxSum::default(), |mut sum, trace| {
-                sum += trace;
-                sum
-            });
+            let face_sum: VoxSum =
+                iproduct!(rotated_voxel_range.y_range(), rotated_voxel_range.x_range())
+                    .map(|(v, u)| {
+                        let cube: Cube = transform.transform_cube(Cube::new(
+                            u,
+                            v,
+                            rotated_voxel_range.z_range().start,
+                        ));
+                        debug_assert!(
+                            data_bounds.contains_cube(cube) || data_bounds.is_empty(),
+                            "bad transform; bounds {data_bounds:?} cube {cube:?}",
+                        );
+                        cube
+                    })
+                    .map(|cube| trace_for_eval(voxels, cube, face.opposite(), resolution))
+                    .fold(VoxSum::default(), |mut sum, trace| {
+                        sum += trace;
+                        sum
+                    });
 
             all_faces_sum += face_sum;
             face_colors[face] = face_sum.color(resolution.squared_f32());

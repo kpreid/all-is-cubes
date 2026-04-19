@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use core::ops::Range;
+use core::range::Range;
 use core::{fmt, mem, ops};
 
 use bit_set::BitSet;
@@ -122,9 +122,10 @@ impl<M: MeshTypes> SpaceMesh<M> {
     fn consistency_check(&self) {
         assert_eq!(self.vertices.0.len(), self.vertices.1.len());
         assert_eq!(self.opaque_range().start, 0);
-        let len_transparent_unculled = self.transparent_range(DepthOrdering::WITHIN).len();
+        let len_transparent_unculled =
+            ops::Range::from(self.transparent_range(DepthOrdering::WITHIN)).len();
         for ordering in DepthOrdering::exhaust() {
-            let len = self.transparent_range(ordering).len();
+            let len = ops::Range::from(self.transparent_range(ordering)).len();
             assert!(
                 len <= len_transparent_unculled,
                 "transparent range {ordering:?} is longer \
@@ -340,7 +341,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
 
         // Set the opaque range to all indices which have already been stored
         // (which will be the opaque ones only).
-        self.meta.opaque_range = 0..self.indices.len();
+        self.meta.opaque_range = Range::from(0..self.indices.len());
 
         // Dispatch to the depth sorting algorithm in its u16 or u32 version.
         #[rustfmt::skip]
@@ -570,7 +571,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             ),
             indices: IndexVec::new(), // placeholder
             meta: MeshMeta {
-                opaque_range: 0..0,
+                opaque_range: Range::from(0..0),
                 transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
                 textures_used: block_mesh.textures().to_vec(),
                 has_non_rect_transparency: block_mesh
@@ -751,7 +752,7 @@ impl<M: MeshTypes> MeshMeta<M> {
     /// of 0 or 1 and therefore may be drawn using a depth buffer rather than sorting.
     #[inline]
     pub fn opaque_range(&self) -> Range<usize> {
-        self.opaque_range.clone()
+        self.opaque_range
     }
 
     /// Returns a range of index data which contains the triangles with alpha values other
@@ -764,7 +765,7 @@ impl<M: MeshTypes> MeshMeta<M> {
     /// [`needs_depth_sorting()`][Self::needs_depth_sorting] reports whether this is necessary.
     #[inline]
     pub fn transparent_range(&self, ordering: DepthOrdering) -> Range<usize> {
-        self.transparent[ordering.to_index()].index_range.clone()
+        self.transparent[ordering.to_index()].index_range
     }
 
     /// Returns whether [`SpaceMesh::depth_sort_for_view()`] would have anything to do if called
@@ -799,7 +800,7 @@ impl<M: MeshTypes> MeshMeta<M> {
             bounding_box,
             flaws,
         } = self;
-        *opaque_range = 0..0;
+        *opaque_range = Range::from(0..0);
         *transparent = [TransparentMeta::EMPTY; DepthOrdering::COUNT];
         textures_used.clear();
         *has_non_rect_transparency = false;
@@ -814,7 +815,7 @@ impl<M: MeshTypes> Default for MeshMeta<M> {
     fn default() -> Self {
         // Note that this must be consistent with `Self::clear()`.
         Self {
-            opaque_range: 0..0,
+            opaque_range: Range::from(0..0),
             transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
             textures_used: Vec::new(),
             has_non_rect_transparency: false,
@@ -879,7 +880,7 @@ impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
 impl<M: MeshTypes> Clone for MeshMeta<M> {
     fn clone(&self) -> Self {
         Self {
-            opaque_range: self.opaque_range.clone(),
+            opaque_range: self.opaque_range,
             transparent: self.transparent.clone(),
             textures_used: self.textures_used.clone(),
             has_non_rect_transparency: self.has_non_rect_transparency,
@@ -927,7 +928,7 @@ pub(crate) struct TransparentMeta {
 
 impl TransparentMeta {
     const EMPTY: Self = Self {
-        index_range: 0..0,
+        index_range: Range { start: 0, end: 0 },
         // If there is nothing to sort, then it's always sorted!
         depth_sort_validity: Aabb::EVERYWHERE,
         dynamic_sub_ranges: SmallVec::new_const(),
@@ -939,10 +940,10 @@ impl TransparentMeta {
 
     #[allow(dead_code, reason = "used conditionally")]
     fn consistency_check(&self) {
-        let Self {
+        let &Self {
             index_range,
             depth_sort_validity: _,
-            dynamic_sub_ranges,
+            ref dynamic_sub_ranges,
         } = self;
 
         for (i, sub_range) in dynamic_sub_ranges.iter().enumerate() {
@@ -1312,8 +1313,11 @@ mod tests {
         assert!(mesh.is_empty());
         assert_eq!(mesh.vertices(), (&[][..], &[][..]));
         assert_eq!(mesh.indices(), IndexSlice::U16(&[]));
-        assert_eq!(mesh.opaque_range(), 0..0);
-        assert_eq!(mesh.transparent_range(DepthOrdering::WITHIN), 0..0);
+        assert_eq!(mesh.opaque_range(), Range::from(0..0));
+        assert_eq!(
+            mesh.transparent_range(DepthOrdering::WITHIN),
+            Range::from(0..0)
+        );
         assert_eq!(mesh.textures_used(), &[]);
         assert_eq!(mesh.texture_channels_used(), None);
         assert_eq!(dbg!(mesh.total_byte_size()), size_of::<TestMesh>());

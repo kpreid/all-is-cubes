@@ -69,6 +69,7 @@ pub enum PrimitiveOrSuch {
         rotation: GridRotation,
 
         /// Specifies how the image is extruded to the depth axis, as a list of ranges.
+        // TODO: switch to core::range::Range when the range syntax for it is stable
         extrusion: &'static [core::ops::Range<GridCoordinate>],
 
         /// Voxel properties to use for image pixels whose alpha is not 0.

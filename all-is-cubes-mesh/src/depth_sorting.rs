@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
-use core::ops::Range;
+use core::range::Range;
 
 use exhaust::Exhaust as _;
 use ordered_float::OrderedFloat;
@@ -425,7 +425,7 @@ pub(crate) fn store_transparent_indices<M: MeshTypes, I: IndexInt>(
             debug_assert!(!index_range.is_empty());
             *meta = TransparentMeta {
                 // Always dynamically sort everything.
-                dynamic_sub_ranges: SmallVec::from([0..range_len(&index_range)]),
+                dynamic_sub_ranges: SmallVec::from([Range::from(0..range_len(index_range))]),
                 // Haven't performed any sorting yet, so there is no region of validity.
                 depth_sort_validity: Aabb::EMPTY,
                 index_range,
@@ -518,7 +518,7 @@ fn static_sort<V: Vertex, P: Primitive>(
             let projection = basis.x;
             debug_assert_ne!(ordering.0[projection.axis()], Rel::Within);
 
-            let mut prim_group = 0..1; // indices into sortable_primitives, not single indices!
+            let mut prim_group = Range { start: 0, end: 1 }; // indices into sortable_primitives, not single indices!
             let mut group_upper_bound = sortable_primitives[0].min_max_on_axis(vertices, basis.x).1;
             for (i, prim) in sortable_primitives[1..].iter().enumerate() {
                 let (qmin, qmax) = prim.min_max_on_axis(vertices, basis.x);
@@ -528,18 +528,25 @@ fn static_sort<V: Vertex, P: Primitive>(
                     group_upper_bound = qmax;
                 } else {
                     // Primitive does not overlap; finish the current group and start a new one.
-                    if range_len(&prim_group) > 1 {
-                        meta.dynamic_sub_ranges
-                            .push((prim_group.start * P::LEN)..(prim_group.end * P::LEN));
+                    if range_len(prim_group) > 1 {
+                        meta.dynamic_sub_ranges.push(Range {
+                            start: prim_group.start * P::LEN,
+                            end: prim_group.end * P::LEN,
+                        });
                     }
-                    prim_group = i..(i + 1);
+                    prim_group = Range {
+                        start: i,
+                        end: i + 1,
+                    };
                     group_upper_bound = qmax;
                 }
             }
             // Write the last group
-            if range_len(&prim_group) > 1 {
-                meta.dynamic_sub_ranges
-                    .push((prim_group.start * P::LEN)..(prim_group.end * P::LEN));
+            if range_len(prim_group) > 1 {
+                meta.dynamic_sub_ranges.push(Range {
+                    start: prim_group.start * P::LEN,
+                    end: prim_group.end * P::LEN,
+                });
             }
 
             if meta.dynamic_sub_ranges.is_empty() {
@@ -631,7 +638,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         // (TODO: Prove this claim.)
         let mut new_validity = Aabb::EVERYWHERE;
 
-        for sub_range in meta.dynamic_sub_ranges.iter().cloned() {
+        for sub_range in meta.dynamic_sub_ranges.iter().copied() {
             let data_slice: &mut [P::Item] = &mut data[sub_range];
             // We want to sort the primitives (rectangles or triangles),
             // so we reinterpret the slice as groups of indices.
@@ -662,7 +669,10 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
             changed: match meta.dynamic_sub_ranges.as_slice() {
                 [Range { start, end }] | [Range { start, .. }, .., Range { end, .. }] => {
                     let base = meta.index_range.start;
-                    Some((base + start)..(base + end))
+                    Some(Range {
+                        start: base + start,
+                        end: base + end,
+                    })
                 }
                 [] => None,
             },
@@ -691,9 +701,9 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     if needs_static_sort {
         // If we did a static sort, then all indices in the range changed,
         // not just the ones the dynamic sort touched.
-        result.changed = Some(meta.index_range.clone());
+        result.changed = Some(meta.index_range);
 
-        result.info.elements_sorted += range_len(&meta.index_range);
+        result.info.elements_sorted += range_len(meta.index_range);
         result.info.static_groups_sorted += 1;
     }
     result
@@ -783,7 +793,7 @@ where
     let start = storage.len();
     storage.extend(items);
     let end = storage.len();
-    start..end
+    Range { start, end }
 }
 
 #[inline]
@@ -869,12 +879,12 @@ mod tests {
     fn depth_ordering_from_view_of_aabb() {
         let mut problems = Vec::new();
         // A coordinate range of ±3 will (more than) exercise every combination of axis orderings.
-        let range = -3..3;
+        let range = Range::from(-3..3);
         // TODO: exercise the bounds not being near 0
         let bounds = Aab::from_lower_upper([-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]);
-        for x in range.clone() {
-            for y in range.clone() {
-                for z in range.clone() {
+        for x in range {
+            for y in range {
+                for z in range {
                     let camera_position = point3(x, y, z);
 
                     let ordering =
@@ -954,7 +964,7 @@ mod tests {
 
         assert_ne!(
             space_mesh.opaque_range(),
-            0..0,
+            Range::from(0..0),
             "if the opaque range is empty then this test is not sufficient"
         );
         assert_eq!(
@@ -1014,8 +1024,8 @@ mod tests {
         let position_with_nothing = Position::new(0.5, 0.5, 10.0);
         assert_eq!(
             (
-                range_len(&space_mesh.transparent_range(ordering_with_face)),
-                range_len(&space_mesh.transparent_range(ordering_with_nothing))
+                range_len(space_mesh.transparent_range(ordering_with_face)),
+                range_len(space_mesh.transparent_range(ordering_with_nothing))
             ),
             (6, 0),
             "expected culling did not occur; test is invalid"
@@ -1054,7 +1064,7 @@ mod tests {
         let ordering = DepthOrdering(vec3(Rel::Lower, Rel::Within, Rel::Within));
         let position = Position::new(-10.5, 0.5, 0.5);
         assert_eq!(
-            range_len(&space_mesh.transparent_range(ordering)),
+            range_len(space_mesh.transparent_range(ordering)),
             6 * 3,
             "expected 3 rects",
         );

@@ -2,7 +2,7 @@
 //! volumes ([`Vol`]), and related.
 
 use core::fmt;
-use core::ops::Range;
+use core::range::Range;
 
 use euclid::{Vector3D, size3};
 use manyfmt::Refmt;
@@ -155,10 +155,14 @@ impl GridAab {
     /// This is identical to [`GridAab::from_lower_upper()`] except for the input type.
     #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     #[track_caller]
-    pub fn from_ranges(ranges: impl Into<Vector3D<Range<GridCoordinate>, Cube>>) -> GridAab {
-        let ranges = ranges.into();
+    pub fn from_ranges<R>(ranges: impl Into<Vector3D<R, Cube>>) -> GridAab
+    where
+        // TODO: remove this generic after `feature(new_range)` syntax is stable.
+        R: Into<Range<GridCoordinate>>,
+    {
+        let ranges = ranges.into().map(Into::into);
         GridAab::from_lower_upper(
-            ranges.clone().map(|r| r.start).to_point(),
+            ranges.map(|r| r.start).to_point(),
             ranges.map(|r| r.end).to_point(),
         )
     }
@@ -363,7 +367,10 @@ impl GridAab {
     /// The range of coordinates for cubes within the box along the given axis.
     #[inline]
     pub fn axis_range(&self, axis: Axis) -> Range<GridCoordinate> {
-        (self.lower_bounds()[axis])..(self.upper_bounds()[axis])
+        Range {
+            start: self.lower_bounds()[axis],
+            end: self.upper_bounds()[axis],
+        }
     }
 
     /// The center of the enclosed volume. Returns [`FreeCoordinate`]s since the center
@@ -675,9 +682,9 @@ impl GridAab {
         } else {
             let _upper_bounds = self.upper_bounds();
             Some(Cube::new(
-                rng.random_range(self.x_range()),
-                rng.random_range(self.y_range()),
-                rng.random_range(self.z_range()),
+                rng.random_range(core::ops::Range::from(self.x_range())),
+                rng.random_range(core::ops::Range::from(self.y_range())),
+                rng.random_range(core::ops::Range::from(self.z_range())),
             ))
         }
     }
