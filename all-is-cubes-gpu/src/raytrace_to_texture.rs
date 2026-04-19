@@ -7,6 +7,7 @@ use alloc::boxed::Box;
 use alloc::sync::Weak;
 #[cfg(feature = "auto-threads")]
 use alloc::vec::Vec;
+use core::range::Range;
 use std::sync::Mutex;
 
 use half::f16;
@@ -836,8 +837,8 @@ struct PixelPicker {
 
     /// Iterator that generates indices into `sorted_pixels` to tell us what to render next.
     iter: itertools::Interleave<
-        core::iter::Cycle<core::ops::Range<usize>>,
-        core::iter::Cycle<core::ops::Range<usize>>,
+        core::iter::Cycle<core::range::RangeIter<usize>>,
+        core::iter::Cycle<core::range::RangeIter<usize>>,
     >,
 
     /// Ordering of pixels such that earlier pixels are higher priorities
@@ -871,12 +872,12 @@ impl PixelPicker {
         // One could call this a form of fixed foveated rendering, to be fancy about it.
         let central_pixel_count: usize = 60000.min(pixel_count / 4);
 
-        let inner_range = 0..central_pixel_count;
-        let outer_range = central_pixel_count..pixel_count;
+        let inner_range = Range::from(0..central_pixel_count);
+        let outer_range = Range::from(central_pixel_count..pixel_count);
 
         // There are two cyclic iterators interleaved, so the overall cycle length is
         // twice the longest individual cycle length.
-        let cycle_length = range_len(&inner_range).max(range_len(&outer_range)) * 2;
+        let cycle_length = range_len(inner_range).max(range_len(outer_range)) * 2;
 
         PixelPicker {
             iter: ((inner_range).into_iter().cycle()).interleave(outer_range.into_iter().cycle()),

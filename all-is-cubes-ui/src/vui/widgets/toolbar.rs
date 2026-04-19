@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::error::Error;
 use core::iter;
-use core::ops::Range;
+use core::range::Range;
 use std::sync::Mutex;
 
 use all_is_cubes::block::{self, Block, Resolution, text};
@@ -49,7 +49,8 @@ impl Toolbar {
         character_source: listen::DynSource<Option<StrongHandle<Character>>>,
         // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
-        slot_range: Range<u16>,
+        // TODO: remove Into when std::range syntax is stable
+        slot_range: impl Into<Range<u16>>,
         cue_channel: CueNotifier,
     ) -> Arc<Self> {
         Arc::new(Self {
@@ -59,7 +60,7 @@ impl Toolbar {
             ))),
             hud_blocks,
             cue_channel,
-            slot_range,
+            slot_range: slot_range.into(),
             slot_info_text_template: text::Text::builder()
                 .foreground(block::from_color!(palette::HUD_TEXT_FILL))
                 .outline(Some(block::from_color!(palette::HUD_TEXT_STROKE)))
@@ -146,7 +147,7 @@ impl ToolbarController {
         // Note that `contents_iter` is infinite; when zipped with `slot_range` it is then
         // guaranteed to be the right length for our number of slots.
         let slots = watcher.inventory().slots();
-        let slot_range = self.definition.slot_range.clone();
+        let slot_range = self.definition.slot_range;
         let contents_iter = slots[usize::from(slot_range.start).min(slots.len())..]
             .iter()
             .chain(iter::repeat(&inv::Slot::Empty));
@@ -196,7 +197,7 @@ impl ToolbarController {
         pressed: [bool; inv::TOOL_SELECTIONS],
     ) -> WidgetTransaction {
         let mut txn = SpaceTransaction::default();
-        for index in self.definition.slot_range.clone() {
+        for index in self.definition.slot_range {
             let position = self.slot_position(index);
             let this_slot_selected_mask = core::array::from_fn(|sel| {
                 if selected_slots.get(sel).is_some_and(|&i| i == index) {
