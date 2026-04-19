@@ -115,7 +115,7 @@ impl ButtonLabel {
             move |label_widget| {
                 let text = label_widget.text(gravity);
                 let bb = text.bounding_blocks();
-                bb.x_range().map(move |x| {
+                bb.x_range().into_iter().map(move |x| {
                     Block::from_primitive(block::Primitive::Text {
                         text: text.clone(),
                         offset: GridVector::new(x, bb.lower_bounds().y, bb.lower_bounds().z),

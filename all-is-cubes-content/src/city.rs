@@ -1052,7 +1052,7 @@ impl CityPlanner {
     fn y_range(&self, lower_y: GridCoordinate, upper_y: GridCoordinate) -> GridAab {
         GridAab::from_ranges([
             self.space_bounds.x_range(),
-            lower_y..upper_y,
+            (lower_y..upper_y).into(),
             self.space_bounds.z_range(),
         ])
     }

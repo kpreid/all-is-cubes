@@ -49,7 +49,7 @@ fn COLLISION(ctx: Context<'_>) {
                     make_slab_txn(
                         &mut txn,
                         range.end - i,
-                        range_len(&range).try_into().unwrap(),
+                        range_len(range).try_into().unwrap(),
                     ),
                 )?;
             }

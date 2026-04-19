@@ -25,11 +25,13 @@ fn plane_to_text(voxels: Vol<&[block::Evoxel]>) -> Vec<String> {
     voxels
         .bounds()
         .y_range()
+        .into_iter()
         .rev() // flip Y axis
         .map(|y| {
             voxels
                 .bounds()
                 .x_range()
+                .into_iter()
                 .map(|x| convert_voxel(&voxels[Cube::new(x, y, z)]))
                 .collect::<String>()
         })
@@ -232,7 +234,10 @@ fn positioning_x(
         })
         .build();
 
-    assert_eq!(text.bounding_voxels().x_range(), expected);
+    assert_eq!(
+        text.bounding_voxels().x_range(),
+        core::range::Range::from(expected)
+    );
 }
 
 #[test]

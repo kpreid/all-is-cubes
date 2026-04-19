@@ -20,7 +20,7 @@ use crate::common::Identified;
 use crate::glue::{extent_to_size3d, point_to_origin, size3d_to_extent, write_texture_by_aab};
 
 type Texel = [u8; LightTexture::COMPONENTS];
-type Range = std::ops::Range<GridCoordinate>;
+type Range = std::range::Range<GridCoordinate>;
 
 /// Kludge to account for chunks being more visible than expected when fog is disabled and
 /// visibility is controlled by the far clipping plane instead of the fog.
@@ -339,7 +339,7 @@ impl LightTexture {
                     self.copy_contiguous_region(
                         queue,
                         space,
-                        GridAab::from_ranges([x_range.clone(), y_range.clone(), z_range]),
+                        GridAab::from_ranges([x_range, y_range, z_range]),
                         buffer,
                     );
                 });
@@ -368,15 +368,14 @@ impl LightTexture {
 
                 buffer.resize(volume, [0; Self::COMPONENTS]);
 
-                let x_chunk_size = range_len(&region.x_range());
-                let xy_chunk_size = x_chunk_size * range_len(&region.y_range());
-                region
-                    .z_range()
+                let x_chunk_size = range_len(region.x_range());
+                let xy_chunk_size = x_chunk_size * range_len(region.y_range());
+                core::ops::Range::from(region.z_range())
                     .into_par_iter()
                     .zip(buffer.par_chunks_mut(xy_chunk_size))
                     .for_each(|(z, xy_chunk)| {
-                        region
-                        .y_range()
+                        core::ops::Range::from(region
+                        .y_range())
                         .into_par_iter()
                         .zip(xy_chunk.par_chunks_mut(x_chunk_size))
                         .for_each(|(y, x_chunk)| {
@@ -564,8 +563,8 @@ fn split_axis(
 
     if first_half_endpoint < space_range.end {
         // Range must be split into two parts to wrap around.
-        let part_1 = space_range.start..first_half_endpoint;
-        let part_2 = first_half_endpoint..space_range.end;
+        let part_1 = Range::from(space_range.start..first_half_endpoint);
+        let part_2 = Range::from(first_half_endpoint..space_range.end);
         cfg_select! {
             feature = "auto-threads" => {
                 rayon::join(
