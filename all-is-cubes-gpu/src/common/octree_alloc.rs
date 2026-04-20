@@ -1,3 +1,5 @@
+#![expect(clippy::single_range_in_vec_init)]
+
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -342,9 +344,7 @@ impl AlloctreeNode {
                         // Modify the tree only once create_handle succeeds.
                         *self = AlloctreeNode::Sliced {
                             axis,
-                            occupied: vec![Range::from(
-                                0..TreeCoord::try_from(request.size()[axis]).unwrap(),
-                            )],
+                            occupied: vec![0..TreeCoord::try_from(request.size()[axis]).unwrap()],
                         };
                         Some(handle)
                     } else {
@@ -398,10 +398,10 @@ impl AlloctreeNode {
                                 end: _,
                             },
                         ),
-                    ) in [Range::from(0..0)]
+                    ) in [0..0]
                         .into_iter()
                         .chain(occupied_iter.clone())
-                        .zip(occupied_iter.chain([Range::from(node_size..node_size)]))
+                        .zip(occupied_iter.chain([node_size..node_size]))
                         .enumerate()
                     {
                         if request_size_on_axis <= (start2 - end1) {
@@ -411,8 +411,7 @@ impl AlloctreeNode {
                     return None;
                 };
 
-                let new_range =
-                    Range::from(relative_offset..(relative_offset + request_size_on_axis));
+                let new_range = relative_offset..(relative_offset + request_size_on_axis);
                 //log::trace!("slice search succeeded; inserting {new_range:?} into {occupied:?} at {insert_index}");
 
                 let mut low_corner_of_slice = low_corner_of_node;
@@ -688,6 +687,7 @@ mod tests {
     fn basic_complete_fill() {
         let mut t = Alloctree::new(5); // side length 2^5 cube = eight side length 16 cubes
         let _allocations: Vec<AlloctreeHandle<()>> = (0..8)
+            .into_iter()
             .map(|i| match t.allocate(GridAab::for_block(R16)) {
                 Some(val) => val,
                 None => panic!("basic_complete_fill allocation failure for #{i}"),
@@ -701,6 +701,7 @@ mod tests {
     fn free_and_allocate_again() {
         let mut t = Alloctree::new(6); // side length 2^6 cube = 64 side length 16 cubes
         let mut allocations: Vec<Option<AlloctreeHandle<()>>> = (0..64)
+            .into_iter()
             .map(|i| match t.allocate(GridAab::for_block(R16)) {
                 Some(val) => Some(val),
                 None => panic!("free_and_allocate_again initial allocation failure for #{i}"),

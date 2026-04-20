@@ -425,7 +425,7 @@ pub(crate) fn store_transparent_indices<M: MeshTypes, I: IndexInt>(
             debug_assert!(!index_range.is_empty());
             *meta = TransparentMeta {
                 // Always dynamically sort everything.
-                dynamic_sub_ranges: SmallVec::from([Range::from(0..range_len(index_range))]),
+                dynamic_sub_ranges: SmallVec::from([0..range_len(index_range)]),
                 // Haven't performed any sorting yet, so there is no region of validity.
                 depth_sort_validity: Aabb::EMPTY,
                 index_range,
@@ -529,10 +529,8 @@ fn static_sort<V: Vertex, P: Primitive>(
                 } else {
                     // Primitive does not overlap; finish the current group and start a new one.
                     if range_len(prim_group) > 1 {
-                        meta.dynamic_sub_ranges.push(Range {
-                            start: prim_group.start * P::LEN,
-                            end: prim_group.end * P::LEN,
-                        });
+                        meta.dynamic_sub_ranges
+                            .push((prim_group.start * P::LEN)..(prim_group.end * P::LEN));
                     }
                     prim_group = Range {
                         start: i,
@@ -543,10 +541,8 @@ fn static_sort<V: Vertex, P: Primitive>(
             }
             // Write the last group
             if range_len(prim_group) > 1 {
-                meta.dynamic_sub_ranges.push(Range {
-                    start: prim_group.start * P::LEN,
-                    end: prim_group.end * P::LEN,
-                });
+                meta.dynamic_sub_ranges
+                    .push((prim_group.start * P::LEN)..(prim_group.end * P::LEN));
             }
 
             if meta.dynamic_sub_ranges.is_empty() {
@@ -880,7 +876,7 @@ mod tests {
     fn depth_ordering_from_view_of_aabb() {
         let mut problems = Vec::new();
         // A coordinate range of ±3 will (more than) exercise every combination of axis orderings.
-        let range = Range::from(-3..3);
+        let range = -3..3;
         // TODO: exercise the bounds not being near 0
         let bounds = Aab::from_lower_upper([-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]);
         for x in range {
@@ -965,7 +961,7 @@ mod tests {
 
         assert_ne!(
             space_mesh.opaque_range(),
-            Range::from(0..0),
+            0..0,
             "if the opaque range is empty then this test is not sufficient"
         );
         assert_eq!(

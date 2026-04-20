@@ -301,7 +301,7 @@ impl<'u> State<'u> {
             // compensate for terrain even though the planner doesn't
             tree_origin.y = terrain_height_function(tree_origin.lower_bounds().xz()).0;
 
-            let height = rng.random_range(1..8);
+            let height = rng.random_range(core::ops::Range::from(1..8));
             let tree_bounds = GridAab::single_cube(tree_origin).expand(FaceMap {
                 nx: height / 3,
                 ny: 0,
@@ -338,6 +338,7 @@ impl<'u> State<'u> {
                 let perpendicular: GridVector =
                     Face::PY.clockwise().transform(direction).normal_vector();
                 for distance in (CityPlanner::LAMP_POSITION_RADIUS..self.planner.city_radius)
+                    .into_iter()
                     .step_by(lamp_spacing)
                 {
                     for side_of_road in [-1, 1] {
@@ -1052,7 +1053,7 @@ impl CityPlanner {
     fn y_range(&self, lower_y: GridCoordinate, upper_y: GridCoordinate) -> GridAab {
         GridAab::from_ranges([
             self.space_bounds.x_range(),
-            (lower_y..upper_y).into(),
+            lower_y..upper_y,
             self.space_bounds.z_range(),
         ])
     }

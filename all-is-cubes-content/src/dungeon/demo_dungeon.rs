@@ -682,11 +682,7 @@ pub(crate) async fn demo_dungeon(
             .build_and_mutate(|m| {
                 // Fill in (under)ground areas
                 m.fill_uniform(
-                    GridAab::from_ranges([
-                        space_bounds.x_range(),
-                        (-1..0).into(),
-                        space_bounds.z_range(),
-                    ]),
+                    GridAab::from_ranges([space_bounds.x_range(), -1..0, space_bounds.z_range()]),
                     &landscape_blocks[LandscapeBlocks::Grass],
                 )?;
                 m.fill_uniform(

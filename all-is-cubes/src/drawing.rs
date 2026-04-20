@@ -338,13 +338,12 @@ impl<'a> VoxelBrush<'a> {
     }
 
     /// Makes a [`VoxelBrush`] which paints the specified block within the specified Z-axis range.
-    // TODO: remove Into when std::range syntax is stable
-    pub fn with_thickness<B>(block: B, range: impl Into<Range<GridCoordinate>>) -> Self
+    pub fn with_thickness<B>(block: B, range: Range<GridCoordinate>) -> Self
     where
         B: Into<Cow<'a, Block>>,
     {
         let block = block.into();
-        Self::new(range.into().into_iter().map(|z| (GridVector::new(0, 0, z), block.clone())))
+        Self::new(range.into_iter().map(|z| (GridVector::new(0, 0, z), block.clone())))
     }
 
     /// Copies each of the brush's blocks into `m` relative to the given origin

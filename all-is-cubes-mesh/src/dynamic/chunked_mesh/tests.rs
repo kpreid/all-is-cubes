@@ -256,7 +256,7 @@ fn no_render_data_updates_after_completion() {
     // In the current implementation there is one extra indices-only update because we don't
     // properly depth sort just-created chunks, but ideally there wouldn't be this one.
     tester.update(|u| {
-        assert_eq!(u.indices_only, Some(core::range::Range::from(0..36)));
+        assert_eq!(u.indices_only, Some(0..36));
     });
 
     // Now, expect quiescence.
@@ -550,6 +550,7 @@ fn at_maximum_number_of_blocks() {
     );
 
     let blocks: Vec<Block> = (0..=BlockIndex::MAX)
+        .into_iter()
         .map(|i| {
             // These blocks must all be distinct.
             // We are not using `make_some_blocks()` because that would construct a large array
@@ -564,8 +565,11 @@ fn at_maximum_number_of_blocks() {
     let space = Space::builder(bounds)
         .palette_and_contents(
             blocks,
-            Vol::from_elements(bounds, (0..=BlockIndex::MAX).collect::<Box<[BlockIndex]>>())
-                .unwrap(),
+            Vol::from_elements(
+                bounds,
+                (0..=BlockIndex::MAX).into_iter().collect::<Box<[BlockIndex]>>(),
+            )
+            .unwrap(),
             None,
         )
         .unwrap()

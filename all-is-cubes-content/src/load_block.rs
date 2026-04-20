@@ -69,8 +69,7 @@ pub enum PrimitiveOrSuch {
         rotation: GridRotation,
 
         /// Specifies how the image is extruded to the depth axis, as a list of ranges.
-        // TODO: switch to core::range::Range when the range syntax for it is stable
-        extrusion: &'static [core::ops::Range<GridCoordinate>],
+        extrusion: &'static [core::range::Range<GridCoordinate>],
 
         /// Voxel properties to use for image pixels whose alpha is not 0.
         visible: Vox,
@@ -158,7 +157,7 @@ impl Context<'_> {
                 // TODO: polishing: make bad data not allocate unbounded memory
                 let extrusion_cubes: Vec<Cube> = extrusion
                     .iter()
-                    .cloned()
+                    .copied()
                     .flatten()
                     .map(|z| Cube::from(rotation.transform_vector(vec3(0, 0, z)).to_point()))
                     .collect();

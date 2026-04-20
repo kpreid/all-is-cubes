@@ -7,7 +7,6 @@ use alloc::boxed::Box;
 use alloc::sync::Weak;
 #[cfg(feature = "auto-threads")]
 use alloc::vec::Vec;
-use core::range::Range;
 use std::sync::Mutex;
 
 use half::f16;
@@ -527,7 +526,7 @@ impl RaytraceToTexture {
                     .saturating_mul(render_viewport.framebuffer_size.height)
                     .saturating_mul(3);
                 render_pass.set_pipeline(&pipelines.rt_reproject_pipeline);
-                render_pass.draw(0..vertex_count, 0..1);
+                render_pass.draw((0..vertex_count).into(), (0..1).into());
             }
 
             // Run gap-filling operation on output of draw
@@ -558,7 +557,7 @@ impl RaytraceToTexture {
         // Draw a straightforward upscaling with no reprojection.
         // TODO: If we previously reprojected, grab the gap-fill output
         render_pass.set_pipeline(&pipelines.rt_frame_copy_pipeline);
-        render_pass.draw(0..3, 0..1);
+        render_pass.draw((0..3).into(), (0..1).into());
 
         Flaws::empty()
     }
@@ -702,6 +701,7 @@ impl Inner {
             }
             UpdateStrategy::Consistent { ref mut next, .. } => {
                 let pixel_iter = (0..self.rays_per_frame)
+                    .into_iter()
                     .map(|i| point_from_pixel_index(render_viewport, i + *next));
                 cfg_select! {
                     feature = "auto-threads" => {
@@ -858,7 +858,7 @@ impl PixelPicker {
         let image_center = viewport.framebuffer_size.to_vector().to_f64() / 2.0 - vec2(0.5, 0.5);
 
         // Precompute an ordering of the pixels based on distance from center with some dithering.
-        let mut sorted_pixels: Box<[usize]> = (0..pixel_count).collect();
+        let mut sorted_pixels: Box<[usize]> = (0..pixel_count).into_iter().collect();
         sorted_pixels.sort_by_key(|index| {
             let image_point = vec2(index % width, index / width);
             let from_center_point = image_point.to_f64() - image_center;
@@ -872,8 +872,8 @@ impl PixelPicker {
         // One could call this a form of fixed foveated rendering, to be fancy about it.
         let central_pixel_count: usize = 60000.min(pixel_count / 4);
 
-        let inner_range = Range::from(0..central_pixel_count);
-        let outer_range = Range::from(central_pixel_count..pixel_count);
+        let inner_range = 0..central_pixel_count;
+        let outer_range = central_pixel_count..pixel_count;
 
         // There are two cyclic iterators interleaved, so the overall cycle length is
         // twice the longest individual cycle length.

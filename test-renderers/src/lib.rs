@@ -1,6 +1,7 @@
 //! Test harness for [`all_is_cubes`]’ various renderers, supporting comparing the
 //! image outputs of various renderers with each other and reference images.
 
+//#![feature(new_range)] // cannot; would break derive(clap::Parser)
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![allow(
     missing_docs,

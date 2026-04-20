@@ -192,7 +192,7 @@ mod tests {
         // Exact at start
         assert_eq!(iter.size_hint(), (expected_size, Some(expected_size)));
 
-        for remaining in (1..=expected_size).rev() {
+        for remaining in (1..=expected_size).into_iter().rev() {
             assert_eq!(iter.size_hint(), (remaining, Some(remaining)));
             assert!(iter.next().is_some());
         }

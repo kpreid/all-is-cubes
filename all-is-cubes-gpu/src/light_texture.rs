@@ -607,7 +607,7 @@ mod tests {
         // for this.
         let step = 1. / 8.;
         // note: view distance is clamped in graphics options to be a minimum of 1.0
-        for view_distance in (8..100).map(|i| ps64(f64::from(i) * step)) {
+        for view_distance in (8..100).into_iter().map(|i| ps64(f64::from(i) * step)) {
             let texture_size =
                 LightTexture::choose_size(&limits, irrelevant_space_bounds, view_distance);
 
@@ -615,7 +615,7 @@ mod tests {
             options.view_distance = view_distance;
             camera.set_options(options);
 
-            for position in (0..100).map(|i| f64::from(i) * step) {
+            for position in (0..100).into_iter().map(|i| f64::from(i) * step) {
                 eprintln!("{view_distance} {position}");
                 camera.set_view_transform(ViewTransform::from_translation(vec3(position, 0., 0.)));
                 let visible_bounds = visible_light_volume(irrelevant_space_bounds, &camera);

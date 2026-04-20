@@ -502,8 +502,6 @@ mod tests {
             (5u8, 4..5),
             (6u8, 12..16),
         ] {
-            let range = Range::from(range);
-
             // Add new data to write.
             source_data[range].fill(value);
 

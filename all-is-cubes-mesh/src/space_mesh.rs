@@ -341,7 +341,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
 
         // Set the opaque range to all indices which have already been stored
         // (which will be the opaque ones only).
-        self.meta.opaque_range = Range::from(0..self.indices.len());
+        self.meta.opaque_range = 0..self.indices.len();
 
         // Dispatch to the depth sorting algorithm in its u16 or u32 version.
         #[rustfmt::skip]
@@ -571,7 +571,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             ),
             indices: IndexVec::new(), // placeholder
             meta: MeshMeta {
-                opaque_range: Range::from(0..0),
+                opaque_range: 0..0,
                 transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
                 textures_used: block_mesh.textures().to_vec(),
                 has_non_rect_transparency: block_mesh
@@ -800,7 +800,7 @@ impl<M: MeshTypes> MeshMeta<M> {
             bounding_box,
             flaws,
         } = self;
-        *opaque_range = Range::from(0..0);
+        *opaque_range = 0..0;
         *transparent = [TransparentMeta::EMPTY; DepthOrdering::COUNT];
         textures_used.clear();
         *has_non_rect_transparency = false;
@@ -815,7 +815,7 @@ impl<M: MeshTypes> Default for MeshMeta<M> {
     fn default() -> Self {
         // Note that this must be consistent with `Self::clear()`.
         Self {
-            opaque_range: Range::from(0..0),
+            opaque_range: 0..0,
             transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
             textures_used: Vec::new(),
             has_non_rect_transparency: false,
@@ -1316,11 +1316,8 @@ mod tests {
         assert!(mesh.is_empty());
         assert_eq!(mesh.vertices(), (&[][..], &[][..]));
         assert_eq!(mesh.indices(), IndexSlice::U16(&[]));
-        assert_eq!(mesh.opaque_range(), Range::from(0..0));
-        assert_eq!(
-            mesh.transparent_range(DepthOrdering::WITHIN),
-            Range::from(0..0)
-        );
+        assert_eq!(mesh.opaque_range(), 0..0);
+        assert_eq!(mesh.transparent_range(DepthOrdering::WITHIN), 0..0);
         assert_eq!(mesh.textures_used(), &[]);
         assert_eq!(mesh.texture_channels_used(), None);
         assert_eq!(dbg!(mesh.total_byte_size()), size_of::<TestMesh>());

@@ -126,10 +126,12 @@ fn demo_blocks_generator(
     let center_point_doubled = (one_diagonal * resolution_g).to_point();
 
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();
-    let road_noise =
-        crate::alg::array_of_random(resolution, 0x52b19f6a, -1.0..=1.0, move |value| {
-            value * 0.12 + 1.0
-        });
+    let road_noise = crate::alg::array_of_random(
+        resolution,
+        0x52b19f6a,
+        core::ops::RangeInclusive::from(-1.0..=1.0),
+        move |value| value * 0.12 + 1.0,
+    );
 
     let curb_fn = move |cube: Cube| {
         let width = resolution_g / 3;
@@ -260,7 +262,7 @@ fn demo_blocks_generator(
                     .display_name("Road")
                     .voxels_fn(output_resolution, |cube| {
                         let y = (i32::from(output_resolution) - 1 - cube.y) / 2;
-                        let x = rng.random_range(range.clone());
+                        let x = rng.random_range(core::ops::Range::from(range));
                         palette_image.get_brush(x, y).origin_block().unwrap_or(&AIR)
                     })?
                     .build_txn(txn)
@@ -545,6 +547,7 @@ fn demo_blocks_generator(
             Clock => {
                 let bounds = GridAab::from_lower_size([0, 0, 0], [16, 16, 1]);
                 let frames = (0..60)
+                    .into_iter()
                     .map(|phase: time::Phase| {
                         let space = Space::builder(bounds)
                             .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
