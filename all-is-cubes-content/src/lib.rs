@@ -3,6 +3,7 @@
 #![move_size_limit = "5000"]
 #![feature(macro_attr)]
 #![feature(macro_derive)]
+#![feature(new_range)]
 
 //! Demo content for All is Cubes.
 //!

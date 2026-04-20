@@ -815,7 +815,7 @@ impl BlRotate for Block {
     }
 }
 
-impl const From<&'static Primitive> for Block {
+const impl From<&'static Primitive> for Block {
     /// Constructs a [`Block`] which references the given static [`Primitive`].
     ///
     /// This performs no allocation.
@@ -837,12 +837,12 @@ impl From<Primitive> for Block {
 // or borrowed `Block`. The motivation for this is to avoid unnecessary cloning
 // (in case an individual block has large data).
 // TODO: Eliminate these given the new Block-is-a-pointer world.
-impl const From<Block> for Cow<'_, Block> {
+const impl From<Block> for Cow<'_, Block> {
     fn from(block: Block) -> Self {
         Cow::Owned(block)
     }
 }
-impl<'a> const From<&'a Block> for Cow<'a, Block> {
+const impl<'a> From<&'a Block> for Cow<'a, Block> {
     fn from(block: &'a Block) -> Self {
         Cow::Borrowed(block)
     }
@@ -961,23 +961,25 @@ mod arbitrary_block {
     // Manual impl because `Primitive::Text` isn't properly overflow-proof yet.
     impl<'a> Arbitrary<'a> for Primitive {
         fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-            Ok(match u.int_in_range(0..=4)? {
-                0 => Primitive::Air,
-                1 => Primitive::Atom(Atom::arbitrary(u)?),
-                2 => Primitive::Indirect(Handle::arbitrary(u)?),
-                3 => Primitive::Recur {
-                    offset: GridPoint::from(<[i32; 3]>::arbitrary(u)?),
-                    resolution: Resolution::arbitrary(u)?,
-                    space: Handle::arbitrary(u)?,
+            Ok(
+                match u.int_in_range(core::ops::RangeInclusive::from(0..=4))? {
+                    0 => Primitive::Air,
+                    1 => Primitive::Atom(Atom::arbitrary(u)?),
+                    2 => Primitive::Indirect(Handle::arbitrary(u)?),
+                    3 => Primitive::Recur {
+                        offset: GridPoint::from(<[i32; 3]>::arbitrary(u)?),
+                        resolution: Resolution::arbitrary(u)?,
+                        space: Handle::arbitrary(u)?,
+                    },
+                    4 => Primitive::Text {
+                        text: Text::arbitrary(u)?,
+                        // TODO: fix unhandled overflows so this can be full i32 range,
+                        // then replace this `Arbitrary` impl with a derived one
+                        offset: GridVector::from(<[i16; 3]>::arbitrary(u)?.map(i32::from)),
+                    },
+                    _ => unreachable!(),
                 },
-                4 => Primitive::Text {
-                    text: Text::arbitrary(u)?,
-                    // TODO: fix unhandled overflows so this can be full i32 range,
-                    // then replace this `Arbitrary` impl with a derived one
-                    offset: GridVector::from(<[i16; 3]>::arbitrary(u)?.map(i32::from)),
-                },
-                _ => unreachable!(),
-            })
+            )
         }
 
         fn size_hint(_depth: usize) -> (usize, Option<usize>) {
@@ -1130,20 +1132,20 @@ mod conversions_for_atom {
         }
     }
 
-    impl const From<Rgb01> for Atom {
+    const impl From<Rgb01> for Atom {
         /// Construct an [`Atom`] with the given reflectance color, and default attributes.
         fn from(color: Rgb01) -> Self {
             Self::from_color(color.with_alpha_one())
         }
     }
-    impl const From<Rgba> for Atom {
+    const impl From<Rgba> for Atom {
         /// Construct an [`Atom`] with the given reflectance color, and default attributes.
         fn from(color: Rgba) -> Self {
             Self::from_color(color)
         }
     }
 
-    impl const From<Atom> for Primitive {
+    const impl From<Atom> for Primitive {
         fn from(value: Atom) -> Self {
             Primitive::Atom(value)
         }

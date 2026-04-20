@@ -238,7 +238,7 @@ where
         );
         render_pass.set_vertex_buffer(BlockBufferSlot::Color as u32, vertex_color_buffer.slice(..));
         render_pass.set_vertex_buffer(BlockBufferSlot::Instance as u32, instance_buffer.slice(..));
-        render_pass.draw(0..3, 0..1);
+        render_pass.draw((0..3).into(), (0..1).into());
     }
     queue.submit(std::iter::once(encoder.finish()));
 

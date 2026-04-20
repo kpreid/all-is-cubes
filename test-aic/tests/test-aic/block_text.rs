@@ -209,8 +209,8 @@ fn bounding_voxels_of_positioning_high() {
 fn positioning_x(
     #[case] pos: PositioningX,
     #[case] odd_character_width: bool,
-    #[case] bounds_range: core::ops::Range<i32>,
-    #[case] expected: core::ops::Range<i32>,
+    #[case] bounds_range: core::range::Range<i32>,
+    #[case] expected: core::range::Range<i32>,
 ) {
     let text = Text::builder()
         .string(if odd_character_width {
@@ -237,10 +237,7 @@ fn positioning_x(
         })
         .build();
 
-    assert_eq!(
-        text.logical_bounding_voxels().x_range(),
-        core::range::Range::from(expected)
-    );
+    assert_eq!(text.logical_bounding_voxels().x_range(), expected);
 }
 
 #[test]

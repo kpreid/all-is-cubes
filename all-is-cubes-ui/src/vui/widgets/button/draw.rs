@@ -288,7 +288,7 @@ fn draw_button_multiblock_from_image(
         &|color| match color {
             image_palette::OUTSIDE => VoxelBrush::single(AIR),
             image_palette::FRAME => VoxelBrush::single(block::from_color!(palette::BUTTON_FRAME)),
-            image_palette::RIM => VoxelBrush::new((0..label_z).map(|z| {
+            image_palette::RIM => VoxelBrush::new((0..label_z).into_iter().map(|z| {
                 // Highlight just the corner with a lighter color;
                 // otherwise identical to BACK.
                 (
