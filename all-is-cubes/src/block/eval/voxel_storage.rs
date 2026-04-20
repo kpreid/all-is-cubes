@@ -581,6 +581,7 @@ impl EvoxelsPaletted {
 impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         use crate::math::GridCoordinate;
+        use core::ops::RangeInclusive as LegacyRange;
         use euclid::point3;
 
         let resolution = Resolution::arbitrary(u)?;
@@ -590,14 +591,14 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
             // Pick bounds.
             let limit = GridCoordinate::from(resolution) - 1;
             let lower_bounds = point3(
-                u.int_in_range(0..=limit)?,
-                u.int_in_range(0..=limit)?,
-                u.int_in_range(0..=limit)?,
+                u.int_in_range(LegacyRange::from(0..=limit))?,
+                u.int_in_range(LegacyRange::from(0..=limit))?,
+                u.int_in_range(LegacyRange::from(0..=limit))?,
             );
             let upper_bounds = point3(
-                u.int_in_range(lower_bounds.x..=limit)?,
-                u.int_in_range(lower_bounds.y..=limit)?,
-                u.int_in_range(lower_bounds.z..=limit)?,
+                u.int_in_range(LegacyRange::from(lower_bounds.x..=limit))?,
+                u.int_in_range(LegacyRange::from(lower_bounds.y..=limit))?,
+                u.int_in_range(LegacyRange::from(lower_bounds.z..=limit))?,
             );
             let bounds = GridAab::from_lower_upper(lower_bounds, upper_bounds);
 
@@ -609,8 +610,9 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
                 // Otherwise, it must have at least one element.
                 1
             };
-            let palette_len: usize =
-                u.int_in_range(palette_len_lower_bound..=usize::from(VoxelIndex::MAX) + 1)?;
+            let palette_len: usize = u.int_in_range(LegacyRange::from(
+                palette_len_lower_bound..=usize::from(VoxelIndex::MAX) + 1,
+            ))?;
 
             // Generate palette.
             let palette: Arc<[Evoxel]> = u
@@ -621,7 +623,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
             // Generate indices.
             let index_range = 0..=(palette_len.saturating_sub(1) as VoxelIndex);
             let indices: Vol<Arc<[VoxelIndex]>> =
-                Vol::try_from_fn(bounds, |_| u.int_in_range(index_range.clone()))?;
+                Vol::try_from_fn(bounds, |_| u.int_in_range(LegacyRange::from(index_range)))?;
 
             Evoxels::from_paletted(resolution, palette, indices)
         })

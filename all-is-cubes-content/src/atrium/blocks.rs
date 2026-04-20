@@ -146,6 +146,7 @@ pub(in crate::atrium) async fn install_atrium_blocks(
         reason = "warns on 32-bit but f64::from() is not an option on 64-bit"
     )]
     let stone_range: Vec<Block> = (-2..=2_isize)
+        .into_iter()
         .map(|x| scale_color(STONE_BASE.clone(), 1.0 + x as f64 * 0.08, 0.02))
         .collect();
 

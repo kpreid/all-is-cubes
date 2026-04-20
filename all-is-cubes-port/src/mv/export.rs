@@ -90,7 +90,7 @@ pub(crate) async fn export_to_dot_vox_data(
     let (palette, materials) = palette.into_parts();
     Ok(dot_vox::DotVoxData {
         version: 150,
-        index_map: (1..=255).collect(),
+        index_map: (1..=255).into_iter().collect(),
         models,
         palette,
         scenes: Vec::new(),

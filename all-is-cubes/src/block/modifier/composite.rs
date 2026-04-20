@@ -409,8 +409,11 @@ impl PaletteBuffer {
         assert!(self.palette.is_empty());
 
         self.palette.extend(self.src_palette.iter().copied());
-        self.blended_index_map
-            .extend((0..(self.src_palette.len() as VoxelIndex)).map(|i| ([Some(i), None], i)));
+        self.blended_index_map.extend(
+            (0..(self.src_palette.len() as VoxelIndex))
+                .into_iter()
+                .map(|i| ([Some(i), None], i)),
+        );
     }
 
     /// Allocate entries for `dst` blended with `AIR` with the same indices as `dst`.
@@ -418,8 +421,11 @@ impl PaletteBuffer {
         assert!(self.palette.is_empty());
 
         self.palette.extend(self.dst_palette.iter().copied());
-        self.blended_index_map
-            .extend((0..(self.dst_palette.len() as VoxelIndex)).map(|i| ([None, Some(i)], i)));
+        self.blended_index_map.extend(
+            (0..(self.dst_palette.len() as VoxelIndex))
+                .into_iter()
+                .map(|i| ([None, Some(i)], i)),
+        );
     }
 
     #[inline]
