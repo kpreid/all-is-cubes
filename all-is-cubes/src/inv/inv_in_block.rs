@@ -112,7 +112,7 @@ impl InvInBlock {
         inventory_size: Ix,
     ) -> impl Iterator<Item = (Ix, GridPoint)> + '_ {
         self.icon_rows.iter().flat_map(move |row| {
-            (0..row.count).map_while(move |sub_index| {
+            (0..row.count).into_iter().map_while(move |sub_index| {
                 let slot_index = row.first_slot.checked_add(sub_index)?;
                 if slot_index >= inventory_size {
                     return None;

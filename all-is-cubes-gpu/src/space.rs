@@ -556,7 +556,11 @@ impl SpaceRenderer {
                     return;
                 }
 
-                render_pass.draw_indexed(to_wgpu_index_range(index_range), 0, id..(id + 1));
+                render_pass.draw_indexed(
+                    to_wgpu_index_range(index_range),
+                    0,
+                    (id..(id + 1)).into(),
+                );
                 *triangles_drawn += range_len(index_range) / 3;
             }
         }
@@ -567,7 +571,7 @@ impl SpaceRenderer {
             // smarter depth test setup.
             render_pass.set_pipeline(&pipelines.skybox_render_pipeline);
             // No vertex buffer; shader generates a fullscreen triangle.
-            render_pass.draw(0..3, 0..1);
+            render_pass.draw((0..3).into(), (0..1).into());
         }
 
         if camera.options().debug_pixel_cost {
@@ -707,8 +711,7 @@ impl SpaceRenderer {
             }
 
             // Record draw command for all instances using this mesh
-            let instance_range =
-                core::range::Range::from(first_instance_index..(first_instance_index + count));
+            let instance_range = first_instance_index..(first_instance_index + count);
             blocks_drawn += range_len(instance_range);
             triangles_drawn += (range_len(meta.opaque_range()) / 3) * range_len(instance_range);
             render_pass.draw_indexed(

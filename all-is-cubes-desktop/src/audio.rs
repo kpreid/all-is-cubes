@@ -185,7 +185,7 @@ fn audio_command_thread(
                     // Randomize start time to reduce constructive interference effects.
                     // TODO: get size of time range from universe tick rate.
                     sound.settings.start_time = kira::StartTime::Delayed(Duration::from_nanos(
-                        rng.random_range(0..16_000_000),
+                        rng.random_range(core::ops::Range::from(0..16_000_000)),
                     ));
 
                     match source {

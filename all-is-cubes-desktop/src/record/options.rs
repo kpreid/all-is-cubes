@@ -57,7 +57,6 @@ impl RecordOptions {
             None => 0..=0,
             Some(animation) => 1..=animation.frame_count,
         }
-        .into()
     }
 }
 
