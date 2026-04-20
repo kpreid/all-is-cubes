@@ -9,6 +9,7 @@ use anyhow::Context;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use futures_channel::oneshot;
 use ratatui::crossterm;
+use ratatui::crossterm::event::KeyEventKind;
 use ratatui::layout::Rect;
 
 use all_is_cubes::euclid::{Point2D, Size2D};
@@ -213,18 +214,21 @@ fn run(
                 Event::Key(KeyEvent {
                     code: KeyCode::Char('c' | 'd'),
                     modifiers: KeyModifiers::CONTROL,
+                    kind: KeyEventKind::Press | KeyEventKind::Repeat,
                     ..
                 }) => {
                     return Ok(());
                 }
                 Event::Key(KeyEvent {
                     code: KeyCode::Char('n'),
-                    modifiers: _,
+                    modifiers: KeyModifiers::NONE,
+                    kind: KeyEventKind::Press | KeyEventKind::Repeat,
                     ..
                 }) => options.colors = options.colors.cycle(),
                 Event::Key(KeyEvent {
                     code: KeyCode::Char('m'),
-                    modifiers: _,
+                    modifiers: KeyModifiers::NONE,
+                    kind: KeyEventKind::Press | KeyEventKind::Repeat,
                     ..
                 }) => {
                     options.characters = options.characters.cycle();
