@@ -10,6 +10,7 @@ use core::fmt;
 use euclid::{Size2D, size2};
 use hashbrown::HashMap;
 
+use bevy_platform::sync::OnceLock;
 use embedded_graphics::prelude::{Point, Size};
 use embedded_graphics::primitives::Rectangle;
 use png_decoder::PngHeader;
@@ -254,7 +255,7 @@ impl core::error::Error for BlockFromImageError {
 #[derive(Debug)]
 pub struct LazyImage {
     /// Lazily decoded image data.
-    decoded_data: LazyImageInner,
+    decoded_data: OnceLock<DecodedPng>,
 
     /// PNG image data for decoding.
     encoded_data: &'static [u8],
@@ -270,7 +271,7 @@ impl LazyImage {
         encoded_data: &'static [u8],
     ) -> Self {
         Self {
-            decoded_data: LazyImageInner::new(),
+            decoded_data: OnceLock::new(),
             path,
             encoded_data,
         }
@@ -287,23 +288,15 @@ impl LazyImage {
 impl core::ops::Deref for LazyImage {
     type Target = DecodedPng;
     fn deref(&self) -> &Self::Target {
-        self.decoded_data.get_or_init(|| {
-            let decoded = match png_decoder::decode(self.encoded_data) {
-                Ok((header, data)) => DecodedPng {
-                    header,
-                    rgba_image_data: data,
-                },
-                Err(error) => panic!(
-                    "Error loading image asset {path:?}: {error:?}",
-                    path = self.path()
-                ),
-            };
-
-            // When we use OnceBox, we need to return a box.
-            #[cfg(not(feature = "std"))]
-            let decoded = ::alloc::boxed::Box::new(decoded);
-
-            decoded
+        self.decoded_data.get_or_init(|| match png_decoder::decode(self.encoded_data) {
+            Ok((header, data)) => DecodedPng {
+                header,
+                rgba_image_data: data,
+            },
+            Err(error) => panic!(
+                "Error loading image asset {path:?}: {error:?}",
+                path = self.path()
+            ),
         })
     }
 }
@@ -323,17 +316,6 @@ macro_rules! _content_load_image_include_image {
             );
         &IMAGE
     }};
-}
-
-cfg_select! {
-    feature = "std" => {
-        #[doc(hidden)]
-        type LazyImageInner = ::std::sync::OnceLock<DecodedPng>;
-    }
-    _ => {
-        #[doc(hidden)]
-        type LazyImageInner = ::once_cell::race::OnceBox<DecodedPng>;
-    }
 }
 pub use _content_load_image_include_image as include_image;
 

@@ -3,6 +3,7 @@
 
 use alloc::vec::Vec;
 
+use bevy_platform::sync::OnceLock;
 use manyfmt::Refmt as _;
 
 use crate::time::Instant;
@@ -30,18 +31,8 @@ pub(crate) fn get() -> &'static [FlatNode] {
     // noticeable hang (just a lack of light updates, which are already throttled by available
     // time).
 
-    cfg_select! {
-        feature = "std" => {
-            static FLAT_TREE: std::sync::OnceLock<Vec<FlatNode>> =
-                std::sync::OnceLock::new();
-            FLAT_TREE.get_or_init(generate_chart_with_logging)
-        }
-        _ => {
-            static FLAT_TREE: once_cell::race::OnceBox<Vec<FlatNode>> =
-                once_cell::race::OnceBox::new();
-            FLAT_TREE.get_or_init(|| alloc::boxed::Box::new(generate_chart_with_logging()))
-        }
-    }
+    static FLAT_TREE: OnceLock<Vec<FlatNode>> = OnceLock::new();
+    FLAT_TREE.get_or_init(generate_chart_with_logging)
 }
 
 fn generate_chart_with_logging() -> Vec<FlatNode> {

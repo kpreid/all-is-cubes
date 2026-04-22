@@ -65,7 +65,6 @@ dependencies = [
  "mutants 0.0.4",
  "nosy",
  "num-traits",
- "once_cell",
  "ordered-float",
  "paste",
  "png-decoder",
