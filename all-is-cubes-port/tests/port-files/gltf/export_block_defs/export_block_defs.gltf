@@ -243,7 +243,7 @@
       "uri": "export_block_defs-mesh-3.glbin"
     },
     {
-      "byteLength": 2442,
+      "byteLength": 2359,
       "name": "texture",
       "uri": "export_block_defs-texture.png"
     },
@@ -312,7 +312,7 @@
     },
     {
       "buffer": 4,
-      "byteLength": 2442,
+      "byteLength": 2359,
       "name": "reflectance"
     },
     {

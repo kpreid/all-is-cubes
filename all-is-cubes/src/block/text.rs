@@ -7,11 +7,14 @@
 
 use alloc::boxed::Box;
 use core::iter;
-use eg::mono_font::MonoFont;
-use embedded_graphics::mono_font::mapping::GlyphMapping;
 
 use arcstr::ArcStr;
+use bevy_platform::sync::OnceLock;
+use eg::mono_font::MonoFont;
 use embedded_graphics as eg;
+use embedded_graphics::mono_font::DecorationDimensions;
+use embedded_graphics::mono_font::mapping::GlyphMapping;
+use embedded_graphics::prelude::Size;
 use embedded_graphics::{Drawable as _, prelude::Dimensions as _};
 use euclid::vec3;
 
@@ -617,24 +620,99 @@ pub enum Font {
     // experimental while we figure things out. Probably to be replaced with fonts stored in Universe
     SmallerBodyText,
 }
+
 impl Font {
     /// Do not use. This will be removed if and when we change font renderers.
     #[doc(hidden)]
     pub fn eg_font(&self) -> &MonoFont<'static> {
-        use eg::mono_font::iso_8859_1 as f;
         match self {
-            Self::System16 => &MonoFont {
-                glyph_mapping: &RemapTo8859_1(f::FONT_8X13_BOLD.glyph_mapping),
-                ..f::FONT_8X13_BOLD
-            },
-            Self::Logo => &MonoFont {
-                glyph_mapping: &RemapTo8859_1(f::FONT_9X15_BOLD.glyph_mapping),
-                ..f::FONT_9X15_BOLD
-            },
-            Self::SmallerBodyText => &MonoFont {
-                glyph_mapping: &RemapTo8859_1(f::FONT_6X10.glyph_mapping),
-                ..f::FONT_6X10
-            },
+            Self::System16 | Self::Logo => {
+                static DECL: FontDecl = FontDecl {
+                    png_data: include_bytes!("text/font-system-7x16.png"),
+                    png_path: "text/new-system-font.png",
+                    binary_image: OnceLock::new(),
+                    character_size: Size::new(7, 16),
+                    baseline: 12,
+                    strikethrough: DecorationDimensions {
+                        offset: 8,
+                        height: 1,
+                    },
+                    underline: DecorationDimensions {
+                        offset: 13,
+                        height: 1,
+                    },
+                };
+                static FONT: OnceLock<MonoFont<'static>> = OnceLock::new();
+                FONT.get_or_init(|| DECL.load())
+            }
+            Self::SmallerBodyText => {
+                static DECL: FontDecl = FontDecl {
+                    png_data: include_bytes!("text/font-body-text-6x14.png"),
+                    png_path: "text/body-text-fot.png",
+                    binary_image: OnceLock::new(),
+                    character_size: Size::new(6, 14),
+                    baseline: 10,
+                    strikethrough: DecorationDimensions {
+                        offset: 7,
+                        height: 1,
+                    },
+                    underline: DecorationDimensions {
+                        offset: 12,
+                        height: 1,
+                    },
+                };
+                static FONT: OnceLock<MonoFont<'static>> = OnceLock::new();
+                FONT.get_or_init(|| DECL.load())
+            }
+        }
+    }
+}
+
+/// Data structure defining the data of a font, that can go in a `static`.
+struct FontDecl {
+    png_data: &'static [u8],
+    png_path: &'static str,
+    binary_image: OnceLock<Box<[u8]>>,
+    character_size: Size,
+    baseline: u32,
+    strikethrough: DecorationDimensions,
+    underline: DecorationDimensions,
+}
+impl FontDecl {
+    fn load(&'static self) -> MonoFont<'static> {
+        const GLYPHS_PER_ROW: u32 = 16;
+
+        let Self {
+            png_data,
+            png_path,
+            ref binary_image,
+            character_size,
+            baseline,
+            strikethrough,
+            underline,
+        } = *self;
+
+        let binary_image = binary_image.get_or_init(|| {
+            let decoded_png =
+                crate::content::load_image::DecodedPng::decode_static(png_data, png_path);
+            assert_eq!(
+                decoded_png.size().width,
+                character_size.width * GLYPHS_PER_ROW
+            );
+            pack_into_binary_color_image_data(decoded_png.pixels())
+        });
+
+        MonoFont {
+            glyph_mapping: &RemapTo8859_1(&embedded_graphics::mono_font::mapping::ISO_8859_1),
+            image: embedded_graphics::image::ImageRaw::new(
+                binary_image,
+                self.character_size.width * GLYPHS_PER_ROW,
+            ),
+            character_size,
+            character_spacing: 0,
+            baseline,
+            strikethrough,
+            underline,
         }
     }
 }
@@ -876,6 +954,19 @@ impl GlyphMapping for RemapTo8859_1<'_> {
             c => c,
         })
     }
+}
+
+fn pack_into_binary_color_image_data(rgba_data: &[[u8; 4]]) -> Box<[u8]> {
+    Box::<[u8]>::from_iter(
+        // pack into 1 bit per pixel
+        rgba_data.chunks(8).map(|chunk| {
+            let mut byte = 0u8;
+            for &[r, _, _, a] in chunk {
+                byte = byte << 1 | u8::from(r > 0 && a > 0);
+            }
+            byte
+        }),
+    )
 }
 
 // No `mod tests`; tests are located in the `test-aic` package.

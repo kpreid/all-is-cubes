@@ -380,14 +380,14 @@ mod tests {
         let text = "abc";
         let widget = LargeText {
             text: text.into(),
-            font: Font::Logo,
+            font: Font::System16,
             brush: VoxelBrush::single(block::from_color!(Rgba::WHITE)),
             text_style: TextStyle::default(),
         };
         assert_eq!(
             widget.requirements(),
             LayoutRequest {
-                minimum: size3(9 * GridSizeCoord::try_from(text.len()).unwrap(), 15, 1)
+                minimum: size3(7 * GridSizeCoord::try_from(text.len()).unwrap(), 16, 1)
             }
         );
     }

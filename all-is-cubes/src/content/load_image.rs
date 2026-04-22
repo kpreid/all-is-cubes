@@ -24,6 +24,7 @@ use crate::universe::{ReadTicket, UniverseTransaction};
 
 // -------------------------------------------------------------------------------------------------
 
+/// Result of [`include_image!`].
 // TODO: better name
 #[doc(hidden)]
 #[derive(Clone, Debug, PartialEq)]
@@ -49,6 +50,36 @@ pub struct PngAdapter<'a> {
 // -------------------------------------------------------------------------------------------------
 
 impl DecodedPng {
+    /// Decode data in PNG format.
+    ///
+    /// This function is intended to be used with embedded assets, in a pattern like:
+    ///
+    /// ```
+    /// # use all_is_cubes::content::load_image::DecodedPng;
+    /// # drop(
+    /// DecodedPng::decode_static(include_bytes!("load_image_test.png"), "load_image_test.png")
+    /// # );
+    /// ```
+    ///
+    /// Ordinarily, you should use [`include_image!`] instead of this function, which provides
+    /// lazy loading (memoization of decoding).
+    /// This function is provided for cases where built-in memoization is unwanted, such as if
+    /// further work is going to be done and the image discarded.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the data is not a valid PNG.
+    #[track_caller]
+    pub fn decode_static(png_data: &'static [u8], path: &'static str) -> Self {
+        match png_decoder::decode(png_data) {
+            Ok((header, data)) => DecodedPng {
+                header,
+                rgba_image_data: data,
+            },
+            Err(error) => panic!("Error loading image asset {path:?}: {error:?}"),
+        }
+    }
+
     pub fn size(&self) -> ImageSize {
         size2(self.header.width, self.header.height)
     }
@@ -287,17 +318,10 @@ impl LazyImage {
 
 impl core::ops::Deref for LazyImage {
     type Target = DecodedPng;
+    #[track_caller] // attribute decoding error to the lazy site
     fn deref(&self) -> &Self::Target {
-        self.decoded_data.get_or_init(|| match png_decoder::decode(self.encoded_data) {
-            Ok((header, data)) => DecodedPng {
-                header,
-                rgba_image_data: data,
-            },
-            Err(error) => panic!(
-                "Error loading image asset {path:?}: {error:?}",
-                path = self.path()
-            ),
-        })
+        self.decoded_data
+            .get_or_init(|| DecodedPng::decode_static(self.encoded_data, self.path))
     }
 }
 

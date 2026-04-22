@@ -199,7 +199,7 @@ impl Tooltip {
             text_builder: text::Text::builder()
                 .foreground(Block::from(palette::HUD_TEXT_FILL))
                 .outline(Some(Block::from(palette::HUD_TEXT_STROKE)))
-                .font(text::Font::System16)
+                .font(text::Font::SmallerBodyText)
                 .positioning(text::Positioning {
                     x: text::PositioningX::Center,
                     line_y: text::PositioningY::BodyMiddle,
@@ -279,8 +279,8 @@ impl WidgetController for TooltipController {
             .text_builder
             .clone()
             .layout_bounds(
-                block::Resolution::R16,
-                grant.bounds.translate(-grant.bounds.lower_bounds().to_vector()).multiply(16),
+                block::Resolution::R32,
+                grant.bounds.translate(-grant.bounds.lower_bounds().to_vector()).multiply(32),
             )
             .string(new_contents.string().clone())
             .build();

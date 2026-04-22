@@ -104,7 +104,7 @@ fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usiz
     let text_block = Block::from(block::Primitive::Text {
         text: text::Text::builder()
             .string(label)
-            .font(text::Font::Logo) // legacy compatibility choice
+            .font(text::Font::System16)
             .foreground(label_voxel)
             .positioning(text::Positioning {
                 x: text::PositioningX::Center,
@@ -120,7 +120,9 @@ fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usiz
                             // are laid out in an even width of ink, and by nudging it
                             // positiveward the result is balanced (and preserves old layout
                             // that got the good result by a wrong path).
-                            .with(Face::NX, 1),
+                            .with(Face::NX, 1)
+                            // nudge upward a bit for balance
+                            .with(Face::NY, 1),
                     )
                     .unwrap(),
             )

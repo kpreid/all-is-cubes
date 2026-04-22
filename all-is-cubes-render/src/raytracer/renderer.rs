@@ -659,7 +659,7 @@ mod eg {
     use embedded_graphics::Drawable;
     use embedded_graphics::Pixel;
     use embedded_graphics::draw_target::DrawTarget;
-    use embedded_graphics::mono_font::{MonoTextStyle, iso_8859_1::FONT_7X13_BOLD};
+    use embedded_graphics::mono_font::MonoTextStyle;
     use embedded_graphics::pixelcolor::BinaryColor;
     use embedded_graphics::prelude::{
         DrawTargetExt as _, OriginDimensions, PixelColor, Point, Size,
@@ -702,7 +702,10 @@ mod eg {
         Text::with_baseline(
             text,
             Point::new(5, 5),
-            MonoTextStyle::new(&FONT_7X13_BOLD, color_value),
+            MonoTextStyle::new(
+                all_is_cubes::block::text::Font::System16.eg_font(),
+                color_value,
+            ),
             Baseline::Top,
         )
     }

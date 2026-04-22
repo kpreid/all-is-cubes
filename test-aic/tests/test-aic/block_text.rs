@@ -82,26 +82,29 @@ fn single_line_text_smoke_test() {
     );
     assert_eq!(
         ev.voxels().bounds(),
-        GridAab::from_lower_size([0, 0, 0], [16, 13, 1])
+        GridAab::from_lower_size([0, 0, 0], [7 * 2, 16, 1])
     );
     assert_eq!(ev.voxels().bounds(), text.bounding_voxels());
 
     assert_eq!(
         plane_to_text(ev.voxels().as_vol_ref()),
         vec![
-            "................",
-            "........##......",
-            "........##......",
-            "........##......",
-            ".#####..##.###..",
-            ".....##.###..##.",
-            ".######.##...##.",
-            "##...##.##...##.",
-            "##...##.##...##.",
-            "##..###.###..##.",
-            ".###.##.##.###..",
-            "................",
-            "................",
+            "..............",
+            "..............",
+            "..............",
+            ".......##.....",
+            ".......##.....",
+            ".......##.....",
+            "..##...####...",
+            ".####..#####..",
+            "##..##.##..##.",
+            "##..##.##..##.",
+            "##..##.##..##.",
+            ".#####.#####..",
+            "..##.#.#.##...",
+            "..............",
+            "..............",
+            "..............",
         ]
     )
 }
@@ -111,7 +114,7 @@ fn multiple_line() {
     let (universe, block) = single_block_test_case(
         Text::builder()
             .resolution(Resolution::R32)
-            .string(literal!("abcd\nabcd"))
+            .string(literal!("abcd\nefgh"))
             .font(Font::System16)
             .positioning(Positioning {
                 x: PositioningX::Left,
@@ -124,32 +127,38 @@ fn multiple_line() {
     assert_eq!(
         plane_to_text(block.evaluate(universe.read_ticket()).unwrap().voxels().as_vol_ref()),
         vec![
-            "................................",
-            "........##...................##.",
-            "........##...................##.",
-            "........##...................##.",
-            ".#####..##.###...#####...###.##.",
-            ".....##.###..##.###..##.##..###.",
-            ".######.##...##.##......##...##.",
-            "##...##.##...##.##......##...##.",
-            "##...##.##...##.##......##...##.",
-            "##..###.###..##.###..##.##..###.",
-            ".###.##.##.###...#####...###.##.",
-            "................................",
-            "................................",
-            "................................",
-            "........##...................##.",
-            "........##...................##.",
-            "........##...................##.",
-            ".#####..##.###...#####...###.##.",
-            ".....##.###..##.###..##.##..###.",
-            ".######.##...##.##......##...##.",
-            "##...##.##...##.##......##...##.",
-            "##...##.##...##.##......##...##.",
-            "##..###.###..##.###..##.##..###.",
-            ".###.##.##.###...#####...###.##.",
-            "................................",
-            "................................",
+            "............................",
+            "............................",
+            "............................",
+            ".......##................##.",
+            ".......##................##.",
+            ".......##................##.",
+            "..##...####.....##.....####.",
+            ".####..#####...####...#####.",
+            "##..##.##..##.##..##.##..##.",
+            "##..##.##..##.##.....##..##.",
+            "##..##.##..##.##..##.##..##.",
+            ".#####.#####...####...#####.",
+            "..##.#.#.##.....##.....##.#.",
+            "............................",
+            "............................",
+            "............................",
+            "............................",
+            "............................",
+            "...........##...............",
+            "..........###........##.....",
+            ".........##..........##.....",
+            ".........##..........##.....",
+            "..##...######...##.#.####...",
+            ".####..######..#####.#####..",
+            "##..##...##...##..##.##..##.",
+            "#####....##...##..##.##..##.",
+            "##.......##...##..##.##..##.",
+            ".####....##....#####.##..##.",
+            "..##.....##.....####.##..##.",
+            "..............#...##........",
+            "..............##..##........",
+            "...............####.........",
         ]
     )
 }
@@ -173,7 +182,7 @@ fn bounding_voxels_of_positioning_high() {
     // The lower corner might change when we change the system font metrics.
     assert_eq!(
         text.bounding_voxels(),
-        GridAab::from_lower_upper([8, 19, 31], [32, 32, 32])
+        GridAab::from_lower_upper([11, 16, 31], [32, 32, 32])
     );
 }
 
@@ -183,26 +192,23 @@ fn bounding_voxels_of_positioning_high() {
 ///
 /// Note that for odd&even cases, we primarily care about the choice of “round down” vs.
 /// “round up” options in that they shouldn’t *change without notice*.
-///
-/// * If `odd_font` is true, the string is 27 voxels wide. If false, 48 voxels wide.
-/// * If `odd_bounds` is true, the `layout_bounds` is 15 voxels wide. false, 16 voxels.
 #[rstest::rstest]
-#[case(PositioningX::Left, false, 0..16, 0..48)]
-#[case(PositioningX::Right, false, 0..16, -32..16)]
-#[case(PositioningX::Center, false, 0..16, -16..32)]
-#[case(PositioningX::Center, true, 0..16, -6..21)]
-#[case(PositioningX::Center, false, 0..15, -16..32)]
-#[case(PositioningX::Center, true, 0..15, -6..21)]
-#[case(PositioningX::Center, false, 1..16, -15..33)]
-#[case(PositioningX::Center, true, 1..16, -5..22)]
+#[case(PositioningX::Left, false, 0..16, 0..36)]
+#[case(PositioningX::Right, false, 0..16, -20..16)]
+#[case(PositioningX::Center, false, 0..16, -10..26)]
+#[case(PositioningX::Center, true, 0..16, -3..18)]
+#[case(PositioningX::Center, false, 0..15, -10..26)]
+#[case(PositioningX::Center, true, 0..15, -3..18)]
+#[case(PositioningX::Center, false, 1..16, -9..27)]
+#[case(PositioningX::Center, true, 1..16, -2..19)]
 fn positioning_x(
     #[case] pos: PositioningX,
-    #[case] odd_font: bool,
+    #[case] odd_character_width: bool,
     #[case] bounds_range: core::ops::Range<i32>,
     #[case] expected: core::ops::Range<i32>,
 ) {
     let text = Text::builder()
-        .string(if odd_font {
+        .string(if odd_character_width {
             // must have an odd number of characters
             literal!("abc")
         } else {
@@ -210,7 +216,11 @@ fn positioning_x(
         })
         // TODO: when we have custom fonts, use custom fonts instead of depending on properties
         // of fonts with other intents.
-        .font(if odd_font { Font::Logo } else { Font::System16 })
+        .font(if odd_character_width {
+            Font::System16 // 7 wide
+        } else {
+            Font::SmallerBodyText // 6 wide
+        })
         .layout_bounds(
             Resolution::R16,
             GridAab::from_ranges([bounds_range, 0..16, 0..16]),

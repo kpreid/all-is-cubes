@@ -46,6 +46,6 @@ mod tests {
 
     #[test]
     fn logo_extent_as_expected() {
-        assert_eq!(logo_text().requirements().minimum, size3(110, 17, 2));
+        assert_eq!(logo_text().requirements().minimum, size3(86, 18, 2));
     }
 }
