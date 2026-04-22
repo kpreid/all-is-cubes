@@ -16,14 +16,15 @@ use core::sync::atomic;
 
 use bevy_ecs::prelude as ecs;
 // Note: If depending on bevy_platform becomes undesirable, then in general, a spinlock suffices;
-// this mutex is never held for a long time. We only require that it is always `Sync`.
+// the mutex is never held for a long time, and the OnceLock is never `get_or_init()`ed.
+// We only require that they are always `Sync`.
 #[cfg_attr(not(feature = "save"), allow(unused_imports))]
-use bevy_platform::sync::{Mutex, MutexGuard};
+use bevy_platform::sync::{Mutex, MutexGuard, OnceLock};
 
 use crate::universe::{
     self, AnyHandle, InsertError, InsertErrorKind, MemberBoilerplate, Membership, Name, ReadTicket,
     ReadTicketError, SealedMember, Universe, UniverseId, UniverseMember, VisitHandles,
-    id::OnceUniverseId, name::OnceName,
+    id::OnceUniverseId,
 };
 
 #[cfg(doc)]
@@ -72,7 +73,7 @@ struct Inner {
     ///
     /// This field is interior mutable and can be written only once,
     /// which happens either at construction time or when this handle is inserted into a universe.
-    permanent_name: OnceName,
+    permanent_name: OnceLock<Name>,
 
     /// Number of [`StrongHandle`]s that exist.
     strong_handle_count: atomic::AtomicUsize,
@@ -131,7 +132,10 @@ impl<T: 'static> Handle<T> {
         Handle {
             inner: Arc::new(Inner {
                 universe_id: OnceUniverseId::new(),
-                permanent_name: OnceName::from_optional_value(permanent_name),
+                permanent_name: match permanent_name {
+                    Some(n) => OnceLock::from(n),
+                    None => OnceLock::new(),
+                },
                 state: Mutex::new(state),
                 strong_handle_count: atomic::AtomicUsize::new(0),
             }),

@@ -63,7 +63,6 @@ std = [
     "all-is-cubes-base/std",
     "arcstr/std", # not required but nicer behavior
     "bevy_platform/std", # selects use of blocking locks instead of spinlocks
-    "once_cell/std", # used conditionally as more efficient than once_cell::race
     "nosy/std-sync", # selects use of blocking locks instead of spinlocks
     "yield-progress/sync",
 ]
@@ -146,7 +145,6 @@ manyfmt = { workspace = true }
 mutants = { workspace = true }
 nosy = { workspace = true, features = ["async", "spin-sync"] }
 num-traits = { workspace = true }
-once_cell = { workspace = true, features = ["alloc", "race"] }
 ordered-float = { workspace = true }
 paste = { workspace = true }
 png-decoder = { workspace = true }

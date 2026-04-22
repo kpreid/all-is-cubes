@@ -1,5 +1,3 @@
-#[cfg(not(feature = "std"))]
-use alloc::boxed::Box;
 use alloc::string::String;
 use core::fmt;
 
@@ -109,46 +107,6 @@ mod impl_arbitrary {
             depth: usize,
         ) -> arbitrary::Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
             ArbName::try_size_hint(depth)
-        }
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-pub(in crate::universe) type OnceName = MbOnceLock<Name>;
-
-/// As `std::sync::OnceLock`, but implemented using `once_cell::race::OnceBox` if necessary.
-/// Implemented generically because it might be useful for more things later.
-#[derive(Debug)]
-pub(in crate::universe) struct MbOnceLock<T>(
-    #[cfg(feature = "std")] std::sync::OnceLock<T>,
-    #[cfg(not(feature = "std"))] once_cell::race::OnceBox<T>, // OnceBox has extra boxing, so only use it if necessary
-);
-
-impl<T> MbOnceLock<T> {
-    pub fn new() -> Self {
-        Self(Default::default())
-    }
-
-    pub fn get(&self) -> Option<&T> {
-        self.0.get()
-    }
-
-    pub fn set(&self, value: T) -> Result<(), T> {
-        cfg_select! {
-            feature = "std" => self.0.set(value),
-            _ => self.0.set(Box::new(value)).map_err(|boxed| *boxed),
-        }
-    }
-
-    pub fn from_optional_value(option: Option<T>) -> Self {
-        match option {
-            Some(value) => Self(cfg_select! {
-                feature = "std" => std::sync::OnceLock::from(value),
-                _ => once_cell::race::OnceBox::with_value(Box::new(value)),
-            }),
-
-            None => Self::new(),
         }
     }
 }
