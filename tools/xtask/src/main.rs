@@ -657,6 +657,7 @@ fn do_for_all_packages(
                         .arg(op.non_build_check_subcmd())
                         .args([
                             "--package=all-is-cubes",
+                            "--package=all-is-cubes-content",
                             "--package=all-is-cubes-mesh",
                             "--package=all-is-cubes-render",
                             "--package=all-is-cubes-ui",
