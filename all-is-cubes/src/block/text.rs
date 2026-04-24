@@ -32,6 +32,8 @@ use crate::block::{Modifier, Primitive};
 
 use super::Evoxels;
 
+// -------------------------------------------------------------------------------------------------
+
 /// A piece of text rendered as voxels.
 ///
 /// Each `Text` contains:
@@ -89,6 +91,8 @@ pub struct TextBuilder {
 
     debug: bool,
 }
+
+// -------------------------------------------------------------------------------------------------
 
 impl Text {
     /// Returns a [`TextBuilder`] which may be used to construct a [`Text`] value with explicit
@@ -600,6 +604,8 @@ impl Default for TextBuilder {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// A font that may be used with [`Text`] blocks.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -668,55 +674,6 @@ impl Font {
     }
 }
 
-/// Data structure defining the data of a font, that can go in a `static`.
-struct FontDecl {
-    png_data: &'static [u8],
-    png_path: &'static str,
-    binary_image: OnceLock<Box<[u8]>>,
-    character_size: Size,
-    baseline: u32,
-    strikethrough: DecorationDimensions,
-    underline: DecorationDimensions,
-}
-impl FontDecl {
-    fn load(&'static self) -> MonoFont<'static> {
-        const GLYPHS_PER_ROW: u32 = 16;
-
-        let Self {
-            png_data,
-            png_path,
-            ref binary_image,
-            character_size,
-            baseline,
-            strikethrough,
-            underline,
-        } = *self;
-
-        let binary_image = binary_image.get_or_init(|| {
-            let decoded_png =
-                crate::content::load_image::DecodedPng::decode_static(png_data, png_path);
-            assert_eq!(
-                decoded_png.size().width,
-                character_size.width * GLYPHS_PER_ROW
-            );
-            pack_into_binary_color_image_data(decoded_png.pixels())
-        });
-
-        MonoFont {
-            glyph_mapping: &RemapTo8859_1(&embedded_graphics::mono_font::mapping::ISO_8859_1),
-            image: embedded_graphics::image::ImageRaw::new(
-                binary_image,
-                self.character_size.width * GLYPHS_PER_ROW,
-            ),
-            character_size,
-            character_spacing: 0,
-            baseline,
-            strikethrough,
-            underline,
-        }
-    }
-}
-
 impl universe::VisitHandles for Font {
     fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
         match self {
@@ -724,6 +681,8 @@ impl universe::VisitHandles for Font {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// How a [`Text`] is to be positioned within a block.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -817,6 +776,17 @@ pub enum PositioningZ {
     Front,
 }
 
+impl Positioning {
+    #[doc(hidden)] // not sure if good idea
+    pub const LOW: Self = Positioning {
+        x: PositioningX::Left,
+        line_y: PositioningY::BodyBottom,
+        z: PositioningZ::Back,
+    };
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(feature = "save")]
 mod serialization {
     use crate::block::text;
@@ -873,14 +843,7 @@ mod serialization {
     }
 }
 
-impl Positioning {
-    #[doc(hidden)] // not sure if good idea
-    pub const LOW: Self = Positioning {
-        x: PositioningX::Left,
-        line_y: PositioningY::BodyBottom,
-        z: PositioningZ::Back,
-    };
-}
+// -------------------------------------------------------------------------------------------------
 
 const DEBUG_NO_INTERSECTION_VOXEL: Evoxel = Evoxel {
     color: rgba_const!(1.0, 0.0, 0.0, 0.5),
@@ -901,6 +864,8 @@ pub(crate) enum Brush {
     Plain(Evoxel),
     Outline { foreground: Evoxel, outline: Evoxel },
 }
+
+// -------------------------------------------------------------------------------------------------
 
 impl Brush {
     fn expand(&self, aab: GridAab) -> GridAab {
@@ -942,6 +907,60 @@ impl Brush {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
+/// Data structure defining a font, that can go in a `static` even though we’re
+/// not using static data compatible with [`embedded_graphics::image::ImageRaw`].
+struct FontDecl {
+    png_data: &'static [u8],
+    png_path: &'static str,
+    binary_image: OnceLock<Box<[u8]>>,
+    character_size: Size,
+    baseline: u32,
+    strikethrough: DecorationDimensions,
+    underline: DecorationDimensions,
+}
+impl FontDecl {
+    fn load(&'static self) -> MonoFont<'static> {
+        const GLYPHS_PER_ROW: u32 = 16;
+
+        let Self {
+            png_data,
+            png_path,
+            ref binary_image,
+            character_size,
+            baseline,
+            strikethrough,
+            underline,
+        } = *self;
+
+        let binary_image = binary_image.get_or_init(|| {
+            let decoded_png =
+                crate::content::load_image::DecodedPng::decode_static(png_data, png_path);
+            assert_eq!(
+                decoded_png.size().width,
+                character_size.width * GLYPHS_PER_ROW
+            );
+            pack_into_binary_color_image_data(decoded_png.pixels())
+        });
+
+        MonoFont {
+            glyph_mapping: &RemapTo8859_1(&embedded_graphics::mono_font::mapping::ISO_8859_1),
+            image: embedded_graphics::image::ImageRaw::new(
+                binary_image,
+                self.character_size.width * GLYPHS_PER_ROW,
+            ),
+            character_size,
+            character_spacing: 0,
+            baseline,
+            strikethrough,
+            underline,
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 // Kludge to pretend to have slightly greater character coverage than the fonts actually do:
 // remap selected Unicode characters to the `iso_8859_1` subset.
 struct RemapTo8859_1<'a>(&'a dyn GlyphMapping);
@@ -956,6 +975,8 @@ impl GlyphMapping for RemapTo8859_1<'_> {
     }
 }
 
+/// Convert image data provided by `png-decoder` into the bit-packed format expected by
+/// `embedded-graphics`.
 fn pack_into_binary_color_image_data(rgba_data: &[[u8; 4]]) -> Box<[u8]> {
     Box::<[u8]>::from_iter(
         // pack into 1 bit per pixel
