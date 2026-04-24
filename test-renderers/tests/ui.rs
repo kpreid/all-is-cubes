@@ -1,18 +1,18 @@
 //! Tests of the visual appearance of [`all_is_cubes_ui`] widgets and pages,
 //! as well as some of the behavior of [`Session`].
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use clap::Parser as _;
 
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::linking::BlockProvider;
-use all_is_cubes::listen;
 use all_is_cubes::math::Face;
 use all_is_cubes::transaction::Transaction as _;
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
+use all_is_cubes::{inv, listen};
 use all_is_cubes::{space, transaction};
 use all_is_cubes_render::Rendering;
 use all_is_cubes_render::camera::Viewport;
@@ -55,9 +55,9 @@ fn ui_render_tests(c: &mut test_renderers::TestCaseCollector<'_>) {
     c.insert("widget_button_toggle", wu.clone(), widget_button_toggle);
     // TODO: test for LayoutDebugFrame widget
     // TODO: test for Frame widget
-    c.insert("widget_progress_bar", wu, widget_progress_bar);
-    // TODO: test for Toolbar widget
-    // TODO: test for Tooltip widget
+    c.insert("widget_progress_bar", wu.clone(), widget_progress_bar);
+    // TODO: test for Toolbar widget in isolation
+    c.insert("widget_tooltip", wu, widget_tooltip);
     // TODO: test for Voxels widget
 }
 
@@ -167,6 +167,17 @@ async fn widget_progress_bar(mut context: RenderTestContext) {
     }
 }
 
+async fn widget_tooltip(mut context: RenderTestContext) {
+    let icons = icons(&context);
+    let state = Arc::new(Mutex::new(widgets::TooltipState::default()));
+    state.lock().unwrap().set_message(literal!("Hello World"));
+    let widget = vui::leaf_widget(widgets::Tooltip::new(state, icons.clone()));
+    context.compare_image(
+        0,
+        render_widget(&context, &widget, vui::Gravity::splat(vui::Align::Center)),
+    );
+}
+
 // --- Test helpers -------------------------------------------------------------------------------
 
 async fn create_session() -> Session {
@@ -186,12 +197,19 @@ async fn create_widget_theme_universe() -> Arc<Universe> {
     widgets::WidgetTheme::new(u.read_ticket(), &mut txn, YieldProgress::noop())
         .await
         .unwrap();
+    inv::Icons::new(&mut txn, YieldProgress::noop())
+        .await
+        .install(u.read_ticket(), &mut txn)
+        .unwrap();
     txn.execute(&mut u, (), &mut transaction::no_outputs).unwrap();
     Arc::from(u)
 }
 
 fn widget_theme(context: &RenderTestContext) -> widgets::WidgetTheme {
     widgets::WidgetTheme::from_provider(BlockProvider::using(context.universe()).unwrap())
+}
+fn icons(context: &RenderTestContext) -> BlockProvider<inv::Icons> {
+    BlockProvider::using(context.universe()).unwrap()
 }
 
 fn advance_time(session: &mut Session) {

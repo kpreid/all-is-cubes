@@ -33,7 +33,7 @@ pub(crate) use toolbar::*;
 #[cfg(feature = "session")]
 mod tooltip;
 #[cfg(feature = "session")]
-pub(crate) use tooltip::*;
+pub use tooltip::*;
 mod voxels;
 pub use voxels::*;
 

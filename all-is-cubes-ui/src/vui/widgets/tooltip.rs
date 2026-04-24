@@ -16,7 +16,8 @@ use all_is_cubes::{inv, universe};
 use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController, widgets};
 
 #[derive(Debug)]
-pub(crate) struct TooltipState {
+#[doc(hidden)] // public for testing only; currently not designed to be general
+pub struct TooltipState {
     /// Character we're reading inventory state from
     character: Option<StrongHandle<Character>>,
     /// Listener gate to stop the listener if we change characters
@@ -175,7 +176,8 @@ impl TooltipContents {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Tooltip {
+#[doc(hidden)] // public for testing only; currently not designed to be general
+pub struct Tooltip {
     width_in_hud: u16,
     icons: BlockProvider<inv::Icons>,
 
@@ -185,7 +187,7 @@ pub(crate) struct Tooltip {
 }
 
 impl Tooltip {
-    pub(crate) fn new(
+    pub fn new(
         state: Arc<Mutex<TooltipState>>,
         // TODO: refactor so that we don't need Icons here (to fetch tool names)
         // <https://github.com/kpreid/all-is-cubes/issues/480>
