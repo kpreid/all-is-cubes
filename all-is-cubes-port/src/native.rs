@@ -10,9 +10,6 @@ use all_is_cubes::util::YieldProgress;
 
 use crate::file::Fileish;
 
-#[cfg(test)]
-mod tests;
-
 #[cfg(feature = "import")]
 pub(crate) fn import_native_json(
     progress: YieldProgress,

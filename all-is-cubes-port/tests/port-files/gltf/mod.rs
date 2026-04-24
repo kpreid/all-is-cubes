@@ -1,0 +1,197 @@
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use gltf_json::Index;
+use gltf_json::texture::MinFilter;
+use gltf_json::validation::Validate;
+
+use all_is_cubes::block::{AIR, Block, BlockDef, Resolution};
+use all_is_cubes::character::Character;
+use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
+use all_is_cubes::math::GridAab;
+use all_is_cubes::space::Space;
+use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe};
+use all_is_cubes::util::yield_progress_for_testing;
+use all_is_cubes_mesh::{MeshOptions, SpaceMesh, block_meshes_for_space};
+use all_is_cubes_render::camera::GraphicsOptions;
+
+use port::gltf::{GltfDataDestination, GltfMt, GltfWriter, MeshInstance};
+use port::{ExportError, ExportSet, Format};
+
+/// Test helper to insert one mesh
+fn gltf_mesh(
+    space: &Space,
+    writer: &mut GltfWriter,
+) -> (SpaceMesh<GltfMt>, Option<Index<gltf_json::Mesh>>) {
+    let space = &space.read();
+    let options = &MeshOptions::new(&GraphicsOptions::default());
+    let blocks = block_meshes_for_space(space, &writer.texture_allocator(), options);
+    let mesh: SpaceMesh<GltfMt> = SpaceMesh::new(space, space.bounds(), options, &*blocks);
+
+    let index = writer.add_mesh(&"mesh", &mesh);
+
+    (mesh, index)
+}
+
+#[test]
+fn gltf_smoke_test() {
+    // Construct recursive block.
+    let resolution = Resolution::R4;
+    let mut u = Universe::new();
+    let mut blocks = Vec::from(make_some_blocks::<2>());
+    blocks.push(AIR);
+    let recursive_block = Block::builder()
+        .voxels_fn(resolution, |p| {
+            &blocks[(p.x as usize).rem_euclid(blocks.len())]
+        })
+        .unwrap()
+        .build_into(&mut u);
+    let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
+        .read_ticket(u.read_ticket())
+        .filled_with(recursive_block)
+        .build();
+
+    let mut writer = GltfWriter::new(GltfDataDestination::null(), MinFilter::Linear);
+    let (_, mesh_index) = gltf_mesh(&outer_space, &mut writer);
+    let mesh_index = mesh_index.unwrap();
+    writer.add_frame(
+        None,
+        &[MeshInstance {
+            mesh: mesh_index,
+            translation: [0, 0, 0],
+        }],
+    );
+
+    let root = writer.into_root(Duration::ZERO).unwrap();
+
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&root).expect("serialization failed")
+    );
+
+    // TODO: better way to call validate()?
+    root.validate(&root, gltf_json::Path::new, &mut |pf, error| {
+        panic!("{path} {error}", path = pf())
+    });
+}
+
+/// Runs a snapshot test case: export glTF to a file and assert the file contents are identical
+/// to an expected file.
+async fn export_snapshot_test(
+    test_name: &'static str,
+    read_ticket: ReadTicket<'_>,
+    export_set: ExportSet,
+) {
+    let destination_dir = tempfile::tempdir().unwrap();
+    let destination: PathBuf = destination_dir.path().join(format!("{test_name}.gltf"));
+
+    port::export_to_path(
+        yield_progress_for_testing(),
+        read_ticket,
+        Format::Gltf,
+        &{
+            let mut options = port::ExportOptions::default();
+            // Use separate files so that e.g. the PNG can be inspected easily.
+            options.gltf_maximum_inline_bytes = Some(0);
+            options
+        },
+        export_set,
+        PathBuf::from(&destination),
+    )
+    .await
+    .unwrap();
+
+    snapbox::Assert::new().action_env("AICSNAP").subset_eq(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/port-files/gltf/")
+            .join(test_name),
+        destination_dir.path(),
+    );
+}
+
+#[macro_rules_attribute::apply(smol_macros::test)]
+async fn export_block_defs() {
+    let mut universe = Universe::new();
+    let blocks1: [Block; 2] = make_some_blocks();
+    let blocks2: [Block; 2] = make_some_voxel_blocks(&mut universe);
+    let block_defs: Vec<Handle<BlockDef>> = blocks1
+        .into_iter()
+        .chain(blocks2)
+        .enumerate()
+        .map(|(i, block)| {
+            // TODO: should be able to construct `Name` better here
+            universe
+                .insert(
+                    Name::from(format!("block{i}")),
+                    BlockDef::new(universe.read_ticket(), block),
+                )
+                .unwrap()
+        })
+        .collect();
+
+    export_snapshot_test(
+        "export_block_defs",
+        universe.read_ticket(),
+        ExportSet::from_block_defs(block_defs),
+    )
+    .await;
+}
+
+#[macro_rules_attribute::apply(smol_macros::test)]
+async fn export_space() {
+    // TODO: Add make_some_voxel_blocks() so that this test exercises both
+    // textured and untextured blocks occurring in the same chunk mesh.
+
+    let [block] = make_some_blocks();
+    let mut universe = Universe::new();
+    universe
+        .insert(
+            "x".into(),
+            // nonzero lower bounds to validate the positioning.
+            Space::builder(GridAab::from_lower_size([10, -5, 0], [1, 1, 1]))
+                .read_ticket(universe.read_ticket())
+                .filled_with(block)
+                .build(),
+        )
+        .unwrap();
+
+    export_snapshot_test(
+        "export_space",
+        universe.read_ticket(),
+        ExportSet::all_of_universe(&universe),
+    )
+    .await;
+}
+
+#[macro_rules_attribute::apply(smol_macros::test)]
+async fn export_character_not_supported() {
+    let mut universe = Universe::new();
+    let space = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+    universe
+        .insert(
+            "x".into(),
+            Character::spawn_default(universe.read_ticket(), space).unwrap(),
+        )
+        .unwrap();
+
+    let destination_dir = tempfile::tempdir().unwrap();
+    let destination: PathBuf = destination_dir.path().join("foo.gltf");
+
+    let error = port::export_to_path(
+        yield_progress_for_testing(),
+        universe.read_ticket(),
+        Format::Gltf,
+        &port::ExportOptions::default(),
+        ExportSet::all_of_universe(&universe),
+        destination,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        ExportError::MemberTypeNotRepresentable {
+            name,
+            ..
+        }
+     if name == "x".into()));
+}

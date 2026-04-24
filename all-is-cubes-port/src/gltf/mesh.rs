@@ -425,12 +425,29 @@ impl MaterialKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gltf::{GltfDataDestination, tests::gltf_mesh};
+    use crate::gltf::{GltfDataDestination, GltfMt};
     use all_is_cubes::block;
     use all_is_cubes::math::GridAab;
     use all_is_cubes::space::Space;
+    use all_is_cubes_mesh as mesh;
     use gltf_json::texture::MinFilter;
     use std::time::Duration;
+
+    /// Test helper to insert one mesh
+    fn gltf_mesh(
+        space: &Space,
+        writer: &mut GltfWriter,
+    ) -> (SpaceMesh<GltfMt>, Option<Index<gltf_json::Mesh>>) {
+        let space = &space.read();
+        let options =
+            &mesh::MeshOptions::new(&all_is_cubes_render::camera::GraphicsOptions::default());
+        let blocks = mesh::block_meshes_for_space(space, &writer.texture_allocator(), options);
+        let mesh: SpaceMesh<GltfMt> = SpaceMesh::new(space, space.bounds(), options, &*blocks);
+
+        let index = writer.add_mesh(&"mesh", &mesh);
+
+        (mesh, index)
+    }
 
     #[test]
     fn no_extra_indices_when_transparent() {

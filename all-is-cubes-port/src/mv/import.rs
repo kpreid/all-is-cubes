@@ -16,6 +16,7 @@ use itertools::izip;
 use crate::mv;
 use crate::mv::error::DotVoxConversionError;
 
+/// Parse a `.vox` file, then convert it to an All is Cubes [`Universe`].
 // TODO: change signature so we can drop the bytes after they are parsed
 pub(crate) async fn load_dot_vox(
     mut progress: YieldProgress,

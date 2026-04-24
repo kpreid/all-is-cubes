@@ -10,20 +10,15 @@ use all_is_cubes::block;
 use all_is_cubes::universe::{Handle, Name};
 use all_is_cubes::util::yield_progress_for_testing;
 
-#[cfg(feature = "import")]
-use crate::load_universe_from_file;
-#[cfg(feature = "export")]
-use crate::{ExportSet, export_to_path};
-
 #[cfg(all(feature = "export", feature = "import"))]
 #[macro_rules_attribute::apply(smol_macros::test)]
 async fn import_export_native_format() {
     let import_path = PathBuf::from(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/src/native/tests/native-test.alliscubesjson"
+        "/tests/port-files/native/native-test.alliscubesjson"
     ));
     let universe =
-        load_universe_from_file(yield_progress_for_testing(), Arc::new(import_path.clone()))
+        port::load_universe_from_file(yield_progress_for_testing(), Arc::new(import_path.clone()))
             .await
             .unwrap();
 
@@ -43,12 +38,12 @@ async fn import_export_native_format() {
     // Export again.
     let destination_dir = tempfile::tempdir().unwrap();
     let destination: PathBuf = destination_dir.path().join("foo.alliscubesjson");
-    export_to_path(
+    port::export_to_path(
         yield_progress_for_testing(),
         universe.read_ticket(),
-        crate::Format::AicJson,
-        &crate::ExportOptions::default(),
-        ExportSet::all_of_universe(&universe),
+        port::Format::AicJson,
+        &port::ExportOptions::default(),
+        port::ExportSet::all_of_universe(&universe),
         destination.clone(),
     )
     .await

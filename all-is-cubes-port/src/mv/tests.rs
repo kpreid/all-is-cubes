@@ -4,15 +4,13 @@ use either::Either;
 use pretty_assertions::assert_eq;
 
 use all_is_cubes::block::{self, Block, BlockDef};
-use all_is_cubes::math::{GridAab, Rgba, rgb_const, rgba_const};
-use all_is_cubes::space::{self, Space};
+use all_is_cubes::math::{GridAab, Rgba};
+use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_render::raytracer::print_space;
 
 use crate::mv::{self, coord};
-#[cfg(feature = "export")]
-use crate::{ExportError, ExportSet};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -30,14 +28,16 @@ fn print_many_transforms() {
     panic!(); // cause output to be displayed
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(all(feature = "export", feature = "import"))]
 async fn roundtrip(
     export_universe: &Universe,
-) -> Result<Box<Universe>, Either<ExportError, mv::DotVoxConversionError>> {
+) -> Result<Box<Universe>, Either<crate::ExportError, mv::DotVoxConversionError>> {
     let data_export = mv::export_to_dot_vox_data(
         yield_progress_for_testing(),
         export_universe.read_ticket(),
-        ExportSet::all_of_universe(export_universe),
+        crate::ExportSet::all_of_universe(export_universe),
     )
     .await
     .map_err(Either::Left)?;
@@ -123,65 +123,6 @@ async fn invalid_file_error() {
     );
 }
 
-#[cfg(feature = "import")]
-#[macro_rules_attribute::apply(smol_macros::test)]
-async fn import_materials() {
-    // This file contains one each of the six material types MagicaVoxel creates, in order.
-    // (It does not contain each of the "media" types.)
-    let universe = mv::load_dot_vox(
-        yield_progress_for_testing(),
-        include_bytes!("tests/materials.vox"),
-    )
-    .await
-    .unwrap();
-    let space: Handle<Space> = universe.get(&"model_0".into()).unwrap();
-    let space: &space::Read<'_> = &space.read(universe.read_ticket()).unwrap();
-    let bounds = GridAab::from_lower_size([0, 0, 0], [6, 1, 1]);
-    assert_eq!(space.bounds(), bounds);
-    let blocks = space
-        .extract::<Vec<Block>, _>(bounds, |e| e.block_data().block().clone())
-        .into_elements();
-
-    assert_eq!(
-        blocks,
-        [
-            // Diffuse
-            Block::builder()
-                .display_name("0")
-                .color(rgba_const!(1.0, 0.0, 0.0, 1.0))
-                .build(),
-            // Metal
-            Block::builder()
-                .display_name("1")
-                .color(rgba_const!(0.0, 1.0, 0.0, 1.0))
-                .build(),
-            // Emit
-            Block::builder()
-                .display_name("2")
-                .color(Rgba::BLACK)
-                .light_emission(rgb_const!(0.0, 0.0, 10.0))
-                .build(),
-            // Glass
-            Block::builder()
-                .display_name("3")
-                .color(rgba_const!(0.0, 1.0, 1.0, 0.5))
-                .build(),
-            // Blend
-            Block::builder()
-                .display_name("4")
-                .color(rgba_const!(1.0, 0.0, 1.0, 0.5))
-                .build(),
-            // Cloud
-            Block::builder()
-                .display_name("5")
-                // TODO: The alpha should be much lower than this, but it is not clear what
-                // the appropriate scaling actually is.
-                .color(rgba_const!(1.0, 1.0, 0.0, 1.0))
-                .build(),
-        ]
-    );
-}
-
 // -------------------------------------------------------------------------------------------------
 // Export-only tests
 
@@ -196,11 +137,11 @@ async fn export_too_large_space() {
     let error = mv::export_to_dot_vox_data(
         yield_progress_for_testing(),
         universe.read_ticket(),
-        ExportSet::from_spaces(vec![space]),
+        crate::ExportSet::from_spaces(vec![space]),
     )
     .await
     .unwrap_err();
-    assert!(matches!(error, ExportError::NotRepresentable { .. }));
+    assert!(matches!(error, crate::ExportError::NotRepresentable { .. }));
 }
 
 /// Test that `export_to_dot_vox_data` accepts BlockDefs.
@@ -220,7 +161,7 @@ async fn export_block_def() {
     let data = mv::export_to_dot_vox_data(
         yield_progress_for_testing(),
         universe.read_ticket(),
-        ExportSet::from_block_defs(vec![block_def]),
+        crate::ExportSet::from_block_defs(vec![block_def]),
     )
     .await
     .unwrap();

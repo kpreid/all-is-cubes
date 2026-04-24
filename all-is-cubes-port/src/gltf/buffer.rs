@@ -43,8 +43,8 @@ struct Inner {
 }
 
 impl GltfDataDestination {
-    #[cfg(test)]
-    pub(crate) fn null() -> GltfDataDestination {
+    /// Creates a [`GltfDataDestination`] that rejects all data.
+    pub fn null() -> GltfDataDestination {
         Self(Arc::new(Inner {
             discard: true,
             maximum_inline_bytes: 0,
