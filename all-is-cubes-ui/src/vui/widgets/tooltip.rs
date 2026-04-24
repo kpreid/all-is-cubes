@@ -247,44 +247,43 @@ impl WidgetController for TooltipController {
         &mut self,
         context: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::StepSuccess, vui::StepError> {
-        // None if no update is needed
-        let new_contents: Option<TooltipContents> =
-            self.definition.state.try_lock().ok().and_then(|mut state| {
-                let contents = &state.current_contents;
-                let contents = if *contents != self.currently_displayed {
-                    Some(contents.clone())
-                } else {
-                    None
-                };
+        {
+            let mut state = self.definition.state.try_lock().unwrap();
+            let contents = &state.current_contents;
+            if *contents != self.currently_displayed {
+                context.request_draw();
+            }
+            state.step(context.tick());
+        }
+        Ok((vui::WidgetTransaction::default(), vui::Then::Step))
+    }
 
-                state.step(context.tick());
+    fn draw(
+        &mut self,
+        context: &vui::WidgetContext<'_, '_>,
+        from_scratch: bool,
+    ) -> vui::WidgetTransaction {
+        let new_contents = self.definition.state.lock().unwrap().current_contents.clone();
+        if new_contents == self.currently_displayed && !from_scratch {
+            return vui::WidgetTransaction::default();
+        }
 
-                contents
-            });
+        let grant = context.grant();
+        let text = self
+            .definition
+            .text_builder
+            .clone()
+            .layout_bounds(
+                block::Resolution::R16,
+                grant.bounds.translate(-grant.bounds.lower_bounds().to_vector()).multiply(16),
+            )
+            .string(new_contents.string().clone())
+            .build();
 
-        let txn = if let Some(new_contents) = new_contents {
-            let grant = context.grant();
-            let text = self
-                .definition
-                .text_builder
-                .clone()
-                .layout_bounds(
-                    block::Resolution::R16,
-                    grant.bounds.translate(-grant.bounds.lower_bounds().to_vector()).multiply(16),
-                )
-                .string(new_contents.string().clone())
-                .build();
-            let txn = widgets::text::draw_text_txn(&text, grant, false);
+        // Remember what we are about to draw so we know we don't need to redraw it.
+        self.currently_displayed = new_contents;
 
-            // Remember what we are about to draw so we know we don't need to redraw it.
-            // TODO: We should do this only if the transaction doesn't fail, but there's no way to express that yet.
-            self.currently_displayed = new_contents;
-
-            txn
-        } else {
-            vui::WidgetTransaction::default()
-        };
-        Ok((txn, vui::Then::Step))
+        widgets::text::draw_text_txn(&text, grant, false)
     }
 }
 
