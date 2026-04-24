@@ -111,9 +111,15 @@ pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     ///
     /// If this is not overridden, it will do nothing.
     ///
-    /// TODO: This is a kludge which should go away soon along with substantial refactoring of
-    /// the UI as a whole.
-    fn synchronize(&mut self, world_read_ticket: ReadTicket<'_>, ui_read_ticket: ReadTicket<'_>) {
+    /// TODO: This is a kludge which should go away soon (or be merged into `step()`)
+    /// along with substantial refactoring of the UI as a whole.
+    fn synchronize(
+        &mut self,
+        context: &WidgetContext<'_, '_>,
+        world_read_ticket: ReadTicket<'_>,
+        ui_read_ticket: ReadTicket<'_>,
+    ) {
+        _ = context;
         _ = world_read_ticket;
         _ = ui_read_ticket;
     }
@@ -173,8 +179,13 @@ impl WidgetController for Box<dyn WidgetController> {
         (**self).initialize(context)
     }
 
-    fn synchronize(&mut self, world_read_ticket: ReadTicket<'_>, ui_read_ticket: ReadTicket<'_>) {
-        (**self).synchronize(world_read_ticket, ui_read_ticket)
+    fn synchronize(
+        &mut self,
+        context: &WidgetContext<'_, '_>,
+        world_read_ticket: ReadTicket<'_>,
+        ui_read_ticket: ReadTicket<'_>,
+    ) {
+        (**self).synchronize(context, world_read_ticket, ui_read_ticket)
     }
 
     fn step(&mut self, context: &WidgetContext<'_, '_>) -> Result<StepSuccess, StepError> {
@@ -205,11 +216,11 @@ impl WidgetBehavior {
     pub(crate) fn installation(
         positioned_widget: Positioned<Arc<dyn Widget>>,
         mut controller: Box<dyn WidgetController>,
-        read_ticket: ReadTicket<'_>,
+        // TODO: unused; revisit this when we have a better story for widget updating/synchronizing
+        _read_ticket: ReadTicket<'_>,
     ) -> Result<SpaceTransaction, InstallVuiError> {
         let draw_requested = AtomicBool::new(false);
         let context = &WidgetContext {
-            read_ticket,
             behavior_context: None,
             grant: &positioned_widget.position,
             draw_requested: &draw_requested,
@@ -223,6 +234,7 @@ impl WidgetBehavior {
                 });
             }
         };
+        // TODO: should we be calling synchronize() now?
         let draw_txn = controller.draw(context, true);
         let full_init_txn =
             init_txn.merge(draw_txn).map_err(|error| InstallVuiError::Conflict {
@@ -265,7 +277,6 @@ impl Behavior<Space> for WidgetBehavior {
         let (txn, then) = {
             let controller = &mut *self.controller.lock().unwrap();
             let widget_context = WidgetContext {
-                read_ticket: context.read_ticket,
                 behavior_context: Some(context),
                 grant: &self.widget.position,
                 draw_requested: &self.draw_requested,
@@ -298,8 +309,6 @@ impl Behavior<Space> for WidgetBehavior {
 #[derive(Debug)]
 pub struct WidgetContext<'ctx, 'read> {
     behavior_context: Option<&'ctx behavior::Context<'ctx, 'read, Space>>,
-    /// [`ReadTicket`] for the universe the widget is UI for, not the one it is in.
-    read_ticket: ReadTicket<'ctx>,
     grant: &'ctx LayoutGrant,
     draw_requested: &'ctx AtomicBool,
 }
@@ -321,11 +330,6 @@ impl<'a> WidgetContext<'a, '_> {
     /// [`Widget::controller()`] was called.
     pub fn grant(&self) -> &'a LayoutGrant {
         self.grant
-    }
-
-    #[allow(dead_code)] // TODO(read_ticket): this may or may not end up being needed
-    pub(crate) fn read_ticket(&self) -> ReadTicket<'a> {
-        self.read_ticket
     }
 
     /// Causes [`WidgetController::draw()`] to be called after the current operation.
@@ -419,11 +423,16 @@ pub(crate) fn synchronize_widgets(
     space: &space::Read<'_>,
 ) {
     for item in space.behaviors().query::<WidgetBehavior>() {
-        item.behavior
-            .controller
-            .lock()
-            .unwrap()
-            .synchronize(world_read_ticket, ui_read_ticket);
+        let context = &WidgetContext {
+            behavior_context: None,
+            grant: &item.behavior.widget.position,
+            draw_requested: &item.behavior.draw_requested,
+        };
+        item.behavior.controller.lock().unwrap().synchronize(
+            context,
+            world_read_ticket,
+            ui_read_ticket,
+        );
     }
 }
 

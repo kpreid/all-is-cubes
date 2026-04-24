@@ -281,7 +281,12 @@ impl WidgetController for ToolbarController {
         Ok(txn)
     }
 
-    fn synchronize(&mut self, world_read_ticket: ReadTicket<'_>, ui_read_ticket: ReadTicket<'_>) {
+    fn synchronize(
+        &mut self,
+        _context: &vui::WidgetContext<'_, '_>,
+        world_read_ticket: ReadTicket<'_>,
+        ui_read_ticket: ReadTicket<'_>,
+    ) {
         let watcher = &mut *self.definition.watcher.lock().unwrap();
         watcher.update(world_read_ticket, ui_read_ticket);
     }
