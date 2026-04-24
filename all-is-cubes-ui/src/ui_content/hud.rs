@@ -59,7 +59,7 @@ pub(super) fn new_hud_page(
         0..TOOLBAR_POSITIONS,
         hud_inputs.cue_channel.clone(),
     );
-    let tooltip = widgets::Tooltip::new(tooltip_state, hud_inputs.hud_blocks.clone());
+    let tooltip = widgets::Tooltip::new(tooltip_state, hud_inputs.hud_blocks.icons.clone());
     let hud_widget_tree: WidgetTree = Arc::new(LayoutTree::Hud {
         crosshair: vui::leaf_widget(widgets::Crosshair::new(
             hud_inputs.hud_blocks.widget_theme.widget_blocks[WidgetBlocks::Crosshair].clone(),

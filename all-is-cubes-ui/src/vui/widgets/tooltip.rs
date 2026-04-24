@@ -7,12 +7,12 @@ use all_is_cubes::block::{self, Block, text};
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::size3;
+use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
 use all_is_cubes::time::{Duration, Tick};
 use all_is_cubes::universe::{ReadTicket, StrongHandle};
 use all_is_cubes::{inv, universe};
 
-use crate::ui_content::hud::HudBlocks;
 use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController, widgets};
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ impl TooltipState {
         &mut self,
         world_read_ticket: ReadTicket<'_>,
         ui_read_ticket: ReadTicket<'_>,
-        hud_blocks: &HudBlocks,
+        icons: &BlockProvider<inv::Icons>,
     ) {
         if self.dirty_inventory {
             self.dirty_inventory = false;
@@ -87,7 +87,7 @@ impl TooltipState {
                     character.selected_slots().get(1).copied().unwrap_or(inv::Ix::MAX);
                 if let Some(tool) = character.inventory().get(selected_slot).cloned() {
                     // TODO: This logic is redundant with what `InventoryWatcher` does and should be replaced with it.
-                    let icon = tool.icon(&hud_blocks.icons);
+                    let icon = tool.icon(icons);
                     let new_text = match icon
                         .evaluate(ui_read_ticket.expect_may_fail())
                         .or_else(|_| icon.evaluate(world_read_ticket.expect_may_fail()))
@@ -177,7 +177,7 @@ impl TooltipContents {
 #[derive(Clone, Debug)]
 pub(crate) struct Tooltip {
     width_in_hud: u16,
-    hud_blocks: Arc<HudBlocks>,
+    icons: BlockProvider<inv::Icons>,
 
     text_builder: text::TextBuilder,
     /// Tracks what we should be displaying and serves as dirty flag.
@@ -187,12 +187,13 @@ pub(crate) struct Tooltip {
 impl Tooltip {
     pub(crate) fn new(
         state: Arc<Mutex<TooltipState>>,
-        // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
-        hud_blocks: Arc<HudBlocks>,
+        // TODO: refactor so that we don't need Icons here (to fetch tool names)
+        // <https://github.com/kpreid/all-is-cubes/issues/480>
+        icons: BlockProvider<inv::Icons>,
     ) -> Arc<Self> {
         Arc::new(Self {
             width_in_hud: 25, // TODO: magic number
-            hud_blocks,
+            icons,
             text_builder: text::Text::builder()
                 .foreground(Block::from(palette::HUD_TEXT_FILL))
                 .outline(Some(Block::from(palette::HUD_TEXT_STROKE)))
@@ -233,11 +234,9 @@ struct TooltipController {
 impl WidgetController for TooltipController {
     fn synchronize(&mut self, world_read_ticket: ReadTicket<'_>, ui_read_ticket: ReadTicket<'_>) {
         match self.definition.state.try_lock().ok() {
-            Some(mut state) => state.synchronize(
-                world_read_ticket,
-                ui_read_ticket,
-                &self.definition.hud_blocks,
-            ),
+            Some(mut state) => {
+                state.synchronize(world_read_ticket, ui_read_ticket, &self.definition.icons)
+            }
             None => {}
         }
     }
@@ -310,18 +309,16 @@ mod tests {
 
         let mut universe = Universe::new();
         let mut install_txn = UniverseTransaction::default();
-        let hud_blocks = &HudBlocks::new(
-            universe.read_ticket(),
-            &mut install_txn,
-            yield_progress_for_testing(),
-        )
-        .await;
+        let icons = inv::Icons::new(&mut install_txn, yield_progress_for_testing())
+            .await
+            .install(universe.read_ticket(), &mut install_txn)
+            .unwrap();
         install_txn.execute(&mut universe, (), &mut transaction::no_outputs).unwrap();
 
         // Initial state: no update.
         let mut t = TooltipState::default();
         t.step(Tick::from_seconds(0.5));
-        t.synchronize(universe.read_ticket(), universe.read_ticket(), hud_blocks);
+        t.synchronize(universe.read_ticket(), universe.read_ticket(), &icons);
         assert_eq!(t.current_contents, TooltipContents::JustStartedExisting);
         assert_eq!(t.age, None);
 
@@ -329,7 +326,7 @@ mod tests {
         t.set_message("Hello world".into());
         assert_eq!(t.age, Some(Duration::ZERO));
         t.step(Tick::from_seconds(0.5));
-        t.synchronize(universe.read_ticket(), universe.read_ticket(), hud_blocks);
+        t.synchronize(universe.read_ticket(), universe.read_ticket(), &icons);
         assert_eq!(
             t.current_contents,
             TooltipContents::Message(literal!("Hello world"))
