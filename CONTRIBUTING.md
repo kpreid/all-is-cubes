@@ -36,6 +36,24 @@ Code style
     Code should panic, or return errors, rather than allowing invariants to be broken
     or misinterpreting input.
 
+    *   In particular, to avoid accidentally creating such bugs, the `as` cast operator should be
+        avoided, due to its silent truncation of numbers and its many possible behaviors depending
+        on the type.
+        Instead:
+
+        1.  Type coercions (such as to `dyn` types) should be expressed by constraining types
+            using type annotations on `let` or explicit generic parameters on functions.
+        2.  Conversions from numeric types to larger numeric types should be expressed using
+            `from()` or `into()`.
+
+        Cases where `as` may ve used:
+
+        *   `as` may be used for converting between integer and floating-point types.
+            The resulting rounding and saturating behavior should be taken into account.
+        *   `as` may be used for truncating numeric conversions in cases where the truncated result
+            either cannot occur, or would produce a correct final due to what the code does next.
+            Such usages should be accompanied by comments explaining why they are correct.
+
 *   Panics due to user input are considered bugs.
     That is, library code should be designed to be usable even when aborting is unacceptable and
     `catch_unwind()` is unavailable.
