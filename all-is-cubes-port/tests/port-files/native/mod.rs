@@ -1,7 +1,3 @@
-#![cfg_attr(
-    not(all(feature = "import", feature = "export")),
-    allow(unused_imports)
-)]
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;

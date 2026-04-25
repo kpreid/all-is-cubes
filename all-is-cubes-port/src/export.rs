@@ -93,10 +93,12 @@ pub fn export_to_path(
             // TODO: distinguish between disabled and unsupported
             // (not currently necessary because we have no import-only formats)
             _ => {
-                _ = destination;
+                // suppress unused warnings in case no format is enabled
                 _ = progress;
                 _ = read_ticket;
+                _ = options;
                 _ = source;
+                _ = destination;
 
                 Box::pin(ready(Err(ExportError::FormatDisabled { format })))
             }
