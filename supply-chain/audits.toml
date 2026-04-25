@@ -257,6 +257,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
 delta = "0.25.0 -> 0.26.1"
 
+[[audits.rustls-webpki]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-run"
+delta = "0.103.12 -> 0.103.13"
+
 [[audits.snapbox]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
