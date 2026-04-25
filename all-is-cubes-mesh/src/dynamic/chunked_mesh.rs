@@ -816,7 +816,7 @@ impl CsmUpdateInfo {
 struct CsmTodo<const CHUNK_SIZE: GridCoordinate> {
     all_blocks_and_chunks: bool,
 
-    // TODO: Benchmark using a BitVec instead.
+    // TODO: Benchmark using a BitSet instead.
     blocks: hashbrown::HashSet<BlockIndex>,
 
     /// Membership in this table indicates that the corresponding [`ChunkMesh`] *exists;*

@@ -52,7 +52,7 @@ _special_testing = ["dep:visibility"]
 all-is-cubes = { workspace = true }
 all-is-cubes-render = { workspace = true }
 arbitrary = { workspace = true, optional = true }
-bitvec = { workspace = true }
+bit-set = { workspace = true }
 bytemuck = { workspace = true }
 derive_more = { workspace = true } # features specified in workspace
 either = { workspace = true }

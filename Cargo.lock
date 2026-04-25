@@ -240,7 +240,7 @@ dependencies = [
  "all-is-cubes",
  "all-is-cubes-render",
  "arbitrary",
- "bitvec",
+ "bit-set",
  "bytemuck",
  "derive_more",
  "either",

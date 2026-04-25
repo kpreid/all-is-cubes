@@ -180,7 +180,7 @@ struct SrtTodo {
     /// All blocks and cubes must be updated.
     everything: bool,
 
-    // TODO: Benchmark using a BitVec instead.
+    // TODO: Benchmark using a BitSet instead.
     blocks: HbHashSet<BlockIndex>,
     cubes: HbHashSet<Cube>,
 }
