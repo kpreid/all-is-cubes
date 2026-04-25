@@ -76,6 +76,15 @@ Code style
     `oxipng -o max` or `pngcrush -brute`)
     and should not require frequent updates.
 
+*   Avoid defining separate “x”, “y”, and “z” variables for points, vectors, boxes, etc.;
+    instead, use the appropriate point, vector, or other geometric type.
+    This reduces duplicate code, prevents bugs confusing axes, may be clearer, and may enable easier
+    generalization to transformed coordinate systems.
+
+    Exception: if using vector types would end up constructing and then immediately destructuring
+    them without using any vector operations while the vectors exist, then you are not obligated to
+    introduce the vector despite that. 
+
 Code formatting
 ---------------
 
