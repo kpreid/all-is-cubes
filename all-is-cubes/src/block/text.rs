@@ -15,15 +15,12 @@ use embedded_graphics as eg;
 use embedded_graphics::mono_font::DecorationDimensions;
 use embedded_graphics::mono_font::mapping::GlyphMapping;
 use embedded_graphics::prelude::Size;
-use embedded_graphics::{Drawable as _, prelude::Dimensions as _};
-use euclid::vec3;
+use euclid::{Point2D, Size2D, point2, size2, vec2, vec3};
+use itertools::iproduct;
 
 use crate::block::{self, Block, BlockAttributes, Evoxel, MinEval, Resolution};
 use crate::content::palette;
-use crate::drawing::{DrawingPlane, rectangle_to_aab};
-use crate::math::{
-    FaceMap, GridAab, GridCoordinate, GridVector, Gridgid, Rgb, Rgba, Vol, rgba_const,
-};
+use crate::math::{GridAab, GridCoordinate, GridPoint, GridVector, Gridgid, Rgb, Vol, rgba_const};
 use crate::space::{self, SpaceTransaction};
 use crate::universe;
 
@@ -31,6 +28,11 @@ use crate::universe;
 use crate::block::{Modifier, Primitive};
 
 use super::Evoxels;
+
+// -------------------------------------------------------------------------------------------------
+
+mod layout;
+use layout::Layout;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -50,8 +52,7 @@ use super::Evoxels;
 ///
 pub struct Text {
     data: TextData,
-    // TODO: this is unused now, but will be when we replace text layout with our own
-    layout_cache: OnceLock<()>,
+    layout_cache: OnceLock<Layout>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -168,20 +169,7 @@ impl Text {
     /// This box is in the same units as [`Self::layout_bounds()`] but reflects the actual text
     /// layout rather than the configuration.
     pub fn bounding_voxels(&self) -> GridAab {
-        // TODO: Memoize this “layout calculation”.
-
-        let dummy_voxel = Evoxel::from_color(Rgba::BLACK); // could be anything
-        self.with_transform_and_drawable(
-            match self.data.outline {
-                Some(_) => Brush::Outline {
-                    foreground: dummy_voxel,
-                    outline: dummy_voxel,
-                },
-                None => Brush::Plain(dummy_voxel),
-            },
-            GridVector::zero(),
-            |_text_obj, text_aab, _drawing_transform| text_aab,
-        )
+        self.get_or_init_layout().bounding_box
     }
     /// Returns the bounding box of the text, in blocks — the set of [`Primitive::Text`] offsets
     /// that will render all of it.
@@ -251,139 +239,99 @@ impl Text {
             return Ok(block::AIR_EVALUATED_MIN); // placeholder value
         }
 
-        // Evaluate blocks making up the brush
-        let brush = {
-            let _recursion_scope = block::Budget::recurse(&filter.budget)?;
-            let evaluated_foreground = self.data.foreground.evaluate_to_evoxel_internal(filter)?;
-            match self.data.outline {
-                Some(ref block) => Brush::Outline {
-                    foreground: evaluated_foreground,
-                    outline: block.evaluate_to_evoxel_internal(filter)?,
-                },
-                None => Brush::Plain(evaluated_foreground),
-            }
-        };
+        let &Layout {
+            bounding_box: text_aab,
+            ref glyphs,
+            z: layout_z,
+        } = self.get_or_init_layout();
 
-        self.with_transform_and_drawable(
-            brush,
-            block_offset,
-            |text_obj, text_aab, drawing_transform| {
-                let voxels: Evoxels = match text_aab
-                    .intersection_cubes(GridAab::for_block(self.data.resolution))
-                {
-                    Some(bounds_in_this_block) => {
-                        let fill = if self.data.debug {
-                            DEBUG_TEXT_BOUNDS_VOXEL
-                        } else {
-                            Evoxel::AIR
-                        };
-                        let mut voxels: Vol<Box<[Evoxel]>> =
-                            Vol::from_fn(bounds_in_this_block, |_| fill);
+        // Apply `block_offset` to the result of the layout.
+        // TODO: handle overflow
+        let block_offset_in_voxels = (-block_offset) * GridCoordinate::from(self.data.resolution);
+        let aab_in_block_voxel_space = text_aab.translate(block_offset_in_voxels);
 
-                        text_obj
-                            .draw(&mut DrawingPlane::new(&mut voxels, drawing_transform))
-                            .unwrap();
-
-                        Evoxels::from_many(self.data.resolution, voxels.map_container(Into::into))
+        // Check whether the text intersects the volume of this block.
+        // If it doesn’t, we can skip consulting the glyphs at all.
+        // TODO: We should also have a way to look up only the intersecting glyphs
+        // so that a fragment of a large text is handled efficiently.
+        let voxels: Evoxels = match aab_in_block_voxel_space
+            .intersection_cubes(GridAab::for_block(self.data.resolution))
+        {
+            Some(bounds_in_this_block) => {
+                // Evaluate blocks making up the brush.
+                let brush = {
+                    let _recursion_scope = block::Budget::recurse(&filter.budget)?;
+                    let evaluated_foreground =
+                        self.data.foreground.evaluate_to_evoxel_internal(filter)?;
+                    match self.data.outline {
+                        Some(ref block) => Brush::Outline {
+                            foreground: evaluated_foreground,
+                            outline: block.evaluate_to_evoxel_internal(filter)?,
+                        },
+                        None => Brush::Plain(evaluated_foreground),
                     }
-
-                    None => Evoxels::from_one(if self.data.debug {
-                        DEBUG_NO_INTERSECTION_VOXEL
-                    } else {
-                        Evoxel::AIR
-                    }),
                 };
 
-                Ok(MinEval::new(
-                    BlockAttributes {
-                        display_name: self.data.string.clone(),
-                        ..BlockAttributes::default()
-                    },
-                    voxels,
-                ))
+                let background = if self.data.debug {
+                    DEBUG_TEXT_BOUNDS_VOXEL
+                } else {
+                    Evoxel::AIR
+                };
+                let mut voxels: Vol<Box<[Evoxel]>> =
+                    Vol::from_fn(bounds_in_this_block, |_| background);
+
+                let decl = self.data.font.font_decl();
+                let pixels = decl.binary_image();
+
+                for glyph in glyphs.iter() {
+                    let glyph_position_3d: GridPoint =
+                        glyph.position.extend(layout_z).cast_unit() + block_offset_in_voxels;
+                    glyph_from_binary_image(pixels, decl, glyph.glyph_index).for_each(
+                        |position_in_glyph| {
+                            let position_in_block_of_voxel = glyph_position_3d
+                                + vec3(position_in_glyph.x, -position_in_glyph.y, 0);
+                            for (offset, evoxel) in brush.iter() {
+                                if let Some(vox) =
+                                    voxels.get_mut(position_in_block_of_voxel + offset)
+                                {
+                                    *vox = evoxel;
+                                }
+                            }
+                        },
+                    );
+                }
+
+                Evoxels::from_many(self.data.resolution, voxels.map_container(Into::into))
+            }
+
+            None => Evoxels::from_one(if self.data.debug {
+                DEBUG_NO_INTERSECTION_VOXEL
+            } else {
+                Evoxel::AIR
+            }),
+        };
+
+        Ok(MinEval::new(
+            BlockAttributes {
+                // TODO: putting the *entire* string in the name is dubious in general.
+                display_name: self.data.string.clone(),
+                ..BlockAttributes::default()
             },
-        )
+            voxels,
+        ))
     }
 
+    fn get_or_init_layout(&self) -> &Layout {
+        self.layout_cache.get_or_init(|| layout::compute_layout(&self.data))
+    }
+}
+
+impl TextData {
     fn thickness(&self) -> GridCoordinate {
-        match self.data.outline {
+        match self.outline {
             Some(_) => 2,
             None => 1,
         }
-    }
-
-    fn with_transform_and_drawable<R>(
-        &self,
-        brush: Brush,
-        block_offset: GridVector,
-        f: impl FnOnce(
-            &'_ eg::text::Text<'_, eg::mono_font::MonoTextStyle<'_, Brush>>,
-            GridAab,
-            Gridgid,
-        ) -> R,
-    ) -> R {
-        let resolution_g = GridCoordinate::from(self.data.resolution);
-        let Positioning {
-            x: positioning_x,
-            line_y,
-            z: positioning_z,
-        } = self.data.positioning;
-
-        let lb = self.data.layout_bounds;
-        // TODO: The subtractions of 1 here are dubious.
-        // I believe they are correct on the principle that embedded-graphics uses
-        // "a point labels a pixel" coordinates, so even leftward-extending text
-        // *includes* the identified pixel, but I'm not certain about that.
-        let layout_offset = vec3(
-            match positioning_x {
-                PositioningX::Left => lb.lower_bounds().x,
-                // 0.75 is a fudge factor that empirically gets the *rounding* behavior we want.
-                // though I'm still suspicious that we need to account for the text width too
-                PositioningX::Center => libm::round(lb.center().x - 0.75) as GridCoordinate,
-                PositioningX::Right => lb.upper_bounds().x - 1,
-            },
-            match line_y {
-                PositioningY::BodyBottom | PositioningY::Baseline => lb.lower_bounds().y,
-                PositioningY::BodyMiddle => libm::round(lb.center().y - 0.75) as GridCoordinate,
-                PositioningY::BodyTop => lb.upper_bounds().y - 1,
-            },
-            match positioning_z {
-                PositioningZ::Back => lb.lower_bounds().z,
-                PositioningZ::Front => lb.upper_bounds().z.saturating_sub(self.thickness()),
-            },
-        );
-
-        let drawing_transform =
-            Gridgid::from_translation(layout_offset - (block_offset * resolution_g))
-                * Gridgid::FLIP_Y;
-
-        let character_style = eg::mono_font::MonoTextStyle::new(self.data.font.eg_font(), brush);
-        let text_style = eg::text::TextStyleBuilder::new()
-            .alignment(match positioning_x {
-                PositioningX::Left => eg::text::Alignment::Left,
-                PositioningX::Center => eg::text::Alignment::Center,
-                PositioningX::Right => eg::text::Alignment::Right,
-            })
-            .baseline(match line_y {
-                PositioningY::BodyTop => eg::text::Baseline::Top,
-                PositioningY::BodyMiddle => eg::text::Baseline::Middle,
-                PositioningY::Baseline => eg::text::Baseline::Alphabetic,
-                PositioningY::BodyBottom => eg::text::Baseline::Bottom,
-            })
-            .build();
-        let text_obj = &eg::text::Text::with_text_style(
-            self.data.string.as_str(),
-            eg::prelude::Point::new(0, 0),
-            character_style,
-            text_style,
-        );
-        let text_aab = brush.expand(rectangle_to_aab(
-            text_obj.bounding_box(),
-            drawing_transform,
-            GridAab::ORIGIN_CUBE,
-        ));
-
-        f(text_obj, text_aab, drawing_transform)
     }
 }
 
@@ -698,16 +646,15 @@ pub enum Font {
 }
 
 impl Font {
-    /// Do not use. This will be removed if and when we change font renderers.
-    #[doc(hidden)]
-    pub fn eg_font(&self) -> &MonoFont<'static> {
+    /// Returns the static (compile-time constant) data for this font.
+    fn font_decl(&self) -> &'static FontDecl {
         match self {
             Self::System16 | Self::Logo => {
-                static DECL: FontDecl = FontDecl {
+                static SYSTEM16_DECL: FontDecl = FontDecl {
                     png_data: include_bytes!("text/font-system-7x16.png"),
                     png_path: "text/new-system-font.png",
                     binary_image: OnceLock::new(),
-                    character_size: Size::new(7, 16),
+                    character_size: size2(7, 16),
                     baseline: 12,
                     strikethrough: DecorationDimensions {
                         offset: 8,
@@ -718,15 +665,15 @@ impl Font {
                         height: 1,
                     },
                 };
-                static FONT: OnceLock<MonoFont<'static>> = OnceLock::new();
-                FONT.get_or_init(|| DECL.load())
+
+                &SYSTEM16_DECL
             }
             Self::SmallerBodyText => {
                 static DECL: FontDecl = FontDecl {
                     png_data: include_bytes!("text/font-body-text-6x14.png"),
                     png_path: "text/body-text-fot.png",
                     binary_image: OnceLock::new(),
-                    character_size: Size::new(6, 14),
+                    character_size: size2(6, 14),
                     baseline: 10,
                     strikethrough: DecorationDimensions {
                         offset: 7,
@@ -737,8 +684,22 @@ impl Font {
                         height: 1,
                     },
                 };
+                &DECL
+            }
+        }
+    }
+
+    /// Do not use. This will be removed when we change font renderers.
+    #[doc(hidden)]
+    pub fn eg_font(&self) -> &MonoFont<'static> {
+        match self {
+            Self::System16 | Self::Logo => {
                 static FONT: OnceLock<MonoFont<'static>> = OnceLock::new();
-                FONT.get_or_init(|| DECL.load())
+                FONT.get_or_init(|| self.font_decl().load())
+            }
+            Self::SmallerBodyText => {
+                static FONT: OnceLock<MonoFont<'static>> = OnceLock::new();
+                FONT.get_or_init(|| self.font_decl().load())
             }
         }
     }
@@ -942,23 +903,6 @@ pub(crate) enum Brush {
 // -------------------------------------------------------------------------------------------------
 
 impl Brush {
-    fn expand(&self, aab: GridAab) -> GridAab {
-        match self {
-            Brush::Plain(_) => aab,
-            Brush::Outline { .. } => aab.expand(FaceMap {
-                // TODO: This *should* expand bounds left, right, up, and down, but for now, that
-                // causes way too much trouble with positioning. As a workaround, pretend those
-                // expansions don't exist.
-                nx: 0, // should be 1
-                ny: 0, // should be 1
-                nz: 0,
-                px: 0, // should be 1
-                py: 0, // should be 1
-                pz: 1,
-            }),
-        }
-    }
-
     pub(crate) fn iter(&self) -> impl Iterator<Item = (GridVector, Evoxel)> + '_ {
         use itertools::Either::{Left, Right};
         match *self {
@@ -983,54 +927,86 @@ impl Brush {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Number of glyphs which we place on each row of our .png and bitmap images.
+///
+/// TODO: Instead of this constant being used in many places, we should, when loading the font
+/// definition, reorganize it into individual glyph images. (It will also need to go away
+/// when we support non-monospaced fonts.)
+const GLYPHS_PER_ROW: u32 = 16;
+
+const GLYPHS_PER_ROW_USIZE: usize = GLYPHS_PER_ROW as usize;
+
 /// Data structure defining a font, that can go in a `static` even though we’re
 /// not using static data compatible with [`embedded_graphics::image::ImageRaw`].
+///
+/// For convenience of the implementation, glyph sizes are not allowed to exceed 255.
 struct FontDecl {
     png_data: &'static [u8],
     png_path: &'static str,
     binary_image: OnceLock<Box<[u8]>>,
-    character_size: Size,
-    baseline: u32,
+    character_size: Size2D<u8, layout::InGlyph>,
+    baseline: u8,
     strikethrough: DecorationDimensions,
     underline: DecorationDimensions,
 }
+
 impl FontDecl {
-    fn load(&'static self) -> MonoFont<'static> {
-        const GLYPHS_PER_ROW: u32 = 16;
-
-        let Self {
-            png_data,
-            png_path,
-            ref binary_image,
-            character_size,
-            baseline,
-            strikethrough,
-            underline,
-        } = *self;
-
-        let binary_image = binary_image.get_or_init(|| {
+    /// Ensures the 1bpp packed font bitmap is loaded (decoding the PNG if needed)
+    /// and returns a reference to it.
+    fn binary_image(&'static self) -> &'static [u8] {
+        self.binary_image.get_or_init(|| {
             let decoded_png =
-                crate::content::load_image::DecodedPng::decode_static(png_data, png_path);
+                crate::content::load_image::DecodedPng::decode_static(self.png_data, self.png_path);
             assert_eq!(
                 decoded_png.size().width,
-                character_size.width * GLYPHS_PER_ROW
+                u32::from(self.character_size.width) * GLYPHS_PER_ROW
             );
             pack_into_binary_color_image_data(decoded_png.pixels())
-        });
+        })
+    }
 
+    fn load(&'static self) -> MonoFont<'static> {
         MonoFont {
             glyph_mapping: &RemapTo8859_1(&embedded_graphics::mono_font::mapping::ISO_8859_1),
             image: embedded_graphics::image::ImageRaw::new(
-                binary_image,
-                self.character_size.width * GLYPHS_PER_ROW,
+                self.binary_image(),
+                u32::from(self.character_size.width) * GLYPHS_PER_ROW,
             ),
-            character_size,
+            character_size: Size {
+                width: self.character_size.width.into(),
+                height: self.character_size.height.into(),
+            },
             character_spacing: 0,
-            baseline,
-            strikethrough,
-            underline,
+            baseline: self.baseline.into(),
+            strikethrough: self.strikethrough,
+            underline: self.underline,
         }
     }
+}
+
+/// Given [`FontDecl::binary_image()`] data, iterate over all the pixels making up one glyph.
+///
+/// TODO: the results of this should typed, not as points, but as unit squares like `Cube`
+/// is a unit cube (or literally `Cube` if we choose to denote voxels this early).
+fn glyph_from_binary_image(
+    pixels: &[u8],
+    decl: &FontDecl,
+    glyph_index: usize,
+) -> impl Iterator<Item = Point2D<GridCoordinate, layout::InGlyph>> {
+    let image_width = usize::from(decl.character_size.width) * GLYPHS_PER_ROW_USIZE;
+    let glyph_origin = vec2(
+        glyph_index % GLYPHS_PER_ROW_USIZE * decl.character_size.width as usize,
+        glyph_index / GLYPHS_PER_ROW_USIZE * decl.character_size.height as usize,
+    );
+    iproduct!(0..decl.character_size.height, 0..decl.character_size.width)
+        .map(move |(y, x)| point2(GridCoordinate::from(x), GridCoordinate::from(y)))
+        .filter(move |&position_in_glyph| {
+            let pixel = position_in_glyph.to_usize() + glyph_origin;
+            let bit_index = pixel.y * image_width + pixel.x;
+            let byte_index = bit_index / 8;
+            let bit_pos = 7 - (bit_index % 8); // MSB-first packing
+            pixels.get(byte_index).is_some_and(|&b| b & (1 << bit_pos) != 0)
+        })
 }
 
 // -------------------------------------------------------------------------------------------------

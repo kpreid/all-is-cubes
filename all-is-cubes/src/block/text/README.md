@@ -1,4 +1,4 @@
-These fonts were created by Kevin Reid for All is Cubes.
+The fonts contained in the `png` files in this directory were created by Kevin Reid for All is Cubes.
 
 Some inspiration was drawn from the fonts of [`embedded-graphics`],
 and the Apple IIGS system font “Shaston”.

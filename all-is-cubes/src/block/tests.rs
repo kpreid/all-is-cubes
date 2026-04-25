@@ -35,7 +35,7 @@ fn listen(
 }
 
 #[test]
-fn block_size_is_pointerish() {
+fn size_of_block_is_pointerish() {
     let block_size = size_of::<Block>();
     let ptr_size = size_of::<*const ()>();
     assert!(
@@ -45,10 +45,10 @@ fn block_size_is_pointerish() {
 }
 
 #[test]
-fn primitive_size() {
+fn size_of_primitive() {
     let size = size_of::<Primitive>();
     assert!(
-        size <= 96,
+        size <= 144,
         "size_of::<Primitive>() = {size} unexpectedly large"
     );
 }
