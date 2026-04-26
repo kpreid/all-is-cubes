@@ -13,7 +13,7 @@ use all_is_cubes_render::Flaws;
 
 use crate::heap::{self, HeapUsage};
 use crate::texture::{self, Tile as _};
-use crate::{Aabbs, IndexVec, MeshOptions, MeshTypes, Vertex, planar};
+use crate::{Aabbs, IndexVec, MeshOptions, MeshTypes, OutOfMemory, Vertex, planar};
 
 #[cfg(doc)]
 use {crate::SpaceMesh, all_is_cubes::space::Space};
@@ -174,7 +174,6 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         Iterator::chain(self.interior_vertices.values(), self.face_vertices.values())
     }
 
-    #[cfg(test)]
     fn all_sub_meshes_mut(&mut self) -> impl Iterator<Item = &mut SubMesh<M::Vertex>> {
         Iterator::chain(
             self.interior_vertices.values_mut(),
@@ -322,7 +321,11 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         texture_allocator: &M::Alloc,
         options: &MeshOptions,
     ) {
-        compute::compute_block_mesh(self, block, texture_allocator, options, Viz::disabled());
+        match compute::compute_block_mesh(self, block, texture_allocator, options, Viz::disabled())
+        {
+            Ok(()) => {}
+            Err(OutOfMemory { .. }) => self.recover_from_out_of_memory(),
+        }
 
         #[cfg(debug_assertions)]
         self.consistency_check();
@@ -337,16 +340,31 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         options: &MeshOptions,
         viz: Viz,
     ) {
-        compute::compute_block_mesh(self, block, texture_allocator, options, viz);
+        match compute::compute_block_mesh(self, block, texture_allocator, options, viz) {
+            Ok(()) => {}
+            Err(OutOfMemory { .. }) => self.recover_from_out_of_memory(),
+        }
 
         #[cfg(debug_assertions)]
         self.consistency_check();
     }
 
+    /// Handle allocation failure while building the mesh.
+    ///
+    /// * Mark the mesh as flawed.
+    /// * Fix an incorrect bounding box.
+    fn recover_from_out_of_memory(&mut self) {
+        self.flaws |= Flaws::OUT_OF_MEMORY;
+        for sub_mesh in self.all_sub_meshes_mut() {
+            sub_mesh.repair_bounding_box();
+        }
+    }
+
     #[cfg(debug_assertions)]
     fn consistency_check(&self) {
+        let is_oom = self.flaws.contains(Flaws::OUT_OF_MEMORY);
         for sub_mesh in self.all_sub_meshes() {
-            sub_mesh.consistency_check();
+            sub_mesh.consistency_check(is_oom);
         }
     }
 
@@ -473,8 +491,28 @@ impl<V: Vertex> SubMesh<V> {
         indices_opaque.len() + indices_transparent.len()
     }
 
+    fn repair_bounding_box(&mut self) {
+        self.bounding_box = self.compute_bounding_box_from_scratch();
+    }
+
+    /// Compute the bounding box this mesh *should* have from the vertices.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the mesh contains indices with no corresponding vertices (out of range).
+    fn compute_bounding_box_from_scratch(&self) -> Aabbs {
+        let mut output = Aabbs::EMPTY;
+        for index in self.indices_opaque.as_slice(..).iter_u32() {
+            output.opaque.add_point(self.vertices.0[index as usize].position());
+        }
+        for index in self.indices_transparent.as_slice(..).iter_u32() {
+            output.transparent.add_point(self.vertices.0[index as usize].position());
+        }
+        output
+    }
+
     #[cfg(debug_assertions)]
-    fn consistency_check(&self) {
+    fn consistency_check(&self, is_oom: bool) {
         use all_is_cubes::math::u32size;
 
         let vertex_count = u32::try_from(self.vertices.0.len()).unwrap();
@@ -482,9 +520,17 @@ impl<V: Vertex> SubMesh<V> {
         // Vertex struct-of-arrays should have matching lengths.
         assert_eq!(self.vertices.1.len(), u32size(vertex_count));
 
+        // Bounding box should contain every vertex.
+        assert_eq!(
+            self.compute_bounding_box_from_scratch(),
+            self.bounding_box,
+            "bounding box of vertices ≠ recorded bounding box"
+        );
+
         // Every vertex should be used at least once,
         // and every index should be in-bounds.
-        let mut used_vertices = crate::BitSet::<u32>::new();
+        // (But only allocate a bit-set to check usage if we’re not already in the OOM path.)
+        let mut used_vertices = (!is_oom).then(crate::BitSet::<u32>::new);
         for index in self
             .indices_opaque
             .as_slice(..)
@@ -495,28 +541,26 @@ impl<V: Vertex> SubMesh<V> {
                 index < vertex_count,
                 "index {index} out of bounds for {vertex_count} vertices"
             );
-            used_vertices.insert(index);
+            if let Some(uv) = &mut used_vertices {
+                match uv.insert(index) {
+                    Ok(_) => {}
+                    Err(OutOfMemory { .. }) => {
+                        used_vertices = None;
+                    }
+                }
+            }
         }
-        for index in 0..vertex_count {
-            // TODO: ideally this would print the vertex in question, but we don’t have a guaranteed
-            // Debug bound. Either add that bound, or wait for Rust to offer `try_as_dyn()` or such
-            // for conditional printing.
-            assert!(
-                used_vertices.contains(index),
-                "vertex {index} is not used by any triangle"
-            );
+        if let Some(used_vertices) = used_vertices {
+            for index in 0..vertex_count {
+                // TODO: ideally this would print the vertex in question, but we don’t have a
+                // guaranteed Debug bound. Either add that bound, or wait for Rust to offer
+                // `try_as_dyn()` or such for conditional printing.
+                assert!(
+                    used_vertices.contains(index),
+                    "vertex {index} is not used by any triangle"
+                );
+            }
         }
-
-        // Bounding box should contain every vertex.
-        let mut bounding_box = crate::Aabb::EMPTY;
-        for vertex in self.vertices.0.iter() {
-            bounding_box.add_point(vertex.position());
-        }
-        assert_eq!(
-            bounding_box,
-            crate::Aabb::from(self.bounding_box.all()),
-            "bounding box of vertices ≠ recorded bounding box"
-        );
     }
 }
 

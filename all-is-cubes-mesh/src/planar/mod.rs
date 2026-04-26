@@ -80,6 +80,7 @@ use all_is_cubes::math::{
     Cube, Face, GridCoordinate, GridPoint, GridRotation, rgba_const, u32size,
 };
 
+use crate::OutOfMemory;
 use crate::Viz;
 
 // -------------------------------------------------------------------------------------------------
@@ -252,9 +253,9 @@ impl Triangulator {
     fn advance_sweep_position(
         &mut self,
         viz: &mut Viz,
-        triangle_callback: &mut impl FnMut([Index; 3]),
+        triangle_callback: &mut impl FnMut([Index; 3]) -> Result<(), OutOfMemory>,
         new_sweep_position: GridCoordinate,
-    ) {
+    ) -> Result<(), OutOfMemory> {
         assert!(
             new_sweep_position > self.sweep_position,
             "incorrect vertex ordering"
@@ -263,10 +264,11 @@ impl Triangulator {
         // Keep the end-of-row old frontier vertices, which we didn't already handle by
         // encountering an input vertex that interacted with them, in the frontier.
         // These will be in `old_frontier` when this function finishes.
+        self.new_frontier.try_reserve(self.old_frontier.len())?;
         self.new_frontier.append(&mut self.old_frontier);
 
         if self.needs_ears_fixed {
-            self.clip_ears_in_new_frontier(viz, triangle_callback);
+            self.clip_ears_in_new_frontier(viz, triangle_callback)?;
         }
 
         // Discard all vertices that are connected only backward (to area that is behind the sweep).
@@ -282,6 +284,8 @@ impl Triangulator {
         self.sweep_position = new_sweep_position;
 
         viz.set_frontier(&self.old_frontier, &self.new_frontier);
+
+        Ok(())
     }
 
     /// Perform triangulation.
@@ -296,6 +300,10 @@ impl Triangulator {
     /// The output is in the form of indices, in the GPU graphics sense; each index is
     /// the value of the [`index`][Vertex::index] field of some [`Vertex`].
     ///
+    /// # Errors
+    ///
+    /// Returns an error if memory allocation fails.
+    ///
     /// # Panics
     ///
     /// If `input` is inconsistent
@@ -309,20 +317,21 @@ impl Triangulator {
         &mut self,
         basis: Basis,
         input: impl Iterator<Item = Vertex>,
-        triangle_callback: impl FnMut([Index; 3]),
-    ) {
+        triangle_callback: impl FnMut([Index; 3]) -> Result<(), OutOfMemory>,
+    ) -> Result<(), OutOfMemory> {
         self.triangulate_with_viz(&mut Viz::Disabled, basis, input, triangle_callback)
     }
 
     /// Same as [`Self::triangulate()`] but allows passing [`Viz`].
+    #[allow(clippy::missing_errors_doc)]
     #[cfg_attr(feature = "_special_testing", visibility::make(pub))]
     pub(crate) fn triangulate_with_viz(
         &mut self,
         viz: &mut Viz,
         basis: Basis,
         input: impl Iterator<Item = Vertex>,
-        mut triangle_callback: impl FnMut([Index; 3]),
-    ) {
+        mut triangle_callback: impl FnMut([Index; 3]) -> Result<(), OutOfMemory>,
+    ) -> Result<(), OutOfMemory> {
         // Set the basis, and ensure any previous usage of self does not affect the results.
         self.clear_and_set_basis(basis);
 
@@ -333,7 +342,7 @@ impl Triangulator {
             let new_sweep_position =
                 self.basis.sweep_direction.dot(input_vertex.position.to_vector());
             if new_sweep_position != self.sweep_position {
-                self.advance_sweep_position(viz, &mut triangle_callback, new_sweep_position);
+                self.advance_sweep_position(viz, &mut triangle_callback, new_sweep_position)?;
             }
 
             viz.set_current_triangulation_vertex(
@@ -376,13 +385,14 @@ impl Triangulator {
                     }
                 {
                     // connect old vertex forward because it is possible
-                    self.basis.emit(viz, &mut triangle_callback, triangle);
+                    self.basis.emit(viz, &mut triangle_callback, triangle)?;
                     viz.completed_step();
                 } else {
                     // if this was true, then we've now hit a gap and should stop connecting
                     previous_should_connect_forward = false;
 
                     // Not connected -- therefore the old vertex stays in the frontier.
+                    self.new_frontier.try_reserve(1)?;
                     self.new_frontier.push_back(passed_over_vertex);
                     moved_any_vertices = true;
                 }
@@ -396,6 +406,7 @@ impl Triangulator {
             // We now have the property that all vertices in old_frontier are perpendicularly
             // ahead of input_vertex.
 
+            self.new_frontier.try_reserve(1)?;
             self.new_frontier.push_back(input_vertex);
 
             if !(input_vertex.connectivity.contains_any_of(Mask::BSFP | Mask::BSBP)) {
@@ -430,7 +441,7 @@ impl Triangulator {
                                     .nth_back(1)
                                     .expect("preceding vertex in new frontier missing"),
                             ],
-                        );
+                        )?;
                     }
                     if predecessor_vertex.connectivity.contains_any_of(Mask::FSFP) {
                         assert!(
@@ -449,7 +460,7 @@ impl Triangulator {
                                     old frontier empty",
                                 ),
                             ],
-                        );
+                        )?;
                     }
                 } else {
                     // We have a new vertex which falls between two existing frontier vertices.
@@ -475,7 +486,7 @@ impl Triangulator {
                             &input_vertex,
                             self.old_frontier.front().unwrap(),
                         ],
-                    );
+                    )?;
                 }
                 viz.completed_step();
             }
@@ -485,7 +496,7 @@ impl Triangulator {
         }
 
         // Advance past the last vertex to do the last ear processing and state cleanup.
-        self.advance_sweep_position(viz, &mut triangle_callback, GridCoordinate::MAX);
+        self.advance_sweep_position(viz, &mut triangle_callback, GridCoordinate::MAX)?;
         viz.completed_step();
 
         // The last vertex input should have caused the triangulation to become complete,
@@ -495,6 +506,8 @@ impl Triangulator {
             "input vertices erroneous or triangulator has a bug; frontier is not empty {:?}",
             self.old_frontier
         );
+
+        Ok(())
     }
 
     /// Look at `self.new_frontier` and generate triangles according to the principle of the
@@ -508,8 +521,8 @@ impl Triangulator {
     fn clip_ears_in_new_frontier(
         &mut self,
         viz: &mut Viz,
-        triangle_callback: &mut impl FnMut([Index; 3]),
-    ) {
+        triangle_callback: &mut impl FnMut([Index; 3]) -> Result<(), OutOfMemory>,
+    ) -> Result<(), OutOfMemory> {
         #![allow(clippy::reversed_empty_ranges)]
 
         debug_assert!(self.needs_ears_fixed);
@@ -549,7 +562,7 @@ impl Triangulator {
 
                 if connected_fwd && connected_back && is_convex {
                     // Emit the ear triangle.
-                    self.basis.emit(viz, triangle_callback, candidate_triangle);
+                    self.basis.emit(viz, triangle_callback, candidate_triangle)?;
                     // Clip the ear: delete its middle vertex, so as to remove that triangle from
                     // the frontier.
                     self.new_frontier.remove(i + 1);
@@ -580,6 +593,7 @@ impl Triangulator {
                 i += 1;
             }
         }
+        Ok(())
     }
 }
 
@@ -713,9 +727,9 @@ impl Basis {
     fn emit(
         self,
         viz: &mut Viz,
-        triangle_callback: &mut impl FnMut([Index; 3]),
+        triangle_callback: &mut impl FnMut([Index; 3]) -> Result<(), OutOfMemory>,
         mut triangle: [&Vertex; 3],
-    ) {
+    ) -> Result<(), OutOfMemory> {
         debug_assert!(
             self.is_correct_winding(triangle),
             "input vertices erroneous or triangulator has a bug; \
@@ -739,7 +753,7 @@ impl Basis {
             || rgba_const!(0.5, 0.5, 0.5, 1.0),
             self.face,
         );
-        triangle_callback(triangle.map(|v| v.index));
+        triangle_callback(triangle.map(|v| v.index))
     }
 }
 

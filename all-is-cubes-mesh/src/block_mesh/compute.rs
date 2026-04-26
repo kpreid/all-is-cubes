@@ -18,7 +18,7 @@ use crate::block_mesh::extend::{
 };
 use crate::block_mesh::planar;
 use crate::texture::{self, Plane as _, Tile as _};
-use crate::{BlockMesh, IndexSlice, MeshOptions, MeshTypes, SubMesh, Viz, vertex};
+use crate::{BlockMesh, IndexSlice, MeshOptions, MeshTypes, OutOfMemory, SubMesh, Viz, vertex};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -32,13 +32,13 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
     options: &MeshOptions,
     // Calls to `Viz` compile to nothing when the "rerun" feature is not enabled.
     mut viz: Viz,
-) {
+) -> Result<(), OutOfMemory> {
     output.clear();
 
     let voxels = block.voxels();
     if voxels.bounds().is_empty() {
         // There cannot be anything to draw. Don't inflict this edge case on the rest of our math.
-        return;
+        return Ok(());
     }
 
     // If this is true, avoid using vertex coloring even on solid rectangles.
@@ -83,8 +83,8 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                 .unwrap_or(OpacityCategory::Partial),
             &BoxColoring::Solid(face_colors),
             &mut viz,
-        );
-        return;
+        )?;
+        return Ok(());
     }
 
     // Short-circuit case: if we have a single voxel a.k.a. resolution 1, then we generate a
@@ -113,7 +113,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             QuadColoring::Solid(voxel.color)
         };
 
-        push_full_box(output, voxel.opacity_category(), coloring, &mut viz);
+        push_full_box(output, voxel.opacity_category(), coloring, &mut viz)?;
     } else {
         viz.voxels(voxels);
         viz.completed_step();
@@ -128,7 +128,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             .intersection_cubes(GridAab::for_block(resolution))
             .is_none()
         {
-            return;
+            return Ok(());
         }
 
         let analysis = analyze(
@@ -136,7 +136,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             voxels_array,
             options.transparency_format(),
             &mut viz,
-        );
+        )?;
 
         compute_block_mesh_from_analysis(
             output,
@@ -147,7 +147,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             options,
             block.voxel_opacity_mask(),
             &mut viz,
-        );
+        )?;
 
         if let Some(bbox) = analysis.transparent_bounding_box
             && let Some(tile) = &output.texture_used
@@ -160,15 +160,20 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                 OpacityCategory::Partial,
                 &BoxColoring::VolumeTexture(tile),
                 &mut viz,
-            );
+            )?;
         }
     }
+    Ok(())
 }
 
 /// The portion of [`compute_block_mesh()`] that has almost no special cases or initialization;
 /// just starts slinging triangles.
 ///
 /// This function assumes that `output` has been cleared and writes to every part of it.
+///
+/// # Errors
+///
+/// Returns an error if memory allocation fails.
 fn compute_block_mesh_from_analysis<M: MeshTypes>(
     output: &mut BlockMesh<M>,
     voxels: &Evoxels,
@@ -178,7 +183,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     options: &MeshOptions,
     voxel_opacity_mask: &block::VoxelOpacityMask,
     viz: &mut Viz,
-) {
+) -> Result<(), OutOfMemory> {
     let flaws = &mut output.flaws;
     let mut used_any_vertex_colors = false;
 
@@ -210,7 +215,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     // TODO: Allow reusing them across multiple blocks, if that is faster.
     let mut triangulator = planar::Triangulator::new();
 
-    let mut vertex_subset: Vec<AnalysisVertex> = Vec::with_capacity(analysis.vertices.len() / 2);
+    let mut vertex_subset: Vec<AnalysisVertex> = Vec::new();
+    vertex_subset.try_reserve(analysis.vertices.len() / 2)?;
 
     // Walk through the planes (layers) of the block, figuring out what geometry to
     // generate for each layer and whether it needs a texture.
@@ -403,7 +409,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                         pass_bounding_box.add_point(position);
                         v
                     }),
-                );
+                )?;
 
                 // Compute triangles and append their indices to SubMesh.
                 let indices_before_this_pass = pass_indices.len();
@@ -419,10 +425,12 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                         )
                     }),
                     |triangle_indices| {
+                        pass_indices.try_reserve(triangle_indices.len())?;
                         pass_indices
                             .extend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);
+                        Ok(())
                     },
-                );
+                )?;
 
                 // If we added more than 2 transparent triangles, then they might not form
                 // rectangles. Depth sorting needs to be aware of that in order to disable
@@ -441,6 +449,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     } else {
         Some(voxel_opacity_mask.clone())
     };
+
+    Ok(())
 }
 
 // -------------------------------------------------------------------------------------------------

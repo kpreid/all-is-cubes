@@ -1,3 +1,12 @@
+//! Utilities for heap allocation management.
+//!
+//! `all-is-cubes-mesh` needs to take particular care with memory usage because the meshes can
+//! easily add up to gigabytes.
+
+use core::fmt;
+
+// -------------------------------------------------------------------------------------------------
+
 /// Counts transitive heap memory ownership for our types.
 ///
 /// This trait is not public, but is used to help correctly implement public methods.
@@ -53,4 +62,26 @@ impl HeapUsage for all_is_cubes::block::VoxelOpacityMask {
 /// Returns the bytes allocated by a `Vec`, ignoring what might be owned by its elements.
 pub(crate) fn capacity_bytes<T>(v: &alloc::vec::Vec<T>) -> usize {
     v.capacity() * size_of::<T>()
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Error type returned from certain functions when memory allocation fails.
+#[derive(Debug)]
+pub struct OutOfMemory {
+    _private: (),
+}
+
+impl core::error::Error for OutOfMemory {}
+
+impl fmt::Display for OutOfMemory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.pad("memory allocation failed while constructing a mesh")
+    }
+}
+
+impl From<alloc::collections::TryReserveError> for OutOfMemory {
+    fn from(_: alloc::collections::TryReserveError) -> Self {
+        Self { _private: () }
+    }
 }

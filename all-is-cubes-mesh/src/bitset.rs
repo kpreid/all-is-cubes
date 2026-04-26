@@ -1,7 +1,10 @@
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use core::{fmt, ops};
+
 use num_traits::Zero;
+
+use crate::OutOfMemory;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -27,20 +30,20 @@ impl<T: Copy + Zero + Into<u32> + TryFrom<u32> + ops::Add<Output = T>> BitSet<T>
 
     /// Adds `value` to the set.
     /// Returns whether `value` was not already present, or an error if memory allocation fails.
-    pub fn insert(&mut self, value: T) -> bool {
+    pub fn insert(&mut self, value: T) -> Result<bool, OutOfMemory> {
         let word = (Into::<u32>::into(value) / u32::BITS) as usize;
         let bit_position = Into::<u32>::into(value) % u32::BITS;
         let bit_value = 1u32 << bit_position;
 
         if word >= self.bits.len() {
-            // TODO: self.bits.try_reserve((word + 1) - self.bits.len())?;
+            self.bits.try_reserve((word + 1) - self.bits.len())?;
             self.bits.resize(word + 1, 0);
         }
 
         let place = &mut self.bits[word];
         let is_new = *place & bit_value == 0;
         *place |= bit_value;
-        is_new
+        Ok(is_new)
     }
 
     #[cfg_attr(
@@ -86,7 +89,7 @@ impl<T: Copy + Zero + Into<u32> + TryFrom<u32>> FromIterator<T> for BitSet<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let mut set = Self::new();
         for item in iter {
-            set.insert(item);
+            set.insert(item).unwrap();
         }
         set
     }

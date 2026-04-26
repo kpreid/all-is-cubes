@@ -46,6 +46,8 @@ fn run(vertices: &[planar::Vertex]) -> Vec<[u8; 3]> {
                     .push(triangle_indices.map(|i| u8::try_from(i).expect("index out of range")));
 
                 // println!("State: {triangulator:#?}"); // TODO: make it possible to grab the state for debugging
+
+                Ok(())
             },
         )
     }));
@@ -474,9 +476,12 @@ fn doc_example_svg_test() {
     ]);
 
     let mut triangles = Vec::new();
-    planar::Triangulator::new().triangulate(test_basis(), vertices.iter().copied(), |triangle| {
-        triangles.push(triangle)
-    });
+    planar::Triangulator::new()
+        .triangulate(test_basis(), vertices.iter().copied(), |triangle| {
+            triangles.push(triangle);
+            Ok(())
+        })
+        .unwrap();
 
     let svg = format!(
         "{}",

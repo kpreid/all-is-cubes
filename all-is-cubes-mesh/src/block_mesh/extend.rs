@@ -31,9 +31,9 @@ pub(crate) fn push_box<M: MeshTypes>(
     opacity_category: OpacityCategory,
     coloring: &BoxColoring<M>,
     viz: &mut Viz,
-) {
+) -> Result<(), crate::OutOfMemory> {
     if opacity_category == OpacityCategory::Invisible {
-        return;
+        return Ok(());
     }
     let fully_opaque = opacity_category == OpacityCategory::Opaque;
     for face in Face::ALL {
@@ -55,7 +55,7 @@ pub(crate) fn push_box<M: MeshTypes>(
             & (depth == 0)
             & (lower_bounds == point2(0, 0))
             & (upper_bounds == Point2D::splat(resolution.into()));
-        reserve_vertices(&mut sub_mesh.vertices, 4);
+        reserve_vertices(&mut sub_mesh.vertices, 4)?;
 
         // TODO: reduce duplication of code between push_box and push_full_box by factoring out
         // "reserve 6 indices" but in a way that borrow checking likes
@@ -82,8 +82,9 @@ pub(crate) fn push_box<M: MeshTypes>(
             } else {
                 &mut sub_mesh.bounding_box.transparent
             },
-        );
+        )?;
     }
+    Ok(())
 }
 
 /// Append triangles to `output` which form a single box filling the entire block cube,
@@ -95,11 +96,11 @@ pub(crate) fn push_full_box<M: MeshTypes>(
     opacity_category: OpacityCategory,
     coloring: QuadColoring<'_, M::Tile>,
     viz: &mut Viz,
-) {
+) -> Result<(), crate::OutOfMemory> {
     let fully_opaque = opacity_category == OpacityCategory::Opaque;
     for (face, sub_mesh) in output.face_vertices.iter_mut() {
         if opacity_category != OpacityCategory::Invisible {
-            reserve_vertices(&mut sub_mesh.vertices, 4);
+            reserve_vertices(&mut sub_mesh.vertices, 4)?;
             push_quad(
                 &mut sub_mesh.vertices,
                 if fully_opaque {
@@ -120,10 +121,11 @@ pub(crate) fn push_full_box<M: MeshTypes>(
                 } else {
                     &mut sub_mesh.bounding_box.transparent
                 },
-            );
+            )?;
         }
         sub_mesh.fully_opaque |= fully_opaque;
     }
+    Ok(())
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -145,7 +147,8 @@ pub(crate) fn push_quad<V, Tex>(
     coloring: QuadColoring<'_, Tex>,
     viz: &mut Viz,
     bounding_box: &mut Aabb,
-) where
+) -> Result<(), crate::OutOfMemory>
+where
     V: crate::Vertex<TexPoint = Tex::Point>,
     Tex: texture::Tile,
 {
@@ -191,7 +194,7 @@ pub(crate) fn push_quad<V, Tex>(
                         coloring: Coloring::Solid(color),
                     })
                 }),
-            );
+            )?;
         }
         QuadColoring::Texture(plane) => {
             push_vertices_from_iter(
@@ -210,7 +213,7 @@ pub(crate) fn push_quad<V, Tex>(
                         },
                     })
                 }),
-            );
+            )?;
         }
         QuadColoring::Volume(tile) => {
             // TODO: deduplicate this code
@@ -230,11 +233,14 @@ pub(crate) fn push_quad<V, Tex>(
                         },
                     })
                 }),
-            );
+            )?;
         }
     }
 
+    indices.try_reserve(QUAD_INDICES.len())?;
     indices.extend(QUAD_INDICES.iter().map(|&i| index_origin + i));
+
+    Ok(())
 }
 
 const QUAD_VERTICES: &[Vector2D<PosCoord, TexelUnit>; 4] = &[
@@ -338,21 +344,34 @@ impl QuadTransform {
 
 // -------------------------------------------------------------------------------------------------
 
-fn reserve_vertices<T, U>((v0, v1): &mut (Vec<T>, Vec<U>), n: usize) {
-    v0.reserve_exact(n);
-    v1.reserve_exact(n);
+fn reserve_vertices<T, U>(
+    (v0, v1): &mut (Vec<T>, Vec<U>),
+    n: usize,
+) -> Result<(), crate::OutOfMemory> {
+    v0.try_reserve_exact(n)?;
+    v1.try_reserve_exact(n)?;
+    Ok(())
 }
 
 /// Extends the parallel vectors of [`Vertex`] and [`Vertex::SecondaryData`].
 ///
 /// Does not attempt to reserve space based on the iterator’s size hint.
 /// The caller should do that on their own if desired.
+///
+/// # Errors
+///
+/// Returns an error if memory allocation fails.
 pub(crate) fn push_vertices_from_iter<V: crate::Vertex>(
     output: &mut (Vec<V>, Vec<V::SecondaryData>),
     input: impl Iterator<Item = (V, V::SecondaryData)>,
-) {
+) -> Result<(), crate::OutOfMemory> {
     for (v0, v1) in input {
+        output.0.try_reserve(1)?;
+        output.1.try_reserve(1)?;
+
+        // With the reservations, these cannot ever fail.
         output.0.push(v0);
         output.1.push(v1);
     }
+    Ok(())
 }

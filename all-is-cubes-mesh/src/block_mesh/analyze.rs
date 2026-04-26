@@ -11,6 +11,7 @@ use all_is_cubes::math::{
     OpacityCategory, Vol, ZMaj,
 };
 
+use crate::OutOfMemory;
 use crate::TransparencyFormat;
 use crate::block_mesh::viz::Viz;
 
@@ -197,7 +198,7 @@ pub(crate) fn analyze(
     voxels: Vol<&[Evoxel]>,
     transparency: TransparencyFormat,
     viz: &mut Viz,
-) -> Analysis {
+) -> Result<Analysis, OutOfMemory> {
     let mut analysis = Analysis::EMPTY;
     analysis.resolution = resolution;
     viz.analysis_in_progress(&analysis);
@@ -208,14 +209,15 @@ pub(crate) fn analyze(
 
     for_each_window(voxels, |(center, window_voxels)| {
         viz.window(center, voxels);
-        analyze_one_window(&mut analysis, center, window_voxels, transparency);
+        analyze_one_window(&mut analysis, center, window_voxels, transparency)?;
         viz.analysis_in_progress(&analysis);
         viz.completed_step();
-    });
+        Ok(())
+    })?;
     viz.clear_window();
     viz.completed_step();
 
-    analysis
+    Ok(analysis)
 }
 
 /// Take one of the outputs of [`windows()`] and compute its contribution to [`analysis`].
@@ -225,7 +227,7 @@ fn analyze_one_window(
     center: GridPoint,
     window: OctantMap<&Evoxel>,
     transparency: TransparencyFormat,
-) {
+) -> Result<(), OutOfMemory> {
     use Face::*;
     const ALL: OctantMask = OctantMask::ALL;
     const NONE: OctantMask = OctantMask::NONE;
@@ -326,9 +328,11 @@ fn analyze_one_window(
                 renderable,
                 opaque,
             };
+            analysis.vertices.try_reserve(1)?;
             analysis.vertices.push(vertex);
         }
     }
+    Ok(())
 }
 
 /// Returns whether any bits in the more `face`ward side of `mask` are set while the
@@ -347,11 +351,11 @@ fn uncovered(mask: OctantMask, face: Face) -> bool {
 /// vector, which must be taken into account.
 fn for_each_window<'a>(
     voxels: Vol<&'a [Evoxel], ZMaj>,
-    mut f: impl FnMut((GridPoint, OctantMap<&'a Evoxel>)),
-) {
+    mut f: impl FnMut((GridPoint, OctantMap<&'a Evoxel>)) -> Result<(), OutOfMemory>,
+) -> Result<(), OutOfMemory> {
     if voxels.bounds().is_empty() {
         // exit early so the rest of the logic can assume our ranges contain at least 1 element
-        return;
+        return Ok(());
     }
 
     // For 2³ windows that spill 1 voxel outside, expand by 1 to get the lower cubes.
@@ -397,10 +401,12 @@ fn for_each_window<'a>(
                 oct_voxels[Octant::Pnp] = get_voxel(new_quad_lb.wrapping_add(vec3(1, 0, 0)));
                 oct_voxels[Octant::Ppp] = get_voxel(uppermost_cube);
 
-                f((center, oct_voxels))
+                f((center, oct_voxels))?;
             }
         }
     }
+
+    Ok(())
 }
 
 impl fmt::Debug for AnalysisVertex {
@@ -440,8 +446,10 @@ mod tests {
             Vol::from_elements(GridAab::ORIGIN_CUBE, vec![Evoxel::from_color(red)]).unwrap();
         let mut results: Vec<(GridPoint, [Rgba; 8])> = Vec::new();
         for_each_window(vol.as_ref(), |(point, colors)| {
-            results.push((point, colors.into_zmaj_array().map(|voxel| voxel.color)))
-        });
+            results.push((point, colors.into_zmaj_array().map(|voxel| voxel.color)));
+            Ok(())
+        })
+        .unwrap();
         assert_eq!(
             results,
             vec![
@@ -486,7 +494,8 @@ mod tests {
             ev.voxels().as_vol_ref(),
             TransparencyFormat::Surfaces,
             &mut Viz::disabled(),
-        );
+        )
+        .unwrap();
 
         let occupied_planes = FaceMap::from_fn(|f| analysis.occupied_planes(f).collect_vec());
         if thickness == 0 {
@@ -541,7 +550,8 @@ mod tests {
             Vol::from_elements(GridAab::for_block(Resolution::R1), [voxel].as_slice()).unwrap(),
             TransparencyFormat::Surfaces,
             &mut Viz::disabled(),
-        );
+        )
+        .unwrap();
 
         assert!(analysis.occupied_planes(Face::NX).next().is_some());
     }
@@ -563,7 +573,8 @@ mod tests {
             ev.voxels().as_vol_ref(),
             TransparencyFormat::BoundingBox,
             &mut Viz::disabled(),
-        );
+        )
+        .unwrap();
 
         // No occupied planes, but...
         assert_eq!(
@@ -589,7 +600,8 @@ mod tests {
             ev.voxels().as_vol_ref(),
             TransparencyFormat::Surfaces,
             &mut Viz::disabled(),
-        );
+        )
+        .unwrap();
 
         let occupied_planes = FaceMap::from_fn(|f| analysis.occupied_planes(f).collect_vec());
 

@@ -276,7 +276,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 return;
             };
 
-            let already_seen_index = !self.block_indices_used.insert(index);
+            let already_seen_index = !self.block_indices_used.insert(index).unwrap(); // TODO: handle oom
 
             if !already_seen_index {
                 // Capture texture handles to ensure that our texture coordinates stay valid.
@@ -303,7 +303,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                             .is_some_and(|bm| bm.face_vertices[face.opposite()].fully_opaque)
                     {
                         // Don't draw obscured faces, but do record that we depended on them.
-                        self.block_indices_used.insert(adj_block_index);
+                        self.block_indices_used.insert(adj_block_index).unwrap();
                         return true;
                     }
                     false

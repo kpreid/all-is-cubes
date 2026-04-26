@@ -43,6 +43,11 @@ bitflags::bitflags! {
         // TODO: Should this just be one of the things TOO_MUCH means?
         const MISSING_TEXTURES = 1 << 6;
 
+        /// A memory allocation required to complete this rendering failed.
+        ///
+        /// Since this refers to a shared resource, this error may appear non-deterministically.
+        const OUT_OF_MEMORY = 1 << 7;
+
         // TODO:
         // /// The rendering is incomplete due to insufficient resources to
         // /// support the full complexity of the scene.

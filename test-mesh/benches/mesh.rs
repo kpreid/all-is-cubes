@@ -489,9 +489,12 @@ fn planar_benches(c: &mut Criterion) {
                 )
             },
             |(vertices, output)| {
-                triangulator.triangulate(basis, vertices.drain(..), |triangle| {
-                    output.push(triangle);
-                });
+                let () = triangulator
+                    .triangulate(basis, vertices.drain(..), |triangle| {
+                        output.push(triangle);
+                        Ok(())
+                    })
+                    .unwrap();
             },
             BatchSize::LargeInput,
         );

@@ -63,6 +63,9 @@ use core::fmt;
 
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
+#[cfg(doc)]
+use all_is_cubes_render::Flaws;
+
 // -------------------------------------------------------------------------------------------------
 
 mod aabb;
@@ -79,6 +82,7 @@ pub use depth_sorting::{DepthOrdering, DepthSortInfo, DepthSortResult};
 #[cfg(feature = "dynamic")]
 pub mod dynamic;
 mod heap;
+pub use heap::OutOfMemory;
 mod index_vec;
 pub use index_vec::*;
 pub mod planar;

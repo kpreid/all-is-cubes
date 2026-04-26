@@ -1,6 +1,8 @@
-use alloc::collections::VecDeque;
+use alloc::collections::{TryReserveError, VecDeque};
 use alloc::vec::Vec;
-use core::{fmt, mem, ops};
+use core::fmt;
+use core::mem;
+use core::ops;
 
 use either::Either;
 
@@ -145,6 +147,14 @@ impl IndexVec {
         match self {
             Self::U16(vec) => vec.reserve_exact(additional),
             Self::U32(vec) => vec.reserve_exact(additional),
+        }
+    }
+
+    /// As per [`Vec::try_reserve()`].
+    pub(crate) fn try_reserve(&mut self, len: usize) -> Result<(), TryReserveError> {
+        match self {
+            Self::U16(vec) => vec.try_reserve(len),
+            Self::U32(vec) => vec.try_reserve(len),
         }
     }
 
