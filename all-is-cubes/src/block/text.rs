@@ -251,16 +251,13 @@ impl Text {
         // Evaluate blocks making up the brush
         let brush = {
             let _recursion_scope = block::Budget::recurse(&filter.budget)?;
-
-            // TODO: We could save a small amount of work by not building the full
-            // `EvaluatedBlock` here and throwing it away.
-            let ev_foreground = self.foreground.evaluate_to_evoxel_internal(filter)?;
+            let evaluated_foreground = self.foreground.evaluate_to_evoxel_internal(filter)?;
             match self.outline {
                 Some(ref block) => Brush::Outline {
-                    foreground: ev_foreground,
+                    foreground: evaluated_foreground,
                     outline: block.evaluate_to_evoxel_internal(filter)?,
                 },
-                None => Brush::Plain(ev_foreground),
+                None => Brush::Plain(evaluated_foreground),
             }
         };
 
