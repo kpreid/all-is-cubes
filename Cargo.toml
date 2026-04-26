@@ -88,7 +88,7 @@ bevy_ecs = { version = "0.18.0", default-features = false }
 bevy_platform = { version = "0.18.0", default-features = false, features = ["alloc"] }
 bitflags = { version = "2.11.1", default-features = false }
 # We use bit sets for change tracking. `bit-set` was chosen due to it also being used by `naga`.
-bit-set = { version = "0.9.1", default-features = false }
+bit-set = { version = "0.10.0", default-features = false }
 bytemuck = { version = "1.25.0", default-features = false, features = ["derive", "must_cast"] }
 # When upgrading clap, beware text output changes causing integration tests to fail.
 clap = { version = "4.5", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }

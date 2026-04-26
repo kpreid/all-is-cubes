@@ -240,7 +240,7 @@ dependencies = [
  "all-is-cubes",
  "all-is-cubes-render",
  "arbitrary",
- "bit-set",
+ "bit-set 0.10.0",
  "bytemuck",
  "derive_more",
  "either",
@@ -1136,6 +1136,15 @@ name = "bit-set"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34ddef2995421ab6a5c779542c81ee77c115206f4ad9d5a8e05f4ff49716a3dd"
+dependencies = [
+ "bit-vec",
+]
+
+[[package]]
+name = "bit-set"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09ec2f926cc3060f09db9ebc5b52823d85268d24bb917e472c0c4bea35780a7d"
 dependencies = [
  "bit-vec",
 ]
@@ -3728,7 +3737,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa2630921705b9b01dcdd0b6864b9562ca3c1951eecd0f0c4f5f04f61e412647"
 dependencies = [
  "arrayvec",
- "bit-set",
+ "bit-set 0.9.1",
  "bitflags 2.11.1",
  "cfg-if",
  "cfg_aliases",
@@ -7166,7 +7175,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e80ac6cf1895df6342f87d975162108f9d98772a0d74bc404ab7304ac29469e"
 dependencies = [
  "arrayvec",
- "bit-set",
+ "bit-set 0.9.1",
  "bit-vec",
  "bitflags 2.11.1",
  "bytemuck",
@@ -7228,7 +7237,7 @@ dependencies = [
  "android_system_properties",
  "arrayvec",
  "ash",
- "bit-set",
+ "bit-set 0.9.1",
  "bitflags 2.11.1",
  "block2 0.6.2",
  "bytemuck",
