@@ -24,6 +24,7 @@
     * `Channels::union()`.
     * `MeshMeta::textures_used()`.
     * `MeshMeta::texture_channels_used()`.
+    * `IndexSlice::iter_usize()`
 
 * `all-is-cubes-port` library:
     * glTF exports now include textures.

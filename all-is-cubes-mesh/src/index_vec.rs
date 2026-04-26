@@ -231,7 +231,25 @@ impl<'a> IndexSlice<'a> {
             IndexSlice::U32(slice) => Either::Right(slice.iter().copied()),
         }
     }
+
+    /// Returns the indices in this slice, each converted unconditionally to [`usize`].
+    //---
+    // Design note: This allows callers to make use of our project-wide assumption that usize
+    // is at least 32 bits, rather than needing to do their own such assumption.
+    #[inline]
+    pub fn iter_usize(&self) -> impl DoubleEndedIterator<Item = usize> + '_ {
+        match self {
+            IndexSlice::U16(slice) => Either::Left(slice.iter().copied().map(usize::from)),
+            // This `as` conversion cannot overflow because `usize` is at least 32 bits,
+            // as asserted with a `compile_error!` in this file.
+            IndexSlice::U32(slice) => Either::Right(slice.iter().copied().map(|i| i as usize)),
+        }
+    }
 }
+
+// Check condition under which `IndexSlice::iter_usize()` is valid.
+#[cfg(target_pointer_width = "16")]
+compile_error!("all-is-cubes does not support platforms with less than 32-bit `usize`");
 
 #[cfg(false)] // currently unused
 impl IndexSliceMut<'_> {
@@ -578,6 +596,30 @@ mod tests {
         assert_eq!(
             v,
             IndexVec::U32(vec![1, 2, 3, 4, 5, 1_000_001, 1_000_002, 1_000_003])
+        );
+    }
+
+    #[test]
+    fn iter_u32() {
+        assert_eq!(
+            Vec::from_iter(IndexSlice::U16(&[5, 10, 72]).iter_u32()),
+            [5u32, 10, 72]
+        );
+        assert_eq!(
+            Vec::from_iter(IndexSlice::U32(&[5, 10, 72]).iter_u32()),
+            [5u32, 10, 72]
+        );
+    }
+
+    #[test]
+    fn iter_usize() {
+        assert_eq!(
+            Vec::from_iter(IndexSlice::U16(&[5, 10, 72]).iter_usize()),
+            [5usize, 10, 72]
+        );
+        assert_eq!(
+            Vec::from_iter(IndexSlice::U32(&[5, 10, 72]).iter_usize()),
+            [5usize, 10, 72]
         );
     }
 }

@@ -106,8 +106,8 @@ fn mesh_has_documented_depth_ordering() {
         );
         let increasing_direction = face.opposite().normal_vector();
         assert!(
-            sub_mesh.indices_opaque.as_slice(..).iter_u32().is_sorted_by_key(|i| {
-                sub_mesh.vertices.0[i as usize].position.to_vector().dot(increasing_direction)
+            sub_mesh.indices_opaque.as_slice(..).iter_usize().is_sorted_by_key(|i| {
+                sub_mesh.vertices.0[i].position.to_vector().dot(increasing_direction)
             }),
             "should be sorted along {face:?}"
         );
