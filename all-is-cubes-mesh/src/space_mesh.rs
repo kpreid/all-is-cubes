@@ -3,7 +3,6 @@ use alloc::vec::Vec;
 use core::range::Range;
 use core::{fmt, mem, ops};
 
-use bit_set::BitSet;
 use exhaust::Exhaust;
 use itertools::izip;
 use smallvec::SmallVec;
@@ -23,6 +22,8 @@ use crate::texture;
 
 // -------------------------------------------------------------------------------------------------
 
+type BlockIndexSet = crate::BitSet<BlockIndex>;
+
 /// A triangle mesh representation of a [`Space`] (or part of it).
 ///
 /// [`SpaceMesh`]es are assembled from [`BlockMesh`]es.
@@ -40,7 +41,7 @@ pub struct SpaceMesh<M: MeshTypes> {
     meta: MeshMeta<M>,
 
     /// Set of all [`BlockIndex`]es whose meshes were incorporated into this mesh.
-    block_indices_used: BitSet,
+    block_indices_used: BlockIndexSet,
 }
 
 impl<M: MeshTypes> SpaceMesh<M> {
@@ -112,10 +113,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     /// contains has changed its definition.
     #[inline]
     pub fn blocks_used_iter(&self) -> impl Iterator<Item = BlockIndex> + '_ {
-        self.block_indices_used.iter().map(|i| {
-            // Cannot overflow unless `block_indices_used` contains invalid data.
-            i as BlockIndex
-        })
+        self.block_indices_used.iter()
     }
 
     #[allow(dead_code, reason = "used conditionally")]
@@ -173,7 +171,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
             + v0.capacity() * size_of::<M::Vertex>()
             + v1.capacity() * size_of::<<M::Vertex as Vertex>::SecondaryData>()
             + indices.capacity_bytes()
-            + block_indices_used.capacity() / 8
+            + block_indices_used.capacity_bytes()
             + textures_used.capacity() * size_of::<M::Tile>()
     }
 
@@ -255,7 +253,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
             v1.clear();
             indices.clear();
             meta.clear();
-            block_indices_used.make_empty();
+            block_indices_used.clear();
         }
 
         // Use the existing index allocation as an (empty) deque for bidirectional insertions.
@@ -278,7 +276,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 return;
             };
 
-            let already_seen_index = !self.block_indices_used.insert(index.into());
+            let already_seen_index = !self.block_indices_used.insert(index);
 
             if !already_seen_index {
                 // Capture texture handles to ensure that our texture coordinates stay valid.
@@ -305,7 +303,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                             .is_some_and(|bm| bm.face_vertices[face.opposite()].fully_opaque)
                     {
                         // Don't draw obscured faces, but do record that we depended on them.
-                        self.block_indices_used.insert(adj_block_index.into());
+                        self.block_indices_used.insert(adj_block_index);
                         return true;
                     }
                     false
@@ -466,7 +464,7 @@ impl<M: MeshTypes> fmt::Debug for SpaceMesh<M> {
         }
         s.field("indices", indices);
         s.field("meta", meta);
-        s.field("block_indices_used", &BitSetDebugAsSet(block_indices_used));
+        s.field("block_indices_used", block_indices_used);
         s.finish()
     }
 }
@@ -550,7 +548,7 @@ impl<M: MeshTypes> Default for SpaceMesh<M> {
             vertices: Default::default(),
             indices: IndexVec::new(),
             meta: MeshMeta::default(),
-            block_indices_used: BitSet::new(),
+            block_indices_used: BlockIndexSet::new(),
         }
     }
 }
@@ -580,7 +578,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 bounding_box: block_mesh.bounding_box(),
                 flaws: block_mesh.flaws(),
             },
-            block_indices_used: BitSet::from_iter([0]),
+            block_indices_used: BlockIndexSet::from_iter([0]),
         };
 
         let mut opaque_indices_deque = IndexVecDeque::from(IndexVec::with_capacity(
@@ -984,14 +982,6 @@ impl fmt::Debug for TransparentMeta {
 }
 
 // -------------------------------------------------------------------------------------------------
-
-/// [`BitSet`]'s `Debug` formats with storage details; this omits those and just prints the set.
-struct BitSetDebugAsSet<'a>(&'a BitSet);
-impl fmt::Debug for BitSetDebugAsSet<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_set().entries(self.0.iter()).finish()
-    }
-}
 
 struct DebugAsDisplay<T>(T);
 impl<T: fmt::Display> fmt::Debug for DebugAsDisplay<T> {

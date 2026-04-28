@@ -475,19 +475,21 @@ impl<V: Vertex> SubMesh<V> {
 
     #[cfg(debug_assertions)]
     fn consistency_check(&self) {
-        let vertex_count = self.vertices.0.len();
+        use all_is_cubes::math::u32size;
+
+        let vertex_count = u32::try_from(self.vertices.0.len()).unwrap();
 
         // Vertex struct-of-arrays should have matching lengths.
-        assert_eq!(self.vertices.1.len(), vertex_count);
+        assert_eq!(self.vertices.1.len(), u32size(vertex_count));
 
         // Every vertex should be used at least once,
         // and every index should be in-bounds.
-        let mut used_vertices = bit_set::BitSet::with_capacity(vertex_count);
+        let mut used_vertices = crate::BitSet::<u32>::new();
         for index in self
             .indices_opaque
             .as_slice(..)
-            .iter_usize()
-            .chain(self.indices_transparent.as_slice(..).iter_usize())
+            .iter_u32()
+            .chain(self.indices_transparent.as_slice(..).iter_u32())
         {
             assert!(
                 index < vertex_count,

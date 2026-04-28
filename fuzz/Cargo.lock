@@ -125,7 +125,6 @@ dependencies = [
  "all-is-cubes",
  "all-is-cubes-render",
  "arbitrary",
- "bit-set",
  "bytemuck",
  "derive_more",
  "either",

@@ -128,7 +128,6 @@ version = "0.10.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-render",
- "bit-set",
  "bytemuck",
  "derive_more",
  "either",
