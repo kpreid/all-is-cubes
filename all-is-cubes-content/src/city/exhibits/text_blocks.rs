@@ -18,9 +18,12 @@ fn TEXT(_: Context<'_>) {
         offset: GridVector,
     }
 
+    let debug = true;
+
     let texts = [
         Texhibit {
             text: text::Text::builder()
+                .debug(debug)
                 .string(literal!("right back"))
                 .positioning(text::Positioning {
                     x: text::PositioningX::Right,
@@ -33,6 +36,7 @@ fn TEXT(_: Context<'_>) {
         },
         Texhibit {
             text: text::Text::builder()
+                .debug(debug)
                 .string(literal!("left front"))
                 .positioning(text::Positioning {
                     x: text::PositioningX::Left,
@@ -64,6 +68,7 @@ fn TEXT(_: Context<'_>) {
         },
         Texhibit {
             text: text::Text::builder()
+                .debug(debug)
                 .string(literal!("left back outline"))
                 .foreground(foreground_block)
                 .outline(Some(outline_block))
@@ -78,6 +83,7 @@ fn TEXT(_: Context<'_>) {
         },
         Texhibit {
             text: text::Text::builder()
+                .debug(debug)
                 .string(literal!("weird vert bounds"))
                 .layout_bounds(R16, GridAab::from_lower_upper([0, 16, 0], [64, 64, 64]))
                 // .foreground(foreground_block)
