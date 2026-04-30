@@ -6,7 +6,7 @@
 )]
 
 use alloc::boxed::Box;
-use core::iter;
+use core::{fmt, iter};
 
 use arcstr::ArcStr;
 use bevy_platform::sync::OnceLock;
@@ -48,11 +48,14 @@ use super::Evoxels;
 /// To create a block or multiblock group from this, use [`Primitive::Text`].
 /// To combine the text with other shapes, use [`Modifier::Composite`].
 ///
-//--
-// TODO: Each `Text` instance should memoize glyph layout so that layout work can be shared among
-// blocks. We don't really have much to do there yet, though.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Text {
+    data: TextData,
+    // TODO: this is unused now, but will be when we replace text layout with our own
+    layout_cache: OnceLock<()>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct TextData {
     string: ArcStr,
 
     font: Font,
@@ -103,7 +106,7 @@ impl Text {
 
     /// Converts this into a [`TextBuilder`] so that it may be modified.
     pub fn into_builder(self) -> TextBuilder {
-        let Self {
+        let TextData {
             string,
             font,
             foreground,
@@ -112,7 +115,7 @@ impl Text {
             layout_bounds,
             positioning,
             debug,
-        } = self;
+        } = self.data;
         TextBuilder {
             string,
             font,
@@ -127,16 +130,16 @@ impl Text {
 
     /// Returns the string which this displays.
     pub fn string(&self) -> &ArcStr {
-        &self.string
+        &self.data.string
     }
     /// Returns the font which this uses to display the text.
     pub fn font(&self) -> &Font {
-        &self.font
+        &self.data.font
     }
 
     /// Returns the voxel resolution which the text blocks will have.
-    pub fn resolution(&self) -> &Font {
-        &self.font
+    pub fn resolution(&self) -> Resolution {
+        self.data.resolution
     }
 
     /// Returns the bounding box, within the blocks at the specified resolution, of the text.
@@ -146,17 +149,17 @@ impl Text {
     /// The text may overflow this bounding box depending on its length and the
     /// [`positioning()`](Self::positioning).
     pub fn layout_bounds(&self) -> GridAab {
-        self.layout_bounds
+        self.data.layout_bounds
     }
 
     /// Returns the [`Positioning`] parameters this uses.
     pub fn positioning(&self) -> Positioning {
-        self.positioning
+        self.data.positioning
     }
 
     /// Returns the debug-rendering flag.
     pub fn debug(&self) -> bool {
-        self.debug
+        self.data.debug
     }
 
     /// Returns the bounding box of the text as displayed, in voxels at the
@@ -169,7 +172,7 @@ impl Text {
 
         let dummy_voxel = Evoxel::from_color(Rgba::BLACK); // could be anything
         self.with_transform_and_drawable(
-            match self.outline {
+            match self.data.outline {
                 Some(_) => Brush::Outline {
                     foreground: dummy_voxel,
                     outline: dummy_voxel,
@@ -185,7 +188,7 @@ impl Text {
     ///
     /// This is identical to [`Self::bounding_voxels()`] scaled down by [`Self::resolution()`].
     pub fn bounding_blocks(&self) -> GridAab {
-        self.bounding_voxels().divide(self.resolution.into())
+        self.bounding_voxels().divide(self.resolution().into())
     }
 
     /// Returns a transaction which places [`Primitive::Text`] blocks containing this text.
@@ -251,8 +254,8 @@ impl Text {
         // Evaluate blocks making up the brush
         let brush = {
             let _recursion_scope = block::Budget::recurse(&filter.budget)?;
-            let evaluated_foreground = self.foreground.evaluate_to_evoxel_internal(filter)?;
-            match self.outline {
+            let evaluated_foreground = self.data.foreground.evaluate_to_evoxel_internal(filter)?;
+            match self.data.outline {
                 Some(ref block) => Brush::Outline {
                     foreground: evaluated_foreground,
                     outline: block.evaluate_to_evoxel_internal(filter)?,
@@ -265,34 +268,35 @@ impl Text {
             brush,
             block_offset,
             |text_obj, text_aab, drawing_transform| {
-                let voxels: Evoxels =
-                    match text_aab.intersection_cubes(GridAab::for_block(self.resolution)) {
-                        Some(bounds_in_this_block) => {
-                            let fill = if self.debug {
-                                DEBUG_TEXT_BOUNDS_VOXEL
-                            } else {
-                                Evoxel::AIR
-                            };
-                            let mut voxels: Vol<Box<[Evoxel]>> =
-                                Vol::from_fn(bounds_in_this_block, |_| fill);
-
-                            text_obj
-                                .draw(&mut DrawingPlane::new(&mut voxels, drawing_transform))
-                                .unwrap();
-
-                            Evoxels::from_many(self.resolution, voxels.map_container(Into::into))
-                        }
-
-                        None => Evoxels::from_one(if self.debug {
-                            DEBUG_NO_INTERSECTION_VOXEL
+                let voxels: Evoxels = match text_aab
+                    .intersection_cubes(GridAab::for_block(self.data.resolution))
+                {
+                    Some(bounds_in_this_block) => {
+                        let fill = if self.data.debug {
+                            DEBUG_TEXT_BOUNDS_VOXEL
                         } else {
                             Evoxel::AIR
-                        }),
-                    };
+                        };
+                        let mut voxels: Vol<Box<[Evoxel]>> =
+                            Vol::from_fn(bounds_in_this_block, |_| fill);
+
+                        text_obj
+                            .draw(&mut DrawingPlane::new(&mut voxels, drawing_transform))
+                            .unwrap();
+
+                        Evoxels::from_many(self.data.resolution, voxels.map_container(Into::into))
+                    }
+
+                    None => Evoxels::from_one(if self.data.debug {
+                        DEBUG_NO_INTERSECTION_VOXEL
+                    } else {
+                        Evoxel::AIR
+                    }),
+                };
 
                 Ok(MinEval::new(
                     BlockAttributes {
-                        display_name: self.string.clone(),
+                        display_name: self.data.string.clone(),
                         ..BlockAttributes::default()
                     },
                     voxels,
@@ -302,7 +306,7 @@ impl Text {
     }
 
     fn thickness(&self) -> GridCoordinate {
-        match self.outline {
+        match self.data.outline {
             Some(_) => 2,
             None => 1,
         }
@@ -318,14 +322,14 @@ impl Text {
             Gridgid,
         ) -> R,
     ) -> R {
-        let resolution_g = GridCoordinate::from(self.resolution);
+        let resolution_g = GridCoordinate::from(self.data.resolution);
         let Positioning {
             x: positioning_x,
             line_y,
             z: positioning_z,
-        } = self.positioning;
+        } = self.data.positioning;
 
-        let lb = self.layout_bounds;
+        let lb = self.data.layout_bounds;
         // TODO: The subtractions of 1 here are dubious.
         // I believe they are correct on the principle that embedded-graphics uses
         // "a point labels a pixel" coordinates, so even leftward-extending text
@@ -353,7 +357,7 @@ impl Text {
             Gridgid::from_translation(layout_offset - (block_offset * resolution_g))
                 * Gridgid::FLIP_Y;
 
-        let character_style = eg::mono_font::MonoTextStyle::new(self.font.eg_font(), brush);
+        let character_style = eg::mono_font::MonoTextStyle::new(self.data.font.eg_font(), brush);
         let text_style = eg::text::TextStyleBuilder::new()
             .alignment(match positioning_x {
                 PositioningX::Left => eg::text::Alignment::Left,
@@ -368,7 +372,7 @@ impl Text {
             })
             .build();
         let text_obj = &eg::text::Text::with_text_style(
-            self.string.as_str(),
+            self.data.string.as_str(),
             eg::prelude::Point::new(0, 0),
             character_style,
             text_style,
@@ -383,21 +387,90 @@ impl Text {
     }
 }
 
+impl From<TextData> for Text {
+    fn from(data: TextData) -> Self {
+        Self {
+            data,
+            layout_cache: OnceLock::new(),
+        }
+    }
+}
+
+impl Clone for Text {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            layout_cache: self.layout_cache.clone(),
+        }
+    }
+}
+
+impl PartialEq for Text {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            data,
+            layout_cache: _, // layout_cache is derived from data
+        } = self;
+        *data == other.data
+    }
+}
+impl Eq for Text {}
+
+impl core::hash::Hash for Text {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        let Self {
+            data,
+            layout_cache: _, // layout_cache is derived from data
+        } = self;
+        data.hash(state);
+    }
+}
+
 impl universe::VisitHandles for Text {
     fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
         let Self {
-            string: _,
-            font,
-            foreground,
-            outline,
-            resolution: _,
-            layout_bounds: _,
-            positioning: _,
-            debug: _,
+            data:
+                TextData {
+                    string: _,
+                    font,
+                    foreground,
+                    outline,
+                    resolution: _,
+                    layout_bounds: _,
+                    positioning: _,
+                    debug: _,
+                },
+            layout_cache: _,
         } = self;
         font.visit_handles(visitor);
         foreground.visit_handles(visitor);
         outline.visit_handles(visitor);
+    }
+}
+
+#[expect(clippy::missing_fields_in_debug)]
+impl fmt::Debug for Text {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let TextData {
+            string,
+            font,
+            foreground,
+            outline,
+            resolution,
+            layout_bounds,
+            positioning,
+            debug,
+        } = &self.data;
+        f.debug_struct("Text")
+            .field("string", string)
+            .field("font", font)
+            .field("foreground", foreground)
+            .field("outline", outline)
+            .field("resolution", resolution)
+            .field("layout_bounds", layout_bounds)
+            .field("positioning", positioning)
+            .field("debug", debug)
+            .finish()
     }
 }
 
@@ -416,7 +489,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Text {
         )
         .map_err(|_volume_error| arbitrary::Error::IncorrectFormat)?;
 
-        Ok(Self {
+        Ok(Self::from(TextData {
             // ArcStr doesn't implement Arbitrary
             string: alloc::string::String::arbitrary(u)?.into(),
             font: Font::arbitrary(u)?,
@@ -426,7 +499,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Text {
             layout_bounds,
             positioning: Positioning::arbitrary(u)?,
             debug: bool::arbitrary(u)?,
-        })
+        }))
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
@@ -468,7 +541,7 @@ impl TextBuilder {
             positioning,
             debug,
         } = self;
-        Text {
+        Text::from(TextData {
             string,
             font,
             foreground,
@@ -477,7 +550,7 @@ impl TextBuilder {
             layout_bounds: layout_bounds.unwrap_or(GridAab::for_block(resolution)),
             positioning,
             debug,
-        }
+        })
     }
 
     /// Sets the string to be displayed.
@@ -792,14 +865,18 @@ mod serialization {
     impl From<&text::Text> for schema::TextSer {
         fn from(value: &text::Text) -> Self {
             let &text::Text {
-                ref string,
-                ref font,
-                ref foreground,
-                ref outline,
-                resolution,
-                layout_bounds,
-                positioning,
-                debug,
+                data:
+                    text::TextData {
+                        ref string,
+                        ref font,
+                        ref foreground,
+                        ref outline,
+                        resolution,
+                        layout_bounds,
+                        positioning,
+                        debug,
+                    },
+                layout_cache: _,
             } = value;
             schema::TextSer::TextV1 {
                 string: string.clone(),

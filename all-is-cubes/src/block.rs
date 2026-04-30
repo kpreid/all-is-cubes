@@ -880,9 +880,14 @@ impl From<Rgba> for Block {
 )]
 macro_rules! _block_from_color {
     ($color:expr) => {
-        $crate::block::Block::from_static_primitive(const {
-            &$crate::block::Primitive::from_color($color.with_alpha_one_if_has_no_alpha())
-        })
+        $crate::block::Block::from_static_primitive(
+            const {
+                // Note: We cannot use `Primitive::from_color()`
+                &$crate::block::Primitive::Atom($crate::block::Atom::from_color(
+                    $color.with_alpha_one_if_has_no_alpha(),
+                ))
+            },
+        )
     };
 
     ($r:literal, $g:literal, $b:literal $(,)?) => {
@@ -997,7 +1002,8 @@ pub const AIR: Block = Block(BlockPtr::Static(&Primitive::Air));
 impl Primitive {
     /// Construct a [`Primitive`] from a reflectance color.
     ///
-    /// This function is equivalent to `Block::from(color)` but it can be used in const contexts.
+    /// This function is equivalent to `Block::from(color)` but it can be used in const contexts
+    /// and returns a [`Primitive`] instead of a [`Block`].
     pub const fn from_color(color: Rgba) -> Primitive {
         Primitive::Atom(Atom::from_color(color))
     }
@@ -1116,9 +1122,8 @@ mod conversions_for_atom {
     impl Atom {
         /// Construct an [`Atom`] with the given reflectance color.
         ///
-        /// This is identical to `From<Rgba>::from()` except that it is a `const fn`.
-        // TODO: public API?
-        pub(crate) const fn from_color(color: Rgba) -> Self {
+        /// This function is equivalent to `Atom::from(color)` but it can be used in const contexts.
+        pub const fn from_color(color: Rgba) -> Self {
             Atom {
                 color,
                 emission: Rgb::ZERO,
