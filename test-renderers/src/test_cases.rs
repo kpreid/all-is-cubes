@@ -641,16 +641,23 @@ async fn info_text(mut context: RenderTestContext, scale_factor: f64) {
     finish_universe_from_space(context.universe_mut(), space);
     let overlays = Overlays {
         cursor: None,
+        // TODO: When we have broader character support in our fonts, add more non-ASCII characters
+        // to increase coverage, such as
+        // * proper box drawing
+        // * combining characters
+        // * emoji and other double-width characters
         info_text: Some(
             "\
             /\\/\\/\\/\\/\\/\\/\\/\\\n\
-            | Hello world. |\n\
+            | Hello·world. |\n\
+            | Info text    |\n\
+            | test Nº 1.   |\n\
             +--------------+--------\n\
-            |\n\
-            |\n\
-            |\n\
-            |\n\
-            |\n\
+            ¦\n\
+            ¦\n\
+            ¦\n\
+            ¦\n\
+            ¦\n\
             ",
         ),
     };
