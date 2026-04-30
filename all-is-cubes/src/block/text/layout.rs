@@ -62,10 +62,15 @@ pub(crate) struct InGlyph;
 // -------------------------------------------------------------------------------------------------
 
 /// For a given piece of text, computes what glyphs to actually draw at what positions.
-pub(crate) fn compute_layout(text: &text::TextData) -> Layout {
-    let decl = text.font.font_decl();
+pub(crate) fn compute_layout(
+    string: &str,
+    decl: &text::FontDecl,
+    outline: bool,
+    layout_bounds: GridAab,
+    positioning: text::Positioning,
+) -> Layout {
     let character_size_g = decl.character_size.to_i32();
-    let z_expansion: GridCoordinate = text.outline.is_some().into();
+    let z_expansion: GridCoordinate = outline.into();
 
     // Find the *point* within the layout_bounds the text is positioned relative to.
     //
@@ -75,15 +80,15 @@ pub(crate) fn compute_layout(text: &text::TextData) -> Layout {
     //
     // TODO: Given that both text width and layout bounds may be odd or even, it is not sufficient
     // for this to be an integer point; it needs to be possibly half-integer (0, 0.5, 1, 1.5, ...).
-    let lb = text.layout_bounds;
+    let lb = layout_bounds;
     let layout_offset = vec3(
-        match text.positioning.x {
+        match positioning.x {
             text::PositioningX::Left => lb.lower_bounds().x,
             // 0.75 is a fudge factor that empirically gets the *rounding* behavior we want.
             text::PositioningX::Center => libm::round(lb.center().x - 0.75) as GridCoordinate,
             text::PositioningX::Right => lb.upper_bounds().x - 1,
         },
-        match text.positioning.line_y {
+        match positioning.line_y {
             text::PositioningY::BodyTop => lb.upper_bounds().y - 1,
             text::PositioningY::BodyMiddle => {
                 // 0.75 is fudge factor to get rounding right — TODO: see if this cancels out another off by 1
@@ -95,9 +100,9 @@ pub(crate) fn compute_layout(text: &text::TextData) -> Layout {
             }
             text::PositioningY::BodyBottom => lb.lower_bounds().y + character_size_g.height - 1,
         },
-        match text.positioning.z {
+        match positioning.z {
             text::PositioningZ::Back => lb.lower_bounds().z,
-            text::PositioningZ::Front => lb.upper_bounds().z.saturating_sub(text.thickness()),
+            text::PositioningZ::Front => lb.upper_bounds().z.saturating_sub(z_expansion + 1),
         },
     );
 
@@ -109,7 +114,7 @@ pub(crate) fn compute_layout(text: &text::TextData) -> Layout {
 
     // TODO: Eventually we will likely want to switch to treating line break characters more like
     // a command (inside a single loop over graphemes) than like a separator of lines.
-    for line in text.string.split('\n') {
+    for line in string.split('\n') {
         // Index in `glyphs` of the first glyph of this line.
         // Once we know the line length, this will let us adjust the horizontal positioning
         let first_glyph_of_line = glyphs.len();
@@ -140,7 +145,7 @@ pub(crate) fn compute_layout(text: &text::TextData) -> Layout {
         // Now that we know the width of the line, we can figure out where it should be positioned
         // horizontally.
         let line_width = cursor_x; // when fonts get fancier these may be different
-        let line_start_x: GridCoordinate = match text.positioning.x {
+        let line_start_x: GridCoordinate = match positioning.x {
             text::PositioningX::Left => 0,
             text::PositioningX::Center => -(line_width - 1) / 2,
             text::PositioningX::Right => -(line_width - 1),

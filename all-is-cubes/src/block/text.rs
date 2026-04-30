@@ -322,16 +322,15 @@ impl Text {
     }
 
     fn get_or_init_layout(&self) -> &Layout {
-        self.layout_cache.get_or_init(|| layout::compute_layout(&self.data))
-    }
-}
-
-impl TextData {
-    fn thickness(&self) -> GridCoordinate {
-        match self.outline {
-            Some(_) => 2,
-            None => 1,
-        }
+        self.layout_cache.get_or_init(|| {
+            layout::compute_layout(
+                &self.data.string,
+                self.data.font.font_decl(),
+                self.data.outline.is_some(),
+                self.data.layout_bounds,
+                self.data.positioning,
+            )
+        })
     }
 }
 
