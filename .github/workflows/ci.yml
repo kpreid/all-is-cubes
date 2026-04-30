@@ -135,7 +135,7 @@ jobs:
       # about caching the builds of them.
       # cargo-mutants and cargo-about are not used in this step but will be cached for later use.
       run: |
-        cargo install --locked wasm-pack@0.14.0 cargo-about@0.8.2 cargo-mutants@25.3.1
+        cargo install --locked wasm-pack@0.14.0 cargo-about@0.8.2 cargo-mutants@27.0.0
 
     - run: df -h .
 
@@ -526,7 +526,7 @@ jobs:
 
       # Install cargo-mutants
       # This should usually be already installed, but is present in case of cache miss
-      - run: cargo install --locked cargo-mutants@25.3.1
+      - run: cargo install --locked cargo-mutants@27.0.0
 
       - name: Relative diff
         run: |
@@ -535,7 +535,7 @@ jobs:
       
       - name: Mutants
         # See mutants.yml for notes on the package selection
-        run: cargo mutants --in-diff git.diff --package all-is-cubes -- --all-features
+        run: cargo mutants --in-diff git.diff --package=all-is-cubes --test-package=test-aic -- --all-features
 
       - uses: actions/upload-artifact@v7
         if: ${{ always() }}

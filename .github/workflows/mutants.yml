@@ -24,11 +24,11 @@ jobs:
         run: rustup toolchain install stable --profile=minimal
 
       - name: Install cargo-mutants
-        run: cargo install --locked cargo-mutants@25.3.1
+        run: cargo install --locked cargo-mutants@27.0.0
 
       - name: Run mutation testing for all-is-cubes
         timeout-minutes: 60
-        run: cargo mutants --package all-is-cubes -- --all-features
+        run: cargo mutants --package=all-is-cubes --test-package=test-aic -- --all-features
         # TODO: Other crates' reasons for non-inclusion:
         #   all-is-cubes-content: insufficient test coverage
         #   all-is-cubes-desktop: insufficient test coverage, unclear if even feasible
