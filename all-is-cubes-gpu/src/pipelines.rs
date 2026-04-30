@@ -820,7 +820,7 @@ impl Pipelines {
         let (info_text_font, info_text_font_metrics) = crate::text::generate_texture_atlas(
             device,
             queue,
-            all_is_cubes::block::text::Font::System16.eg_font(),
+            &all_is_cubes::block::text::Font::System16,
         );
 
         let block_linear_sampler = device.create_sampler(&wgpu::SamplerDescriptor {

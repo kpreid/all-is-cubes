@@ -15,10 +15,11 @@ use embedded_graphics as eg;
 use embedded_graphics::mono_font::DecorationDimensions;
 use embedded_graphics::mono_font::mapping::GlyphMapping;
 use embedded_graphics::prelude::Size;
-use euclid::{Point2D, Size2D, point2, size2, vec2, vec3};
+use euclid::{Point2D, Size2D, Translation2D, point2, size2, vec2, vec3};
 use itertools::iproduct;
 
 use crate::block::{self, Block, BlockAttributes, Evoxel, MinEval, Resolution};
+use crate::camera::ImageSize;
 use crate::content::palette;
 use crate::math::{GridAab, GridCoordinate, GridPoint, GridVector, Gridgid, Rgb, Vol, rgba_const};
 use crate::space::{self, SpaceTransaction};
@@ -700,6 +701,65 @@ impl Font {
                 static FONT: OnceLock<MonoFont<'static>> = OnceLock::new();
                 FONT.get_or_init(|| self.font_decl().load())
             }
+        }
+    }
+
+    /// Returns the size of a character cell that should be used when this font is used with a
+    /// strictly monospaced renderer.
+    ///
+    /// Currently, this will always agree with the spacing that [`Font::draw_str_monospaced()`]
+    /// produces.
+    pub fn character_cell_size(&self) -> ImageSize {
+        let s = self.font_decl().character_size;
+        size2(u32::from(s.width), u32::from(s.height))
+    }
+
+    /// Draws text in this font, calling `set_pixel` for each pixel that should be set.
+    ///
+    /// The output coordinates are X-right Y-down starting from `(0, 0)` at the top-left of the
+    /// first line of text.
+    ///
+    //---
+    // Design note: In most cases, “set pixel” is an inefficient way of drawing images.
+    // In this case, we are using it somewhat for historical reasons, but also because:
+    // * our text generally has few foreground pixels relative to the area it covers
+    // * all of our users want to track bounding boxes or otherwise work with the foreground
+    //   area distinct from the background.
+    //
+    // TODO: This should support drawing outlines, because it can do it more efficiently with
+    // access to the glyph.
+    //
+    // TODO: Ideally this should return an iterator, but a non-borrowing iterator over
+    // `Arc<[PositionedGlyph]>` is tricky.
+    //
+    // TODO: Return a more appropriate unit.
+    pub fn draw_str_monospaced(
+        &self,
+        text: &str,
+        mut set_pixel: impl FnMut(Point2D<i32, euclid::UnknownUnit>),
+    ) {
+        let decl = self.font_decl();
+        let pixels = decl.binary_image();
+        let layout = layout::compute_layout(
+            text,
+            decl,
+            false,
+            GridAab::ORIGIN_CUBE,
+            Positioning {
+                x: PositioningX::Left,
+                line_y: PositioningY::BodyTop,
+                z: PositioningZ::Back,
+            },
+        );
+        for glyph in layout.glyphs.iter() {
+            // TODO: change the output convention so that we do not have to flip coords here?
+            let translation: Translation2D<i32, layout::InGlyph, euclid::UnknownUnit> =
+                Translation2D::from(
+                    glyph.position.to_vector().cast_unit().component_mul(vec2(1, -1)),
+                );
+            glyph_from_binary_image(pixels, decl, glyph.glyph_index).for_each(|p| {
+                set_pixel(translation.transform_point(p));
+            });
         }
     }
 }

@@ -4,10 +4,8 @@ use core::iter;
 
 use itertools::iproduct;
 
-use all_is_cubes::drawing::embedded_graphics::{
-    self as eg, Drawable as _, geometry::Point, prelude::Size, transform::Transform as _,
-};
-use all_is_cubes::euclid::{Size2D, Vector2D, point2, size2};
+use all_is_cubes::drawing::embedded_graphics as eg;
+use all_is_cubes::euclid::{self, Size2D, Vector2D, point2, size2};
 use all_is_cubes_render::camera::{ImageSize, Viewport};
 
 use crate::everything::InfoTextTexture;
@@ -100,19 +98,22 @@ impl GpuFontMetrics {
 /// arranged as 16 cells × 16 cells of premultiplied-alpha color.
 ///
 /// Returns the texture and information needed to use it.
+///
+/// Design note:
+/// The reason why we are approaching this as drawing strings into the atlas, rather than copying
+/// glyphs into the atlas, is that we want the GPU’s job to be solely “decide which of these
+/// existing character-cell-sized pictures should cover this part of the screen”, rather than, in
+/// the future where we have composed characters and such, needing the shader to do layout itself.
 pub(crate) fn generate_texture_atlas(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    font: &eg::mono_font::MonoFont<'_>,
+    font: &all_is_cubes::block::text::Font,
 ) -> (Identified<wgpu::TextureView>, GpuFontMetrics) {
     let outline_radius_u = 1u32;
     let outline_radius_i = outline_radius_u.cast_signed();
 
     // Size of the on-screen cell, which the outline may overflow.
-    let logical_cell_size = size2(
-        font.character_size.width + font.character_spacing,
-        font.character_size.height,
-    );
+    let logical_cell_size: ImageSize = font.character_cell_size();
     // Size of the atlas glyph cell, which has to be big enough for the added outline.
     let atlas_cell_size = logical_cell_size + ImageSize::splat(outline_radius_u * 2);
 
@@ -125,35 +126,34 @@ pub(crate) fn generate_texture_atlas(
     for (character, (y, x)) in iter::zip('\u{00}'..='\u{FF}', iproduct!(0..16, 0..16)) {
         let string = character.encode_utf8(&mut string_buf);
 
-        let position = Point::new(
-            x * atlas_cell_size.width.cast_signed()
-                    // center in cell, and if only 1px, prefer putting it on the left
-                    + font.character_spacing.div_ceil(2).cast_signed(),
-            y * atlas_cell_size.height.cast_signed(),
-        ) + Size::new_equal(outline_radius_u); // offset by outline radius to fit into cell
-        let character_style = eg::text::TextStyle::with_baseline(eg::text::Baseline::Top);
-
-        let text = eg::text::Text::with_text_style(
-            string,
-            position,
-            eg::mono_font::MonoTextStyle::new(font, EgRgba([255, 255, 255, 255])),
-            character_style,
-        );
-        let shadow = eg::text::Text::with_text_style(
-            string,
-            position,
-            eg::mono_font::MonoTextStyle::new(font, EgRgba([0, 0, 0, 255])),
-            character_style,
+        let translate_glyph_to_atlas = euclid::Translation2D::new(
+            x * atlas_cell_size.width.cast_signed() + outline_radius_i,
+            y * atlas_cell_size.height.cast_signed() + outline_radius_i,
         );
 
+        // Draw black shadow at all offsets within the outline radius.
+        // TODO: Replace this with the font renderer being able to offer us outlined glyphs
+        // directly.
         for (dx, dy) in iproduct!(
             -outline_radius_i..=outline_radius_i,
             -outline_radius_i..=outline_radius_i
         ) {
-            let Ok(_) = shadow.translate(Point::new(dx, dy)).draw(dt.draw_target());
+            let outlined_translation =
+                translate_glyph_to_atlas + euclid::Translation2D::new(dx, dy);
+            font.draw_str_monospaced(string, |p| {
+                if let Some(p) = outlined_translation.transform_point(p).try_cast::<u32>() {
+                    dt.draw_target().set_pixel(p, [0u8, 0, 0, 255]);
+                }
+            });
         }
 
-        let Ok(_) = text.draw(dt.draw_target());
+        // Draw white foreground glyph on top.
+        font.draw_str_monospaced(string, |p| {
+            // TODO: also clip to the cell boundary?
+            if let Some(p) = translate_glyph_to_atlas.transform_point(p).try_cast::<u32>() {
+                dt.draw_target().set_pixel(p, [255u8, 255, 255, 255]);
+            }
+        });
     }
 
     dt.upload(queue);
