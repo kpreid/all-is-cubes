@@ -44,9 +44,6 @@ pub use texture::{GltfAtlasPoint, GltfTextureAllocator, GltfTexturePlane, GltfTi
 mod vertex;
 pub use vertex::GltfVertex;
 
-#[cfg(test)]
-mod tests;
-
 // -------------------------------------------------------------------------------------------------
 
 /// [`MeshTypes`] implementation for glTF output.
