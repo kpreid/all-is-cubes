@@ -782,23 +782,16 @@ impl universe::VisitHandles for Font {
     reason = "TODO: probably want to do something else"
 )]
 pub struct Positioning {
-    /// How to place the text horizontally relative to the anchor point.
+    /// How to place the text horizontally relative to the layout bounds.
     pub x: PositioningX,
 
     // TODO: implement this
-    // /// How to place the text's first or last line relative to the anchor point.
+    // /// How to place the text's first or last line relative to the layout bounds.
     // pub total_y: (),
-    /// How to place the characters of the first line relative to the anchor point.
+    /// How to place the characters of the first line relative to the layout bounds.
     pub line_y: PositioningY,
 
-    /// How to place the text depthwise.
-    ///
-    /// For example, 0 means the voxels will be fill the `0..1` range (in front of the
-    /// anchor point), and `-1` means they will fill the `-1..0` range (behind the anchor point).
-    ///
-    /// This is in units of whatever voxel resolution the font itself uses. Therefore, it should
-    /// not be used for positioning the text overall,
-    /// but rather for voxel-level effects like engraving vs. embossing.
+    /// How to place the text depthwise relative to the layout bounds.
     pub z: PositioningZ,
 }
 
