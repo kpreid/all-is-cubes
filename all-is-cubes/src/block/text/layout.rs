@@ -70,7 +70,7 @@ pub(crate) fn compute_layout(
     positioning: text::Positioning,
 ) -> Layout {
     let character_size_g = decl.character_size.to_i32();
-    let z_expansion: GridCoordinate = outline.into();
+    let outline_expansion: GridCoordinate = outline.into();
 
     // Find the *point* within the layout_bounds the text is positioned relative to.
     //
@@ -98,7 +98,7 @@ pub(crate) fn compute_layout(
         },
         match positioning.z {
             text::PositioningZ::Back => lb.lower_bounds().z,
-            text::PositioningZ::Front => lb.upper_bounds().z.saturating_sub(z_expansion + 1),
+            text::PositioningZ::Front => lb.upper_bounds().z.saturating_sub(outline_expansion + 1),
         },
     );
 
@@ -146,7 +146,7 @@ pub(crate) fn compute_layout(
         // not to get perfect rendering of extreme cases.
         let line_width = cursor_x; // when fonts get fancier these may be different
         let line_start_x: GridCoordinate = match positioning.x {
-            text::PositioningX::Left => lb.lower_bounds().x,
+            text::PositioningX::Left => lb.lower_bounds().x.saturating_add(outline_expansion),
             // By adding up everything before we divide by 2, we get perfectly centered
             // odd-width texts in odd-with bounds, and even-width texts in even-width bounds,
             // and when the parity does not match, we round down.
@@ -157,7 +157,9 @@ pub(crate) fn compute_layout(
                     .saturating_sub(line_width))
                     / 2
             }
-            text::PositioningX::Right => lb.upper_bounds().x.saturating_sub(line_width),
+            text::PositioningX::Right => {
+                lb.upper_bounds().x.saturating_sub(line_width).saturating_sub(outline_expansion)
+            }
         };
 
         // Move all glyphs in the line to where they should be,
@@ -165,15 +167,22 @@ pub(crate) fn compute_layout(
         for glyph in &mut glyphs[first_glyph_of_line..] {
             glyph.position.x = glyph.position.x.saturating_add(line_start_x);
 
-            // TODO: neither this nor the consistency check accounts for outline expansion in x and y
             let glyph_bounding_box = GridAab::from_lower_upper(
                 // accounting for Y flip -- TODO: load fonts Y-up instead
-                (glyph.position + vec2(0, 1 - character_size_g.height))
-                    .extend(layout_offset.z)
-                    .cast_unit(),
-                (glyph.position + vec2(character_size_g.width, 1))
-                    .extend(layout_offset.z + 1 + z_expansion)
-                    .cast_unit(),
+                (glyph.position
+                    + vec2(
+                        -outline_expansion,
+                        1 - character_size_g.height - outline_expansion,
+                    ))
+                .extend(layout_offset.z)
+                .cast_unit(),
+                (glyph.position
+                    + vec2(
+                        character_size_g.width + outline_expansion,
+                        1 + outline_expansion,
+                    ))
+                .extend(layout_offset.z + 1 + outline_expansion)
+                .cast_unit(),
             );
             bounding_box = Some(match bounding_box {
                 None => glyph_bounding_box,
@@ -192,7 +201,7 @@ pub(crate) fn compute_layout(
     };
 
     #[cfg(debug_assertions)]
-    result.consistency_check(decl);
+    result.consistency_check(decl, outline);
 
     result
 }
@@ -201,16 +210,18 @@ pub(crate) fn compute_layout(
 
 impl Layout {
     #[cfg(debug_assertions)]
-    pub(crate) fn consistency_check(&self, font: &text::FontDecl) {
-        // TODO: neither this nor the original computation accounts for outlines
+    pub(crate) fn consistency_check(&self, font: &text::FontDecl, outline: bool) {
+        let outline_expansion: GridCoordinate = outline.into();
+
         let bounding_box_from_glyphs =
             euclid::Box2D::from_points(self.glyphs.iter().flat_map(|glyph| {
                 [
-                    glyph.position + vec2(0, 1), // account for Y flip -- TODO: load fonts Y-up instead
+                    glyph.position + vec2(-outline_expansion, 1 + outline_expansion), // account for Y flip -- TODO: load fonts Y-up instead
                     glyph.position
                         + vec2(
-                            GridCoordinate::from(font.character_size.width),
-                            1 - GridCoordinate::from(font.character_size.height),
+                            GridCoordinate::from(font.character_size.width) + outline_expansion,
+                            1 - GridCoordinate::from(font.character_size.height)
+                                - outline_expansion,
                         ),
                 ]
             }));
@@ -292,6 +303,15 @@ mod tests {
             p,
         )
     }
+    fn one_outlined_letter_for_positioning(p: text::Positioning) -> Layout {
+        compute_layout(
+            "A",
+            Font::System16.font_decl(),
+            true,
+            GridAab::for_block(R32),
+            p,
+        )
+    }
 
     // TODO: these bounding box tests overlap with test-aic/block_text.rs positioning_x() --
     // we should keep only one of them, probably.
@@ -302,6 +322,16 @@ mod tests {
             one_letter_for_positioning(positioning!(Left, BodyTop, Back)),
             [0, 16, 0],
             [7, 32, 1],
+        )
+    }
+
+    #[test]
+    fn bb_x_left_and_outline() {
+        assert_bb(
+            one_outlined_letter_for_positioning(positioning!(Left, BodyTop, Back)),
+            // TODO: Y positioning is wrong (not what this test is about)
+            [0, 15, 0],
+            [9, 33, 2],
         )
     }
 
