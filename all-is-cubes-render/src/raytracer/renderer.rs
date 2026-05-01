@@ -1,16 +1,18 @@
-use all_is_cubes::util::StatusText;
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::fmt;
 
+use itertools::iproduct;
+
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
-use all_is_cubes::euclid::{self, point2, vec2};
+use all_is_cubes::euclid::{self, Vector2D, point2, vec2};
 use all_is_cubes::listen::{self, Source as _};
 use all_is_cubes::math::{Rgba, ZeroOne};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, ReadTicket};
+use all_is_cubes::util::StatusText;
 
 use crate::camera::{
     Camera, GraphicsOptions, Layers, Ndc, NdcPoint2, StandardCameras, Viewport, area_usize,
@@ -203,10 +205,10 @@ where
         let onscreen_info_text: String = info_text_fn(&image_info);
         if !onscreen_info_text.is_empty() && self.cameras.cameras().world.options().debug_info_text
         {
-            eg::draw_info_text(
+            draw_info_text(
                 output,
                 viewport,
-                [
+                &[
                     encoder(P::paint(Rgba::BLACK, scene.options_refs().ui)),
                     encoder(P::paint(Rgba::WHITE, scene.options_refs().ui)),
                 ],
@@ -654,100 +656,41 @@ impl Default for ImageInfo {
 }
 // -------------------------------------------------------------------------------------------------
 
-mod eg {
-    use super::*;
-    use embedded_graphics::Drawable;
-    use embedded_graphics::Pixel;
-    use embedded_graphics::draw_target::DrawTarget;
-    use embedded_graphics::mono_font::MonoTextStyle;
-    use embedded_graphics::pixelcolor::BinaryColor;
-    use embedded_graphics::prelude::{
-        DrawTargetExt as _, OriginDimensions, PixelColor, Point, Size,
-    };
-    use embedded_graphics::primitives::Rectangle;
-    use embedded_graphics::text::{Baseline, Text};
-    use itertools::iproduct;
+pub(crate) fn draw_info_text<T: Clone>(
+    output: &mut [T],
+    viewport: Viewport,
+    paint: &[T; 2],
+    info_text: &str,
+) {
+    // TODO: We should scale text according to the viewport's logical size.
 
-    pub(crate) fn draw_info_text<T: Clone>(
-        output: &mut [T],
-        viewport: Viewport,
-        paint: [T; 2],
-        info_text: &str,
-    ) {
-        let target = &mut EgImageTarget {
-            data: output,
-            paint,
-            size: Size {
-                width: viewport.framebuffer_size.width,
-                height: viewport.framebuffer_size.height,
-            },
-        };
+    let output_bounds = euclid::Box2D::from_size(viewport.framebuffer_size);
+    let origin = vec2(5, 5);
+    let font = all_is_cubes::block::text::Font::System16;
 
-        // Draw outline around the text using copies of the text
-        let outline = info_text_drawable(info_text, BinaryColor::Off);
-        for translation in iproduct!(-1..=1, -1..=1)
-            .map(Point::from)
-            .filter(|&point| point != Point::zero())
-        {
-            let Ok(_) = outline.draw(&mut target.translated(translation));
-        }
-
-        info_text_drawable(info_text, BinaryColor::On).draw(target).unwrap();
-    }
-
-    fn info_text_drawable<C: PixelColor + 'static>(
-        text: &str,
-        color_value: C,
-    ) -> impl Drawable<Color = C> + '_ {
-        Text::with_baseline(
-            text,
-            Point::new(5, 5),
-            MonoTextStyle::new(
-                all_is_cubes::block::text::Font::System16.eg_font(),
-                color_value,
-            ),
-            Baseline::Top,
-        )
-    }
-
-    /// Just enough [`DrawTarget`] to implement info text drawing.
-    pub(crate) struct EgImageTarget<'a, T> {
-        data: &'a mut [T],
-        paint: [T; 2],
-        size: Size,
-    }
-
-    impl<T: Clone> DrawTarget for EgImageTarget<'_, T> {
-        type Color = BinaryColor;
-        type Error = core::convert::Infallible;
-
-        fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
-        where
-            I: IntoIterator<Item = Pixel<Self::Color>>,
-        {
-            let bounds = Rectangle {
-                top_left: Point::zero(),
-                size: self.size,
-            };
-            for Pixel(point, color) in pixels {
-                if bounds.contains(point) {
-                    self.data[point.y as usize * self.size.width as usize + point.x as usize] =
-                        match color {
-                            BinaryColor::Off => &self.paint[0],
-                            BinaryColor::On => &self.paint[1],
-                        }
-                        .clone();
-                }
+    // Draw outline around the text using copies of the text
+    // TODO: The font renderer should support outlines directly.
+    for translation in iproduct!(-1..=1, -1..=1)
+        .map(|t| origin + Vector2D::from(t))
+        .filter(|&t| t != Vector2D::zero())
+    {
+        font.draw_str_monospaced(info_text, |mut pixel| {
+            pixel += translation;
+            if output_bounds.contains(pixel.to_u32().cast_unit()) {
+                output[pixel.y as usize * viewport.framebuffer_size.width as usize
+                    + pixel.x as usize] = paint[0].clone();
             }
-            Ok(())
-        }
+        });
     }
 
-    impl<T> OriginDimensions for EgImageTarget<'_, T> {
-        fn size(&self) -> Size {
-            self.size
+    font.draw_str_monospaced(info_text, |mut pixel| {
+        pixel += origin;
+        if output_bounds.contains(pixel.to_u32().cast_unit()) {
+            output
+                [pixel.y as usize * viewport.framebuffer_size.width as usize + pixel.x as usize] =
+                paint[1].clone();
         }
-    }
+    });
 }
 
 // -------------------------------------------------------------------------------------------------
