@@ -293,6 +293,9 @@ mod tests {
         )
     }
 
+    // TODO: these bounding box tests overlap with test-aic/block_text.rs positioning_x() --
+    // we should keep only one of them, probably.
+
     #[test]
     fn bb_x_left() {
         assert_bb(
@@ -303,11 +306,58 @@ mod tests {
     }
 
     #[test]
-    fn bb_x_center() {
+    fn bb_x_center_odd_text_in_even_box() {
         assert_bb(
             one_letter_for_positioning(positioning!(Center, BodyTop, Back)),
+            // when we must round, we round down (leftward)
+            [16 - 4, 16, 0],
+            [16 + 3, 32, 1],
+        )
+    }
+
+    #[test]
+    fn bb_x_center_even_text_in_even_box() {
+        assert_bb(
+            compute_layout(
+                "AB",
+                Font::System16.font_decl(),
+                false,
+                GridAab::for_block(R32),
+                positioning!(Center, BodyTop, Back),
+            ),
+            [16 - 7, 16, 0],
+            [16 + 7, 32, 1],
+        )
+    }
+
+    #[test]
+    fn bb_x_center_odd_text_in_odd_box() {
+        assert_bb(
+            compute_layout(
+                "A",
+                Font::System16.font_decl(),
+                false,
+                GridAab::from_lower_upper([0, 0, 0], [31, 32, 32]),
+                positioning!(Center, BodyTop, Back),
+            ),
             [12, 16, 0],
             [19, 32, 1],
+        )
+    }
+
+    #[test]
+    fn bb_x_center_even_text_in_odd_box() {
+        assert_bb(
+            compute_layout(
+                "AB",
+                Font::System16.font_decl(),
+                false,
+                GridAab::from_lower_upper([0, 0, 0], [31, 32, 32]),
+                positioning!(Center, BodyTop, Back),
+            ),
+            // when we must round, we round down (leftward)
+            [15 - 7, 16, 0],
+            [15 + 7, 32, 1],
         )
     }
 

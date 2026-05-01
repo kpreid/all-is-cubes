@@ -192,6 +192,8 @@ fn bounding_voxels_of_positioning_high() {
 ///
 /// Note that for odd&even cases, we primarily care about the choice of “round down” vs.
 /// “round up” options in that they shouldn’t *change without notice*.
+///
+/// TODO: this test overlaps with tests in layout.rs. We should keep only one of them, probably.
 #[rstest::rstest]
 #[case(PositioningX::Left, false, 0..16, 0..36)]
 #[case(PositioningX::Right, false, 0..16, -20..16)]
