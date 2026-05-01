@@ -5,13 +5,6 @@ use alloc::sync::Arc;
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::text::{self, Text as BlockText};
 use all_is_cubes::block::{self, Resolution::*};
-use all_is_cubes::drawing::embedded_graphics::{
-    Drawable,
-    mono_font::MonoTextStyle,
-    prelude::{Dimensions, Point},
-    text::{Text as EgText, TextStyle},
-};
-use all_is_cubes::drawing::{VoxelBrush, rectangle_to_aab};
 use all_is_cubes::math::{GridAab, GridSize, Gridgid};
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 
@@ -27,33 +20,17 @@ use crate::vui::{self, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetCon
 #[derive(Clone, Debug)]
 #[expect(clippy::exhaustive_structs)] // TODO: find a better strategy
 pub struct LargeText {
-    /// Text to be displayed.
-    pub text: ArcStr,
-    /// Font with which to draw the text.
-    pub font: text::Font,
-    /// Brush with which to draw the text.
-    pub brush: VoxelBrush<'static>,
-    /// Text positioning within the bounds of the widget.
-    pub text_style: TextStyle,
+    /// Text to be displayed, and its style.
+    ///
+    /// The `resolution` field is ignored.
+    /// The `positioning` field does not override UI layout gravity but does affect the
+    /// relationships among the text’s lines.
+    pub text: text::Text,
 }
 
 impl LargeText {
-    fn drawable(&self) -> EgText<'_, MonoTextStyle<'_, &VoxelBrush<'_>>> {
-        EgText::with_text_style(
-            &self.text,
-            Point::new(0, 0),
-            MonoTextStyle::new(self.font.eg_font(), &self.brush),
-            self.text_style,
-        )
-    }
-
     fn bounds(&self) -> GridAab {
-        // TODO: this conversion should be less fiddly
-        rectangle_to_aab(
-            self.drawable().bounding_box(),
-            Gridgid::FLIP_Y,
-            self.brush.bounds().unwrap_or(GridAab::ORIGIN_CUBE),
-        )
+        self.text.bounding_voxels()
     }
 }
 
@@ -68,16 +45,12 @@ impl Layoutable for LargeText {
 impl Widget for LargeText {
     fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController> {
         let mut txn = SpaceTransaction::default();
-        let drawable = self.drawable();
         let draw_bounds = self.bounds();
-        drawable
-            .draw(&mut txn.draw_target(
-                Gridgid::from_translation(
-                    position.shrink_to(draw_bounds.size(), false).bounds.lower_bounds()
-                        - draw_bounds.lower_bounds(),
-                ) * Gridgid::FLIP_Y,
-            ))
-            .unwrap();
+        let text_bounds = position.shrink_to(draw_bounds.size(), false).bounds;
+        self.text.draw_voxels_to_transaction(
+            &mut txn,
+            Gridgid::from_translation(text_bounds.lower_bounds() - draw_bounds.lower_bounds()),
+        );
 
         widgets::OneshotController::new(txn)
     }
@@ -369,7 +342,7 @@ pub(crate) fn draw_text_txn(
 mod tests {
     use super::*;
     use all_is_cubes::arcstr::literal;
-    use all_is_cubes::block::text::Font;
+    use all_is_cubes::block::text;
     use all_is_cubes::euclid::size3;
     use all_is_cubes::math::{GridSizeCoord, Rgba};
     use all_is_cubes::space::{self, SpacePhysics};
@@ -379,10 +352,16 @@ mod tests {
     fn large_text_size() {
         let text = "abc";
         let widget = LargeText {
-            text: text.into(),
-            font: Font::System16,
-            brush: VoxelBrush::single(block::from_color!(Rgba::WHITE)),
-            text_style: TextStyle::default(),
+            text: text::Text::builder()
+                .string(text.into())
+                .font(text::Font::System16)
+                .foreground(block::from_color!(Rgba::WHITE))
+                .positioning(text::Positioning {
+                    x: text::PositioningX::Left,
+                    line_y: text::PositioningY::BodyTop,
+                    z: text::PositioningZ::Back,
+                })
+                .build(),
         };
         assert_eq!(
             widget.requirements(),

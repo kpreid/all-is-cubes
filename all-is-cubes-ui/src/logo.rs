@@ -4,12 +4,8 @@ use alloc::sync::Arc;
 
 use all_is_cubes::{
     arcstr::literal,
-    block::{Block, text::Font},
+    block::{Block, text},
     content::palette,
-    drawing::{
-        VoxelBrush,
-        embedded_graphics::text::{Alignment, Baseline, TextStyleBuilder},
-    },
 };
 
 use crate::vui;
@@ -21,20 +17,16 @@ pub fn logo_text() -> Arc<dyn vui::Widget> {
     let background_text_block: Block = palette::LOGO_STROKE.into();
 
     Arc::new(vui::widgets::LargeText {
-        text: literal!("All is Cubes"),
-        font: Font::Logo,
-        brush: {
-            VoxelBrush::new([
-                ([0, 0, 1], foreground_text_block),
-                ([1, 0, 0], background_text_block.clone()),
-                ([-1, 0, 0], background_text_block.clone()),
-                ([0, 1, 0], background_text_block.clone()),
-                ([0, -1, 0], background_text_block),
-            ])
-        },
-        text_style: TextStyleBuilder::new()
-            .alignment(Alignment::Center)
-            .baseline(Baseline::Middle)
+        text: text::Text::builder()
+            .string(literal!("All is Cubes"))
+            .font(text::Font::Logo)
+            .foreground(foreground_text_block)
+            .outline(Some(background_text_block))
+            .positioning(text::Positioning {
+                x: text::PositioningX::Center,
+                line_y: text::PositioningY::BodyMiddle,
+                z: text::PositioningZ::Back,
+            })
             .build(),
     })
 }

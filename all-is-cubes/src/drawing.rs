@@ -28,7 +28,7 @@ use embedded_graphics::primitives::Rectangle;
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
-use crate::block::{Block, Evoxel, text};
+use crate::block::Block;
 use crate::math::{
     Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid, Rgb01,
     Rgba, Vol,
@@ -184,30 +184,6 @@ where
     }
 }
 
-impl<Container> DrawTarget for DrawingPlane<'_, Vol<Container>, text::Brush>
-where
-    Container: core::ops::DerefMut<Target = [Evoxel]>,
-{
-    type Color = text::Brush;
-    type Error = core::convert::Infallible;
-
-    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
-    where
-        I: IntoIterator<Item = Pixel<Self::Color>>,
-    {
-        for Pixel(point, brush) in pixels {
-            let point3d = self.convert_point(point);
-            for (offset, ev) in brush.iter() {
-                let offset = self.transform.rotation.transform_vector(offset);
-                if let Some(vox) = self.space.get_mut(point3d + offset) {
-                    *vox = ev;
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
 impl<C> Dimensions for DrawingPlane<'_, Mutation<'_, '_>, C> {
     fn bounding_box(&self) -> Rectangle {
         rectangle_from_bounds(self.transform, self.space.bounds())
@@ -285,10 +261,6 @@ impl<'a> VoxelColor<'a> for Rgba {
     fn into_blocks(self) -> VoxelBrush<'a> {
         VoxelBrush::single(Block::from(self))
     }
-}
-
-impl PixelColor for text::Brush {
-    type Raw = ();
 }
 
 /// Adapt [`embedded_graphics`]'s most general color type to ours.

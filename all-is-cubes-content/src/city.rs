@@ -14,11 +14,9 @@ use rand::{RngExt as _, SeedableRng as _};
 use num_traits::float::Float as _;
 
 use all_is_cubes::arcstr::literal;
-use all_is_cubes::block::{self, AIR, Resolution::*, text::Font};
+use all_is_cubes::block::{self, AIR, Resolution::*, text};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
-use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::drawing::embedded_graphics::text::{Alignment, Baseline, TextStyleBuilder};
 use all_is_cubes::euclid::{Point2D, vec3};
 use all_is_cubes::inv::{Slot, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
@@ -872,27 +870,33 @@ fn draw_exhibit_info(read_ticket: ReadTicket<'_>, exhibit: &Exhibit) -> Result<S
         direction: Face::NY,
         children: vec![
             vui::leaf_widget(widgets::LargeText {
-                text: exhibit.name.into(),
-                font: Font::System16,
-                brush: VoxelBrush::single(block::from_color!(palette::ALMOST_BLACK)),
-                text_style: TextStyleBuilder::new()
-                    .alignment(Alignment::Center)
-                    .baseline(Baseline::Middle)
+                text: text::Text::builder()
+                    .string(exhibit.name.into())
+                    .font(text::Font::System16)
+                    .foreground(block::from_color!(palette::ALMOST_BLACK))
+                    .positioning(text::Positioning {
+                        x: text::PositioningX::Left,
+                        line_y: text::PositioningY::BodyMiddle,
+                        z: text::PositioningZ::Back,
+                    })
                     .build(),
             }),
             vui::leaf_widget(widgets::LargeText {
-                text: {
-                    let t = exhibit.subtitle;
-                    // TODO: rectangle_to_aab() fails when the empty string is drawn;
-                    // when that's fixed, remove this condition
-                    if t.is_empty() { " " } else { t }
-                }
-                .into(),
-                font: Font::SmallerBodyText,
-                brush: VoxelBrush::single(block::from_color!(palette::ALMOST_BLACK)),
-                text_style: TextStyleBuilder::new()
-                    .alignment(Alignment::Center)
-                    .baseline(Baseline::Middle)
+                text: text::Text::builder()
+                    .string(
+                        {
+                            let t = exhibit.subtitle;
+                            if t.is_empty() { "" } else { t }
+                        }
+                        .into(),
+                    )
+                    .font(text::Font::SmallerBodyText)
+                    .foreground(block::from_color!(palette::ALMOST_BLACK))
+                    .positioning(text::Positioning {
+                        x: text::PositioningX::Left,
+                        line_y: text::PositioningY::BodyMiddle,
+                        z: text::PositioningZ::Back,
+                    })
                     .build(),
             }),
         ],

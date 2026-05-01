@@ -21,7 +21,9 @@ use itertools::iproduct;
 use crate::block::{self, Block, BlockAttributes, Evoxel, MinEval, Resolution};
 use crate::camera::ImageSize;
 use crate::content::palette;
-use crate::math::{GridAab, GridCoordinate, GridPoint, GridVector, Gridgid, Rgb, Vol, rgba_const};
+use crate::math::{
+    Cube, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid, Rgb, Vol, rgba_const,
+};
 use crate::space::{self, SpaceTransaction};
 use crate::universe;
 
@@ -260,7 +262,7 @@ impl Text {
         {
             Some(bounds_in_this_block) => {
                 // Evaluate blocks making up the brush.
-                let brush = {
+                let brush: Brush<Evoxel> = {
                     let _recursion_scope = block::Budget::recurse(&filter.budget)?;
                     let evaluated_foreground =
                         self.data.foreground.evaluate_to_evoxel_internal(filter)?;
@@ -320,6 +322,45 @@ impl Text {
             },
             voxels,
         ))
+    }
+
+    /// Draw text voxels directly to blocks in a space (making large text)
+    ///
+    /// TODO: This is quickly slapped together for the `LargeText` widget, and may not be good
+    /// general API.
+    #[doc(hidden)]
+    pub fn draw_voxels_to_transaction(&self, txn: &mut SpaceTransaction, transform: Gridgid) {
+        let &Layout {
+            bounding_box: _,
+            ref glyphs,
+            z: layout_z,
+        } = self.get_or_init_layout();
+
+        let decl = self.data.font.font_decl();
+        let pixels = decl.binary_image();
+
+        let brush: Brush<&Block> = match self.data.outline {
+            Some(ref outline) => Brush::Outline {
+                foreground: &self.data.foreground,
+                outline,
+            },
+            None => Brush::Plain(&self.data.foreground),
+        };
+
+        for glyph in glyphs.iter() {
+            glyph_from_binary_image(pixels, decl, glyph.glyph_index).for_each(
+                |position_in_glyph| {
+                    for (brush_offset, brush_block) in brush.iter() {
+                        let transformed_position = transform.transform_cube(Cube::from(
+                            glyph.position.extend(layout_z).cast_unit()
+                                + vec3(position_in_glyph.x, -position_in_glyph.y, 0)
+                                + brush_offset,
+                        ));
+                        txn.at(transformed_position).overwrite(brush_block.clone());
+                    }
+                },
+            );
+        }
     }
 
     fn get_or_init_layout(&self) -> &Layout {
@@ -945,17 +986,20 @@ const DEBUG_TEXT_BOUNDS_VOXEL: Evoxel = Evoxel {
     collision: block::BlockCollision::None,
 };
 
-/// Type which can be used on a `DrawingPlane` of `Evoxel`s to render text.
+/// Specifies how a text glyph is painted into 3D space.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Brush {
-    Plain(Evoxel),
-    Outline { foreground: Evoxel, outline: Evoxel },
+pub(crate) enum Brush<V> {
+    Plain(V),
+    Outline { foreground: V, outline: V },
 }
 
 // -------------------------------------------------------------------------------------------------
 
-impl Brush {
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (GridVector, Evoxel)> + '_ {
+impl<V> Brush<V> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (GridVector, V)> + '_
+    where
+        V: Copy,
+    {
         use itertools::Either::{Left, Right};
         match *self {
             Brush::Plain(foreground) => Left(iter::once((GridVector::zero(), foreground))),
