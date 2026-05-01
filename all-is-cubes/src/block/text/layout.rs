@@ -240,3 +240,121 @@ fn char_to_glyph_index(c: char) -> usize {
         _ => 0x1f, // unavailable glyphs become question marks -- TODO: dedicate a glyph
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::block::Resolution::R32;
+    use crate::block::text::Font;
+
+    #[track_caller]
+    #[inline(never)]
+    #[allow(clippy::needless_pass_by_value)]
+    fn assert_bb(
+        layout: Layout,
+        lower_bounds: [GridCoordinate; 3],
+        upper_bounds: [GridCoordinate; 3],
+    ) {
+        assert_eq!(
+            layout.bounding_box,
+            GridAab::from_lower_upper(lower_bounds, upper_bounds)
+        )
+    }
+
+    // TODO: think about how to get syntax this concise for normal usage of `Positioning`
+    macro_rules! positioning {
+        ($x:ident, $y:ident, $z:ident) => {
+            text::Positioning {
+                x: text::PositioningX::$x,
+                line_y: text::PositioningY::$y,
+                z: text::PositioningZ::$z,
+            }
+        };
+    }
+
+    fn one_letter_for_positioning(p: text::Positioning) -> Layout {
+        compute_layout(
+            "A",
+            Font::System16.font_decl(),
+            false,
+            GridAab::for_block(R32),
+            p,
+        )
+    }
+
+    #[test]
+    fn bb_x_left() {
+        assert_bb(
+            one_letter_for_positioning(positioning!(Left, BodyTop, Back)),
+            [0, 16, 0],
+            [7, 32, 1],
+        )
+    }
+
+    #[test]
+    fn bb_x_center() {
+        assert_bb(
+            one_letter_for_positioning(positioning!(Center, BodyTop, Back)),
+            [12, 16, 0],
+            [19, 32, 1],
+        )
+    }
+
+    #[test]
+    fn bb_x_right() {
+        assert_bb(
+            one_letter_for_positioning(positioning!(Right, BodyTop, Back)),
+            [25, 16, 0],
+            [32, 32, 1],
+        )
+    }
+
+    #[test]
+    fn bb_y_body_top() {
+        assert_bb(
+            one_letter_for_positioning(positioning!(Left, BodyTop, Back)),
+            [0, 16, 0],
+            [7, 32, 1],
+        )
+    }
+
+    #[test]
+    fn bb_y_body_middle() {
+        assert_bb(
+            one_letter_for_positioning(positioning!(Left, BodyMiddle, Back)),
+            // TODO: this is an incorrect rounding; the Y range should be 8..24
+            [0, 7, 0],
+            [7, 23, 1],
+        )
+    }
+
+    #[test]
+    fn bb_y_baseline() {
+        assert_bb(
+            one_letter_for_positioning(positioning!(Left, Baseline, Back)),
+            [0, -3, 0],
+            [7, 13, 1],
+        )
+    }
+
+    #[test]
+    fn bb_y_body_bottom() {
+        assert_bb(
+            one_letter_for_positioning(positioning!(Left, BodyBottom, Back)),
+            [0, 0, 0],
+            [7, 16, 1],
+        )
+    }
+
+    // There is no corresponding bb_z_back test because all other tests are `Back`.
+    #[test]
+    fn bb_z_front() {
+        assert_bb(
+            one_letter_for_positioning(positioning!(Left, BodyBottom, Front)),
+            [0, 0, 31],
+            [7, 16, 32],
+        )
+    }
+}
