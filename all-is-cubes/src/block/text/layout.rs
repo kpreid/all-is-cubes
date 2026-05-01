@@ -82,12 +82,8 @@ pub(crate) fn compute_layout(
     // for this to be an integer point; it needs to be possibly half-integer (0, 0.5, 1, 1.5, ...).
     let lb = layout_bounds;
     let layout_offset = vec3(
-        match positioning.x {
-            text::PositioningX::Left => lb.lower_bounds().x,
-            // 0.75 is a fudge factor that empirically gets the *rounding* behavior we want.
-            text::PositioningX::Center => libm::round(lb.center().x - 0.75) as GridCoordinate,
-            text::PositioningX::Right => lb.upper_bounds().x - 1,
-        },
+        // Horizontal positioning is done after each line’s width is known.
+        0,
         match positioning.line_y {
             text::PositioningY::BodyTop => lb.upper_bounds().y - 1,
             text::PositioningY::BodyMiddle => {
@@ -144,11 +140,24 @@ pub(crate) fn compute_layout(
 
         // Now that we know the width of the line, we can figure out where it should be positioned
         // horizontally.
+        //
+        // Note: Saturating is not strictly the right overflow behavior here, but it's cheap, and
+        // our goal is to avoid long-distance misbehavior resulting from wrapping arithmetic,
+        // not to get perfect rendering of extreme cases.
         let line_width = cursor_x; // when fonts get fancier these may be different
         let line_start_x: GridCoordinate = match positioning.x {
-            text::PositioningX::Left => 0,
-            text::PositioningX::Center => -(line_width - 1) / 2,
-            text::PositioningX::Right => -(line_width - 1),
+            text::PositioningX::Left => lb.lower_bounds().x,
+            // By adding up everything before we divide by 2, we get perfectly centered
+            // odd-width texts in odd-with bounds, and even-width texts in even-width bounds,
+            // and when the parity does not match, we round down.
+            text::PositioningX::Center => {
+                (lb.lower_bounds()
+                    .x
+                    .saturating_add(lb.upper_bounds().x)
+                    .saturating_sub(line_width))
+                    / 2
+            }
+            text::PositioningX::Right => lb.upper_bounds().x.saturating_sub(line_width),
         };
 
         // Move all glyphs in the line to where they should be,

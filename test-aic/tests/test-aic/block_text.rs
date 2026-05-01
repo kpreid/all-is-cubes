@@ -196,7 +196,7 @@ fn bounding_voxels_of_positioning_high() {
 #[case(PositioningX::Left, false, 0..16, 0..36)]
 #[case(PositioningX::Right, false, 0..16, -20..16)]
 #[case(PositioningX::Center, false, 0..16, -10..26)]
-#[case(PositioningX::Center, true, 0..16, -3..18)]
+#[case(PositioningX::Center, true, 0..16, -2..19)]
 #[case(PositioningX::Center, false, 0..15, -10..26)]
 #[case(PositioningX::Center, true, 0..15, -3..18)]
 #[case(PositioningX::Center, false, 1..16, -9..27)]
