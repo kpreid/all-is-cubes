@@ -1009,27 +1009,6 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgb01 {
     }
 }
 
-/// Implementations necessary for `all_is_cubes::drawing` to be able to use these types
-mod eg {
-    use embedded_graphics_core::pixelcolor::{self, RgbColor as _};
-
-    use super::*;
-    impl pixelcolor::PixelColor for Rgb01 {
-        type Raw = ();
-    }
-    impl pixelcolor::PixelColor for Rgba {
-        type Raw = ();
-    }
-    /// Adapt `embedded_graphics`'s most general color type to ours.
-    // ^ can't be doc link because we don't depend on it
-    impl From<pixelcolor::Rgb888> for Rgb01 {
-        #[inline]
-        fn from(color: pixelcolor::Rgb888) -> Rgb01 {
-            Rgb01::from_srgb8([color.r(), color.g(), color.b()])
-        }
-    }
-}
-
 #[cfg(feature = "rerun")]
 mod rerun {
     use super::*;

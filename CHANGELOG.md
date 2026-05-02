@@ -60,7 +60,7 @@
 ### Removed
 
 * `all-is-cubes` library:
-    * Interoperation with `embedded-graphics` has been removed, and thus the following items:
+    * Interoperation with the `embedded-graphics` library has been removed, and thus the following items:
         * `space::Mutation::draw_target()`
         * `space::SpaceTransaction::draw_target()`
         * `drawing::rectangle_to_aab()`

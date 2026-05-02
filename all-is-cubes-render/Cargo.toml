@@ -36,7 +36,6 @@ std = [
 auto-threads = ["std", "dep:rayon"]
 # Adds the `raytracer` module.
 raytracer = [
-    "dep:embedded-graphics", # to render overlay info text
     "dep:hashbrown",
     "dep:rand", # random bounce rays
     "dep:rand_distr", # random bounce rays
@@ -50,7 +49,6 @@ all-is-cubes = { workspace = true }
 bitflags = { workspace = true }
 derive_more = { workspace = true } # features specified in workspace
 displaydoc = { workspace = true }
-embedded-graphics = { workspace = true, optional = true }
 futures-core = { workspace = true }
 hashbrown = { workspace = true, optional = true }
 imgref = { workspace = true }

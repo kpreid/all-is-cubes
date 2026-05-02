@@ -34,7 +34,9 @@ pub struct DecodedPng {
 /// Pixel type.
 type Srgba = [u8; 4];
 
-/// Adapter from [`png_decoder`] decoded images to [`embedded_graphics::Drawable`].
+/// Adapter from [`png_decoder`] decoded images to voxel drawing.
+///
+/// TODO: Needs a better name now that it is no longer specifically a trait adapter.
 #[doc(hidden)] // still experimental API
 #[expect(missing_debug_implementations)]
 pub struct PngAdapter<'a> {

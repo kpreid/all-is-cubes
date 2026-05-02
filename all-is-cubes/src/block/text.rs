@@ -1057,6 +1057,9 @@ fn glyph_from_binary_image(
 
 /// Convert image data provided by `png-decoder` into the bit-packed format expected by
 /// `embedded-graphics`.
+///
+/// TODO: We are no longer using `embedded-graphics` and this format should be changed to
+/// better suit our needs, such as being Y-up and able to mark outline/shadow pixels.
 fn pack_into_binary_color_image_data(rgba_data: &[[u8; 4]]) -> Box<[u8]> {
     Box::<[u8]>::from_iter(
         // pack into 1 bit per pixel

@@ -96,9 +96,6 @@ criterion = { version = "0.8.0", features = ["async", "cargo_bench_support", "ht
 derive_more = { version = "2.1.1", default-features = false, features = ["add", "add_assign", "sum"] }
 displaydoc = { version = "0.2.5", default-features = false }
 either = { version = "1.10.0", default-features = false }
-# embedded-graphics and embedded-graphics-core must match
-embedded-graphics = { version = "0.8.0", default-features = false }
-embedded-graphics-core = { version = "0.4.0", default-features = false }
 euclid = { version = "0.22.11", default-features = false }
 exhaust = { version = "0.2.5", default-features = false }
 fearless_simd = { version = "0.4", default-features = false }

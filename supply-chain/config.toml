@@ -428,14 +428,6 @@ criteria = "safe-to-deploy"
 version = "0.1.4"
 criteria = "safe-to-run"
 
-[[exemptions.embedded-graphics]]
-version = "0.8.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.embedded-graphics-core]]
-version = "0.4.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.encode_unicode]]
 version = "1.0.0"
 criteria = "safe-to-deploy"

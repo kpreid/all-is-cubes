@@ -7,8 +7,7 @@ This is a work in progress. Currently implemented:
 
 * Core data model of [Blocks] and [Spaces] (subject to change).
 * Some ways for these things to change and interact with each other.
-* Foundations of rendering using a CPU-only raytracer. (See `all-is-cubes-gpu` for GPU.)
-* 2D drawing into the voxel space, built on top of the [embedded-graphics] library.
+* Character movement and collision.
 
 For more information on the capabilities, limitations, and requirements of the library,
 please consult [the crate documentation].
@@ -19,11 +18,12 @@ but its API is not stable and it makes many specific assumptions.
 [the crate documentation]: https://docs.rs/all-is-cubes/0.10.0/all_is_cubes/
 [Blocks]: https://docs.rs/all-is-cubes/0.10.0/all_is_cubes/block/enum.Block.html
 [Spaces]: https://docs.rs/all-is-cubes/0.10.0/all_is_cubes/space/struct.Space.html
-[embedded-graphics]: https://crates.io/crates/embedded-graphics
 
 Related crates
 --------------
 
+*   [`all-is-cubes-render`](https://crates.io/crates/all-is-cubes-render)
+    provides rendering-related types and a CPU-only raytracer.
 *   [`all-is-cubes-mesh`](https://crates.io/crates/all-is-cubes-mesh)
     generates triangle meshes from `all-is-cubes` voxel data.
 *   [`all-is-cubes-gpu`](https://crates.io/crates/all-is-cubes-gpu)
