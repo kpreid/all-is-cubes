@@ -10,11 +10,6 @@ use core::{fmt, iter};
 
 use arcstr::ArcStr;
 use bevy_platform::sync::OnceLock;
-use eg::mono_font::MonoFont;
-use embedded_graphics as eg;
-use embedded_graphics::mono_font::DecorationDimensions;
-use embedded_graphics::mono_font::mapping::GlyphMapping;
-use embedded_graphics::prelude::Size;
 use euclid::{Point2D, Size2D, Translation2D, point2, size2, vec2, vec3};
 use itertools::iproduct;
 
@@ -697,14 +692,6 @@ impl Font {
                     binary_image: OnceLock::new(),
                     character_size: size2(7, 16),
                     baseline: 12,
-                    strikethrough: DecorationDimensions {
-                        offset: 8,
-                        height: 1,
-                    },
-                    underline: DecorationDimensions {
-                        offset: 13,
-                        height: 1,
-                    },
                 };
 
                 &SYSTEM16_DECL
@@ -716,31 +703,8 @@ impl Font {
                     binary_image: OnceLock::new(),
                     character_size: size2(6, 14),
                     baseline: 10,
-                    strikethrough: DecorationDimensions {
-                        offset: 7,
-                        height: 1,
-                    },
-                    underline: DecorationDimensions {
-                        offset: 12,
-                        height: 1,
-                    },
                 };
                 &DECL
-            }
-        }
-    }
-
-    /// Do not use. This will be removed when we change font renderers.
-    #[doc(hidden)]
-    pub fn eg_font(&self) -> &MonoFont<'static> {
-        match self {
-            Self::System16 | Self::Logo => {
-                static FONT: OnceLock<MonoFont<'static>> = OnceLock::new();
-                FONT.get_or_init(|| self.font_decl().load())
-            }
-            Self::SmallerBodyText => {
-                static FONT: OnceLock<MonoFont<'static>> = OnceLock::new();
-                FONT.get_or_init(|| self.font_decl().load())
             }
         }
     }
@@ -1032,18 +996,20 @@ const GLYPHS_PER_ROW: u32 = 16;
 
 const GLYPHS_PER_ROW_USIZE: usize = GLYPHS_PER_ROW as usize;
 
-/// Data structure defining a font, that can go in a `static` even though we’re
-/// not using static data compatible with [`embedded_graphics::image::ImageRaw`].
+/// Data structure defining a font, that can go in a `static` even though the image needs decoding.
 ///
-/// For convenience of the implementation, glyph sizes are not allowed to exceed 255.
+/// For convenience of the implementation, glyph sizes are not allowed to exceed 255, allowing
+/// all dimensions to be `u8`.
 struct FontDecl {
     png_data: &'static [u8],
     png_path: &'static str,
     binary_image: OnceLock<Box<[u8]>>,
     character_size: Size2D<u8, layout::InGlyph>,
+
+    /// Y position of the baseline in the glyph.
+    ///
+    /// TODO: Clarify interpretation of this coordinate
     baseline: u8,
-    strikethrough: DecorationDimensions,
-    underline: DecorationDimensions,
 }
 
 impl FontDecl {
@@ -1059,24 +1025,6 @@ impl FontDecl {
             );
             pack_into_binary_color_image_data(decoded_png.pixels())
         })
-    }
-
-    fn load(&'static self) -> MonoFont<'static> {
-        MonoFont {
-            glyph_mapping: &RemapTo8859_1(&embedded_graphics::mono_font::mapping::ISO_8859_1),
-            image: embedded_graphics::image::ImageRaw::new(
-                self.binary_image(),
-                u32::from(self.character_size.width) * GLYPHS_PER_ROW,
-            ),
-            character_size: Size {
-                width: self.character_size.width.into(),
-                height: self.character_size.height.into(),
-            },
-            character_spacing: 0,
-            baseline: self.baseline.into(),
-            strikethrough: self.strikethrough,
-            underline: self.underline,
-        }
     }
 }
 
@@ -1106,20 +1054,6 @@ fn glyph_from_binary_image(
 }
 
 // -------------------------------------------------------------------------------------------------
-
-// Kludge to pretend to have slightly greater character coverage than the fonts actually do:
-// remap selected Unicode characters to the `iso_8859_1` subset.
-struct RemapTo8859_1<'a>(&'a dyn GlyphMapping);
-
-impl GlyphMapping for RemapTo8859_1<'_> {
-    fn index(&self, c: char) -> usize {
-        self.0.index(match c {
-            '‘' | '’' => '\'',
-            '“' | '”' => '"',
-            c => c,
-        })
-    }
-}
 
 /// Convert image data provided by `png-decoder` into the bit-packed format expected by
 /// `embedded-graphics`.
