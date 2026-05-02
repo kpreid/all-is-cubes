@@ -1,7 +1,6 @@
 use core::fmt;
 use core::sync::atomic::AtomicBool;
 
-use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
 use all_is_cubes::math::{PositiveSign, ps32};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{GraphicsOptions, ImageSize};
@@ -132,15 +131,6 @@ impl<P> fmt::Debug for DrawableTexture<P> {
             .field("size", &self.size)
             // Skipping .local_data because it's a large image
             .finish_non_exhaustive()
-    }
-}
-
-impl<P> OriginDimensions for DrawableTexture<P> {
-    fn size(&self) -> Size {
-        Size {
-            width: self.size.width,
-            height: self.size.height,
-        }
     }
 }
 
