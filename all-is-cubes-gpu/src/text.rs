@@ -4,7 +4,6 @@ use core::iter;
 
 use itertools::iproduct;
 
-use all_is_cubes::drawing::embedded_graphics as eg;
 use all_is_cubes::euclid::{self, Size2D, Vector2D, point2, size2};
 use all_is_cubes_render::camera::{ImageSize, Viewport};
 
@@ -117,7 +116,7 @@ pub(crate) fn generate_texture_atlas(
     // Size of the atlas glyph cell, which has to be big enough for the added outline.
     let atlas_cell_size = logical_cell_size + ImageSize::splat(outline_radius_u * 2);
 
-    let mut dt: DrawableTexture<EgRgba, [u8; 4]> =
+    let mut dt: DrawableTexture<[u8; 4], [u8; 4]> =
         DrawableTexture::new(wgpu::TextureFormat::Rgba8Unorm);
     dt.resize(device, Some("font atlas"), atlas_cell_size * 16);
 
@@ -163,19 +162,4 @@ pub(crate) fn generate_texture_atlas(
         cell_margin: outline_radius_u,
     };
     (dt.view().unwrap().clone(), metrics)
-}
-
-// e-g doesn't have an RGBA color, nor does it support alpha yet, but we aren't asking it
-// to do any blending so we can get away with this
-#[derive(Clone, Copy, PartialEq)]
-struct EgRgba([u8; 4]);
-
-impl eg::pixelcolor::PixelColor for EgRgba {
-    type Raw = (); // not used
-}
-
-impl crate::ToTexel<[u8; 4]> for EgRgba {
-    fn to_texel(self) -> [u8; 4] {
-        self.0
-    }
 }

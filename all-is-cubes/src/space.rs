@@ -15,10 +15,9 @@ use crate::behavior::BehaviorSet;
 use crate::behavior::BehaviorSetStepInfo;
 use crate::block::{AIR, AIR_EVALUATED_REF, Block, EvaluatedBlock, Resolution};
 use crate::character::Spawn;
-use crate::drawing::DrawingPlane;
 use crate::fluff::Fluff;
 use crate::listen::{self, Listen, Notifier};
-use crate::math::{Cube, GridAab, Gridgid, Vol};
+use crate::math::{Cube, GridAab, Vol};
 use crate::time::TimeStats;
 use crate::universe::{self, HandleVisitor, ReadTicket, SealedMember as _, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText};
@@ -1479,15 +1478,6 @@ impl<'space> Mutation<'_, 'space> {
     #[expect(clippy::missing_errors_doc, reason = "explicitly delegating")]
     pub fn fill_all_uniform(&mut self, block: &Block) -> Result<(), SetCubeError> {
         self.fill_uniform(self.bounds(), block)
-    }
-
-    /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
-    /// adapter for 2.5D drawing.
-    ///
-    /// For more information on how to use this, see
-    /// [`all_is_cubes::drawing`](crate::drawing).
-    pub fn draw_target<C>(&mut self, transform: Gridgid) -> DrawingPlane<'_, Self, C> {
-        DrawingPlane::new(self, transform)
     }
 
     /// Perform lighting updates until there are none left to do. Returns the number of

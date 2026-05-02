@@ -10,9 +10,8 @@ use hashbrown::HashMap as HbHashMap;
 
 use crate::behavior::{self, BehaviorSetTransaction};
 use crate::block::Block;
-use crate::drawing::DrawingPlane;
 use crate::fluff::Fluff;
-use crate::math::{Cube, GridCoordinate, GridPoint, Gridgid, Vol};
+use crate::math::{Cube, GridCoordinate, GridPoint, Vol};
 use crate::space::{
     self, ActivatableRegion, GridAab, Mutation, PendingEvaluation, SetCubeError, Space,
 };
@@ -76,15 +75,6 @@ impl SpaceTransaction {
     /// TODO: Consider replacing all uses of this with `CubeTransaction::replacing()`.
     pub fn set_cube(cube: impl Into<Cube>, old: Option<Block>, new: Option<Block>) -> Self {
         CubeTransaction::replacing(old, new).at(cube.into())
-    }
-
-    /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
-    /// adapter for 2.5D drawing.
-    ///
-    /// For more information on how to use this, see
-    /// [`all_is_cubes::drawing`](crate::drawing).
-    pub fn draw_target<C>(&mut self, transform: Gridgid) -> DrawingPlane<'_, Self, C> {
-        DrawingPlane::new(self, transform)
     }
 
     /// Marks all cube modifications in this transaction as [non-conservative].
