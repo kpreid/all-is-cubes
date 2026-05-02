@@ -17,23 +17,9 @@ use crate::space::{Mutation, SetCubeError, SpaceTransaction};
 #[cfg(doc)]
 use crate::space::{CubeTransaction, Space};
 
-/// Convert a bounding-box rectangle, as from [`embedded_graphics::geometry::Dimensions`],
-/// to a [`GridAab`] which encloses the voxels that would be affected by drawing a
-/// [`Drawable`] with those bounds on a [`DrawingPlane`] with the given `transform`.
-///
-/// `max_brush` should be the union of bounds of [`VoxelBrush`]es used by the drawable.
-/// If using plain colors, `GridAab::ORIGIN_CUBE` is the appropriate
-/// input.
-///
-/// Please note that coordinate behavior may be surprising. [`embedded_graphics`]
-/// considers coordinates to refer to pixel centers, which is similar but not identical
-/// to our identifying [`Cube`]s by their low corner. The `transform` is
-/// then applied to those coordinates. So, for example, applying [`Gridgid::FLIP_Y`]
-/// to a [`Rectangle`] whose top-left corner is `[0, 0]` will result in a [`GridAab`]
-/// which *includes* the <var>y</var> = 0 row — not one which abuts it and is strictly in
-/// the negative y range.
-///
-/// TODO: The above text is either wrong or describes a bad idea. Fix.
+/// Convert a 2D bounding-box rectangle
+/// to a [`GridAab`] which encloses the voxels that would be affected by drawing that
+/// rectangle using a [`VoxelBrush`] and the given `transform`.
 ///
 /// TODO: This function still has some bugs to work out
 ///
@@ -82,10 +68,7 @@ pub fn rectangle_to_aab(rectangle: Rectangle, transform: Gridgid, max_brush: Gri
 }
 
 /// A shape of multiple blocks to “paint” with. This may be used to make copies of a
-/// simple shape, or to make multi-layered "2.5D" drawings using [`DrawingPlane`].
-///
-/// Note that only `&VoxelBrush` implements [`PixelColor`]; this is because `PixelColor`
-/// requires a value implementing [`Copy`].
+/// simple shape, or to make multi-layered "2.5D" drawings out of 2D data.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct VoxelBrush<'a>(Vec<(GridVector, Cow<'a, Block>)>);
@@ -147,7 +130,7 @@ impl<'a> VoxelBrush<'a> {
 
     /// Creates a transaction equivalent to [`VoxelBrush::paint`].
     ///
-    /// Note that [`VoxelBrush::paint`] or using it in a [`DrawTarget`] ignores
+    /// Note that [`VoxelBrush::paint`] ignores
     /// out-of-bounds drawing, but transactions do not support this and will fail instead.
     pub fn paint_transaction(&self, origin: Cube) -> SpaceTransaction {
         let mut txn = SpaceTransaction::default();
@@ -158,7 +141,7 @@ impl<'a> VoxelBrush<'a> {
     /// Like [`Self::paint_transaction()`] but modifies an existing transaction (as per
     /// [`CubeTransaction::overwrite()`]).
     ///
-    /// Note that [`VoxelBrush::paint`] or using it in a [`DrawTarget`] ignores
+    /// Note that [`VoxelBrush::paint`] ignores
     /// out-of-bounds drawing, but transactions do not support this and will fail instead.
     pub fn paint_transaction_mut(&self, transaction: &mut SpaceTransaction, origin: Cube) {
         for &(offset, ref block) in &self.0 {
