@@ -96,8 +96,8 @@ struct Inner {
     rays_per_frame: usize,
 
     // Textures the CPU side writes to.
-    color_render_target: DrawableTexture<[f16; 4], [f16; 4]>,
-    depth_render_target: DrawableTexture<f32, f32>,
+    color_render_target: DrawableTexture<[f16; 4]>,
+    depth_render_target: DrawableTexture<f32>,
 }
 
 /// Schedule with which a [`RaytraceToTexture`] re-traces its pixels.

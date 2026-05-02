@@ -13,15 +13,15 @@ use crate::glue::size2d_to_extent;
 use crate::shaders::Shaders;
 
 /// A RGBA [`wgpu::Texture`] with a CPU-side buffer that can be drawn on.
-pub(crate) struct DrawableTexture<In, Out> {
+pub(crate) struct DrawableTexture<P> {
     texture_format: wgpu::TextureFormat,
     texture: Option<wgpu::Texture>,
     texture_view: Option<Identified<wgpu::TextureView>>,
     size: wgpu::Extent3d,
-    local_buffer: EgFramebuffer<In, Out>,
+    local_buffer: EgFramebuffer<P>,
 }
 
-impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
+impl<P: Copy + Default + bytemuck::Pod> DrawableTexture<P> {
     /// `texture_format` must be an uncompressed format and the same bytes-per-texel as the
     /// `Out` generic parameter.
     pub fn new(texture_format: wgpu::TextureFormat) -> Self {
@@ -78,7 +78,7 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
         };
     }
 
-    pub fn draw_target(&mut self) -> &mut EgFramebuffer<In, Out> {
+    pub fn draw_target(&mut self) -> &mut EgFramebuffer<P> {
         &mut self.local_buffer
     }
 
@@ -114,13 +114,13 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
                     wgpu::TextureAspect::All
                 },
             },
-            bytemuck::must_cast_slice::<Out, u8>(
+            bytemuck::must_cast_slice::<P, u8>(
                 &self.local_buffer.data()[full_width as usize * dirty_rect.top_left.y as usize
                     + dirty_rect.top_left.x as usize..],
             ),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(const { size_of::<Out>() as u32 } * full_width),
+                bytes_per_row: Some(const { size_of::<P>() as u32 } * full_width),
                 rows_per_image: None,
             },
             wgpu::Extent3d {
@@ -134,7 +134,7 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
     }
 }
 
-impl<In, Out> fmt::Debug for DrawableTexture<In, Out> {
+impl<P> fmt::Debug for DrawableTexture<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DrawableTexture")
             .field("texture", &self.texture.is_some())
@@ -144,7 +144,7 @@ impl<In, Out> fmt::Debug for DrawableTexture<In, Out> {
     }
 }
 
-impl<In, Out> OriginDimensions for DrawableTexture<In, Out> {
+impl<P> OriginDimensions for DrawableTexture<P> {
     fn size(&self) -> Size {
         Size {
             width: self.size.width,

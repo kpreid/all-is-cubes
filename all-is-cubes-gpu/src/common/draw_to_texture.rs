@@ -2,7 +2,6 @@
 
 use alloc::vec;
 use alloc::vec::Vec;
-use core::marker::PhantomData;
 
 use all_is_cubes::{
     drawing::embedded_graphics::{
@@ -16,32 +15,28 @@ use all_is_cubes_render::camera::ImagePixel;
 /// Storage for an image which can be written one pixel at a time.
 ///
 /// This storage tracks a “dirty rectangle” so that copying can be limited to affected areas.
-//---
-// TODO: When we have eliminated `embedded_graphics` usage, get rid of the `In` type.
-pub(crate) struct EgFramebuffer<In, Out> {
+pub(crate) struct EgFramebuffer<P> {
     /// RGBA image buffer. Row-major, Y-up.
-    data: Vec<Out>,
+    data: Vec<P>,
     /// Size of the buffer.
     size: Size,
     /// Region of the buffer not yet copied to the GPU.
     dirty: Rectangle,
     /// Region of the buffer that is not entirely zeroes.
     nonzero: Rectangle,
-    _phantom_pixel_type: PhantomData<fn(In)>,
 }
 
-impl<In, Out: Copy + Default> EgFramebuffer<In, Out> {
+impl<P: Copy + Default> EgFramebuffer<P> {
     pub fn new(size: Size) -> Self {
         Self {
-            data: vec![Out::default(); size.width as usize * size.height as usize],
+            data: vec![P::default(); size.width as usize * size.height as usize],
             size,
             dirty: Rectangle::zero(),
             nonzero: Rectangle::zero(),
-            _phantom_pixel_type: PhantomData,
         }
     }
 
-    pub fn data(&self) -> &[Out] {
+    pub fn data(&self) -> &[P] {
         &self.data
     }
 
@@ -54,7 +49,7 @@ impl<In, Out: Copy + Default> EgFramebuffer<In, Out> {
     }
 
     pub fn clear_transparent(&mut self) {
-        self.data.fill(Out::default());
+        self.data.fill(P::default());
         // Everything that wasn't zero is now dirty.
         if let Some(bottom_right) = self.nonzero.bottom_right() {
             expand_rectangle(&mut self.dirty, self.nonzero.top_left);
@@ -69,7 +64,7 @@ impl<In, Out: Copy + Default> EgFramebuffer<In, Out> {
 
     /// Directly write a single image pixel.
     /// Does nothing if out of bounds.
-    pub fn set_pixel(&mut self, position: Point2D<u32, ImagePixel>, value: Out) {
+    pub fn set_pixel(&mut self, position: Point2D<u32, ImagePixel>, value: P) {
         if !(position.x < self.size.width && position.y < self.size.height) {
             return;
         }
@@ -82,7 +77,7 @@ impl<In, Out: Copy + Default> EgFramebuffer<In, Out> {
     }
 }
 
-impl<In, Out> OriginDimensions for EgFramebuffer<In, Out> {
+impl<P> OriginDimensions for EgFramebuffer<P> {
     fn size(&self) -> Size {
         self.size
     }

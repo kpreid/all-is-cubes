@@ -116,8 +116,7 @@ pub(crate) fn generate_texture_atlas(
     // Size of the atlas glyph cell, which has to be big enough for the added outline.
     let atlas_cell_size = logical_cell_size + ImageSize::splat(outline_radius_u * 2);
 
-    let mut dt: DrawableTexture<[u8; 4], [u8; 4]> =
-        DrawableTexture::new(wgpu::TextureFormat::Rgba8Unorm);
+    let mut dt: DrawableTexture<[u8; 4]> = DrawableTexture::new(wgpu::TextureFormat::Rgba8Unorm);
     dt.resize(device, Some("font atlas"), atlas_cell_size * 16);
 
     // Write characters into atlas

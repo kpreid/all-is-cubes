@@ -6,7 +6,6 @@ use core::mem;
 
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
-use all_is_cubes::drawing::embedded_graphics::pixelcolor::Gray8;
 use all_is_cubes::euclid::{Size2D, Vector2D};
 use all_is_cubes::math::Rgba;
 use all_is_cubes::time;
@@ -38,7 +37,7 @@ use crate::{RerunFilter, rerun_image};
 
 // -------------------------------------------------------------------------------------------------
 
-pub(super) type InfoTextTexture = DrawableTexture<Gray8, u8>;
+pub(super) type InfoTextTexture = DrawableTexture<u8>;
 
 type BackdropUniforms = [f32; 4];
 
