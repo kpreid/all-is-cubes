@@ -120,7 +120,6 @@
 //! * [`arcstr`] for string data (as `all_is_cubes::arcstr`).
 //! * [`euclid`] for vector math (as `all_is_cubes::euclid`).
 //! * [`ordered_float`] (only the type [`all_is_cubes::math::NotNan`][crate::math::NotNan]).
-//! * [`embedded_graphics`] (as `all_is_cubes::drawing::embedded_graphics`).
 //!
 //! [`Behavior`]: crate::behavior::Behavior
 //! [`Block`]: crate::block::Block

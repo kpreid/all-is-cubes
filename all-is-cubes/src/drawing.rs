@@ -5,67 +5,12 @@ use alloc::borrow::{Borrow, Cow};
 use alloc::vec::Vec;
 use core::ops::Range;
 
-use embedded_graphics::primitives::Rectangle;
-
-/// Re-export the version of the [`embedded_graphics`] crate we're using.
-pub use embedded_graphics;
-
 use crate::block::Block;
-use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, GridVector, Gridgid};
+use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, GridVector};
 use crate::space::{Mutation, SetCubeError, SpaceTransaction};
 
 #[cfg(doc)]
 use crate::space::{CubeTransaction, Space};
-
-/// Convert a 2D bounding-box rectangle
-/// to a [`GridAab`] which encloses the voxels that would be affected by drawing that
-/// rectangle using a [`VoxelBrush`] and the given `transform`.
-///
-/// TODO: This function still has some bugs to work out
-///
-/// TODO: This function needs a better name
-///
-/// TODO: Handling zero-area rectangles is not implemented
-#[expect(clippy::missing_panics_doc, reason = "TODO")]
-pub fn rectangle_to_aab(rectangle: Rectangle, transform: Gridgid, max_brush: GridAab) -> GridAab {
-    // Note that embedded_graphics uses the convention that coordinates *identify pixels*,
-    // not the boundaries between pixels. Thus, a rectangle whose bottom_right corner is
-    // 1, 1 includes the pixel with coordinates 1, 1. This is consistent with our “cube”
-    // coordinate convention, but not with `GridAab`'s meaning of upper bounds. However,
-    // accounting for `max_brush` will conveniently fix that for us in exactly the right
-    // way, since it is precisely about identifying the volume occupied by drawing a
-    // 2D-pixel.
-
-    #![allow(clippy::too_long_first_doc_paragraph)] // TODO: find better phrasing
-
-    if rectangle.size.width == 0 || rectangle.size.height == 0 {
-        // Handle zero-sized rectangles — they don't draw any pixels, so don't enlarge them
-
-        let type_converted = GridAab::from_lower_size(
-            [rectangle.top_left.x, rectangle.top_left.y, 0],
-            [rectangle.size.width, rectangle.size.height, 0],
-        );
-
-        // Transform into the target 3D coordinate system.
-        type_converted.transform(transform).unwrap()
-    } else {
-        // Construct rectangle whose edges *exclude* the direction in which the
-        // drawn pixels overhang, because that's going to change.
-        let type_converted_excluding_size = GridAab::from_lower_size(
-            [rectangle.top_left.x, rectangle.top_left.y, 0],
-            [(rectangle.size.width - 1), (rectangle.size.height - 1), 0],
-        );
-
-        // Transform into the target 3D coordinate system.
-        let transformed = type_converted_excluding_size.transform(transform).unwrap();
-
-        // Account for the brush size -- assuming the brush is *not* rotated by the
-        // transform, so we must cancel it out.
-        // TODO: We want to change this to rotate the brush, but must do it globally
-        // consistently in both drawing and size-computation.
-        transformed.minkowski_sum(max_brush).unwrap()
-    }
-}
 
 /// A shape of multiple blocks to “paint” with. This may be used to make copies of a
 /// simple shape, or to make multi-layered "2.5D" drawings out of 2D data.

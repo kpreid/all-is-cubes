@@ -60,10 +60,15 @@
 ### Removed
 
 * `all-is-cubes` library:
+    * Interoperation with `embedded-graphics` has been removed, and thus the following items:
+        * `space::Mutation::draw_target()`
+        * `space::SpaceTransaction::draw_target()`
+        * `drawing::rectangle_to_aab()`
+        * `drawing::embedded_graphics` re-export.
+        * Implementations of the `DrawTarget`, `OriginDimensions`, and `PixelColor` traits.
     * `block::BlockDef` no longer implements `AsRef<Block>`.
     * `block::Modifier::Attributes` has been replaced by `SetAttribute`.
     * `space::PackedLight` no longer implements `From<Rgb>`. There is currently no replacement.
-
 
 ## 0.10.0 (2025-12-11)
 
