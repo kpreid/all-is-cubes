@@ -2,10 +2,9 @@ use core::fmt;
 use core::sync::atomic::AtomicBool;
 
 use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
-use all_is_cubes::euclid::Size2D;
 use all_is_cubes::math::{PositiveSign, ps32};
 use all_is_cubes_render::Flaws;
-use all_is_cubes_render::camera::{GraphicsOptions, ImagePixel};
+use all_is_cubes_render::camera::{GraphicsOptions, ImageSize};
 
 use super::bloom;
 use crate::common::{EgFramebuffer, Identified};
@@ -34,7 +33,7 @@ impl<P: Copy + Default + bytemuck::Pod> DrawableTexture<P> {
                 height: 0,
                 depth_or_array_layers: 1,
             },
-            local_buffer: EgFramebuffer::new(Size::zero()),
+            local_buffer: EgFramebuffer::new(ImageSize::zero()),
         }
     }
 
@@ -42,12 +41,7 @@ impl<P: Copy + Default + bytemuck::Pod> DrawableTexture<P> {
     ///
     /// The current texture data will be discarded if and only if the given size is
     /// different than the previous size.
-    pub fn resize(
-        &mut self,
-        device: &wgpu::Device,
-        label: Option<&str>,
-        size: Size2D<u32, ImagePixel>,
-    ) {
+    pub fn resize(&mut self, device: &wgpu::Device, label: Option<&str>, size: ImageSize) {
         let new_extent = size2d_to_extent(size);
         if new_extent == self.size && self.texture.is_some() {
             return;
@@ -66,10 +60,7 @@ impl<P: Copy + Default + bytemuck::Pod> DrawableTexture<P> {
 
         *self = Self {
             texture_format: self.texture_format,
-            local_buffer: EgFramebuffer::new(Size {
-                width: new_extent.width,
-                height: new_extent.height,
-            }),
+            local_buffer: EgFramebuffer::new(size),
             texture_view: Some(Identified::new(
                 texture.create_view(&wgpu::TextureViewDescriptor::default()),
             )),
@@ -92,7 +83,7 @@ impl<P: Copy + Default + bytemuck::Pod> DrawableTexture<P> {
 
     pub fn upload(&mut self, queue: &wgpu::Queue) {
         let dirty_rect = self.local_buffer.dirty_rect();
-        if dirty_rect.is_zero_sized() {
+        if dirty_rect.is_empty() {
             return;
         }
         let Some(texture) = &self.texture else { return };
@@ -103,8 +94,8 @@ impl<P: Copy + Default + bytemuck::Pod> DrawableTexture<P> {
                 texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d {
-                    x: dirty_rect.top_left.x.cast_unsigned(),
-                    y: dirty_rect.top_left.y.cast_unsigned(),
+                    x: dirty_rect.min.x,
+                    y: dirty_rect.min.y,
                     z: 0,
                 },
                 // kludge that only works as long as we don't plan to use stencil textures
@@ -115,8 +106,8 @@ impl<P: Copy + Default + bytemuck::Pod> DrawableTexture<P> {
                 },
             },
             bytemuck::must_cast_slice::<P, u8>(
-                &self.local_buffer.data()[full_width as usize * dirty_rect.top_left.y as usize
-                    + dirty_rect.top_left.x as usize..],
+                &self.local_buffer.data()
+                    [full_width as usize * dirty_rect.min.y as usize + dirty_rect.min.x as usize..],
             ),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
@@ -124,8 +115,8 @@ impl<P: Copy + Default + bytemuck::Pod> DrawableTexture<P> {
                 rows_per_image: None,
             },
             wgpu::Extent3d {
-                width: dirty_rect.size.width,
-                height: dirty_rect.size.height,
+                width: dirty_rect.size().width,
+                height: dirty_rect.size().height,
                 depth_or_array_layers: 1,
             },
         );
