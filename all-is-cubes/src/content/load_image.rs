@@ -11,14 +11,12 @@ use euclid::{Size2D, size2};
 use hashbrown::HashMap;
 
 use bevy_platform::sync::OnceLock;
-use embedded_graphics::prelude::{Point, Size};
-use embedded_graphics::primitives::Rectangle;
 use png_decoder::PngHeader;
 
 use crate::block::{self, AIR, Block, Resolution};
 use crate::camera::ImageSize;
-use crate::drawing::{VoxelBrush, rectangle_to_aab};
-use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, GridRotation, Rgba};
+use crate::drawing::VoxelBrush;
+use crate::math::{Cube, FaceMap, GridAab, GridCoordinate, GridRotation, Rgba};
 use crate::space::{self, Space, SpacePhysics};
 use crate::universe::{ReadTicket, UniverseTransaction};
 
@@ -161,12 +159,8 @@ pub fn space_from_image<'b>(
     let size: Size2D<i32, ()> = Size2D::new(header.width, header.height).to_i32();
 
     // TODO: let caller control the transform offsets (not necessarily positive-octant)
-    //
-    // TODO: Subtracting 1 here is wrong but cancels out wrongness in rectangle_to_aab()
-    // and the code below using transform_point() instead of transform_cube().
-    // Fix this once we've gotten rid of rectangle_to_aab().
     let transform = rotation.to_positive_octant_transform(
-        GridCoordinate::try_from(header.width.max(header.height)).unwrap() - 1,
+        GridCoordinate::try_from(header.width.max(header.height)).unwrap(),
     );
 
     let ia = &PngAdapter::adapt(png, pixel_function);
@@ -175,17 +169,23 @@ pub fn space_from_image<'b>(
     // Note: This strategy will overestimate the size in case a brush has X/Y size but is
     // never used near the edge. To fix that, we could use a dynamically resized Space
     // instead of this pessimistic choice.
-    let bounds: GridAab = rectangle_to_aab(
-        Rectangle::new(
-            Point::zero(),
-            Size {
-                width: header.width,
-                height: header.height,
-            },
-        ),
-        transform,
-        ia.max_brush,
-    );
+    let bounds: GridAab = GridAab::from_lower_size([0, 0, 0], [header.width, header.height, 1])
+        .transform(transform)
+        .unwrap()
+        .minkowski_sum(
+            ia.max_brush
+                // account for that a brush of size 1×1×1 is zero expansion of the image
+                .shrink(FaceMap {
+                    nx: 0,
+                    ny: 0,
+                    nz: 0,
+                    px: 1,
+                    py: 1,
+                    pz: 1,
+                })
+                .unwrap_or(GridAab::ORIGIN_EMPTY),
+        )
+        .unwrap();
 
     Space::builder(bounds)
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
@@ -193,10 +193,7 @@ pub fn space_from_image<'b>(
         .build_and_mutate(|m| {
             for y in 0..(size.height) {
                 for x in 0..(size.width) {
-                    ia.get_brush(x, y).paint(
-                        m,
-                        Cube::from(transform.transform_point(GridPoint::new(x, y, 0))),
-                    )?;
+                    ia.get_brush(x, y).paint(m, transform.transform_cube(Cube::new(x, y, 0)))?;
                 }
             }
             Ok(())
