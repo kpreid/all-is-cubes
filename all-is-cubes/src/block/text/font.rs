@@ -1,0 +1,219 @@
+use alloc::boxed::Box;
+
+use bevy_platform::sync::OnceLock;
+use euclid::{Point2D, Size2D, Translation2D, point2, size2, vec2};
+use itertools::iproduct;
+
+use crate::block::text::{self, layout::InGlyph};
+use crate::camera::ImageSize;
+use crate::math::{GridAab, GridCoordinate};
+use crate::universe;
+
+#[cfg(doc)]
+use crate::block::text::Text;
+
+// -------------------------------------------------------------------------------------------------
+
+/// A font that may be used with [`Text`] blocks.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[non_exhaustive]
+pub enum Font {
+    /// A font whose characteristics are unspecified, other than that it is general-purpose and
+    /// has a line height (vertical distance from a point on one line to the corresponding
+    /// point of the next line) of 16 voxels.
+    ///
+    /// This is a placeholder for further improvement in the font system.
+    System16,
+
+    #[doc(hidden)]
+    // experimental while we figure things out. Probably to be replaced with fonts stored in Universe
+    Logo,
+
+    #[doc(hidden)]
+    // experimental while we figure things out. Probably to be replaced with fonts stored in Universe
+    SmallerBodyText,
+}
+
+impl Font {
+    /// Returns the static (compile-time constant) data for this font.
+    pub(in crate::block::text) fn font_decl(&self) -> &'static FontDecl {
+        match self {
+            Self::System16 | Self::Logo => {
+                static DECL: FontDecl = FontDecl {
+                    png_data: include_bytes!("font-system-7x16.png"),
+                    png_path: "new-system-font.png",
+                    binary_image: OnceLock::new(),
+                    character_size: size2(7, 16),
+                    baseline: 12,
+                };
+
+                &DECL
+            }
+            Self::SmallerBodyText => {
+                static DECL: FontDecl = FontDecl {
+                    png_data: include_bytes!("font-body-text-6x14.png"),
+                    png_path: "body-text-fot.png",
+                    binary_image: OnceLock::new(),
+                    character_size: size2(6, 14),
+                    baseline: 10,
+                };
+                &DECL
+            }
+        }
+    }
+
+    /// Returns the size of a character cell that should be used when this font is used with a
+    /// strictly monospaced renderer.
+    ///
+    /// Currently, this will always agree with the spacing that [`Font::draw_str_monospaced()`]
+    /// produces.
+    pub fn character_cell_size(&self) -> ImageSize {
+        let s = self.font_decl().character_size;
+        size2(u32::from(s.width), u32::from(s.height))
+    }
+
+    /// Draws text in this font, calling `set_pixel` for each pixel that should be set.
+    ///
+    /// The output coordinates are X-right Y-down starting from `(0, 0)` at the top-left of the
+    /// first line of text.
+    ///
+    //---
+    // Design note: In most cases, “set pixel” is an inefficient way of drawing images.
+    // In this case, we are using it somewhat for historical reasons, but also because:
+    // * our text generally has few foreground pixels relative to the area it covers
+    // * all of our users want to track bounding boxes or otherwise work with the foreground
+    //   area distinct from the background.
+    //
+    // TODO: This should support drawing outlines, because it can do it more efficiently with
+    // access to the glyph.
+    //
+    // TODO: Ideally this should return an iterator, but a non-borrowing iterator over
+    // `Arc<[PositionedGlyph]>` is tricky.
+    //
+    // TODO: Return a more appropriate unit.
+    pub fn draw_str_monospaced(
+        &self,
+        text: &str,
+        mut set_pixel: impl FnMut(Point2D<i32, euclid::UnknownUnit>),
+    ) {
+        let decl = self.font_decl();
+        let pixels = decl.binary_image();
+        let layout = text::compute_layout(
+            text,
+            decl,
+            false,
+            GridAab::ORIGIN_CUBE,
+            text::Positioning {
+                x: text::PositioningX::Left,
+                line_y: text::PositioningY::BodyTop,
+                z: text::PositioningZ::Back,
+            },
+        );
+        for glyph in layout.glyphs.iter() {
+            // TODO: change the output convention so that we do not have to flip coords here?
+            let translation: Translation2D<i32, InGlyph, euclid::UnknownUnit> = Translation2D::from(
+                glyph.position.to_vector().cast_unit().component_mul(vec2(1, -1)),
+            );
+            glyph_from_binary_image(pixels, decl, glyph.glyph_index).for_each(|p| {
+                set_pixel(translation.transform_point(p));
+            });
+        }
+    }
+}
+
+impl universe::VisitHandles for Font {
+    fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
+        match self {
+            Self::System16 | Self::SmallerBodyText | Self::Logo => {}
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Number of glyphs which we place on each row of our .png and bitmap images.
+///
+/// TODO: Instead of this constant being used in many places, we should, when loading the font
+/// definition, reorganize it into individual glyph images. (It will also need to go away
+/// when we support non-monospaced fonts.)
+const GLYPHS_PER_ROW: u32 = 16;
+
+const GLYPHS_PER_ROW_USIZE: usize = GLYPHS_PER_ROW as usize;
+
+/// Data structure defining a font, that can go in a `static` even though the image needs decoding.
+///
+/// For convenience of the implementation, glyph sizes are not allowed to exceed 255, allowing
+/// all dimensions to be `u8`.
+pub(in crate::block::text) struct FontDecl {
+    png_data: &'static [u8],
+    png_path: &'static str,
+
+    /// Lazily decoded from `png_data` and bit-packed.
+    binary_image: OnceLock<Box<[u8]>>,
+
+    pub(in crate::block::text) character_size: Size2D<u8, InGlyph>,
+
+    /// Y position of the baseline in the glyph.
+    ///
+    /// TODO: Clarify interpretation of this coordinate
+    pub(in crate::block::text) baseline: u8,
+}
+
+impl FontDecl {
+    /// Ensures the 1bpp packed font bitmap is loaded (decoding the PNG if needed)
+    /// and returns a reference to it.
+    pub fn binary_image(&'static self) -> &'static [u8] {
+        self.binary_image.get_or_init(|| {
+            let decoded_png =
+                crate::content::load_image::DecodedPng::decode_static(self.png_data, self.png_path);
+            assert_eq!(
+                decoded_png.size().width,
+                u32::from(self.character_size.width) * GLYPHS_PER_ROW
+            );
+            rgba_to_binary_image(decoded_png.pixels())
+        })
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Given [`FontDecl::binary_image()`] data, iterate over all the pixels making up one glyph.
+///
+/// TODO: the results of this should typed, not as points, but as unit squares like `Cube`
+/// is a unit cube (or literally `Cube` if we choose to denote voxels this early).
+pub(in crate::block::text) fn glyph_from_binary_image(
+    pixels: &[u8],
+    decl: &FontDecl,
+    glyph_index: usize,
+) -> impl Iterator<Item = Point2D<GridCoordinate, InGlyph>> {
+    let image_width = usize::from(decl.character_size.width) * GLYPHS_PER_ROW_USIZE;
+    let glyph_origin = vec2(
+        glyph_index % GLYPHS_PER_ROW_USIZE * decl.character_size.width as usize,
+        glyph_index / GLYPHS_PER_ROW_USIZE * decl.character_size.height as usize,
+    );
+    iproduct!(0..decl.character_size.height, 0..decl.character_size.width)
+        .map(move |(y, x)| point2(GridCoordinate::from(x), GridCoordinate::from(y)))
+        .filter(move |&position_in_glyph| {
+            let pixel = position_in_glyph.to_usize() + glyph_origin;
+            let bit_index = pixel.y * image_width + pixel.x;
+            let byte_index = bit_index / 8;
+            let bit_pos = 7 - (bit_index % 8); // MSB-first packing
+            pixels.get(byte_index).is_some_and(|&b| b & (1 << bit_pos) != 0)
+        })
+}
+
+/// Convert image data provided by `png-decoder` into the bit-packed format expected by
+/// [`glyph_from_binary_image()`].
+fn rgba_to_binary_image(rgba_data: &[[u8; 4]]) -> Box<[u8]> {
+    Box::<[u8]>::from_iter(
+        // pack into 1 bit per pixel
+        rgba_data.chunks(8).map(|chunk| {
+            let mut byte = 0u8;
+            for &[r, _, _, a] in chunk {
+                byte = byte << 1 | u8::from(r > 0 && a > 0);
+            }
+            byte
+        }),
+    )
+}
