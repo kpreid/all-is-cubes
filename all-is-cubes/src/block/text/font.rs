@@ -5,7 +5,8 @@ use euclid::{Point2D, Size2D, Translation2D, point2, size2, vec2};
 use itertools::iproduct;
 
 use crate::block::text::{self, layout::InGlyph};
-use crate::camera::ImageSize;
+use crate::camera::{ImagePixel, ImageSize};
+use crate::content::load_image::DecodedPng;
 use crate::math::{GridAab, GridCoordinate};
 use crate::universe;
 
@@ -165,13 +166,12 @@ impl FontDecl {
     /// and returns a reference to it.
     pub fn binary_image(&'static self) -> &'static [u8] {
         self.binary_image.get_or_init(|| {
-            let decoded_png =
-                crate::content::load_image::DecodedPng::decode_static(self.png_data, self.png_path);
+            let decoded_png = DecodedPng::decode_static(self.png_data, self.png_path);
             assert_eq!(
                 decoded_png.size().width,
                 u32::from(self.character_size.width) * GLYPHS_PER_ROW
             );
-            rgba_to_binary_image(decoded_png.pixels())
+            rgba_image_to_glyphs(&decoded_png, self.character_size)
         })
     }
 }
@@ -183,37 +183,70 @@ impl FontDecl {
 /// TODO: the results of this should typed, not as points, but as unit squares like `Cube`
 /// is a unit cube (or literally `Cube` if we choose to denote voxels this early).
 pub(in crate::block::text) fn glyph_from_binary_image(
-    pixels: &[u8],
+    all_glyph_pixels: &[u8],
     decl: &FontDecl,
     glyph_index: usize,
 ) -> impl Iterator<Item = Point2D<GridCoordinate, InGlyph>> {
-    let image_width = usize::from(decl.character_size.width) * GLYPHS_PER_ROW_USIZE;
-    let glyph_origin = vec2(
-        glyph_index % GLYPHS_PER_ROW_USIZE * decl.character_size.width as usize,
-        glyph_index / GLYPHS_PER_ROW_USIZE * decl.character_size.height as usize,
-    );
+    let glyph_byte_size =
+        (decl.character_size.width as usize * decl.character_size.height as usize).div_ceil(8);
+    let this_glyph_pixels = &all_glyph_pixels[glyph_index * glyph_byte_size..][..glyph_byte_size];
+
     iproduct!(0..decl.character_size.height, 0..decl.character_size.width)
         .map(move |(y, x)| point2(GridCoordinate::from(x), GridCoordinate::from(y)))
         .filter(move |&position_in_glyph| {
-            let pixel = position_in_glyph.to_usize() + glyph_origin;
-            let bit_index = pixel.y * image_width + pixel.x;
+            let pixel = position_in_glyph.to_usize();
+            let bit_index = pixel.y * usize::from(decl.character_size.width) + pixel.x;
             let byte_index = bit_index / 8;
-            let bit_pos = 7 - (bit_index % 8); // MSB-first packing
-            pixels.get(byte_index).is_some_and(|&b| b & (1 << bit_pos) != 0)
+            let bit_pos = bit_index % 8;
+            this_glyph_pixels.get(byte_index).is_some_and(|&b| b & (1 << bit_pos) != 0)
         })
 }
 
-/// Convert image data provided by `png-decoder` into the bit-packed format expected by
+/// Convert image data provided by [`png_decoder`] into the bit-packed format expected by
 /// [`glyph_from_binary_image()`].
-fn rgba_to_binary_image(rgba_data: &[[u8; 4]]) -> Box<[u8]> {
-    Box::<[u8]>::from_iter(
-        // pack into 1 bit per pixel
-        rgba_data.chunks(8).map(|chunk| {
-            let mut byte = 0u8;
-            for &[r, _, _, a] in chunk {
-                byte = byte << 1 | u8::from(r > 0 && a > 0);
+///
+/// This involves reorganizing the image from having glyphs arrayed in two dimensions, to
+/// separate blocks of data for each glyph. This is intended to simplfy usage and improve locality
+/// of reference.
+fn rgba_image_to_glyphs(image: &DecodedPng, glyph_size: Size2D<u8, InGlyph>) -> Box<[u8]> {
+    let glyph_size = glyph_size.to_u32();
+    let row_count = image.size().height / glyph_size.height;
+    let bytes_per_glyph = glyph_size.area().div_ceil(u8::BITS) as usize;
+    let glyph_count = row_count * GLYPHS_PER_ROW;
+
+    assert_eq!(
+        image.size(),
+        size2(
+            glyph_size.width * GLYPHS_PER_ROW,
+            row_count * glyph_size.height
+        ),
+        "image not consistently sized"
+    );
+
+    let mut output = vec![0u8; bytes_per_glyph * glyph_count as usize].into_boxed_slice();
+
+    // This is hardly a highly efficient image copying operation, but it's done only once per font.
+    for glyph_index_u in 0..(glyph_count as usize) {
+        let input_glyph_pixel_offset: Translation2D<u32, InGlyph, ImagePixel> = Translation2D::new(
+            (glyph_index_u % GLYPHS_PER_ROW_USIZE) as u32 * glyph_size.width,
+            (glyph_index_u / GLYPHS_PER_ROW_USIZE) as u32 * glyph_size.height,
+        );
+        let output_glyph_byte_offset = glyph_index_u * bytes_per_glyph;
+
+        for position_in_glyph in iproduct!(0..glyph_size.height, 0..glyph_size.width)
+            .map(|(y, x)| <Point2D<u32, InGlyph>>::new(x, y))
+        {
+            let input_position = input_glyph_pixel_offset.transform_point(position_in_glyph);
+            let [r, _g, _b, a] = image.get_pixel(input_position.cast_unit()).unwrap();
+            if !(r > 0 && a > 0) {
+                continue;
             }
-            byte
-        }),
-    )
+
+            let output_bit_in_glyph = position_in_glyph.x + position_in_glyph.y * glyph_size.width;
+            output[output_glyph_byte_offset + (output_bit_in_glyph / 8) as usize] |=
+                1 << (output_bit_in_glyph % 8);
+        }
+    }
+
+    output
 }

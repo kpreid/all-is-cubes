@@ -7,14 +7,14 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use euclid::{Size2D, size2};
+use euclid::{Point2D, Size2D, size2};
 use hashbrown::HashMap;
 
 use bevy_platform::sync::OnceLock;
 use png_decoder::PngHeader;
 
 use crate::block::{self, AIR, Block, Resolution};
-use crate::camera::ImageSize;
+use crate::camera::{ImagePixel, ImageSize};
 use crate::drawing::VoxelBrush;
 use crate::math::{Cube, FaceMap, GridAab, GridCoordinate, GridRotation, Rgba};
 use crate::space::{self, Space, SpacePhysics};
@@ -86,6 +86,20 @@ impl DecodedPng {
 
     pub fn pixels(&self) -> &[Srgba] {
         &self.rgba_image_data
+    }
+
+    /// Returns the value of one pixel, or [`None`] for out-of-bounds access.
+    pub fn get_pixel<T: TryInto<u32>>(&self, pixel: Point2D<T, ImagePixel>) -> Option<Srgba> {
+        let Ok(x) = pixel.x.try_into() else {
+            return None;
+        };
+        let Ok(y) = pixel.y.try_into() else {
+            return None;
+        };
+        if x >= self.header.width || y >= self.header.height {
+            return None;
+        }
+        Some(self.rgba_image_data[x as usize + y as usize * self.header.width as usize])
     }
 }
 
