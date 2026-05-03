@@ -6,7 +6,7 @@
 )]
 
 use alloc::boxed::Box;
-use core::{fmt, iter};
+use core::fmt;
 
 use arcstr::ArcStr;
 use bevy_platform::sync::OnceLock;
@@ -28,8 +28,8 @@ use super::Evoxels;
 // -------------------------------------------------------------------------------------------------
 
 mod font;
-pub use font::Font;
 use font::FontDecl;
+pub use font::{Font, Value};
 
 mod layout;
 use layout::{Layout, compute_layout};
@@ -286,15 +286,19 @@ impl Text {
                 for glyph in text_glyphs.iter() {
                     let glyph_position_3d: GridPoint =
                         glyph.position.extend(layout_z).cast_unit() + block_offset_in_voxels;
-                    font_glyphs.get(decl, glyph.glyph_index).for_each(|position_in_glyph| {
-                        let position_in_block_of_voxel =
-                            glyph_position_3d + vec3(position_in_glyph.x, -position_in_glyph.y, 0);
-                        for (offset, evoxel) in brush.iter() {
-                            if let Some(vox) = voxels.get_mut(position_in_block_of_voxel + offset) {
-                                *vox = evoxel;
+                    font_glyphs.get(decl, glyph.glyph_index).for_each(
+                        |(position_in_glyph, value)| {
+                            let position_in_block_of_voxel = glyph_position_3d
+                                + vec3(position_in_glyph.x, -position_in_glyph.y, 0);
+                            for (offset, evoxel) in brush.iter(value) {
+                                if let Some(vox) =
+                                    voxels.get_mut(position_in_block_of_voxel + offset)
+                                {
+                                    *vox = evoxel;
+                                }
                             }
-                        }
-                    });
+                        },
+                    );
                 }
 
                 Evoxels::from_many(self.data.resolution, voxels.map_container(Into::into))
@@ -341,8 +345,8 @@ impl Text {
         };
 
         for glyph in glyphs.iter() {
-            font_glyphs.get(decl, glyph.glyph_index).for_each(|position_in_glyph| {
-                for (brush_offset, brush_block) in brush.iter() {
+            font_glyphs.get(decl, glyph.glyph_index).for_each(|(position_in_glyph, value)| {
+                for (brush_offset, brush_block) in brush.iter(value) {
                     let transformed_position = transform.transform_cube(Cube::from(
                         glyph.position.extend(layout_z).cast_unit()
                             + vec3(position_in_glyph.x, -position_in_glyph.y, 0)
@@ -835,32 +839,33 @@ pub(crate) enum Brush<V> {
 // -------------------------------------------------------------------------------------------------
 
 impl<V> Brush<V> {
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (GridVector, V)> + '_
+    pub(crate) fn iter(&self, value: Value) -> impl Iterator<Item = (GridVector, V)> + '_
     where
         V: Copy,
     {
-        use itertools::Either::{Left, Right};
-        match *self {
-            Brush::Plain(foreground) => Left(iter::once((GridVector::zero(), foreground))),
-            Brush::Outline {
-                foreground,
-                outline,
-            } => Right(
-                [
-                    (vec3(0, 0, 1), foreground),
-                    (vec3(-1, -1, 0), outline),
-                    (vec3(-1, 0, 0), outline),
-                    (vec3(-1, 1, 0), outline),
-                    (vec3(0, -1, 0), outline),
-                    (vec3(0, 0, 0), outline),
-                    (vec3(0, 1, 0), outline),
-                    (vec3(1, -1, 0), outline),
-                    (vec3(1, 0, 0), outline),
-                    (vec3(1, 1, 0), outline),
-                ]
-                .into_iter(),
-            ),
-        }
+        const P0: GridVector = vec3(0, 0, 0);
+        const P1: GridVector = vec3(0, 0, 1);
+
+        // Using ArrayVec as a variable length owning iterator.
+        // In principle it’d be more efficient to write an iterator from scratch.
+        let av: arrayvec::ArrayVec<(GridVector, V), 2> = match (value, *self) {
+            (Value::Foreground, Brush::Plain(foreground)) => {
+                [(P0, foreground)].into_iter().collect()
+            }
+            (Value::Outline, Brush::Plain(_)) => [].into_iter().collect(),
+            (
+                Value::Foreground,
+                Brush::Outline {
+                    foreground,
+                    outline,
+                },
+            ) => [(P1, foreground), (P0, outline)].into_iter().collect(),
+            (Value::Outline, Brush::Outline { outline, .. }) => {
+                [(P0, outline)].into_iter().collect()
+            }
+        };
+
+        av.into_iter()
     }
 }
 

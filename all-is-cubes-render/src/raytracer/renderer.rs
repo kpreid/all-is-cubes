@@ -3,11 +3,10 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use core::fmt;
 
-use itertools::iproduct;
-
+use all_is_cubes::block::text;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
-use all_is_cubes::euclid::{self, Vector2D, point2, vec2};
+use all_is_cubes::euclid::{self, point2, vec2};
 use all_is_cubes::listen::{self, Source as _};
 use all_is_cubes::math::{Rgba, ZeroOne};
 use all_is_cubes::space::Space;
@@ -666,29 +665,18 @@ pub(crate) fn draw_info_text<T: Clone>(
 
     let output_bounds = euclid::Box2D::from_size(viewport.framebuffer_size);
     let origin = vec2(5, 5);
-    let font = all_is_cubes::block::text::Font::System16;
+    let font = text::Font::System16;
 
-    // Draw outline around the text using copies of the text
-    // TODO: The font renderer should support outlines directly.
-    for translation in iproduct!(-1..=1, -1..=1)
-        .map(|t| origin + Vector2D::from(t))
-        .filter(|&t| t != Vector2D::zero())
-    {
-        font.draw_str_monospaced(info_text, |mut pixel| {
-            pixel += translation;
-            if output_bounds.contains(pixel.to_u32().cast_unit()) {
-                output[pixel.y as usize * viewport.framebuffer_size.width as usize
-                    + pixel.x as usize] = paint[0].clone();
-            }
-        });
-    }
-
-    font.draw_str_monospaced(info_text, |mut pixel| {
+    font.draw_str_monospaced(info_text, |mut pixel, value| {
         pixel += origin;
         if output_bounds.contains(pixel.to_u32().cast_unit()) {
             output
                 [pixel.y as usize * viewport.framebuffer_size.width as usize + pixel.x as usize] =
-                paint[1].clone();
+                paint[match value {
+                    text::Value::Outline => 0,
+                    text::Value::Foreground => 1,
+                }]
+                .clone();
         }
     });
 }

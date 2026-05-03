@@ -4,6 +4,7 @@ use core::iter;
 
 use itertools::iproduct;
 
+use all_is_cubes::block::text;
 use all_is_cubes::euclid::{self, Size2D, Vector2D, point2, size2};
 use all_is_cubes_render::camera::{ImageSize, Viewport};
 
@@ -106,7 +107,7 @@ impl GpuFontMetrics {
 pub(crate) fn generate_texture_atlas(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    font: &all_is_cubes::block::text::Font,
+    font: &text::Font,
 ) -> (Identified<wgpu::TextureView>, GpuFontMetrics) {
     let outline_radius_u = 1u32;
     let outline_radius_i = outline_radius_u.cast_signed();
@@ -129,27 +130,16 @@ pub(crate) fn generate_texture_atlas(
             y * atlas_cell_size.height.cast_signed() + outline_radius_i,
         );
 
-        // Draw black shadow at all offsets within the outline radius.
-        // TODO: Replace this with the font renderer being able to offer us outlined glyphs
-        // directly.
-        for (dx, dy) in iproduct!(
-            -outline_radius_i..=outline_radius_i,
-            -outline_radius_i..=outline_radius_i
-        ) {
-            let outlined_translation =
-                translate_glyph_to_atlas + euclid::Translation2D::new(dx, dy);
-            font.draw_str_monospaced(string, |p| {
-                if let Some(p) = outlined_translation.transform_point(p).try_cast::<u32>() {
-                    dt.draw_target().set_pixel(p, [0u8, 0, 0, 255]);
-                }
-            });
-        }
-
-        // Draw white foreground glyph on top.
-        font.draw_str_monospaced(string, |p| {
+        font.draw_str_monospaced(string, |p, value| {
             // TODO: also clip to the cell boundary?
             if let Some(p) = translate_glyph_to_atlas.transform_point(p).try_cast::<u32>() {
-                dt.draw_target().set_pixel(p, [255u8, 255, 255, 255]);
+                dt.draw_target().set_pixel(
+                    p,
+                    match value {
+                        text::Value::Outline => [0u8, 0, 0, 255],
+                        text::Value::Foreground => [255u8, 255, 255, 255],
+                    },
+                );
             }
         });
     }

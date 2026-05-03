@@ -74,10 +74,23 @@ impl Font {
         size2(u32::from(s.width), u32::from(s.height))
     }
 
-    /// Draws text in this font, calling `set_pixel` for each pixel that should be set.
+    /// Draws text in this font, calling `set_pixel` for each pixel that should be set
+    /// according to some [`Value`].
     ///
     /// The output coordinates are X-right Y-down starting from `(0, 0)` at the top-left of the
     /// first line of text.
+    ///
+    /// **Caution:**
+    /// Glyphs may overlap, and in particular, the [`Value::Outline`] of one glyph may be produced
+    /// before or after an adjacent glyph’s [`Value::Foreground`]. Therefore, you must adopt one
+    /// of these strategies to handle this case:
+    ///
+    /// * Ignore outline pixels.
+    /// * If an outline pixel is drawn after a foreground pixel, do not overwrite the foreground
+    ///   pixel (draw to different layers, or have some priority mechanism such as taking the
+    ///   maximum or minimum).
+    /// * Call this function twice, first taking the outline pixels only, and then taking the
+    ///   foreground pixels only.
     ///
     //---
     // Design note: In most cases, “set pixel” is an inefficient way of drawing images.
@@ -86,9 +99,6 @@ impl Font {
     // * all of our users want to track bounding boxes or otherwise work with the foreground
     //   area distinct from the background.
     //
-    // TODO: This should support drawing outlines, because it can do it more efficiently with
-    // access to the glyph.
-    //
     // TODO: Ideally this should return an iterator, but a non-borrowing iterator over
     // `Arc<[PositionedGlyph]>` is tricky.
     //
@@ -96,7 +106,7 @@ impl Font {
     pub fn draw_str_monospaced(
         &self,
         text: &str,
-        mut set_pixel: impl FnMut(Point2D<i32, euclid::UnknownUnit>),
+        mut set_pixel: impl FnMut(Point2D<i32, euclid::UnknownUnit>, Value),
     ) {
         let decl = self.font_decl();
         let glyphs = decl.glyphs();
@@ -116,8 +126,8 @@ impl Font {
             let translation: Translation2D<i32, InGlyph, euclid::UnknownUnit> = Translation2D::from(
                 glyph.position.to_vector().cast_unit().component_mul(vec2(1, -1)),
             );
-            glyphs.get(decl, glyph.glyph_index).for_each(|p| {
-                set_pixel(translation.transform_point(p));
+            glyphs.get(decl, glyph.glyph_index).for_each(|(position, value)| {
+                set_pixel(translation.transform_point(position), value);
             });
         }
     }
@@ -177,9 +187,38 @@ impl FontDecl {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Values a pixel of a glyph or piece of text can have.
+///
+/// These are not specific colors, but identify which color role (“foreground”, “outline”)
+/// to use at a specific position, given the particular piece of text’s style.
+///
+/// This enum is produced by [`Font::draw_str_monospaced()`].
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[expect(clippy::exhaustive_enums)]
+pub enum Value {
+    /// Part of the shape of the glyph itself.
+    Foreground = 0b11,
+
+    /// Part of the outline of the glyph.
+    /// Every pixel 8-way-adjacent to a `Foreground` pixel is part of the outline.
+    Outline = 0b01,
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// All the glyphs of one font, ready for use by the renderer.
 pub(crate) struct Glyphs {
     pixels: Box<[u8]>,
+}
+
+const BITS_PER_PIXEL: u32 = 2;
+const PIXELS_PER_BYTE: u32 = u8::BITS / BITS_PER_PIXEL;
+const PIXEL_MASK: u8 = 0b11;
+
+/// Set bits in [`Glyphs`] bit-packed data.
+fn set_glyph_bits(data: &mut [u8], pixel_index: usize, value: u8) {
+    data[pixel_index / PIXELS_PER_BYTE as usize] |=
+        value << ((pixel_index % PIXELS_PER_BYTE as usize) as u32 * BITS_PER_PIXEL);
 }
 
 impl Glyphs {
@@ -188,11 +227,32 @@ impl Glyphs {
     /// This involves reorganizing the image from having glyphs arrayed in two dimensions, to
     /// separate blocks of data for each glyph. This is intended to simplify usage and improve
     /// locality of reference.
+    ///
+    /// It also precalculates which pixels are adjacent to the glyph for outline drawing.
     fn new(image: &DecodedPng, glyph_size: Size2D<u8, InGlyph>) -> Self {
+        let loaded_glyph_rect_size = glyph_data_rect_size(glyph_size);
         let glyph_size = glyph_size.to_u32();
         let row_count = image.size().height / glyph_size.height;
-        let bytes_per_glyph = glyph_size.area().div_ceil(u8::BITS) as usize;
+        let bytes_per_glyph = loaded_glyph_rect_size.area().div_ceil(PIXELS_PER_BYTE) as usize;
         let glyph_count = row_count * GLYPHS_PER_ROW;
+
+        // Bits that should be set in the output in the neighborhood of the input,
+        // and their offsets in terms of pixel indices.
+        // This forms the 3×3 pattern of outline pixels around a foreground pixel:
+        //      O O O
+        //      O F O
+        //      O O O
+        #[rustfmt::skip]
+        let brush: [(u8, usize); 9] = {
+            let o = Value::Outline as u8;
+            let f = Value::Foreground as u8;
+            let row = loaded_glyph_rect_size.width as usize;
+            [
+                (o, 0      ), (o,           1), (o,           2),
+                (o, row    ), (f, row     + 1), (o, row     + 2),
+                (o, row * 2), (o, row * 2 + 1), (o, row * 2 + 2),
+            ]
+        };
 
         assert_eq!(
             image.size(),
@@ -212,7 +272,8 @@ impl Glyphs {
                     (glyph_index_u % GLYPHS_PER_ROW_USIZE) as u32 * glyph_size.width,
                     (glyph_index_u / GLYPHS_PER_ROW_USIZE) as u32 * glyph_size.height,
                 );
-            let output_glyph_byte_offset = glyph_index_u * bytes_per_glyph;
+            let output_glyph_data =
+                &mut output[glyph_index_u * bytes_per_glyph..][..bytes_per_glyph];
 
             for position_in_glyph in iproduct!(0..glyph_size.height, 0..glyph_size.width)
                 .map(|(y, x)| <Point2D<u32, InGlyph>>::new(x, y))
@@ -223,10 +284,11 @@ impl Glyphs {
                     continue;
                 }
 
-                let output_bit_in_glyph =
-                    position_in_glyph.x + position_in_glyph.y * glyph_size.width;
-                output[output_glyph_byte_offset + (output_bit_in_glyph / 8) as usize] |=
-                    1 << (output_bit_in_glyph % 8);
+                let first_output_pixel = position_in_glyph.x as usize
+                    + position_in_glyph.y as usize * loaded_glyph_rect_size.width as usize;
+                for (value, offset) in brush {
+                    set_glyph_bits(output_glyph_data, first_output_pixel + offset, value);
+                }
             }
         }
 
@@ -241,19 +303,45 @@ impl Glyphs {
         &self,
         decl: &FontDecl,
         glyph_index: usize,
-    ) -> impl Iterator<Item = Point2D<GridCoordinate, InGlyph>> {
+    ) -> impl Iterator<Item = (Point2D<GridCoordinate, InGlyph>, Value)> {
+        let glyph_data_rect_size = glyph_data_rect_size(decl.character_size);
         let glyph_byte_size =
-            (decl.character_size.width as usize * decl.character_size.height as usize).div_ceil(8);
+            (glyph_data_rect_size.area() as usize).div_ceil(PIXELS_PER_BYTE as usize);
         let this_glyph_pixels = &self.pixels[glyph_index * glyph_byte_size..][..glyph_byte_size];
 
-        iproduct!(0..decl.character_size.height, 0..decl.character_size.width)
-            .map(move |(y, x)| point2(GridCoordinate::from(x), GridCoordinate::from(y)))
-            .filter(move |&position_in_glyph| {
-                let pixel = position_in_glyph.to_usize();
-                let bit_index = pixel.y * usize::from(decl.character_size.width) + pixel.x;
-                let byte_index = bit_index / 8;
-                let bit_pos = bit_index % 8;
-                this_glyph_pixels.get(byte_index).is_some_and(|&b| b & (1 << bit_pos) != 0)
-            })
+        iproduct!(
+            0..glyph_data_rect_size.height,
+            0..glyph_data_rect_size.width
+        )
+        // can't overflow due to ranges of the original character size
+        .map(move |(y, x)| point2(x.cast_signed(), y.cast_signed()))
+        .filter_map(move |position_in_data| {
+            let pixel = position_in_data.to_usize();
+            let pixel_index = pixel.y * glyph_data_rect_size.width as usize + pixel.x;
+
+            let byte_index = pixel_index / PIXELS_PER_BYTE as usize;
+            let shift = (pixel_index % PIXELS_PER_BYTE as usize) * 2;
+
+            let byte_value = *this_glyph_pixels.get(byte_index)?;
+            let bit_value = (byte_value >> shift) & PIXEL_MASK;
+
+            // offset of -1 accounts for the thickness of the outline area
+            let position_in_glyph = position_in_data - vec2(1, 1);
+            match bit_value {
+                0b00 => None,
+                0b01 => Some((position_in_glyph, Value::Outline)),
+                0b11 => Some((position_in_glyph, Value::Foreground)),
+                _ => unreachable!(),
+            }
+        })
     }
+}
+
+/// Compute the size of a glyph as loaded into [`Glyphs`] with its pre-calculated outline,
+/// which is 1 pixel larger on all sides than the original image size.
+fn glyph_data_rect_size(character_size: Size2D<u8, InGlyph>) -> ImageSize {
+    size2(
+        u32::from(character_size.width) + 2,
+        u32::from(character_size.height) + 2,
+    )
 }
