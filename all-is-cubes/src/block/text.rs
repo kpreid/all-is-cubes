@@ -29,7 +29,7 @@ use super::Evoxels;
 
 mod font;
 pub use font::Font;
-use font::{FontDecl, glyph_from_binary_image};
+use font::FontDecl;
 
 mod layout;
 use layout::{Layout, compute_layout};
@@ -241,7 +241,7 @@ impl Text {
 
         let &Layout {
             bounding_box: text_aab,
-            ref glyphs,
+            glyphs: ref text_glyphs,
             z: layout_z,
         } = self.get_or_init_layout();
 
@@ -281,24 +281,20 @@ impl Text {
                     Vol::from_fn(bounds_in_this_block, |_| background);
 
                 let decl = self.data.font.font_decl();
-                let pixels = decl.binary_image();
+                let font_glyphs = decl.glyphs();
 
-                for glyph in glyphs.iter() {
+                for glyph in text_glyphs.iter() {
                     let glyph_position_3d: GridPoint =
                         glyph.position.extend(layout_z).cast_unit() + block_offset_in_voxels;
-                    glyph_from_binary_image(pixels, decl, glyph.glyph_index).for_each(
-                        |position_in_glyph| {
-                            let position_in_block_of_voxel = glyph_position_3d
-                                + vec3(position_in_glyph.x, -position_in_glyph.y, 0);
-                            for (offset, evoxel) in brush.iter() {
-                                if let Some(vox) =
-                                    voxels.get_mut(position_in_block_of_voxel + offset)
-                                {
-                                    *vox = evoxel;
-                                }
+                    font_glyphs.get(decl, glyph.glyph_index).for_each(|position_in_glyph| {
+                        let position_in_block_of_voxel =
+                            glyph_position_3d + vec3(position_in_glyph.x, -position_in_glyph.y, 0);
+                        for (offset, evoxel) in brush.iter() {
+                            if let Some(vox) = voxels.get_mut(position_in_block_of_voxel + offset) {
+                                *vox = evoxel;
                             }
-                        },
-                    );
+                        }
+                    });
                 }
 
                 Evoxels::from_many(self.data.resolution, voxels.map_container(Into::into))
@@ -334,7 +330,7 @@ impl Text {
         } = self.get_or_init_layout();
 
         let decl = self.data.font.font_decl();
-        let pixels = decl.binary_image();
+        let font_glyphs = decl.glyphs();
 
         let brush: Brush<&Block> = match self.data.outline {
             Some(ref outline) => Brush::Outline {
@@ -345,18 +341,16 @@ impl Text {
         };
 
         for glyph in glyphs.iter() {
-            glyph_from_binary_image(pixels, decl, glyph.glyph_index).for_each(
-                |position_in_glyph| {
-                    for (brush_offset, brush_block) in brush.iter() {
-                        let transformed_position = transform.transform_cube(Cube::from(
-                            glyph.position.extend(layout_z).cast_unit()
-                                + vec3(position_in_glyph.x, -position_in_glyph.y, 0)
-                                + brush_offset,
-                        ));
-                        txn.at(transformed_position).overwrite(brush_block.clone());
-                    }
-                },
-            );
+            font_glyphs.get(decl, glyph.glyph_index).for_each(|position_in_glyph| {
+                for (brush_offset, brush_block) in brush.iter() {
+                    let transformed_position = transform.transform_cube(Cube::from(
+                        glyph.position.extend(layout_z).cast_unit()
+                            + vec3(position_in_glyph.x, -position_in_glyph.y, 0)
+                            + brush_offset,
+                    ));
+                    txn.at(transformed_position).overwrite(brush_block.clone());
+                }
+            });
         }
     }
 
