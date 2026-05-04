@@ -848,11 +848,15 @@ impl<V> Brush<V> {
             } => Right(
                 [
                     (vec3(0, 0, 1), foreground),
-                    (vec3(0, 0, 0), outline),
+                    (vec3(-1, -1, 0), outline),
                     (vec3(-1, 0, 0), outline),
-                    (vec3(1, 0, 0), outline),
+                    (vec3(-1, 1, 0), outline),
                     (vec3(0, -1, 0), outline),
+                    (vec3(0, 0, 0), outline),
                     (vec3(0, 1, 0), outline),
+                    (vec3(1, -1, 0), outline),
+                    (vec3(1, 0, 0), outline),
+                    (vec3(1, 1, 0), outline),
                 ]
                 .into_iter(),
             ),
