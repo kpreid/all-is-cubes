@@ -168,7 +168,7 @@ impl DemoTheme {
 
         let wall_parallel = Face::PY.clockwise().transform(face);
         let parallel_axis = wall_parallel.axis();
-        assert!(parallel_axis != Axis::Y);
+        assert_ne!(parallel_axis, Axis::Y);
 
         let rotate_nz_to_face = GridRotation::from_to(Face::NZ, face, Face::PY).unwrap();
 

@@ -481,7 +481,7 @@ mod state {
     impl Ticket {
         pub fn new(shared: Arc<Counters>, job_id: JobId, current_state: State) -> Self {
             // avoid complexity by not supporting this case
-            assert!(current_state != State::Completed);
+            assert_ne!(current_state, State::Completed);
 
             {
                 let counters = &mut *shared.counters.lock().unwrap();
@@ -499,7 +499,7 @@ mod state {
             if new_state == self.current_state {
                 return;
             }
-            assert!(self.current_state != State::Completed);
+            assert_ne!(self.current_state, State::Completed);
 
             let old_state = self.current_state;
 

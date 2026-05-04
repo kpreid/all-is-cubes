@@ -240,7 +240,10 @@ impl Session {
     pub fn set_character(&mut self, character: Option<StrongHandle<Character>>) {
         let shuttle = self.shuttle_mut();
         if let Some(character) = &character {
-            assert!(character.universe_id() == Some(shuttle.game_universe.universe_id()));
+            assert_eq!(
+                character.universe_id(),
+                Some(shuttle.game_universe.universe_id())
+            );
         }
 
         shuttle.game_character.set(character);
