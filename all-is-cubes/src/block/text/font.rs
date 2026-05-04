@@ -43,7 +43,7 @@ impl Font {
             Self::System16 | Self::Logo => {
                 static DECL: FontDecl = FontDecl {
                     png_data: include_bytes!("font-system-7x16.png"),
-                    png_path: "new-system-font.png",
+                    png_path: "font-system-7x16.png",
                     glyphs: OnceLock::new(),
                     character_size: size2(7, 16),
                     baseline: 12,
@@ -54,7 +54,7 @@ impl Font {
             Self::SmallerBodyText => {
                 static DECL: FontDecl = FontDecl {
                     png_data: include_bytes!("font-body-text-6x14.png"),
-                    png_path: "body-text-fot.png",
+                    png_path: "font-body-text-6x14.png",
                     glyphs: OnceLock::new(),
                     character_size: size2(6, 14),
                     baseline: 10,
