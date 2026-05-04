@@ -62,7 +62,7 @@ fn block_static_eq_to_non_static() {
 
 #[test]
 fn block_debug_air() {
-    assert_eq!(&format!("{:?}", &AIR), "Block { primitive: Air }");
+    assert_eq!(&format!("{AIR:?}"), "Block { primitive: Air }");
 }
 
 #[test]
@@ -70,7 +70,7 @@ fn block_debug_with_modifiers() {
     assert_eq!(
         &format!(
             "{:?}",
-            &Block::builder()
+            Block::builder()
                 .color(Rgba::new(1.0, 0.5, 0.0, 1.0))
                 // TODO: When we have more modifiers, pick a different one, that isn't
                 // essentially irrelevant to Primitive::Atom

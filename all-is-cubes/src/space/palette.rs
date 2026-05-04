@@ -330,8 +330,7 @@ impl Palette {
             let actual_count = actual_counts.remove(&index).unwrap_or(0);
             if data.count != actual_count {
                 problems.push(format!(
-                    "Index {} appears {} times but {:?}",
-                    index, actual_count, &data
+                    "Index {index} appears {actual_count} times but {data:?}",
                 ));
             }
         }
@@ -340,8 +339,7 @@ impl Palette {
         // (The previous section should have drained actual_counts).
         if !actual_counts.is_empty() {
             problems.push(format!(
-                "Block indexes were not indexed in palette: {:?}",
-                &actual_counts
+                "Block indexes were not indexed in palette: {actual_counts:?}",
             ));
         }
 
@@ -355,7 +353,7 @@ impl Palette {
             if bti_index != Some(index as BlockIndex) {
                 problems.push(format!(
                     "block_to_index[{:?}] should have been {:?}={:?} but was {:?}={:?}",
-                    &data.block,
+                    data.block,
                     index,
                     data,
                     bti_index,

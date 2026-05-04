@@ -995,7 +995,7 @@ impl fmt::Debug for BitSetDebugAsSet<'_> {
 struct DebugAsDisplay<T>(T);
 impl<T: fmt::Display> fmt::Debug for DebugAsDisplay<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.0)
+        write!(f, "{}", self.0)
     }
 }
 

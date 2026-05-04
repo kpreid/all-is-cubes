@@ -107,7 +107,7 @@ where
             assert!(
                 succeeded_at_least_once,
                 "Transaction did not pass check() on any provided target: {:?}",
-                &tap.transaction
+                tap.transaction
             );
         }
     }
