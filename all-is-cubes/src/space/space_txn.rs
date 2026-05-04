@@ -89,7 +89,7 @@ impl SpaceTransaction {
     ///
     /// [non-conservative]: https://en.wikipedia.org/wiki/Conserved_quantity
     pub fn nonconserved(mut self) -> Self {
-        for (_, cube_txn) in self.cubes.iter_mut() {
+        for cube_txn in self.cubes.values_mut() {
             cube_txn.conserved = false;
         }
         self
