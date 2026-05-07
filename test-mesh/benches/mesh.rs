@@ -39,6 +39,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
     // Exercise the code paths that only apply to resolution 1;
     // all the other benchmarks use larger resolutions.
+    g.throughput(criterion::Throughput::Elements(1));
     g.bench_function("r1-fresh", |b| {
         let universe = &mut Universe::new();
         iter_new_block_mesh(
@@ -59,6 +60,7 @@ fn block_mesh_benches(c: &mut Criterion) {
     });
 
     // This block requires texturing but is otherwise trivial.
+    g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("opaque", |b| {
         let universe = &mut Universe::new();
         let block = checkerboard_block(
@@ -73,6 +75,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
     // Exercise the standard test blocks from `make_some_voxel_blocks`.
     // This is very similar to the "opaque" benchmark but also has light emission.
+    g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("msvb", |b| {
         let universe = &mut Universe::new();
         let [block] = make_some_voxel_blocks(universe);
@@ -83,6 +86,7 @@ fn block_mesh_benches(c: &mut Criterion) {
     // terminology of the space mesh benches in this file.
     // Note also that unlike `make_slab()`, `half_space()` is not shrinkwrapping the space
     // — there are empty voxels the analysis is obligated to check.
+    g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("half", |b| {
         let universe = &mut Universe::new();
         let block = Block::builder()
@@ -96,6 +100,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
     // The tetrahedron shape is one that has a reasonably complex surface,
     // but spread across many separate planes (so each plane has little work).
+    g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("tetrahedron", |b| {
         let universe = &mut Universe::new();
         let block = tetrahedron_block(universe);
@@ -103,6 +108,7 @@ fn block_mesh_benches(c: &mut Criterion) {
     });
 
     // The greebly block has very complex surface detail confined to only a few planes.
+    g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("greebly", |b| {
         let universe = &mut Universe::new();
         {
@@ -116,6 +122,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 
     // The empty/opaque checkerboard is the “worst case” for these benchmarks, because it has almost
     // the maximum possible number of vertices and triangles.
+    g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("checker-fresh", |b| {
         let universe = &mut Universe::new();
         let block = checkerboard_block(universe, &[AIR, block::from_color!(Rgba::WHITE)]);
@@ -164,6 +171,7 @@ fn space_mesh_benches(c: &mut Criterion) {
     // This also ensures we're not timing dropping them.
     let checker_ing = checkerboard_space_bench_setup(options.clone(), false);
 
+    g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("checker-fresh", |b| {
         // This benchmark actually has no use for iter_batched_ref -- it could be
         // iter_with_large_drop -- but I want to make sure any quirks of the measurement
@@ -193,6 +201,7 @@ fn space_mesh_benches(c: &mut Criterion) {
     });
 
     let half_ing = SpaceMeshIngredients::new(options, half_space(&block::from_color!(Rgba::WHITE)));
+    g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("half-fresh", |b| {
         b.iter_batched_ref(|| (), |()| half_ing.do_new(), BatchSize::SmallInput);
     });
@@ -215,6 +224,7 @@ fn slow_mesh_benches(c: &mut Criterion) {
     g.sample_size(10);
     let options = MeshOptions::new(&GraphicsOptions::default());
 
+    g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("transparent", |b| {
         let ing = checkerboard_space_bench_setup(options.clone(), true);
         b.iter_batched_ref(|| (), |()| ing.do_new(), BatchSize::SmallInput);
