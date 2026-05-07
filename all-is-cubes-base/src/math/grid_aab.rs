@@ -110,7 +110,17 @@ impl GridAab {
         Self::const_checked_from_lower_upper(lower_bounds.into(), upper_bounds.into())
     }
 
-    pub(crate) const fn const_checked_from_lower_upper(
+    /// Constructs a [`GridAab`] from inclusive lower bounds and exclusive upper bounds.
+    ///
+    /// This function is identical to [`GridAab::checked_from_lower_upper()`],
+    /// except that its parameters are non-generic and it can be called in `const` contexts.
+    /// It will no longer be necessary when Rust has const trait support.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the `upper_bounds` are less than the `lower_bounds`.
+    #[inline]
+    pub const fn const_checked_from_lower_upper(
         lower_bounds: GridPoint,
         upper_bounds: GridPoint,
     ) -> Result<GridAab, GridOverflowError> {
@@ -118,6 +128,7 @@ impl GridAab {
             || upper_bounds.y < lower_bounds.y
             || upper_bounds.z < lower_bounds.z
         {
+            core::hint::cold_path();
             return Err(GridOverflowError(OverflowKind::Inverted {
                 lower_bounds,
                 upper_bounds,
