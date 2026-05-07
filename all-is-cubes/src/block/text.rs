@@ -461,18 +461,6 @@ impl fmt::Debug for Text {
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for Text {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // As a temporary measure, restrict GridAab coordinate range to avoid overflows.
-        // Eventually we should fix the overflows, but let's do that after we build our own
-        // text rendering because that'll be easier. Once that’s done, replace this with a
-        // derived implementation.
-        //
-        // (Another possibility would be to actually restrict `layout_bounds` itself.)
-        let layout_bounds = GridAab::checked_from_lower_upper(
-            <[i16; 3]>::arbitrary(u)?.map(i32::from),
-            <[u16; 3]>::arbitrary(u)?.map(i32::from),
-        )
-        .map_err(|_volume_error| arbitrary::Error::IncorrectFormat)?;
-
         Ok(Self::from(TextData {
             // ArcStr doesn't implement Arbitrary
             string: alloc::string::String::arbitrary(u)?.into(),
@@ -480,7 +468,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Text {
             foreground: Block::arbitrary(u)?,
             outline: Option::<Block>::arbitrary(u)?,
             resolution: Resolution::arbitrary(u)?,
-            layout_bounds,
+            layout_bounds: GridAab::arbitrary(u)?,
             positioning: Positioning::arbitrary(u)?,
             debug: bool::arbitrary(u)?,
         }))

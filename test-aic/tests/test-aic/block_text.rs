@@ -1,13 +1,13 @@
-use all_is_cubes::arcstr::literal;
 use pretty_assertions::assert_eq;
 
+use all_is_cubes::arcstr::literal;
 use all_is_cubes::block::text::{
     Font, Positioning, PositioningX, PositioningY, PositioningZ, Text,
 };
 use all_is_cubes::block::{self, Block, Primitive, Resolution};
-use all_is_cubes::math::{Cube, GridAab, GridVector, Vol};
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector, Vol};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_render::raytracer::print_space;
 
 /// Convert voxels with z range = 1 to a string for readable comparisons.
@@ -257,6 +257,26 @@ fn no_intersection_with_block() {
     );
     assert_eq!(ev.resolution(), Resolution::R1);
     assert!(!ev.visible());
+}
+
+#[rstest::rstest]
+fn overflowing_coordinates(
+    #[values(GridCoordinate::MIN, GridCoordinate::MAX)] coordinate: GridCoordinate,
+) {
+    // we only care that this doesn't panic
+    Block::from_primitive(Primitive::Text {
+        offset: GridVector::zero(),
+        text: Text::builder()
+            .string(literal!("ab"))
+            .font(Font::System16)
+            .layout_bounds(
+                Resolution::R16,
+                GridAab::from_lower_size(GridPoint::splat(coordinate), [0, 0, 0]),
+            )
+            .build(),
+    })
+    .evaluate(ReadTicket::stub())
+    .unwrap();
 }
 
 // TODO: test that Evoxel attributes are as expected

@@ -3,7 +3,7 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use euclid::{Point2D, point2, vec2, vec3};
+use euclid::{Point2D, Vector3D, point2, vec2, vec3};
 
 use crate::block::text;
 use crate::math::{GridAab, GridCoordinate};
@@ -61,9 +61,32 @@ pub(crate) struct InGlyph;
 
 // -------------------------------------------------------------------------------------------------
 
+/// Glyphs whose [`PositionedGlyph::position()`] would be outside this range are discarded instead
+/// of being entered into the [`Layout`].
+///
+/// This is a mechanism to robustly avoid numeric overflow occurring, at the cost of missing text
+/// when we are near the area where that text would have to be clipped regardless.
+const POSITION_CLIP_RANGE: euclid::Box2D<GridCoordinate, ()> = {
+    // glyphs are constrained to be no more than 255 × 255,
+    // so this prevents any individual glyph from overflowing
+    let min = GridCoordinate::MIN + 256;
+    let max = GridCoordinate::MAX - 256;
+    euclid::Box2D {
+        min: Point2D::new(min, min),
+        max: Point2D::new(max, max),
+    }
+};
+
+/// Internally used temporarily to mark that a glyph should be discarded from the layout.
+///
+/// This position must be outside of [`POSITION_CLIP_RANGE`] to ensure that it cannot ever be a
+/// real position.
+const DELETE_ME_POSITION: Point2D<GridCoordinate, ()> =
+    Point2D::new(GridCoordinate::MAX, GridCoordinate::MAX);
+
 /// For a given piece of text, computes what glyphs to actually draw at what positions.
 pub(crate) fn compute_layout(
-    string: &str,
+    mut string: &str,
     decl: &text::FontDecl,
     outline: bool,
     layout_bounds: GridAab,
@@ -71,6 +94,7 @@ pub(crate) fn compute_layout(
 ) -> Layout {
     let character_size_g = decl.character_size.to_i32();
     let outline_expansion: GridCoordinate = outline.into();
+    let thickness = 1 + outline_expansion;
 
     // Find the *point* within the layout_bounds the text is positioned relative to.
     //
@@ -81,26 +105,33 @@ pub(crate) fn compute_layout(
     // TODO: Given that both text width and layout bounds may be odd or even, it is not sufficient
     // for this to be an integer point; it needs to be possibly half-integer (0, 0.5, 1, 1.5, ...).
     let lb = layout_bounds;
-    let layout_offset = vec3(
+    let layout_offset: Vector3D<GridCoordinate, ()> = vec3(
         // Horizontal positioning is done after each line’s width is known.
         0,
         match positioning.line_y {
-            text::PositioningY::BodyTop => lb.upper_bounds().y - 1,
+            text::PositioningY::BodyTop => lb.upper_bounds().y.saturating_sub(1),
             text::PositioningY::BodyMiddle => {
                 // 0.75 is fudge factor to get rounding right — TODO: see if this cancels out another off by 1
-                libm::round(lb.center().y - 0.75) as GridCoordinate
-                    + (character_size_g.height - 1) / 2
+                (libm::round(lb.center().y - 0.75) as GridCoordinate)
+                    .saturating_add((character_size_g.height - 1) / 2)
             }
             text::PositioningY::Baseline => {
-                lb.lower_bounds().y + GridCoordinate::from(decl.baseline)
+                lb.lower_bounds().y.saturating_add(GridCoordinate::from(decl.baseline))
             }
-            text::PositioningY::BodyBottom => lb.lower_bounds().y + character_size_g.height - 1,
+            text::PositioningY::BodyBottom => {
+                lb.lower_bounds().y.saturating_add(character_size_g.height).saturating_sub(1)
+            }
         },
         match positioning.z {
             text::PositioningZ::Back => lb.lower_bounds().z,
-            text::PositioningZ::Front => lb.upper_bounds().z.saturating_sub(outline_expansion + 1),
+            text::PositioningZ::Front => lb.upper_bounds().z.saturating_sub(thickness),
         },
     );
+
+    if layout_offset.z.checked_add(thickness).is_none() {
+        // Z would overflow, so the whole string is clipped instead.
+        string = "";
+    }
 
     let mut glyphs: Vec<PositionedGlyph> = Vec::new();
     let mut bounding_box: Option<GridAab> = None;
@@ -122,15 +153,20 @@ pub(crate) fn compute_layout(
         // and mapping those to glyphs.
         for c in line.chars() {
             let glyph_index = char_to_glyph_index(c);
-            let position: Point2D<GridCoordinate, ()> =
-                point2(cursor_x, cursor_y) + layout_offset.xy();
+            let position: Point2D<GridCoordinate, ()> = point2(
+                cursor_x.saturating_add(layout_offset.x),
+                cursor_y.saturating_add(layout_offset.y),
+            );
+            if !POSITION_CLIP_RANGE.contains(position) {
+                continue;
+            }
 
             // TODO: we should use tight bounding boxes around each glyph, so the text bounding box
             // is tight, but we currently don't have those to start with.
 
             // Advance cursor to the right edge of the glyph.
             // This will become more complex when we have proportional fonts and kerning.
-            cursor_x += character_size_g.width;
+            cursor_x = cursor_x.saturating_add(character_size_g.width);
 
             glyphs.push(PositionedGlyph {
                 glyph_index,
@@ -164,8 +200,19 @@ pub(crate) fn compute_layout(
 
         // Move all glyphs in the line to where they should be,
         // and add them to the overall bounding box.
+        //
+        // Some glyphs’ positions could overflow, and we mark those for later removal instead of
+        // adding them into the bounding box.
         for glyph in &mut glyphs[first_glyph_of_line..] {
-            glyph.position.x = glyph.position.x.saturating_add(line_start_x);
+            let mut new_position = glyph.position;
+            new_position.x = new_position.x.saturating_add(line_start_x);
+
+            if !POSITION_CLIP_RANGE.contains(new_position) {
+                glyph.position = DELETE_ME_POSITION;
+                continue;
+            }
+
+            glyph.position = new_position;
 
             let glyph_bounding_box = GridAab::from_lower_upper(
                 // accounting for Y flip -- TODO: load fonts Y-up instead
@@ -181,7 +228,7 @@ pub(crate) fn compute_layout(
                         character_size_g.width + outline_expansion,
                         1 + outline_expansion,
                     ))
-                .extend(layout_offset.z + 1 + outline_expansion)
+                .extend(layout_offset.z + thickness)
                 .cast_unit(),
             );
             bounding_box = Some(match bounding_box {
@@ -193,6 +240,8 @@ pub(crate) fn compute_layout(
         // Move cursor to the next line.
         cursor_y -= character_size_g.height;
     }
+
+    glyphs.retain(|g| g.position != DELETE_ME_POSITION);
 
     let result = Layout {
         bounding_box: bounding_box.unwrap_or(GridAab::ORIGIN_EMPTY),
