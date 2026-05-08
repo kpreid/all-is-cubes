@@ -39,6 +39,7 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 #![cfg_attr(not(feature = "session"), allow(clippy::arc_with_non_send_sync))]
+#![cfg_attr(test, allow(dead_code_pub_in_binary))]
 
 extern crate alloc;
 

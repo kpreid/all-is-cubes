@@ -62,6 +62,7 @@
     feature = "_special_testing",
     allow(missing_docs, clippy::missing_panics_doc)
 )]
+#![cfg_attr(test, allow(dead_code_pub_in_binary))]
 
 extern crate alloc;
 

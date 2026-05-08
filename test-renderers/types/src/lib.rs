@@ -7,6 +7,7 @@
     exported_private_dependencies,
     reason = "library for internal use only"
 )]
+#![cfg_attr(test, allow(dead_code_pub_in_binary))]
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
