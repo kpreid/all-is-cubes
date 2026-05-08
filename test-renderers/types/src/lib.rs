@@ -1,6 +1,8 @@
 //! Types which are used by both `test-renderers-runner` and `test-renderers-cases`,
 //! broken out to minimize rebuilds when the test cases are edited.
 
+#![cfg_attr(test, allow(dead_code_pub_in_binary, reason = "FP on test binaries"))]
+
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
