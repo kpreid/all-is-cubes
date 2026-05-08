@@ -24,6 +24,7 @@
 #![feature(new_range)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
+#![cfg_attr(test, allow(dead_code_pub_in_binary))]
 
 extern crate alloc;
 #[cfg(any(feature = "std", test))]

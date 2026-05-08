@@ -13,6 +13,7 @@
     reason = "library for internal use only"
 )]
 #![forbid(unsafe_code)]
+#![cfg_attr(test, allow(dead_code_pub_in_binary))]
 
 use std::fmt;
 use std::fs;
