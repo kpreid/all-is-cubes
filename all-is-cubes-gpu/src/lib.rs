@@ -21,6 +21,7 @@
     allow(missing_docs, clippy::missing_panics_doc)
 )]
 #![forbid(unsafe_code)]
+#![cfg_attr(test, allow(dead_code_pub_in_binary, reason = "FP on test binaries"))]
 
 extern crate alloc;
 extern crate std;

@@ -12,6 +12,7 @@
 )]
 #![cfg_attr(not(feature = "std"), allow(clippy::arc_with_non_send_sync))]
 #![warn(clippy::missing_inline_in_public_items)]
+#![cfg_attr(test, allow(dead_code_pub_in_binary, reason = "FP on test binaries"))]
 
 extern crate alloc;
 #[cfg(any(feature = "std", test))]
