@@ -17,6 +17,7 @@
     reason = "not currently intended to be a well-designed library"
 )]
 #![forbid(unsafe_code)]
+#![cfg_attr(test, allow(dead_code_pub_in_binary, reason = "FP on test binaries"))]
 
 use all_is_cubes::euclid::{Size2D, size2};
 use all_is_cubes_render::camera;
