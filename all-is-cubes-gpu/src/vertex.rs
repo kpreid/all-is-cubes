@@ -1,10 +1,14 @@
 use core::fmt::{self, Write as _};
 
+use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Box3D, Point3D, Vector3D};
-use all_is_cubes::math::{Cube, GridVector, Rgba};
+use all_is_cubes::math::{Cube, Face, GridVector, Rgba};
+use all_is_cubes::util::{ConciseDebug, Refmt};
 use all_is_cubes_mesh::{self as mesh, BlockVertex, Vertex};
 
 use crate::DebugLineVertex;
+
+// -------------------------------------------------------------------------------------------------
 
 /// If true, label meshes, in the rendering, with which instance they came from.
 const DEBUG_INSTANCES: bool = false;
@@ -31,6 +35,8 @@ pub enum AtlasTexel {}
 
 /// Coordinate system for within-cube positions divided by 128.
 pub(crate) enum CubeFix128 {}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Triangle mesh [`Vertex`] type that is used for rendering [blocks].
 ///
@@ -68,7 +74,7 @@ pub(crate) enum CubeFix128 {}
 /// This makes a total of 42 used bits, out of a total of 64 bits.
 ///
 /// [blocks]: all_is_cubes::block::Block
-#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub(crate) struct BPosition {
     /// Chunk-relative position of the cube containing the triangle this vertex belongs to,
@@ -100,7 +106,7 @@ pub(crate) struct BPosition {
 }
 
 /// Additional vertex data accompanying [`BPosition`].
-#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub(crate) struct BColor {
     /// Packed format:
@@ -140,6 +146,42 @@ impl BPosition {
             // location numbers must not clash with WgpuInstanceData
         ],
     };
+
+    /// Unpack the cube value, without performing further numeric conversion.
+    #[inline]
+    fn cube_raw(self) -> Point3D<u32, mesh::MeshRel> {
+        Point3D::new(
+            self.cube_packed & 0xFF,
+            (self.cube_packed >> 8) & 0xFF,
+            (self.cube_packed >> 16) & 0xFF,
+        )
+    }
+
+    /// Returns the position of the vertex within its cube.
+    #[inline]
+    fn position_in_cube(self) -> Vector3D<mesh::PosCoord, mesh::MeshRel> {
+        let pos_packed = self.position_in_cube_and_normal_and_resolution_packed;
+        let position_in_cube_fixed = Vector3D::new(
+            pos_packed & 0xFF,
+            (pos_packed >> 8) & 0xFF,
+            (pos_packed >> 16) & 0xFF,
+        );
+        position_in_cube_fixed.map(|c| c as f32 / 128.)
+    }
+
+    fn normal(self) -> Face {
+        Face::from_discriminant(
+            ((self.position_in_cube_and_normal_and_resolution_packed >> 24) & 0xF) as u8,
+        )
+        .unwrap()
+    }
+
+    fn resolution(self) -> Resolution {
+        Resolution::try_from(
+            1 << ((self.position_in_cube_and_normal_and_resolution_packed >> 28) & 0xF),
+        )
+        .unwrap()
+    }
 }
 
 impl BColor {
@@ -152,6 +194,13 @@ impl BColor {
             // location numbers must not clash with WgpuInstanceData
         ],
     };
+
+    fn clamp_box(&self) -> Box3D<f32, AtlasTexel> {
+        Box3D {
+            min: self.clamp_min_max.map(FixTexCoord::unpack_low).into(),
+            max: self.clamp_min_max.map(FixTexCoord::unpack_high).into(),
+        }
+    }
 }
 
 impl Vertex for BPosition {
@@ -230,20 +279,60 @@ impl Vertex for BPosition {
 
     #[inline]
     fn position(&self) -> mesh::Position {
-        let cube = Point3D::new(
-            self.cube_packed & 0xFF,
-            (self.cube_packed >> 8) & 0xFF,
-            (self.cube_packed >> 16) & 0xFF,
-        );
-        let pos_packed = self.position_in_cube_and_normal_and_resolution_packed;
-        let position_in_cube_fixed = Vector3D::new(
-            pos_packed & 0xFF,
-            (pos_packed >> 8) & 0xFF,
-            (pos_packed >> 16) & 0xFF,
-        );
-        cube.map(|c| c as f32) + position_in_cube_fixed.map(|c| c as f32 / 128.)
+        self.cube_raw().map(|c| c as f32) + self.position_in_cube()
     }
 }
+
+impl fmt::Debug for BPosition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            cube_packed: _,                                       // unpacked via methods
+            position_in_cube_and_normal_and_resolution_packed: _, // unpacked via methods
+        } = self;
+
+        f.debug_struct("BPosition")
+            .field(
+                "cube",
+                &Cube::from(self.cube_raw().map(u32::cast_signed).cast_unit()),
+            )
+            .field(
+                "position_in_cube",
+                &self.position_in_cube().refmt(&ConciseDebug),
+            )
+            .field("normal", &self.normal())
+            .field("resolution", &self.resolution())
+            .finish()
+    }
+}
+
+impl fmt::Debug for BColor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ds = f.debug_struct("BColor");
+        let alpha_or_atlas = self.color_or_texture[3];
+        if alpha_or_atlas <= -1.0 && alpha_or_atlas.floor() == alpha_or_atlas {
+            // texture
+            let clamp = self.clamp_box();
+            ds.field("atlas_id", &(-1 - alpha_or_atlas as i64));
+            ds.field("tc", &format_args!("{:?}", &self.color_or_texture[..3]));
+            ds.field("clamp_min", &format_args!("{:?}", clamp.min));
+            ds.field("clamp_max", &format_args!("{:?}", clamp.max));
+        } else if (0.0..=1.0).contains(&alpha_or_atlas) {
+            let color = Rgba::new(
+                self.color_or_texture[0],
+                self.color_or_texture[1],
+                self.color_or_texture[2],
+                alpha_or_atlas,
+            );
+            ds.field("rgba", &color);
+        } else {
+            ds.field("color_or_texture (invalid)", &self.color_or_texture);
+            ds.field("clamp_min_max", &self.clamp_min_max);
+        }
+        ds.finish()
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Data for a block mesh instance (in the sense of _instancing_).
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
@@ -288,6 +377,8 @@ impl WgpuInstanceData {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub(crate) struct WgpuLinesVertex {
@@ -315,6 +406,8 @@ impl DebugLineVertex for WgpuLinesVertex {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Fixed-point texture coordinate, with a multiplier of 2 so it can represent edges and
 /// middles of texels (0.0, 0.5, 1.0, 1.5, ...)
@@ -356,8 +449,20 @@ impl FixTexCoord {
         Self((int_tc * 2 - 1) as u16)
     }
 
+    /// Packs two [`FixTexCoord`] into a single [`u32`] for use in vertices.
     pub(crate) fn pack(low: Self, high: Self) -> u32 {
         u32::from(low.0) | (u32::from(high.0) << 16)
+    }
+
+    /// Reverses [`Self::pack()`], returning the low component as a float.
+    /// Meant for [`fmt::Debug`] only.
+    pub(crate) fn unpack_low(packed: u32) -> f32 {
+        Self(packed as u16).into()
+    }
+
+    /// Reverses [`Self::pack()`], returning the high component as a float.
+    pub(crate) fn unpack_high(packed: u32) -> f32 {
+        Self((packed >> 16) as u16).into()
     }
 }
 
@@ -366,6 +471,8 @@ impl From<FixTexCoord> for f32 {
         f32::from(tc.0) / 2.
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Packs text into the WGSL-compatible `debug_text: vec4<u32>` format.
 /// If the input is too long, silently truncates it.
@@ -404,10 +511,14 @@ fn format_into_debug_text_vector(message: &dyn fmt::Display) -> [u32; 4] {
     buf
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use all_is_cubes::math::{Face, Rgba};
+    use pretty_assertions::assert_eq;
+    use std::format;
 
     /// Assert the vertex's size, just so that we're reminded to think about it when we
     /// change the amount of data in it. This assertion is not platform-dependent because
@@ -417,6 +528,77 @@ mod tests {
         assert_eq!(size_of::<BPosition>(), 8);
         assert_eq!(size_of::<BColor>(), 28);
         assert_eq!(size_of::<WgpuLinesVertex>(), 28);
+    }
+
+    #[test]
+    fn vertex_debug_color() {
+        let vertex = BPosition::from_block_vertex(BlockVertex {
+            position: Point3D::new(0.25, 0.0, 1.0),
+            face: Face::PX,
+            coloring: mesh::Coloring::Solid(Rgba::new(0.0, 0.5, 1.0, 0.5)),
+        });
+        assert_eq!(
+            format!("{vertex:#?}"),
+            indoc::indoc! {"(
+                BPosition {
+                    cube: (+0, +0, +0),
+                    position_in_cube: (+0.250, +0.000, +1.000),
+                    normal: PX,
+                    resolution: 1,
+                },
+                BColor {
+                    rgba: Rgba(0.0, 0.5, 1.0, 0.5),
+                },
+            )"}
+        );
+    }
+
+    #[test]
+    fn vertex_debug_texture() {
+        let vertex = BPosition::from_block_vertex(BlockVertex {
+            position: Point3D::new(0.25, 0.0, 1.0),
+            face: Face::PX,
+            coloring: mesh::Coloring::Texture {
+                pos: TexPoint {
+                    atlas_id: 123,
+                    tc: Point3D::new(
+                        FixTexCoord::from_int(101),
+                        FixTexCoord::from_int(102),
+                        FixTexCoord::from_int(103),
+                    ),
+                    clamp_box: Box3D {
+                        min: Point3D::new(
+                            FixTexCoord::from_int(100),
+                            FixTexCoord::from_int(100),
+                            FixTexCoord::from_int(100),
+                        ),
+                        max: Point3D::new(
+                            FixTexCoord::from_int(200),
+                            FixTexCoord::from_int(200),
+                            FixTexCoord::from_int(200),
+                        ),
+                    },
+                },
+                resolution: Resolution::R32,
+            },
+        });
+        assert_eq!(
+            format!("{vertex:#?}"),
+            indoc::indoc! {"(
+                BPosition {
+                    cube: (+0, +0, +0),
+                    position_in_cube: (+0.250, +0.000, +1.000),
+                    normal: PX,
+                    resolution: 32,
+                },
+                BColor {
+                    atlas_id: 123,
+                    tc: [101.0, 102.0, 103.0],
+                    clamp_min: (100.0, 100.0, 100.0),
+                    clamp_max: (200.0, 200.0, 200.0),
+                },
+            )"}
+        );
     }
 
     /// Tests the implementation of [`Vertex::position()`],

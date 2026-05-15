@@ -103,6 +103,7 @@ dependencies = [
  "log",
  "num-traits",
  "pollster",
+ "pretty_assertions",
  "rand 0.10.1",
  "rand_xoshiro",
  "resource",

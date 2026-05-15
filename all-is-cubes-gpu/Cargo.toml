@@ -72,6 +72,7 @@ log = { workspace = true }
 num-traits = { workspace = true }
 # Used to implement start_polling() on non-Wasm targets, and in the `rerun` support.
 pollster = { workspace = true }
+pretty_assertions = { workspace = true }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }
@@ -103,6 +104,7 @@ async-lock = { workspace = true, features = ["std"] }
 criterion = { workspace = true }
 # Used in shader tests. TODO: Not really necessary
 image = { workspace = true }
+indoc = { workspace = true }
 macro_rules_attribute = { workspace = true }
 rstest = { workspace = true }
 # Used in benchmark
