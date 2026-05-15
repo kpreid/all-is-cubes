@@ -456,10 +456,37 @@ impl<V: Vertex> SubMesh<V> {
 
     #[cfg(debug_assertions)]
     fn consistency_check(&self) {
-        // TODO: check vertex/index consistency like SpaceMesh does
+        let vertex_count = self.vertices.0.len();
 
-        assert_eq!(self.vertices.0.len(), self.vertices.1.len());
+        // Vertex struct-of-arrays should have matching lengths.
+        assert_eq!(self.vertices.1.len(), vertex_count);
 
+        // Every vertex should be used at least once,
+        // and every index should be in-bounds.
+        let mut used_vertices = bit_set::BitSet::with_capacity(vertex_count);
+        for index in self
+            .indices_opaque
+            .as_slice(..)
+            .iter_usize()
+            .chain(self.indices_transparent.as_slice(..).iter_usize())
+        {
+            assert!(
+                index < vertex_count,
+                "index {index} out of bounds for {vertex_count} vertices"
+            );
+            used_vertices.insert(index);
+        }
+        for index in 0..vertex_count {
+            // TODO: ideally this would print the vertex in question, but we don’t have a guaranteed
+            // Debug bound. Either add that bound, or wait for Rust to offer `try_as_dyn()` or such
+            // for conditional printing.
+            assert!(
+                used_vertices.contains(index),
+                "vertex {index} is not used by any triangle"
+            );
+        }
+
+        // Bounding box should contain every vertex.
         let mut bounding_box = crate::Aabb::EMPTY;
         for vertex in self.vertices.0.iter() {
             bounding_box.add_point(vertex.position());
