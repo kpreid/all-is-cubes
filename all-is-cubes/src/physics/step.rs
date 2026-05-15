@@ -514,7 +514,8 @@ pub(crate) fn step_one_body(
                     _ => unreachable!(),
                 }))
                 .with_class_ids(class_ids)
-                .with_colors(colors),
+                .with_colors(colors)
+                .with_fill_mode(rg::components::FillMode::TransparentFillMajorWireframe),
             );
         }
 
@@ -531,12 +532,14 @@ pub(crate) fn step_one_body(
                 [body.collision_box],
                 body.position.map(NotNan::into_inner).to_vector(),
             )
-            .with_class_ids([rg::ClassId::BodyCollisionBox]),
+            .with_class_ids([rg::ClassId::BodyCollisionBox])
+            .with_fill_mode(rg::components::FillMode::MajorWireframe),
         );
         rerun_destination.log(
             &rg::entity_path!["occupying"],
             &rg::convert_aabs([body.occupying], FreeVector::zero())
-                .with_class_ids([rg::ClassId::BodyCollisionBox]),
+                .with_class_ids([rg::ClassId::BodyCollisionBox])
+                .with_fill_mode(rg::components::FillMode::TransparentFillMajorWireframe),
         );
 
         // Our movement arrows shall be logged relative to all collision box corners

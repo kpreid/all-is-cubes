@@ -167,13 +167,15 @@ impl Viz {
                 &rg::entity_path!["block_bounds"],
                 &rg::convert_grid_aabs([GridAab::for_block(voxels.resolution())])
                     .with_class_ids([rg::ClassId::MeshVizBlockBounds])
-                    .with_radii([BOUNDS_LINE_RADIUS]),
+                    .with_radii([BOUNDS_LINE_RADIUS])
+                    .with_fill_mode(rg::components::FillMode::MajorWireframe),
             );
             state.destination.log(
                 &rg::entity_path!["data_bounds"],
                 &rg::convert_grid_aabs([voxels.bounds()])
                     .with_class_ids([rg::ClassId::MeshVizVoxelBounds])
-                    .with_radii([BOUNDS_LINE_RADIUS]),
+                    .with_radii([BOUNDS_LINE_RADIUS])
+                    .with_fill_mode(rg::components::FillMode::MajorWireframe),
             );
 
             let voxel_vol = voxels.as_vol_ref();
@@ -241,9 +243,13 @@ impl Viz {
         if let Self::Enabled(state) = self {
             state.destination.log(
                 &state.layer_path,
-                &rg::convert_grid_aabs([state.layer_box(face, layer)])
+                // Put this transparent box just slightly *under* the plane we are building,
+                // so it acts as a backdrop for where the work is happening.
+                &rg::convert_aabs([state.layer_box(face, layer).to_free()], face.vector(-0.1))
                     .with_class_ids([rg::ClassId::MeshVizWipPlane])
-                    .with_radii([IN_PROGRESS_LINE_RADIUS]),
+                    .with_radii([IN_PROGRESS_LINE_RADIUS])
+                    .with_colors([rg::components::Color::from_rgb(0x22, 0x22, 0x22)])
+                    .with_fill_mode(rg::components::FillMode::TransparentFillMajorWireframe),
             );
 
             // Delete the corresponding analysis rect, to indicate that we're (about to be)
@@ -424,7 +430,8 @@ impl Inner {
             &self.occupied_path,
             &rg::convert_grid_aabs(iter)
                 .with_class_ids([rg::ClassId::MeshVizOccupiedPlane])
-                .with_radii([OCCUPIED_RADIUS]),
+                .with_radii([OCCUPIED_RADIUS])
+                .with_fill_mode(rg::components::FillMode::MajorWireframe),
         );
     }
 

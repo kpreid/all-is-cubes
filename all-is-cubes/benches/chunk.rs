@@ -48,7 +48,7 @@ fn cull_bench(c: &mut Criterion) {
     // This would make more sense as an ignored #[test], but we can't do that
     // while we use harness=false.
     #[cfg(feature = "rerun")]
-    if false {
+    if true {
         dump_frustum_culling();
     }
 
@@ -158,7 +158,8 @@ fn dump_frustum_culling() {
                             && chunked_bounds.contains_cube(chunk.0)
                     })
                     .map(|chunk| chunk.bounds()),
-            ),
+            )
+            .with_fill_mode(rg::components::FillMode::TransparentFillMajorWireframe),
         )
         .unwrap();
 }

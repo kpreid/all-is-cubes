@@ -107,7 +107,11 @@ fn show(
                 face = step.face(),
                 t = step.t_distance()
             )])
-            .with_colors([box_color]),
+            .with_colors([box_color])
+            .with_fill_mode(match recurse {
+                Recurse::Outer { .. } => rg::components::FillMode::MajorWireframe,
+                Recurse::Inner { .. } => rg::components::FillMode::TransparentFillMajorWireframe,
+            }),
         );
         previous_point = Some(intersection_point);
 
@@ -116,14 +120,6 @@ fn show(
                 let (r_raycaster, r_ray) =
                     step.recursive_raycast(ray, resolution, GridAab::for_block(resolution));
                 let r_destination = destination.child(&rg::entity_path!["recursive"]);
-                // r_destination.log(
-                //     &rg::entity_path![],
-                //     &rg::archetypes::Transform3D::from_translation_rotation_scale(
-                //         rg::convert_vec(step.cube_ahead().lower_bounds().to_vector()),
-                //         rg::datatypes::Rotation3D::IDENTITY,
-                //         rg::datatypes::Scale3D::Uniform(resolution.recip_f32()),
-                //     ),
-                // );
                 show(
                     r_destination,
                     r_raycaster,
