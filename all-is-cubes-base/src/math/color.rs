@@ -1092,7 +1092,7 @@ const fn component_from_srgb8_const(c: u8) -> ZeroOne<f32> {
 /// This may be used in rendering algorithms to refer to whether something moved from
 /// one category to another, and hence might need different treatment than in the previous
 /// frame.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[expect(clippy::exhaustive_enums)]
 #[repr(u8)]

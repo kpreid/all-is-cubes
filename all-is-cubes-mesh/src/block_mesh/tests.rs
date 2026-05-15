@@ -1,14 +1,17 @@
 //! Stand-alone tests of [`BlockMesh`].
 //! See [`crate::tests`] for additional tests.
 
-use all_is_cubes::euclid::Size3D;
 use alloc::vec::Vec;
 
+use exhaust::Exhaust;
+
 use all_is_cubes::block::{self, AIR, Block, Resolution};
-use all_is_cubes::math::{Aab, Cube, GridPoint, Rgba};
+use all_is_cubes::euclid::{Size3D, point3, size3};
+use all_is_cubes::math::{Aab, Cube, GridAab, GridPoint, OpacityCategory, Rgba};
+use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_render::Flaws;
-use all_is_cubes_render::camera::GraphicsOptions;
+use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
 use crate::tests::test_block_mesh;
 use crate::texture::NoTextures;
@@ -110,6 +113,64 @@ fn mesh_has_documented_depth_ordering() {
                 sub_mesh.vertices.0[i].position.to_vector().dot(increasing_direction)
             }),
             "should be sorted along {face:?}"
+        );
+    }
+}
+
+/// Tries building a mesh from each possible shape within chosen bounds.
+///
+/// TODO: The current bounds, 2×2×2, aren't very thorough at exercising inside corners.
+/// Figure out how to get better coverage without getting into multi-second run times.
+#[test]
+fn exhaustive_geometry() {
+    // Test data.
+    const BOUNDS: GridAab = GridAab::tiny(point3(0, 0, 0), size3(2, 2, 2));
+    const VOLUME: usize = BOUNDS.volume().unwrap();
+    let resolution = Resolution::R2;
+    let partial = block::from_color!(Rgba::new(0.0, 1.0, 0.0, 0.5));
+    let opaque = block::from_color!(Rgba::WHITE);
+    let mesh_options = MeshOptions {
+        transparency: TransparencyOption::Volumetric,
+        ignore_voxels: false,
+    };
+
+    // Block definition.
+    // It would be more efficient to just shove bare voxel data into the mesh algorithms without
+    // introducing a `Universe`, but there’s no API to bypass needing an `EvaluatedBlock`.
+    // If we ever get one (e.g. due to wanting to expose our mesh algorithms for generic use
+    // without our world data structures), use it.
+    let mut universe = Universe::new();
+    let space_handle = universe
+        .insert(
+            "space".into(),
+            Space::builder(BOUNDS).physics(space::SpacePhysics::DEFAULT_FOR_BLOCK).build(),
+        )
+        .unwrap();
+    let block = Block::from_primitive(block::Primitive::Recur {
+        space: space_handle.clone(),
+        offset: GridPoint::zero(),
+        resolution,
+    });
+    let mut block_mesh: BlockMesh<crate::testing::TextureMt> = BlockMesh::default();
+    let allocator = crate::testing::Allocator::new();
+
+    for case in <[OpacityCategory; VOLUME]>::exhaust() {
+        let mut voxel_data = case.into_iter().map(|category| match category {
+            OpacityCategory::Invisible => &AIR,
+            OpacityCategory::Partial => &partial,
+            OpacityCategory::Opaque => &opaque,
+        });
+        universe
+            .mutate_space(&space_handle, |m| m.fill_all(|_cube| voxel_data.next()))
+            .unwrap()
+            .unwrap();
+
+        // The point of this test is that this mesh building operation should not fail its debug
+        // assertions.
+        block_mesh.compute(
+            &block.evaluate(universe.read_ticket()).unwrap(),
+            &allocator,
+            &mesh_options,
         );
     }
 }
