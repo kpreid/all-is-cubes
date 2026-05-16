@@ -339,9 +339,9 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     // that have some content on this face and are not purely opposite,
                     // that are either opaque or transparent as requested.
                     (if pass_is_transparent {
-                        v.renderable & !v.opaque
+                        v.renderable & !v.opaque & !v.renderable.shift(-face)
                     } else {
-                        v.opaque
+                        v.opaque & !v.opaque.shift(-face)
                     } & interior_side_octant_mask)
                         .any()
                         && voxel_transform_inverse.transform_point(v.position).z == layer
