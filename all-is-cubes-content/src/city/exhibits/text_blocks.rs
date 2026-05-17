@@ -46,10 +46,18 @@ fn TEXT(_: Context<'_>) {
             offset: vec3(0, 1, 0),
         },
         {
-            let op = Composite::new(
-                block::from_color!(palette::MENU_BACK),
-                CompositeOperator::Out,
-            );
+            let material_block =
+                Composite::new(block::from_color!(palette::STEEL), CompositeOperator::Over)
+                    .reversed()
+                    .compose_or_replace(
+                        block::from_color!(palette::PLANK).with_modifier(Move::new(
+                            Face::NZ,
+                            R32,
+                            1,
+                            0,
+                        )),
+                    );
+            let op = Composite::new(material_block, CompositeOperator::Out);
             Texhibit {
                 text: block::Text::builder()
                     .string(literal!("engraved"))
