@@ -11,6 +11,7 @@ publish = false
 
 [lib]
 doc = false # internal
+test = false
 doctest = false
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
