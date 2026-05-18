@@ -283,21 +283,24 @@ impl Glyphs {
                     (glyph_index_u / GLYPHS_PER_ROW_USIZE) as u32 * glyph_size.height,
                 );
 
+            // Returns an iterator over the set pixels of the glyph.
+            let iter_glyph_image = || {
+                iproduct!(0..glyph_size.height, 0..glyph_size.width)
+                    .map(|(y, x)| <Point2D<u32, InGlyph>>::new(x, y))
+                    .filter(|&position_in_glyph| {
+                        let input_position =
+                            input_glyph_pixel_offset.transform_point(position_in_glyph);
+                        rgba_to_bit(image.get_pixel(input_position.cast_unit()).unwrap())
+                    })
+            };
+
             // Allocate zeroed space for the pixels of this glyph.
             pixels.resize(offset_of_glyph_in_output + bytes_per_glyph, 0);
             let output_glyph_data = &mut pixels[offset_of_glyph_in_output..];
 
             // Copy RGBA input pixels to bit-masked output pixels, and write the outline bits in
             // neighboring pixels.
-            for position_in_glyph in iproduct!(0..glyph_size.height, 0..glyph_size.width)
-                .map(|(y, x)| <Point2D<u32, InGlyph>>::new(x, y))
-            {
-                let input_position = input_glyph_pixel_offset.transform_point(position_in_glyph);
-                let [r, _g, _b, a] = image.get_pixel(input_position.cast_unit()).unwrap();
-                if !(r > 0 && a > 0) {
-                    continue;
-                }
-
+            for position_in_glyph in iter_glyph_image() {
                 let first_output_pixel = position_in_glyph.x as usize
                     + position_in_glyph.y as usize * loaded_glyph_rect_size.width as usize;
                 for (value, offset) in brush {
@@ -359,4 +362,8 @@ fn glyph_data_rect_size(character_size: Size2D<u8, InGlyph>) -> ImageSize {
         u32::from(character_size.width) + 2,
         u32::from(character_size.height) + 2,
     )
+}
+
+fn rgba_to_bit([r, _, _, a]: [u8; 4]) -> bool {
+    r > 0 && a > 0
 }
