@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::vec::Vec;
 
 use bevy_platform::sync::OnceLock;
 use euclid::{Point2D, Size2D, Translation2D, point2, size2, vec2};
@@ -208,7 +208,13 @@ pub enum Value {
 
 /// All the glyphs of one font, ready for use by the renderer.
 pub(crate) struct Glyphs {
-    pixels: Box<[u8]>,
+    /// Bit-packed glyph data.
+    ///
+    /// Each glyph starts on a whole byte.
+    pixels: Vec<u8>,
+
+    /// Offset of the first byte of each glyph in `self.pixels`.
+    lookup: Vec<usize>,
 }
 
 const BITS_PER_PIXEL: u32 = 2;
@@ -263,18 +269,26 @@ impl Glyphs {
             "image not consistently sized"
         );
 
-        let mut output = vec![0u8; bytes_per_glyph * glyph_count as usize].into_boxed_slice();
+        let mut pixels = Vec::with_capacity(bytes_per_glyph * glyph_count as usize);
+        let mut lookup = Vec::new();
 
         // This is hardly a highly efficient image copying operation, but it's done only once per font.
         for glyph_index_u in 0..(glyph_count as usize) {
+            let offset_of_glyph_in_output = pixels.len();
+            lookup.push(offset_of_glyph_in_output);
+
             let input_glyph_pixel_offset: Translation2D<u32, InGlyph, ImagePixel> =
                 Translation2D::new(
                     (glyph_index_u % GLYPHS_PER_ROW_USIZE) as u32 * glyph_size.width,
                     (glyph_index_u / GLYPHS_PER_ROW_USIZE) as u32 * glyph_size.height,
                 );
-            let output_glyph_data =
-                &mut output[glyph_index_u * bytes_per_glyph..][..bytes_per_glyph];
 
+            // Allocate zeroed space for the pixels of this glyph.
+            pixels.resize(offset_of_glyph_in_output + bytes_per_glyph, 0);
+            let output_glyph_data = &mut pixels[offset_of_glyph_in_output..];
+
+            // Copy RGBA input pixels to bit-masked output pixels, and write the outline bits in
+            // neighboring pixels.
             for position_in_glyph in iproduct!(0..glyph_size.height, 0..glyph_size.width)
                 .map(|(y, x)| <Point2D<u32, InGlyph>>::new(x, y))
             {
@@ -292,7 +306,7 @@ impl Glyphs {
             }
         }
 
-        Self { pixels: output }
+        Self { pixels, lookup }
     }
 
     /// Returns an iterator over all the pixels making up one glyph.
@@ -305,9 +319,10 @@ impl Glyphs {
         glyph_index: usize,
     ) -> impl Iterator<Item = (Point2D<GridCoordinate, InGlyph>, Value)> {
         let glyph_data_rect_size = glyph_data_rect_size(decl.character_size);
-        let glyph_byte_size =
-            (glyph_data_rect_size.area() as usize).div_ceil(PIXELS_PER_BYTE as usize);
-        let this_glyph_pixels = &self.pixels[glyph_index * glyph_byte_size..][..glyph_byte_size];
+
+        let start_byte = *self.lookup.get(glyph_index).expect("glyph index out of range");
+        let end_byte = self.lookup.get(glyph_index + 1).copied().unwrap_or(self.pixels.len());
+        let this_glyph_pixels = &self.pixels[start_byte..end_byte];
 
         iproduct!(
             0..glyph_data_rect_size.height,
