@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use bevy_platform::sync::OnceLock;
-use euclid::{Point2D, Size2D, Translation2D, point2, size2, vec2};
+use euclid::{Box2D, Point2D, Size2D, Translation2D, point2, size2, vec2};
 use itertools::iproduct;
 
 use crate::block::text::{self, layout::InGlyph};
@@ -126,7 +126,7 @@ impl Font {
             let translation: Translation2D<i32, InGlyph, euclid::UnknownUnit> = Translation2D::from(
                 glyph.position.to_vector().cast_unit().component_mul(vec2(1, -1)),
             );
-            glyphs.get(decl, glyph.glyph_index).for_each(|(position, value)| {
+            glyphs.get(glyph.glyph_index).for_each(|(position, value)| {
                 set_pixel(translation.transform_point(position), value);
             });
         }
@@ -213,9 +213,26 @@ pub(crate) struct Glyphs {
     /// Each glyph starts on a whole byte.
     pixels: Vec<u8>,
 
-    /// Offset of the first byte of each glyph in `self.pixels`.
-    lookup: Vec<usize>,
+    lookup: Vec<GlyphInfo>,
 }
+
+/// Information for locating a packed glyph in [`Glyphs`].
+#[derive(Clone, Copy, Debug)]
+pub struct GlyphInfo {
+    /// Offset of the first byte of each glyph in `self.pixels`.
+    data_offset: usize,
+
+    /// Bounding box which this glyph occupies when drawn by [`Glyphs::get()`].
+    bounding_box_including_outline: Box2D<u8, InGlyph>,
+}
+
+/// [`euclid`] coordinate system type for coordinates within the glyph images stored in
+/// [`Glyphs`].
+///
+/// This has the same scale and directionality as [`InGlyph`], but the origin of this coordinate
+/// system is the top-left corner, counting the outline, of the actual set pixels of the glyph;
+/// that is, the origin is equal to `glyph_info.bounding_box_including_outline.min`.
+pub(crate) struct InStoredGlyph;
 
 const BITS_PER_PIXEL: u32 = 2;
 const PIXELS_PER_BYTE: u32 = u8::BITS / BITS_PER_PIXEL;
@@ -236,73 +253,89 @@ impl Glyphs {
     ///
     /// It also precalculates which pixels are adjacent to the glyph for outline drawing.
     fn new(image: &DecodedPng, glyph_size: Size2D<u8, InGlyph>) -> Self {
-        let loaded_glyph_rect_size = glyph_data_rect_size(glyph_size);
-        let glyph_size = glyph_size.to_u32();
-        let row_count = image.size().height / glyph_size.height;
-        let bytes_per_glyph = loaded_glyph_rect_size.area().div_ceil(PIXELS_PER_BYTE) as usize;
+        let glyph_size_32 = glyph_size.to_u32();
+        let row_count = image.size().height / glyph_size_32.height;
         let glyph_count = row_count * GLYPHS_PER_ROW;
-
-        // Bits that should be set in the output in the neighborhood of the input,
-        // and their offsets in terms of pixel indices.
-        // This forms the 3×3 pattern of outline pixels around a foreground pixel:
-        //      O O O
-        //      O F O
-        //      O O O
-        #[rustfmt::skip]
-        let brush: [(u8, usize); 9] = {
-            let o = Value::Outline as u8;
-            let f = Value::Foreground as u8;
-            let row = loaded_glyph_rect_size.width as usize;
-            [
-                (o, 0      ), (o,           1), (o,           2),
-                (o, row    ), (f, row     + 1), (o, row     + 2),
-                (o, row * 2), (o, row * 2 + 1), (o, row * 2 + 2),
-            ]
-        };
 
         assert_eq!(
             image.size(),
             size2(
-                glyph_size.width * GLYPHS_PER_ROW,
-                row_count * glyph_size.height
+                glyph_size_32.width * GLYPHS_PER_ROW,
+                row_count * glyph_size_32.height
             ),
             "image not consistently sized"
         );
 
-        let mut pixels = Vec::with_capacity(bytes_per_glyph * glyph_count as usize);
+        let mut pixels = Vec::new();
         let mut lookup = Vec::new();
 
         // This is hardly a highly efficient image copying operation, but it's done only once per font.
         for glyph_index_u in 0..(glyph_count as usize) {
             let offset_of_glyph_in_output = pixels.len();
-            lookup.push(offset_of_glyph_in_output);
 
             let input_glyph_pixel_offset: Translation2D<u32, InGlyph, ImagePixel> =
                 Translation2D::new(
-                    (glyph_index_u % GLYPHS_PER_ROW_USIZE) as u32 * glyph_size.width,
-                    (glyph_index_u / GLYPHS_PER_ROW_USIZE) as u32 * glyph_size.height,
+                    (glyph_index_u % GLYPHS_PER_ROW_USIZE) as u32 * glyph_size_32.width,
+                    (glyph_index_u / GLYPHS_PER_ROW_USIZE) as u32 * glyph_size_32.height,
                 );
 
             // Returns an iterator over the set pixels of the glyph.
             let iter_glyph_image = || {
                 iproduct!(0..glyph_size.height, 0..glyph_size.width)
-                    .map(|(y, x)| <Point2D<u32, InGlyph>>::new(x, y))
+                    .map(|(y, x)| <Point2D<u8, InGlyph>>::new(x, y))
                     .filter(|&position_in_glyph| {
                         let input_position =
-                            input_glyph_pixel_offset.transform_point(position_in_glyph);
+                            input_glyph_pixel_offset.transform_point(position_in_glyph.to_u32());
                         rgba_to_bit(image.get_pixel(input_position.cast_unit()).unwrap())
                     })
             };
 
+            // Find bounding box of set pixels, expanded to account for outlining (1 pixel each
+            // side) and for the width of the pixel (1 pixel down-right).
+            // This is the bounding box of the data that will be actually stored.
+            let storage_bounding_box = Box2D::from_points(iter_glyph_image())
+                .outer_box(euclid::SideOffsets2D::new(0, 3, 3, 0));
+
+            let byte_size_of_glyph =
+                storage_bounding_box.to_u32().area().div_ceil(PIXELS_PER_BYTE) as usize;
+
+            // Bits that should be set in the output in the neighborhood of the input,
+            // and their offsets in terms of pixel indices.
+            // This forms the 3×3 pattern of outline pixels around a foreground pixel:
+            //      O O O
+            //      O F O
+            //      O O O
+            #[rustfmt::skip]
+            let brush: [(u8, usize); 9] = {
+                let o = Value::Outline as u8;
+                let f = Value::Foreground as u8;
+                let row = storage_bounding_box.width() as usize;
+                [
+                    (o, 0      ), (o,           1), (o,           2),
+                    (o, row    ), (f, row     + 1), (o, row     + 2),
+                    (o, row * 2), (o, row * 2 + 1), (o, row * 2 + 2),
+                ]
+            };
+
+            let info = GlyphInfo {
+                data_offset: offset_of_glyph_in_output,
+                bounding_box_including_outline: storage_bounding_box,
+            };
+            lookup.push(info);
+
             // Allocate zeroed space for the pixels of this glyph.
-            pixels.resize(offset_of_glyph_in_output + bytes_per_glyph, 0);
+            pixels.resize(offset_of_glyph_in_output + byte_size_of_glyph, 0);
             let output_glyph_data = &mut pixels[offset_of_glyph_in_output..];
 
             // Copy RGBA input pixels to bit-masked output pixels, and write the outline bits in
             // neighboring pixels.
             for position_in_glyph in iter_glyph_image() {
-                let first_output_pixel = position_in_glyph.x as usize
-                    + position_in_glyph.y as usize * loaded_glyph_rect_size.width as usize;
+                let position_in_stored_glyph: Point2D<u8, InStoredGlyph> =
+                    (position_in_glyph - storage_bounding_box.min.to_vector()).cast_unit();
+
+                let first_output_pixel = position_in_stored_glyph.x as usize
+                    + position_in_stored_glyph.y as usize * storage_bounding_box.width() as usize;
+
                 for (value, offset) in brush {
                     set_glyph_bits(output_glyph_data, first_output_pixel + offset, value);
                 }
@@ -318,50 +351,43 @@ impl Glyphs {
     /// is a unit cube (or literally `Cube` if we choose to denote voxels this early).
     pub(in crate::block::text) fn get(
         &self,
-        decl: &FontDecl,
         glyph_index: usize,
     ) -> impl Iterator<Item = (Point2D<GridCoordinate, InGlyph>, Value)> {
-        let glyph_data_rect_size = glyph_data_rect_size(decl.character_size);
-
-        let start_byte = *self.lookup.get(glyph_index).expect("glyph index out of range");
-        let end_byte = self.lookup.get(glyph_index + 1).copied().unwrap_or(self.pixels.len());
-        let this_glyph_pixels = &self.pixels[start_byte..end_byte];
+        let info: &GlyphInfo = self.lookup.get(glyph_index).expect("glyph index out of range");
+        // this slice includes extra pixels beyond this glyph ones, but those are not used
+        let this_glyph_pixels = &self.pixels[info.data_offset..];
 
         iproduct!(
-            0..glyph_data_rect_size.height,
-            0..glyph_data_rect_size.width
+            0..info.bounding_box_including_outline.height(),
+            0..info.bounding_box_including_outline.width(),
         )
-        // can't overflow due to ranges of the original character size
-        .map(move |(y, x)| point2(x.cast_signed(), y.cast_signed()))
-        .filter_map(move |position_in_data| {
-            let pixel = position_in_data.to_usize();
-            let pixel_index = pixel.y * glyph_data_rect_size.width as usize + pixel.x;
+        .map(move |(y, x)| point2(x, y))
+        .filter_map(
+            move |position_in_stored_glyph: Point2D<u8, InStoredGlyph>| {
+                let pixel_index = usize::from(position_in_stored_glyph.y)
+                    * usize::from(info.bounding_box_including_outline.width())
+                    + usize::from(position_in_stored_glyph.x);
 
-            let byte_index = pixel_index / PIXELS_PER_BYTE as usize;
-            let shift = (pixel_index % PIXELS_PER_BYTE as usize) * 2;
+                let byte_index = pixel_index / PIXELS_PER_BYTE as usize;
+                let shift = (pixel_index % PIXELS_PER_BYTE as usize) * 2;
 
-            let byte_value = *this_glyph_pixels.get(byte_index)?;
-            let bit_value = (byte_value >> shift) & PIXEL_MASK;
+                let byte_value = *this_glyph_pixels.get(byte_index)?;
+                let bit_value = (byte_value >> shift) & PIXEL_MASK;
 
-            // offset of -1 accounts for the thickness of the outline area
-            let position_in_glyph = position_in_data - vec2(1, 1);
-            match bit_value {
-                0b00 => None,
-                0b01 => Some((position_in_glyph, Value::Outline)),
-                0b11 => Some((position_in_glyph, Value::Foreground)),
-                _ => unreachable!(),
-            }
-        })
+                // offset of -1 accounts for the thickness of the outline area
+                let position_in_glyph: Point2D<GridCoordinate, InGlyph> =
+                    position_in_stored_glyph.map(i32::from).cast_unit()
+                        + info.bounding_box_including_outline.min.to_vector().map(i32::from)
+                        - vec2(1, 1);
+                match bit_value {
+                    0b00 => None,
+                    0b01 => Some((position_in_glyph, Value::Outline)),
+                    0b11 => Some((position_in_glyph, Value::Foreground)),
+                    _ => unreachable!(),
+                }
+            },
+        )
     }
-}
-
-/// Compute the size of a glyph as loaded into [`Glyphs`] with its pre-calculated outline,
-/// which is 1 pixel larger on all sides than the original image size.
-fn glyph_data_rect_size(character_size: Size2D<u8, InGlyph>) -> ImageSize {
-    size2(
-        u32::from(character_size.width) + 2,
-        u32::from(character_size.height) + 2,
-    )
 }
 
 fn rgba_to_bit([r, _, _, a]: [u8; 4]) -> bool {

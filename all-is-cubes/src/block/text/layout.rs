@@ -56,7 +56,9 @@ pub(crate) struct PositionedGlyph {
 ///
 /// X increases rightward and Y increases downward.
 /// There is no Z.
-/// The origin is the top-left corner of the glyph image.
+/// The origin is the top-left corner of the abstract character cell,
+/// not counting the effect of outlining or any other transformation or combination of glyphs
+/// that may spill out of the cell.
 pub(crate) struct InGlyph;
 
 // -------------------------------------------------------------------------------------------------

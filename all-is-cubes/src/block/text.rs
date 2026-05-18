@@ -286,19 +286,15 @@ impl Text {
                 for glyph in text_glyphs.iter() {
                     let glyph_position_3d: GridPoint =
                         glyph.position.extend(layout_z).cast_unit() + block_offset_in_voxels;
-                    font_glyphs.get(decl, glyph.glyph_index).for_each(
-                        |(position_in_glyph, value)| {
-                            let position_in_block_of_voxel = glyph_position_3d
-                                + vec3(position_in_glyph.x, -position_in_glyph.y, 0);
-                            for (offset, evoxel) in brush.iter(value) {
-                                if let Some(vox) =
-                                    voxels.get_mut(position_in_block_of_voxel + offset)
-                                {
-                                    *vox = evoxel;
-                                }
+                    font_glyphs.get(glyph.glyph_index).for_each(|(position_in_glyph, value)| {
+                        let position_in_block_of_voxel =
+                            glyph_position_3d + vec3(position_in_glyph.x, -position_in_glyph.y, 0);
+                        for (offset, evoxel) in brush.iter(value) {
+                            if let Some(vox) = voxels.get_mut(position_in_block_of_voxel + offset) {
+                                *vox = evoxel;
                             }
-                        },
-                    );
+                        }
+                    });
                 }
 
                 Evoxels::from_many(self.data.resolution, voxels.map_container(Into::into))
@@ -345,7 +341,7 @@ impl Text {
         };
 
         for glyph in glyphs.iter() {
-            font_glyphs.get(decl, glyph.glyph_index).for_each(|(position_in_glyph, value)| {
+            font_glyphs.get(glyph.glyph_index).for_each(|(position_in_glyph, value)| {
                 for (brush_offset, brush_block) in brush.iter(value) {
                     let transformed_position = transform.transform_cube(Cube::from(
                         glyph.position.extend(layout_z).cast_unit()
