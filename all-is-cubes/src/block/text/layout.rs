@@ -5,10 +5,10 @@ use core::fmt;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use euclid::{Point2D, Vector3D, point2, vec2, vec3};
+use euclid::{Box2D, Point2D, SideOffsets2D, Vector3D, point2, vec3};
 
 use crate::block::text;
-use crate::math::{GridAab, GridCoordinate};
+use crate::math::{Cube, GridAab, GridCoordinate, GridPoint};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -24,6 +24,18 @@ pub(in crate::block::text) struct Layout(
 );
 
 pub(in crate::block::text) struct LayoutHeader {
+    /// Logical bounding box of the text as determined by font metrics and outline style.
+    ///
+    /// This box may be significantly larger than the actual visual space taken up; it measures
+    /// whole line heights without considering the presence or absence of ascenders, descenders, or
+    /// accents.
+    ///
+    /// This is not necessarily contained by the [`text::Text::layout_bounds`], in case the text
+    /// is larger than fits in those bounds.
+    ///
+    /// TODO: Currently, leading and trailing newlines are not counted, but they should be.
+    pub logical_bounding_box: GridAab,
+
     /// Bounding box of all glyphs to be drawn according to this layout.
     ///
     /// This is not necessarily contained by the [`text::Text::layout_bounds`].
@@ -32,7 +44,7 @@ pub(in crate::block::text) struct LayoutHeader {
     /// this box will not contain the height of those blank lines.
     /// This box is intended solely to answer the *rendering* question of what region of space is
     /// affected by drawing this text.
-    pub bounding_box: GridAab,
+    pub rendering_bounding_box: GridAab,
 
     /// Z-axis translation of the glyphs when they are drawn.
     /// Not part of `PositionedGlyph::position` since it is (currently) the same for all.
@@ -71,12 +83,12 @@ pub(crate) struct InGlyph;
 ///
 /// This is a mechanism to robustly avoid numeric overflow occurring, at the cost of missing text
 /// when we are near the area where that text would have to be clipped regardless.
-const POSITION_CLIP_RANGE: euclid::Box2D<GridCoordinate, ()> = {
+const POSITION_CLIP_RANGE: Box2D<GridCoordinate, ()> = {
     // glyphs are constrained to be no more than 255 × 255,
     // so this prevents any individual glyph from overflowing
     let min = GridCoordinate::MIN + 256;
     let max = GridCoordinate::MAX - 256;
-    euclid::Box2D {
+    Box2D {
         min: Point2D::new(min, min),
         max: Point2D::new(max, max),
     }
@@ -100,6 +112,7 @@ pub(crate) fn compute_layout(
     let character_size_g = decl.character_size.to_i32();
     let outline_expansion: GridCoordinate = outline.into();
     let thickness = 1 + outline_expansion;
+    let font_glyphs = decl.glyphs();
 
     // Find the *point* within the layout_bounds the text is positioned relative to.
     //
@@ -139,7 +152,13 @@ pub(crate) fn compute_layout(
     }
 
     let mut glyphs: Vec<PositionedGlyph> = Vec::new();
-    let mut bounding_box: Option<GridAab> = None;
+    // Accumulated bounding box of the character cells.
+    // TODO: This is an `Option` because we want it to be able to be meaningful even when zero
+    // width or zero height (e.g. the string "\n" should be two line heights and zero width).
+    // However, this is not yet implemented correctly.
+    let mut logical_bounding_box: Option<GridAab> = None;
+    // Accumulated bounding box of the rendered voxels; usually smaller than the logical box.
+    let mut rendering_bounding_box: GridAab = GridAab::ORIGIN_EMPTY;
     // Y coordinate of the position of the glyphs of the next line, relative to the origin of the
     // glyphs of the first line. Accumulates the height of the text.
     let mut cursor_y: GridCoordinate = 0;
@@ -219,27 +238,24 @@ pub(crate) fn compute_layout(
 
             glyph.position = new_position;
 
-            let glyph_bounding_box = GridAab::from_lower_upper(
-                // accounting for Y flip -- TODO: load fonts Y-up instead
-                (glyph.position
-                    + vec2(
-                        -outline_expansion,
-                        1 - character_size_g.height - outline_expansion,
-                    ))
-                .extend(layout_offset.z)
-                .cast_unit(),
-                (glyph.position
-                    + vec2(
-                        character_size_g.width + outline_expansion,
-                        1 + outline_expansion,
-                    ))
-                .extend(layout_offset.z + thickness)
-                .cast_unit(),
+            union_opt_aab(
+                &mut logical_bounding_box,
+                glyph_bounding_box_to_3d(
+                    Box2D {
+                        min: Point2D::zero(),
+                        max: decl.character_size.to_vector().to_point().to_i32(),
+                    }
+                    .outer_box(SideOffsets2D::new_all_same(outline_expansion)),
+                    glyph.position.cast_unit().extend(layout_offset.z),
+                    outline,
+                ),
             );
-            bounding_box = Some(match bounding_box {
-                None => glyph_bounding_box,
-                Some(bb) => bb.union_cubes(glyph_bounding_box),
-            });
+
+            rendering_bounding_box = rendering_bounding_box.union_cubes(glyph_bounding_box_to_3d(
+                font_glyphs.rendering_bounding_box(glyph.glyph_index, outline),
+                glyph.position.cast_unit().extend(layout_offset.z),
+                outline,
+            ));
         }
 
         // Move cursor to the next line.
@@ -251,7 +267,8 @@ pub(crate) fn compute_layout(
     let arc_with_length: Arc<slice_dst::SliceWithHeader<LayoutHeader, PositionedGlyph>> =
         slice_dst::SliceWithHeader::new(
             LayoutHeader {
-                bounding_box: bounding_box.unwrap_or(GridAab::ORIGIN_EMPTY),
+                logical_bounding_box: logical_bounding_box.unwrap_or(GridAab::ORIGIN_EMPTY),
+                rendering_bounding_box,
                 z: layout_offset.z,
             },
             glyphs,
@@ -262,6 +279,39 @@ pub(crate) fn compute_layout(
     result.consistency_check(decl, outline);
 
     result
+}
+
+/// Y flip and apply translation
+fn glyph_bounding_box_to_3d(
+    bbox: Box2D<GridCoordinate, InGlyph>,
+    position_of_glyph_origin: GridPoint,
+    outline: bool,
+) -> GridAab {
+    let glyph_bounding_box_2d = bbox.cast_unit::<Cube>().to_i32();
+
+    // Y flip and change origin from top left to bottom left
+    let mut flipped_glyph_bounding_box_2d = glyph_bounding_box_2d;
+    flipped_glyph_bounding_box_2d.min.y = 1 - glyph_bounding_box_2d.max.y;
+    flipped_glyph_bounding_box_2d.max.y = 1 - glyph_bounding_box_2d.min.y;
+
+    GridAab::from_lower_upper(
+        flipped_glyph_bounding_box_2d.min.extend(0).cast_unit(),
+        flipped_glyph_bounding_box_2d
+            .max
+            .extend(1 + GridCoordinate::from(outline))
+            .cast_unit(),
+    )
+    .translate(position_of_glyph_origin.to_vector())
+}
+
+fn union_opt_aab(accumulator: &mut Option<GridAab>, addition: GridAab) {
+    if addition.is_empty() {
+        return;
+    }
+    *accumulator = Some(match *accumulator {
+        None => addition,
+        Some(bb) => bb.union_cubes(addition),
+    });
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -282,34 +332,38 @@ impl Layout {
 
     #[cfg(debug_assertions)]
     pub(crate) fn consistency_check(&self, font: &text::FontDecl, outline: bool) {
-        let (LayoutHeader { bounding_box, z: _ }, glyphs) = self.parts();
+        let (
+            &LayoutHeader {
+                // Cannot truly validate the logical bounding box because it is determined in part
+                // by whitespace that doesn’t actually render as glyphs.
+                logical_bounding_box: _,
+                rendering_bounding_box,
+                z,
+            },
+            glyphs,
+        ) = self.parts();
+        let font_glyphs = font.glyphs();
 
-        let outline_expansion: GridCoordinate = outline.into();
-
-        let bounding_box_from_glyphs =
-            euclid::Box2D::from_points(glyphs.iter().flat_map(|glyph| {
-                [
-                    glyph.position + vec2(-outline_expansion, 1 + outline_expansion), // account for Y flip -- TODO: load fonts Y-up instead
-                    glyph.position
-                        + vec2(
-                            GridCoordinate::from(font.character_size.width) + outline_expansion,
-                            1 - GridCoordinate::from(font.character_size.height)
-                                - outline_expansion,
-                        ),
-                ]
-            }));
-
-        if bounding_box_from_glyphs.is_empty() {
-            assert!(bounding_box.is_empty());
-        } else {
-            // TODO: check Z axis too
-            assert_eq!(
-                euclid::Box2D::new(
-                    bounding_box.lower_bounds().xy(),
-                    bounding_box.upper_bounds().xy(),
+        let rendering_bounding_box_from_glyphs = glyphs
+            .iter()
+            .map(|glyph| {
+                glyph_bounding_box_to_3d(
+                    font_glyphs.rendering_bounding_box(glyph.glyph_index, outline),
+                    glyph.position.extend(z).cast_unit(),
+                    outline,
                 )
-                .cast_unit(),
-                bounding_box_from_glyphs
+            })
+            .reduce(GridAab::union_cubes);
+
+        if let Some(bb) = rendering_bounding_box_from_glyphs {
+            assert_eq!(
+                rendering_bounding_box, bb,
+                "stored bounding box != expected bounding box"
+            );
+        } else {
+            assert!(
+                rendering_bounding_box.is_empty(),
+                "when there are no glyphs, stored bounding box should be empty"
             );
         }
     }
@@ -317,9 +371,14 @@ impl Layout {
 
 impl fmt::Debug for Layout {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let LayoutHeader { bounding_box, z } = &self.0.header;
+        let LayoutHeader {
+            logical_bounding_box,
+            rendering_bounding_box,
+            z,
+        } = &self.0.header;
         f.debug_struct("Layout")
-            .field("bounding_box", bounding_box)
+            .field("logical_bounding_box", logical_bounding_box)
+            .field("rendering_bounding_box", rendering_bounding_box)
             .field("z", z)
             .finish_non_exhaustive()
     }
@@ -360,8 +419,9 @@ mod tests {
         lower_bounds: [GridCoordinate; 3],
         upper_bounds: [GridCoordinate; 3],
     ) {
+        // TODO: also test rendering bb
         assert_eq!(
-            layout.parts().0.bounding_box,
+            layout.parts().0.logical_bounding_box,
             GridAab::from_lower_upper(lower_bounds, upper_bounds)
         )
     }

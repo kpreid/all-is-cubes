@@ -30,7 +30,8 @@ pub struct LargeText {
 
 impl LargeText {
     fn bounds(&self) -> GridAab {
-        self.text.bounding_voxels()
+        // TODO: offer rendering_bounding_voxels as an option?
+        self.text.logical_bounding_voxels()
     }
 }
 
@@ -119,7 +120,10 @@ impl Layoutable for Label {
         // When we actually go to render text, we'll use the actual gravity and bounds, so this
         // alignment choice won't matter.
         LayoutRequest {
-            minimum: self.text(vui::Gravity::splat(vui::Align::Low)).bounding_blocks().size(),
+            minimum: self
+                .text(vui::Gravity::splat(vui::Align::Low))
+                .logical_bounding_blocks()
+                .size(),
         }
     }
 }
@@ -310,7 +314,7 @@ pub(crate) fn draw_text_txn(
     full_grant: &LayoutGrant,
     shrink: bool,
 ) -> SpaceTransaction {
-    let text_aabb = text.bounding_blocks();
+    let text_aabb = text.logical_bounding_blocks();
     let shrunk_grant = full_grant.shrink_to(text_aabb.size(), true);
     let translation = shrunk_grant.bounds.lower_bounds() - text_aabb.lower_bounds();
 

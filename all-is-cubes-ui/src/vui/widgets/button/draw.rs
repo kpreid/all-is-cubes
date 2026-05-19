@@ -114,7 +114,7 @@ impl ButtonLabel {
         self.icon.clone().into_iter().chain(self.text.as_ref().into_iter().flat_map(
             move |label_widget| {
                 let text = label_widget.text(gravity);
-                let bb = text.bounding_blocks();
+                let bb = text.logical_bounding_blocks();
                 bb.x_range().map(move |x| {
                     Block::from_primitive(block::Primitive::Text {
                         text: text.clone(),

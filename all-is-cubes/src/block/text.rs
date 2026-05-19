@@ -163,25 +163,50 @@ impl Text {
         self.data.debug
     }
 
-    /// Returns the bounding box of the text as displayed, in voxels at the
-    /// [`resolution()`](Self::resolution).
+    /// Returns the bounding box that the text logically occupies,
+    /// in voxels at the [`resolution()`](Self::resolution).
+    ///
+    /// This box may be significantly larger than the actual visual space taken up; it measures
+    /// whole line heights without considering the presence or absence of ascenders, descenders, or
+    /// accents.
+    /// It is most appropriate for arranging pieces of text next to other pieces of text,
+    /// such as in UI layouts.
     ///
     /// This box is in the same units as [`Self::layout_bounds()`] but reflects the actual text
     /// layout rather than the configuration.
-    pub fn bounding_voxels(&self) -> GridAab {
-        self.get_or_init_layout().header().bounding_box
+    pub fn logical_bounding_voxels(&self) -> GridAab {
+        self.get_or_init_layout().header().logical_bounding_box
     }
-    /// Returns the bounding box of the text, in blocks — the set of [`Primitive::Text`] offsets
-    /// that will render all of it.
+
+    /// Returns the bounding box that the text as drawn actually covers,
+    /// in voxels at the [`resolution()`](Self::resolution).
     ///
-    /// This is identical to [`Self::bounding_voxels()`] scaled down by [`Self::resolution()`].
-    pub fn bounding_blocks(&self) -> GridAab {
-        self.bounding_voxels().divide(self.resolution().into())
+    /// This box is in the same units as [`Self::layout_bounds()`] but reflects the actual text
+    /// layout rather than the configuration.
+    pub fn rendering_bounding_voxels(&self) -> GridAab {
+        self.get_or_init_layout().header().rendering_bounding_box
+    }
+
+    /// Returns the bounding box that the text logically occupies,
+    /// in whole blocks — the set of [`Primitive::Text`] offsets that will fit all of it.
+    ///
+    /// This is identical to [`Self::logical_bounding_voxels()`] scaled down by [`Self::resolution()`].
+    pub fn logical_bounding_blocks(&self) -> GridAab {
+        self.logical_bounding_voxels().divide(self.resolution().into())
+    }
+
+    /// Returns the bounding box that the text as drawn actually covers,
+    /// in whole blocks — the set of [`Primitive::Text`] offsets that will fit all of it.
+    ///
+    /// This is identical to [`Self::rendering_bounding_voxels()`] scaled down by [`Self::resolution()`].
+    pub fn rendering_bounding_blocks(&self) -> GridAab {
+        self.rendering_bounding_voxels().divide(self.resolution().into())
     }
 
     /// Returns a transaction which places [`Primitive::Text`] blocks containing this text.
     ///
-    /// The text lies within the volume [`Self::bounding_blocks()`] transformed by `transform`.
+    /// The text lies within the volume [`Self::rendering_bounding_blocks()`] transformed by
+    /// `transform`.
     ///
     /// Each individual block is given to `block_fn` to allow alterations.
     ///
@@ -198,7 +223,7 @@ impl Text {
         let dst_to_src_transform = transform.inverse();
         let block_rotation = transform.rotation;
         SpaceTransaction::filling(
-            self.bounding_blocks().transform(transform).unwrap(),
+            self.rendering_bounding_blocks().transform(transform).unwrap(),
             |cube| {
                 space::CubeTransaction::replacing(
                     None,
@@ -241,7 +266,8 @@ impl Text {
 
         let (
             &LayoutHeader {
-                bounding_box: text_aab,
+                logical_bounding_box: _,
+                rendering_bounding_box: text_aab,
                 z: layout_z,
             },
             text_glyphs,
@@ -327,7 +353,8 @@ impl Text {
     pub fn draw_voxels_to_transaction(&self, txn: &mut SpaceTransaction, transform: Gridgid) {
         let (
             &LayoutHeader {
-                bounding_box: _,
+                logical_bounding_box: _,
+                rendering_bounding_box: _,
                 z: layout_z,
             },
             glyphs,

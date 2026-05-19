@@ -354,6 +354,24 @@ impl Glyphs {
         Self { pixels, lookup }
     }
 
+    /// Returns the bounding box of one glyph.
+    ///
+    /// This box covers exactly the pixels that would be drawn, and does not have any guaranteed
+    /// relationship to the font’s metrics.
+    pub(in crate::block::text) fn rendering_bounding_box(
+        &self,
+        glyph_index: usize,
+        outline: bool,
+    ) -> Box2D<GridCoordinate, InGlyph> {
+        let bbox = self.lookup[glyph_index].bounding_box_including_outline.cast();
+        if outline {
+            bbox
+        } else {
+            // Subtract the outline.
+            bbox.inner_box(euclid::SideOffsets2D::new_all_same(1))
+        }
+    }
+
     /// Returns an iterator over all the pixels making up one glyph.
     ///
     /// TODO: the results of this should typed, not as points, but as unit squares like `Cube`
