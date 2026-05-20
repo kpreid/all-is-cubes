@@ -158,7 +158,7 @@ impl Fire {
         SpaceTransaction::filling(self.fire_state.bounds(), |cube| {
             CubeTransaction::replacing(
                 None,
-                Some(self.blocks[self.fire_state[cube] as usize].clone()),
+                Some(self.blocks[usize::from(self.fire_state[cube])].clone()),
             )
         })
     }

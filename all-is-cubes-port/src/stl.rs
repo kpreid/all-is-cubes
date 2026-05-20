@@ -8,7 +8,7 @@ use stl_io::Triangle;
 
 use all_is_cubes::block;
 use all_is_cubes::euclid::Vector3D;
-use all_is_cubes::math::zo32;
+use all_is_cubes::math::{u32size, zo32};
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe;
 use all_is_cubes::util::YieldProgress;
@@ -99,9 +99,9 @@ fn space_mesh_to_triangles(mesh: &mesh::SpaceMesh<StlMt>) -> Vec<Triangle> {
         .tuples()
         .map(|(i1, i2, i3)| {
             let tri = [
-                vertices[i1 as usize],
-                vertices[i2 as usize],
-                vertices[i3 as usize],
+                vertices[u32size(i1)],
+                vertices[u32size(i2)],
+                vertices[u32size(i3)],
             ];
             Triangle {
                 normal: convert_vector(tri[0].face.normal_vector()),

@@ -44,10 +44,18 @@ mod serde_impls;
 mod vol;
 pub use vol::*;
 
-// We make an assumption in several places that `usize` is at least 32 bits.
-// It's likely that compilation would not succeed anyway, but let's make it explicit.
-#[cfg(target_pointer_width = "16")]
-compile_error!("all-is-cubes does not support platforms with less than 32-bit `usize`");
+/// Infallibly converts `u32` to `usize`.
+///
+/// All is Cubes would not work and does not compile on 16-bit platforms, so this conversion is
+/// possible.
+/// This function provides a way to express it which is concise and does not provoke any warnings.
+#[inline(always)] // trivial
+pub const fn u32size(value: u32) -> usize {
+    #[cfg(target_pointer_width = "16")]
+    compile_error!("all-is-cubes does not support platforms with less than 32-bit `usize`");
+
+    value as usize
+}
 
 /// Allows writing a [`NotNan`] value as a constant expression (which is not currently
 /// a feature provided by the [`ordered_float`] crate itself).

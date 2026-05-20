@@ -15,7 +15,7 @@ use alloc::vec::Vec;
 use euclid::{Point3D, Size3D, vec3};
 use manyfmt::Refmt as _;
 
-use crate::math::{Axis, Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector};
+use crate::math::{Axis, Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector, u32size};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -343,7 +343,7 @@ impl<C, O> Vol<C, O> {
 
         let size = self.bounds.size();
         // This will not overflow, as an invariant of the `Vol` type.
-        size.width as usize * size.height as usize * size.depth as usize
+        u32size(size.width) * u32size(size.height) * u32size(size.depth)
     }
 
     /// Extracts the linear contents, discarding the bounds and ordering.
@@ -927,9 +927,9 @@ fn index_into_aab_zmaj(bounds: GridAab, cube: Cube) -> Option<usize> {
         .to_point();
 
     // Bounds check, expressed as a single unsigned comparison.
-    if (deoffsetted.x as u32 >= sizes.width)
-        | (deoffsetted.y as u32 >= sizes.height)
-        | (deoffsetted.z as u32 >= sizes.depth)
+    if (deoffsetted.x.cast_unsigned() >= sizes.width)
+        | (deoffsetted.y.cast_unsigned() >= sizes.height)
+        | (deoffsetted.z.cast_unsigned() >= sizes.depth)
     {
         return None;
     }
@@ -947,8 +947,8 @@ fn index_into_aab_zmaj(bounds: GridAab, cube: Cube) -> Option<usize> {
     // Always use wrapping (rather than maybe-checked) arithmetic, because we
     // checked the criteria for it to not overflow.
     Some(
-        (ixvec.x.wrapping_mul(sizes.height as usize).wrapping_add(ixvec.y))
-            .wrapping_mul(sizes.depth as usize)
+        (ixvec.x.wrapping_mul(u32size(sizes.height)).wrapping_add(ixvec.y))
+            .wrapping_mul(u32size(sizes.depth))
             .wrapping_add(ixvec.z),
     )
 }

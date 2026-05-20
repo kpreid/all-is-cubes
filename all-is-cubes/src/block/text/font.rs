@@ -7,7 +7,7 @@ use itertools::iproduct;
 use crate::block::text::{self, layout::InGlyph};
 use crate::camera::{ImagePixel, ImageSize};
 use crate::content::load_image::DecodedPng;
-use crate::math::{GridAab, GridCoordinate};
+use crate::math::{GridAab, GridCoordinate, u32size};
 use crate::universe;
 
 #[cfg(doc)]
@@ -150,7 +150,7 @@ impl universe::VisitHandles for Font {
 /// when we support non-monospaced fonts.)
 const GLYPHS_PER_ROW: u32 = 16;
 
-const GLYPHS_PER_ROW_USIZE: usize = GLYPHS_PER_ROW as usize;
+const GLYPHS_PER_ROW_USIZE: usize = u32size(GLYPHS_PER_ROW);
 
 /// Data structure defining a font, that can go in a `static` even though the image needs decoding.
 ///
@@ -240,8 +240,8 @@ const PIXEL_MASK: u8 = 0b11;
 
 /// Set bits in [`Glyphs`] bit-packed data.
 fn set_glyph_bits(data: &mut [u8], pixel_index: usize, value: u8) {
-    data[pixel_index / PIXELS_PER_BYTE as usize] |=
-        value << ((pixel_index % PIXELS_PER_BYTE as usize) as u32 * BITS_PER_PIXEL);
+    data[pixel_index / u32size(PIXELS_PER_BYTE)] |=
+        value << ((pixel_index % u32size(PIXELS_PER_BYTE)) as u32 * BITS_PER_PIXEL);
 }
 
 impl Glyphs {
@@ -270,7 +270,7 @@ impl Glyphs {
         let mut lookup = Vec::new();
 
         // This is hardly a highly efficient image copying operation, but it's done only once per font.
-        for glyph_index_u in 0..(glyph_count as usize) {
+        for glyph_index_u in 0..u32size(glyph_count) {
             let offset_of_glyph_in_output = pixels.len();
 
             let input_glyph_pixel_offset: Translation2D<u32, InGlyph, ImagePixel> =
@@ -297,7 +297,7 @@ impl Glyphs {
                 .outer_box(euclid::SideOffsets2D::new(0, 3, 3, 0));
 
             let byte_size_of_glyph =
-                storage_bounding_box.to_u32().area().div_ceil(PIXELS_PER_BYTE) as usize;
+                u32size(storage_bounding_box.to_u32().area().div_ceil(PIXELS_PER_BYTE));
 
             // Bits that should be set in the output in the neighborhood of the input,
             // and their offsets in terms of pixel indices.
@@ -309,7 +309,7 @@ impl Glyphs {
             let brush: [(u8, usize); 9] = {
                 let o = Value::Outline as u8;
                 let f = Value::Foreground as u8;
-                let row = storage_bounding_box.width() as usize;
+                let row = usize::from(storage_bounding_box.width());
                 [
                     (o, 0      ), (o,           1), (o,           2),
                     (o, row    ), (f, row     + 1), (o, row     + 2),
@@ -333,8 +333,9 @@ impl Glyphs {
                 let position_in_stored_glyph: Point2D<u8, InStoredGlyph> =
                     (position_in_glyph - storage_bounding_box.min.to_vector()).cast_unit();
 
-                let first_output_pixel = position_in_stored_glyph.x as usize
-                    + position_in_stored_glyph.y as usize * storage_bounding_box.width() as usize;
+                let first_output_pixel = usize::from(position_in_stored_glyph.x)
+                    + usize::from(position_in_stored_glyph.y)
+                        * usize::from(storage_bounding_box.width());
 
                 for (value, offset) in brush {
                     set_glyph_bits(output_glyph_data, first_output_pixel + offset, value);
@@ -368,8 +369,8 @@ impl Glyphs {
                     * usize::from(info.bounding_box_including_outline.width())
                     + usize::from(position_in_stored_glyph.x);
 
-                let byte_index = pixel_index / PIXELS_PER_BYTE as usize;
-                let shift = (pixel_index % PIXELS_PER_BYTE as usize) * 2;
+                let byte_index = pixel_index / u32size(PIXELS_PER_BYTE);
+                let shift = (pixel_index % u32size(PIXELS_PER_BYTE)) * 2;
 
                 let byte_value = *this_glyph_pixels.get(byte_index)?;
                 let bit_value = (byte_value >> shift) & PIXEL_MASK;

@@ -10,7 +10,7 @@ use gltf_json::validation::Checked::Valid;
 
 use all_is_cubes::block::Evoxel;
 use all_is_cubes::euclid::{Point2D, Point3D, Scale, Vector2D, point2};
-use all_is_cubes::math::{Axis, Cube, GridAab, GridRotation, Gridgid, Vol};
+use all_is_cubes::math::{self, Axis, Cube, GridAab, GridRotation, Gridgid, Vol};
 use all_is_cubes_mesh::texture::{self, TilePoint};
 
 use crate::gltf::GltfDataDestination;
@@ -703,7 +703,7 @@ fn copy_texels_to_atlas_images(
                 + texels_size.width
                     * (position_in_texels.y + texels_size.height * position_in_texels.z);
 
-            let texel = texels[usize::try_from(index_in_texels).unwrap()];
+            let texel = texels[math::u32size(index_in_texels)];
             atlas_image.put_pixel(
                 location_in_atlas.x() + x_in_rect,
                 location_in_atlas.y() + y_in_rect,

@@ -4,6 +4,7 @@ use core::any::Any;
 use core::fmt::Debug;
 
 use all_is_cubes::character::Cursor;
+use all_is_cubes::math::u32size;
 use all_is_cubes::util::{Fmt, StatusText};
 
 use crate::camera::{ImageSize, Layers};
@@ -69,9 +70,8 @@ impl From<Rendering> for imgref::ImgVec<[u8; 4]> {
     fn from(value: Rendering) -> Self {
         imgref::Img::new(
             value.data,
-            // cannot overflow — we statically assert size_of(usize) >= size_of(u32)
-            value.size.width as usize,
-            value.size.height as usize,
+            u32size(value.size.width),
+            u32size(value.size.height),
         )
     }
 }
@@ -79,9 +79,8 @@ impl<'a> From<&'a Rendering> for imgref::ImgRef<'a, [u8; 4]> {
     fn from(value: &'a Rendering) -> Self {
         imgref::Img::new(
             value.data.as_slice(),
-            // cannot overflow — we statically assert size_of(usize) >= size_of(u32)
-            value.size.width as usize,
-            value.size.height as usize,
+            u32size(value.size.width),
+            u32size(value.size.height),
         )
     }
 }

@@ -9,7 +9,7 @@ use crate::block::{
 };
 use crate::content::make_some_blocks;
 use crate::listen::{self, Log, NullListener};
-use crate::math::{Face, GridRotation, Rgba};
+use crate::math::{Face, GridRotation, Rgba, u32size};
 use crate::space::{Space, SpaceTransaction};
 use crate::time;
 use crate::transaction::{self, Transaction as _};
@@ -220,7 +220,7 @@ fn overflow_evaluate() {
     let mut block = AIR;
     block.modifiers_mut().extend(std::iter::repeat_n(
         Modifier::Rotate(Face::PY.clockwise()),
-        too_many_modifiers as usize,
+        u32size(too_many_modifiers),
     ));
     assert_eq!(
         block.evaluate(universe.read_ticket()),

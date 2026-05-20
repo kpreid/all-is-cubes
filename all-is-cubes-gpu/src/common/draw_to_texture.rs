@@ -4,6 +4,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use all_is_cubes::euclid::{Box2D, Point2D};
+use all_is_cubes::math::u32size;
 use all_is_cubes_render::camera::{ImagePixel, ImageSize};
 
 // -------------------------------------------------------------------------------------------------
@@ -29,7 +30,7 @@ pub(crate) struct EgFramebuffer<P> {
 impl<P: Copy + Default> EgFramebuffer<P> {
     pub fn new(size: ImageSize) -> Self {
         Self {
-            data: vec![P::default(); size.width as usize * size.height as usize],
+            data: vec![P::default(); u32size(size.width) * u32size(size.height)],
             size,
             dirty: Rectangle::zero(),
             nonzero: Rectangle::zero(),
@@ -76,7 +77,7 @@ impl<P: Copy + Default> EgFramebuffer<P> {
         expand_rectangle(&mut self.dirty, position_eg);
         expand_rectangle(&mut self.nonzero, position_eg);
 
-        self.data[position.x as usize + position.y as usize * self.size.width as usize] = value;
+        self.data[u32size(position.x) + u32size(position.y) * u32size(self.size.width)] = value;
     }
 }
 

@@ -10,8 +10,8 @@ use rayon::{
 
 use all_is_cubes::euclid::{Box3D, Point3D, Size3D, Vector3D, vec3};
 use all_is_cubes::math::{
-    Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord,
-    PositiveSign, VectorOps as _,
+    self, Aab, Axis, Cube, FaceMap, GridAab, GridCoordinate, GridSize, GridSizeCoord, PositiveSign,
+    VectorOps as _,
 };
 use all_is_cubes::space;
 use all_is_cubes_render::camera::Camera;
@@ -61,7 +61,7 @@ const LIGHT_CHUNK_SIZE_I32: Size3D<i32, Cube> = Size3D::new(
     LIGHT_CHUNK_SIZE.depth.cast_signed(),
 );
 const LIGHT_CHUNK_VOLUME: usize =
-    (LIGHT_CHUNK_SIZE.width * LIGHT_CHUNK_SIZE.height * LIGHT_CHUNK_SIZE.depth) as usize;
+    math::u32size(LIGHT_CHUNK_SIZE.width * LIGHT_CHUNK_SIZE.height * LIGHT_CHUNK_SIZE.depth);
 
 /// Coordinates for a chunk of light values in a [`LightTexture`] to update.
 /// These are generally much smaller than mesh chunks.
@@ -139,7 +139,7 @@ impl LightTexture {
     pub fn choose_size(
         limits: &wgpu::Limits,
         space_bounds: GridAab,
-        view_distance: PositiveSign<FreeCoordinate>,
+        view_distance: PositiveSign<math::FreeCoordinate>,
     ) -> GridSize {
         // Extra volume of 1 extra cube around all sides automatically captures sky light.
         let space_size = space_bounds.size() + GridSize::splat(2);

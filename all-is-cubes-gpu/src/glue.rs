@@ -8,7 +8,7 @@ use core::ops::Range;
 use bytemuck::Pod;
 
 use all_is_cubes::euclid::{Box3D, Point3D, Size2D, Size3D};
-use all_is_cubes::math::{GridSize, Rgba, range_len};
+use all_is_cubes::math::{GridSize, Rgba, range_len, u32size};
 use all_is_cubes_mesh::IndexSlice;
 use num_traits::NumCast;
 
@@ -70,7 +70,7 @@ pub fn write_texture_by_aab<T: Pod, U>(
     region: Box3D<u32, U>,
     data: &[T],
 ) {
-    let volume = usize::try_from(region.volume()).unwrap();
+    let volume = u32size(region.volume());
     let len = data.len();
     assert!(
         volume == len,

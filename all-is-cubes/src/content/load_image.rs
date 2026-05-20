@@ -16,7 +16,7 @@ use png_decoder::PngHeader;
 use crate::block::{self, AIR, Block, Resolution};
 use crate::camera::{ImagePixel, ImageSize};
 use crate::drawing::VoxelBrush;
-use crate::math::{Cube, FaceMap, GridAab, GridCoordinate, GridRotation, Rgba};
+use crate::math::{Cube, FaceMap, GridAab, GridCoordinate, GridRotation, Rgba, u32size};
 use crate::space::{self, Space, SpacePhysics};
 use crate::universe::{ReadTicket, UniverseTransaction};
 
@@ -99,7 +99,7 @@ impl DecodedPng {
         if x >= self.header.width || y >= self.header.height {
             return None;
         }
-        Some(self.rgba_image_data[x as usize + y as usize * self.header.width as usize])
+        Some(self.rgba_image_data[u32size(x) + u32size(y) * u32size(self.header.width)])
     }
 }
 

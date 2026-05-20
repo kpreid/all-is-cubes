@@ -18,7 +18,7 @@ use web_time::{Duration, Instant};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::{Box2D, point2, point3, vec2, vec3};
 use all_is_cubes::listen;
-use all_is_cubes::math::{OpacityCategory, VectorOps as _, range_len};
+use all_is_cubes::math::{self, OpacityCategory, VectorOps as _, range_len};
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::{ConciseDebug, Refmt};
 use all_is_cubes_render::camera::{
@@ -617,8 +617,8 @@ impl Inner {
 
         // Function to trace one ray, independent of strategy.
         let trace_one = |point: Point| -> Trace {
-            let x = point.x as usize;
-            let y = point.y as usize;
+            let x = math::u32size(point.x);
+            let y = math::u32size(point.y);
             let (
                 Split {
                     color: color_buf,
@@ -851,7 +851,7 @@ struct PixelPicker {
 impl PixelPicker {
     fn new(viewport: Viewport) -> Self {
         let pixel_count = viewport.pixel_count().unwrap();
-        let width = viewport.framebuffer_size.width as usize;
+        let width = math::u32size(viewport.framebuffer_size.width);
         // Subtracting 0.5 here means that when we use this later,
         // it'll give us pixel-center coordinates
         let image_center = viewport.framebuffer_size.to_vector().to_f64() / 2.0 - vec2(0.5, 0.5);
@@ -906,8 +906,7 @@ impl Iterator for PixelPicker {
 /// Convert an index in the viewport to a pixel position. If out of range, wraps around.
 #[inline(always)]
 fn point_from_pixel_index(viewport: Viewport, index: usize) -> Point {
-    // `as usize` is valid because we would have failed earlier if it doesn't fit in usize.
-    let size = viewport.framebuffer_size.map(|s| s as usize);
+    let size = viewport.framebuffer_size.map(math::u32size);
     Point::new(
         index.rem_euclid(size.width) as u32,
         index.div_euclid(size.width).rem_euclid(size.height) as u32,

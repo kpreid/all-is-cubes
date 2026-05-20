@@ -4,6 +4,8 @@ use core::{fmt, mem, ops};
 
 use either::Either;
 
+use all_is_cubes::math::u32size;
+
 // -------------------------------------------------------------------------------------------------
 
 /// Data storage for meshes’ index lists, automatically choosing an element type which is
@@ -240,16 +242,10 @@ impl<'a> IndexSlice<'a> {
     pub fn iter_usize(&self) -> impl DoubleEndedIterator<Item = usize> + '_ {
         match self {
             IndexSlice::U16(slice) => Either::Left(slice.iter().copied().map(usize::from)),
-            // This `as` conversion cannot overflow because `usize` is at least 32 bits,
-            // as asserted with a `compile_error!` in this file.
-            IndexSlice::U32(slice) => Either::Right(slice.iter().copied().map(|i| i as usize)),
+            IndexSlice::U32(slice) => Either::Right(slice.iter().copied().map(u32size)),
         }
     }
 }
-
-// Check condition under which `IndexSlice::iter_usize()` is valid.
-#[cfg(target_pointer_width = "16")]
-compile_error!("all-is-cubes does not support platforms with less than 32-bit `usize`");
 
 #[cfg(false)] // currently unused
 impl IndexSliceMut<'_> {
@@ -483,20 +479,12 @@ pub(crate) trait IndexInt:
 
 impl IndexInt for u16 {
     fn to_slice_index(self) -> usize {
-        self as usize
+        usize::from(self)
     }
 }
 impl IndexInt for u32 {
     fn to_slice_index(self) -> usize {
-        const {
-            assert!(
-                size_of::<usize>() >= 4,
-                "16-bit platforms are not supported by all-is-cubes-mesh"
-            );
-        }
-
-        // Given the condition we statically checked, this cannot overflow.
-        self as usize
+        u32size(self)
     }
 }
 

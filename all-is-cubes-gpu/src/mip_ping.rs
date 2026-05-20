@@ -11,6 +11,8 @@ use alloc::vec::Vec;
 
 use itertools::izip;
 
+use all_is_cubes::math;
+
 use crate::Identified;
 use crate::queries::{Queries, Query};
 
@@ -291,7 +293,7 @@ impl<const N: usize> Texture<N> {
             })
         });
 
-        let mut stages = Vec::with_capacity(mip_level_count as usize * 2 - 1);
+        let mut stages = Vec::with_capacity(math::u32size(mip_level_count) * 2 - 1);
 
         // Repeat the downsample-upsample several times.
         // This can give us a larger radius of effect in cases where downsampling further

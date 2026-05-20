@@ -76,7 +76,9 @@ use core::format_args;
 use core::mem;
 use core::num::Wrapping;
 
-use all_is_cubes::math::{Cube, Face, GridCoordinate, GridPoint, GridRotation, rgba_const};
+use all_is_cubes::math::{
+    Cube, Face, GridCoordinate, GridPoint, GridRotation, rgba_const, u32size,
+};
 
 use crate::Viz;
 
@@ -325,7 +327,7 @@ impl Triangulator {
         self.clear_and_set_basis(basis);
 
         for input_vertex in input {
-            let input_index_usize = usize::try_from(input_vertex.index).unwrap();
+            let input_index_usize = u32size(input_vertex.index);
 
             // Advance sweep line if the new vertex is ahead of the line.
             let new_sweep_position =

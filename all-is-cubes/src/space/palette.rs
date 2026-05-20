@@ -111,7 +111,7 @@ impl Palette {
         let dummy_buffer = &mut dummy_notifier.buffer();
 
         let len = blocks.len();
-        if len.saturating_sub(1) > (BlockIndex::MAX as usize) {
+        if len.saturating_sub(1) > const { BlockIndex::MAX as usize } {
             return Err(PaletteError::PaletteTooLarge { len });
         }
 
@@ -147,7 +147,7 @@ impl Palette {
     #[inline]
     #[track_caller]
     pub(crate) fn entry(&self, index: BlockIndex) -> &SpaceBlockData {
-        &self.entries[index as usize]
+        &self.entries[usize::from(index)]
     }
 
     /// If this palette contains only blocks of uniform [`EvaluatedBlock::opacity_as_category()`]
@@ -196,7 +196,7 @@ impl Palette {
                     }
                 }
             }
-            if high_mark > BlockIndex::MAX as usize {
+            if high_mark > const { BlockIndex::MAX as usize } {
                 return Err(TooManyBlocks);
             }
             let new_index = high_mark as BlockIndex;
@@ -219,7 +219,7 @@ impl Palette {
         new_block: &Block,
         change_buffer: &mut ChangeBuffer<'_>,
     ) -> bool {
-        if self.entries[old_block_index as usize].count == 1
+        if self.entries[usize::from(old_block_index)].count == 1
             && !self.block_to_index.contains_key(new_block)
         {
             // Swap out the block_data entry.
@@ -230,7 +230,7 @@ impl Palette {
                     old_block_index,
                 );
                 data.count = 1;
-                core::mem::swap(&mut data, &mut self.entries[old_block_index as usize]);
+                core::mem::swap(&mut data, &mut self.entries[usize::from(old_block_index)]);
                 data.block
             };
 
@@ -247,11 +247,11 @@ impl Palette {
     }
 
     pub(crate) fn increment(&mut self, index: u16) {
-        self.entries[index as usize].count += 1
+        self.entries[usize::from(index)].count += 1
     }
 
     pub(crate) fn decrement_maybe_free(&mut self, old_block_index: BlockIndex) {
-        let old_data: &mut SpaceBlockData = &mut self.entries[old_block_index as usize];
+        let old_data: &mut SpaceBlockData = &mut self.entries[usize::from(old_block_index)];
         old_data.count -= 1;
         if old_data.count == 0 {
             // Free data of old entry.

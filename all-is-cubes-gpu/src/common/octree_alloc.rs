@@ -339,7 +339,7 @@ impl AlloctreeNode {
                             low_corner_of_node,
                             request,
                             usize::from(expsize(size_exponent)).pow(2)
-                                * usize::try_from(request.size()[axis]).unwrap(),
+                                * math::u32size(request.size()[axis]),
                         )?;
                         // Modify the tree only once create_handle succeeds.
                         *self = AlloctreeNode::Sliced {

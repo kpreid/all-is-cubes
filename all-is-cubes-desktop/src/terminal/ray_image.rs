@@ -1,6 +1,7 @@
 use std::fmt;
 
 use all_is_cubes::euclid::Vector2D;
+use all_is_cubes::math::u32size;
 use all_is_cubes_render::camera::{ImagePixel, Viewport};
 use all_is_cubes_render::raytracer::ImageInfo;
 
@@ -47,7 +48,7 @@ impl TextRayImage {
     ) -> [[&TextAndColor; W]; H] {
         let patch_size = self.patch_size().map(usize::from);
         let data: &[TextAndColor] = &self.image;
-        let image_row_length = usize::try_from(self.viewport.framebuffer_size.width).unwrap();
+        let image_row_length = u32size(self.viewport.framebuffer_size.width);
         let base_image_pos = character_position.component_mul(patch_size);
 
         assert!(

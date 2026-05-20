@@ -163,7 +163,7 @@ where
                 self.state.cubes[cube] = TracingCubeData {
                     block_index,
                     lighting: space.get_lighting(cube),
-                    always_invisible: block_data_slice[block_index as usize].block() == &AIR,
+                    always_invisible: block_data_slice[usize::from(block_index)].block() == &AIR,
                 };
             }
 

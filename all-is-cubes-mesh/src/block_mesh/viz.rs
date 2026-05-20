@@ -18,7 +18,7 @@ use {
     crate::block_mesh::analyze::AnalysisVertex,
     all_is_cubes::block::Resolution,
     all_is_cubes::euclid::Vector3D,
-    all_is_cubes::math::{Cube, GridAab, GridVector, Octant},
+    all_is_cubes::math::{Cube, GridAab, GridVector, Octant, u32size},
     all_is_cubes::rerun_glue as rg,
     alloc::{vec, vec::Vec},
     core::iter,
@@ -336,9 +336,9 @@ impl Viz {
 
             // Draw edges of each triangle — by interpreting the indices
             for (i1, i2, i3) in relative_indices_iter.tuples() {
-                let p1 = vertex_positions[i1 as usize];
-                let p2 = vertex_positions[i2 as usize];
-                let p3 = vertex_positions[i3 as usize];
+                let p1 = vertex_positions[u32size(i1)];
+                let p2 = vertex_positions[u32size(i2)];
+                let p3 = vertex_positions[u32size(i3)];
                 state
                     .mesh_edge_positions
                     .push(rg::components::LineStrip3D(vec![p1.0, p2.0, p3.0, p1.0]));

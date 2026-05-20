@@ -17,7 +17,7 @@ use itertools::iproduct;
 use all_is_cubes::block::Evoxel;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{Box3D, Translation3D};
-use all_is_cubes::math::{Cube, GridAab, GridCoordinate, VectorOps as _, Vol};
+use all_is_cubes::math::{self, Cube, GridAab, GridCoordinate, VectorOps as _, Vol};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;
@@ -592,7 +592,7 @@ impl AllocatorBacking {
                         // TODO: keep a preallocated GPU buffer instead
                         let data = vec![
                             palette::UNALLOCATED_TEXELS_ERROR.to_srgb8();
-                            region.volume() as usize
+                            math::u32size(region.volume())
                         ];
 
                         write_texture_by_aab(queue, &textures.reflectance.texture, region, &data);

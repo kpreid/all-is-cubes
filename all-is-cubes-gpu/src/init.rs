@@ -10,6 +10,7 @@ use alloc::vec::Vec;
 use std::io::Write as _;
 
 use all_is_cubes::euclid::Size3D;
+use all_is_cubes::math;
 use all_is_cubes_render::{Flaws, Rendering, camera};
 
 /// Create a [`wgpu::Instance`] controlled by environment variables.
@@ -347,10 +348,10 @@ impl TextureCopyParameters {
         {
             let mapped: &[u8] = &buffer.get_mapped_range();
             for row in 0..self.row_count() {
-                let byte_start_of_row = (self.padded_bytes_per_row()) as usize * row;
+                let byte_start_of_row = math::u32size(self.padded_bytes_per_row()) * row;
                 // TODO: this cast_slice() could fail if `C`’s alignment is higher than the buffer.
                 texel_vector.extend(bytemuck::cast_slice::<u8, C>(
-                    &mapped[byte_start_of_row..][..self.dense_bytes_per_row() as usize],
+                    &mapped[byte_start_of_row..][..math::u32size(self.dense_bytes_per_row())],
                 ));
             }
             debug_assert_eq!(texel_vector.len(), element_count);
@@ -360,6 +361,6 @@ impl TextureCopyParameters {
     }
 
     fn row_count(&self) -> usize {
-        self.size.height as usize * self.size.depth as usize
+        math::u32size(self.size.height) * math::u32size(self.size.depth)
     }
 }

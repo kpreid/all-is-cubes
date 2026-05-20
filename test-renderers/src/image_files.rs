@@ -3,6 +3,8 @@ use std::{fmt, io};
 
 use clap::builder::PossibleValue;
 
+use all_is_cubes::math::u32size;
+
 use crate::{SuiteId, TestId};
 
 /// Uniquely identifies each distinct image produced/consumed by the renderer test suite.
@@ -177,8 +179,8 @@ pub(crate) fn load_and_copy_expected_image(
 }
 
 fn image_to_imgref(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> imgref::ImgVec<[u8; 4]> {
-    let width = usize::try_from(image.width()).unwrap();
-    let height = usize::try_from(image.height()).unwrap();
+    let width = u32size(image.width());
+    let height = u32size(image.height());
     let data: Vec<u8> = image.into_vec();
     let (pixels, remainder) = data.as_chunks::<4>();
     debug_assert!(remainder.is_empty());

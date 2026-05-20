@@ -7,7 +7,7 @@ use rand::SeedableRng as _;
 use all_is_cubes::block::{self, AIR, Block, Resolution::R16};
 use all_is_cubes::euclid::point3;
 use all_is_cubes::linking::BlockProvider;
-use all_is_cubes::math::{Face, GridAab, GridCoordinate, GridPoint, Rgba};
+use all_is_cubes::math::{Face, GridAab, GridCoordinate, GridPoint, Rgba, u32size};
 use all_is_cubes::space::Space;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::{self, Universe};
@@ -439,7 +439,7 @@ fn planar_benches(c: &mut Criterion) {
 
         b.iter_batched_ref(
             || {
-                let mut vertices = Vec::with_capacity(extra_vertex_count as usize + 4);
+                let mut vertices = Vec::with_capacity(u32size(extra_vertex_count) + 4);
                 vertices.extend([
                     planar::Vertex {
                         position: point3(0, 0, 0),
@@ -485,7 +485,7 @@ fn planar_benches(c: &mut Criterion) {
                 // not measuring allocator behavior. The size in practice varies around
                 (
                     vertices,
-                    Vec::with_capacity(extra_vertex_count as usize * 3),
+                    Vec::with_capacity(u32size(extra_vertex_count) * 3),
                 )
             },
             |(vertices, output)| {

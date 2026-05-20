@@ -10,7 +10,7 @@ use rand::RngExt as _;
 
 use crate::math::{
     Aab, Axis, Cube, Face, FaceMap, FreeCoordinate, FreePoint, GridCoordinate, GridIter, GridPoint,
-    GridSize, GridSizeCoord, GridVector, Gridgid, Vol, sort_two,
+    GridSize, GridSizeCoord, GridVector, Gridgid, Vol, sort_two, u32size,
 };
 use crate::resolution::Resolution;
 use crate::util::ConciseDebug;
@@ -265,17 +265,10 @@ impl GridAab {
     // TODO: add doctest example of failure
     #[inline]
     pub const fn volume(&self) -> Option<usize> {
-        // Convert size values to usize.
-        // These conversions cannot overflow and do not need to be checked,
-        // because we only build on platforms where usize is 32 bits.
-        // This is checked elsewhere but let's assert it locally too.
-        const {
-            assert!(size_of::<GridSizeCoord>() <= size_of::<usize>());
-        }
         let sizes = self.size();
-        let width = sizes.width as usize;
-        let height = sizes.height as usize;
-        let depth = sizes.depth as usize;
+        let width = u32size(sizes.width);
+        let height = u32size(sizes.height);
+        let depth = u32size(sizes.depth);
 
         // Checked multiplication of width * height * depth.
         let Some(area) = width.checked_mul(height) else {

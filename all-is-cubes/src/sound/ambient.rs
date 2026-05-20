@@ -117,7 +117,7 @@ impl Exhaust for Band {
     }
 
     fn from_factory(index: Self::Factory) -> Self {
-        Self::from_index(index as usize)
+        Self::from_index(usize::from(index))
     }
 }
 

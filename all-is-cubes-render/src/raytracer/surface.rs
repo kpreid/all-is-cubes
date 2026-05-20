@@ -307,7 +307,7 @@ where
             });
         }
 
-        let tb: &TracingBlock<D> = &self.blocks[cube_data.block_index as usize];
+        let tb: &TracingBlock<D> = &self.blocks[usize::from(cube_data.block_index)];
         Some(match tb.voxels.single_voxel() {
             Some(Evoxel {
                 color, emission, ..
