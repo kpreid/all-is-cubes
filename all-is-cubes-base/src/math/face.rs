@@ -174,6 +174,54 @@ impl Face {
         })
     }
 
+    /// Returns the [`Face`] of `inside` which also touches `outside`.
+    ///
+    /// This is equivalent to `Face::try_from(outside - inside)`, except that it cannot overflow
+    /// and returns an error reporting both cubes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if they are not adjacent. (Being equal counts as not adjacent.)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Face, Cube};
+    ///
+    /// let face = Face::from_adjacency(Cube::new(1, 2, 3), Cube::new(1, 3, 3))?;
+    /// assert_eq!(face, Face::PY);
+    /// # Ok::<(), all_is_cubes::math::NotAdjacent>(())
+    /// ```
+    #[allow(clippy::missing_inline_in_public_items, reason = "unsure")]
+    pub fn from_adjacency(inside: Cube, outside: Cube) -> Result<Self, NotAdjacent> {
+        // Determine the axis, or error if the relationship is not axis-aligned.
+        // Also determine which two `Result<Face, _>`s we might return.
+        let (inside_coord, outside_coord, pos_result, neg_result) = match (
+            inside.x == outside.x,
+            inside.y == outside.y,
+            inside.z == outside.z,
+        ) {
+            (false, true, true) => (inside.x, outside.x, Ok(Face::PX), Ok(Face::NX)),
+            (true, false, true) => (inside.y, outside.y, Ok(Face::PY), Ok(Face::NY)),
+            (true, true, false) => (inside.z, outside.z, Ok(Face::PZ), Ok(Face::NZ)),
+            _ => {
+                core::hint::cold_path();
+                return Err(NotAdjacent { inside, outside });
+            }
+        };
+
+        // Check that the distance on that axis is exactly 1.
+        match outside_coord.saturating_sub(inside_coord) {
+            1 => pos_result,
+            -1 => neg_result,
+            _ => {
+                core::hint::cold_path();
+                Err(NotAdjacent { inside, outside })
+            }
+        }
+    }
+
     /// Returns which axis this face's normal vector is parallel to.
     #[inline]
     #[must_use]
@@ -697,6 +745,8 @@ impl Face7 {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 impl ops::Neg for Face {
     type Output = Self;
     #[inline]
@@ -805,6 +855,18 @@ impl TryFrom<GridVector> for Face7 {
 #[displaydoc("Face7::Within does not have a direction or axis")]
 #[expect(clippy::exhaustive_structs)]
 pub struct Faceless;
+
+// -------------------------------------------------------------------------------------------------
+
+/// Error from [`Face::from_adjacency()`] when the two cubes are not adjacent.
+#[derive(Clone, Copy, Debug, displaydoc::Display)]
+#[displaydoc("{outside:?} is not adjacent to {inside:?}")] // TODO: non-Debug formatting
+pub struct NotAdjacent {
+    inside: Cube,
+    outside: Cube,
+}
+
+impl core::error::Error for NotAdjacent {}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -1308,13 +1370,13 @@ impl lines::Wireframe for CubeFace {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::MultiFailure;
-
     use super::*;
+    use crate::util::MultiFailure;
     use alloc::string::String;
     use alloc::vec::Vec;
     use exhaust::Exhaust;
     use pretty_assertions::assert_eq;
+    use std::string::ToString as _;
 
     #[test]
     fn from_snapped_vector_roundtrip() {
@@ -1349,6 +1411,21 @@ mod tests {
                 assert_eq!(face, Face::from_snapped_vector(vector), "{comment}, {vector:?}");
             });
         }
+    }
+
+    #[test]
+    fn from_adjacency_error() {
+        let error = Face::from_adjacency(Cube::new(1, 2, 3), Cube::new(1, 2, 100)).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "(+1, +2, +100) is not adjacent to (+1, +2, +3)"
+        );
+    }
+
+    #[test]
+    fn from_adjacency_non_overflow() {
+        Face::from_adjacency(Cube::new(i32::MAX, 0, 0), Cube::new(i32::MIN, 0, 0)).unwrap_err();
+        Face::from_adjacency(Cube::new(i32::MIN, 0, 0), Cube::new(i32::MAX, 0, 0)).unwrap_err();
     }
 
     #[test]

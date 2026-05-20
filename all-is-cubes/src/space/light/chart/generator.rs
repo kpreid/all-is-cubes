@@ -114,7 +114,11 @@ impl RayTreeNode {
     pub fn insert(&mut self, tail: &[Step], weight: FaceMap<Weight>) {
         self.weight += weight;
         if let &[Step { relative_cube, .. }, ref tail @ ..] = tail {
-            let direction = Face::try_from((relative_cube - self.relative_cube).to_i32()).unwrap();
+            let direction = Face::from_adjacency(
+                self.relative_cube.map(i32::from).into(),
+                relative_cube.map(i32::from).into(),
+            )
+            .unwrap();
             self.children[direction]
                 .get_or_insert_with(|| {
                     Box::new(RayTreeNode {

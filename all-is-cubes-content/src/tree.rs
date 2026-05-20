@@ -201,7 +201,7 @@ pub(crate) fn make_tree(
             },
         ) {
             for &[rootward, leafward] in path.array_windows() {
-                let face = Face::try_from(leafward - rootward).unwrap();
+                let face = Face::from_adjacency(rootward, leafward).unwrap();
                 // TODO: cleverer algorithm (at least don't overwrite)
                 *graph.edge_mut(rootward, face).unwrap() = Some(TreeGrowth::Sapling);
 

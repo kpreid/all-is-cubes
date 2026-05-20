@@ -88,9 +88,9 @@ impl Kit {
         path: impl IntoIterator<Item = Cube>,
     ) -> impl Iterator<Item = (Cube, &Block)> {
         path.into_iter().tuple_windows().map(|(cube_behind, cube_here, cube_ahead)| {
-            let face_behind = Face::try_from(cube_behind - cube_here)
+            let face_behind = Face::from_adjacency(cube_here, cube_behind)
                 .expect("path must consist of adjacent cubes");
-            let face_ahead = Face::try_from(cube_ahead - cube_here)
+            let face_ahead = Face::from_adjacency(cube_here, cube_ahead)
                 .expect("path must consist of adjacent cubes");
             (cube_here, &self.0[&(face_behind, face_ahead)])
         })

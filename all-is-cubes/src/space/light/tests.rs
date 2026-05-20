@@ -92,7 +92,7 @@ fn out_of_bounds_light_is_sky(#[values(0.0, 0.5, 1.0)] opacity: f32) {
             space.get_lighting(neighboring_cube),
             // TODO: This should also be NO_RAYS in the case where it would be NO_RAYS inside the
             // space, that is, when the adjacent cube inside the space is transparent.
-            if let Ok(face) = Face::try_from(neighboring_cube.lower_bounds().to_vector()) {
+            if let Ok(face) = Face::from_adjacency(Cube::ORIGIN, neighboring_cube) {
                 space.physics().sky.for_blocks().in_direction(face)
             } else {
                 PackedLight::NO_RAYS
