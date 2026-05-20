@@ -16,6 +16,8 @@ use crate::math::{
     GridVector, Gridgid, PositiveSign, Zero, lines,
 };
 
+// -------------------------------------------------------------------------------------------------
+
 /// Identifies a face of a cube, or an orthogonal direction, or a normal vector.
 ///
 /// <figure style='text-align:center'>
@@ -115,6 +117,8 @@ pub enum Face7 {
     /// Positive Z; the face whose normal vector is `(0, 0, 1)`.
     PZ,
 }
+
+// -------------------------------------------------------------------------------------------------
 
 impl Face {
     /// All the values of [`Face`].
@@ -802,6 +806,8 @@ impl TryFrom<GridVector> for Face7 {
 #[expect(clippy::exhaustive_structs)]
 pub struct Faceless;
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(feature = "rerun")]
 impl From<Face> for re_sdk_types::view_coordinates::SignedAxis3 {
     #[inline]
@@ -835,6 +841,8 @@ impl From<Face> for re_sdk_types::view_coordinates::SignedAxis3 {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Container for values keyed by [`Face`]s. Always holds exactly six elements.
 ///
@@ -1212,7 +1220,10 @@ impl<V> IntoIterator for FaceMap<V> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// The combination of a [`Cube`] and [`Face7`] identifying one face of it or the interior.
+///
 /// This pattern appears in cursor selection and collision detection.
 #[derive(Clone, Copy, Hash, Eq, PartialEq)]
 #[expect(clippy::exhaustive_structs)]
@@ -1292,6 +1303,8 @@ impl lines::Wireframe for CubeFace {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
