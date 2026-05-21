@@ -223,7 +223,10 @@ pub struct GlyphInfo {
     data_offset: usize,
 
     /// Bounding box which this glyph occupies when drawn by [`Glyphs::get()`].
-    bounding_box_including_outline: Box2D<u8, InGlyph>,
+    ///
+    /// This is stored in signed coordinates because outlines extend in the negative direction
+    /// whenever they touch the low (top and left) edges of the `InGlyph` coordinate system.
+    bounding_box_including_outline: Box2D<i16, InGlyph>,
 }
 
 /// [`euclid`] coordinate system type for coordinates within the glyph images stored in
@@ -293,7 +296,10 @@ impl Glyphs {
             // Find bounding box of set pixels, expanded to account for outlining (1 pixel each
             // side) and for the width of the pixel (1 pixel down-right).
             // This is the bounding box of the data that will be actually stored.
-            let storage_bounding_box = Box2D::from_points(iter_glyph_image())
+            //
+            // Note that while the coordinate system type of this box is `InGlyph`, it is actually
+            // offset by the outline width from that.
+            let storage_bounding_box: Box2D<u8, InGlyph> = Box2D::from_points(iter_glyph_image())
                 .outer_box(euclid::SideOffsets2D::new(0, 3, 3, 0));
 
             let byte_size_of_glyph =
@@ -319,7 +325,9 @@ impl Glyphs {
 
             let info = GlyphInfo {
                 data_offset: offset_of_glyph_in_output,
-                bounding_box_including_outline: storage_bounding_box,
+                bounding_box_including_outline: storage_bounding_box
+                    .cast::<i16>()
+                    .translate(vec2(-1, -1)),
             };
             lookup.push(info);
 
@@ -358,36 +366,36 @@ impl Glyphs {
         // this slice includes extra pixels beyond this glyph ones, but those are not used
         let this_glyph_pixels = &self.pixels[info.data_offset..];
 
+        let translation_to_stored: Translation2D<i32, InGlyph, InStoredGlyph> = Translation2D::from(
+            -info.bounding_box_including_outline.min.to_vector().cast::<i32>().cast_unit(),
+        );
+        let storage_row_width = info.bounding_box_including_outline.width() as usize;
+
         iproduct!(
-            0..info.bounding_box_including_outline.height(),
-            0..info.bounding_box_including_outline.width(),
+            info.bounding_box_including_outline.y_range(),
+            info.bounding_box_including_outline.x_range(),
         )
-        .map(move |(y, x)| point2(x, y))
-        .filter_map(
-            move |position_in_stored_glyph: Point2D<u8, InStoredGlyph>| {
-                let pixel_index = usize::from(position_in_stored_glyph.y)
-                    * usize::from(info.bounding_box_including_outline.width())
-                    + usize::from(position_in_stored_glyph.x);
+        .map(move |(y, x)| point2(x, y).map(GridCoordinate::from))
+        .filter_map(move |position_in_glyph: Point2D<GridCoordinate, InGlyph>| {
+            let position_in_stored_glyph: Point2D<usize, InStoredGlyph> =
+                translation_to_stored.transform_point(position_in_glyph).cast::<usize>();
 
-                let byte_index = pixel_index / u32size(PIXELS_PER_BYTE);
-                let shift = (pixel_index % u32size(PIXELS_PER_BYTE)) * 2;
+            let pixel_index =
+                position_in_stored_glyph.y * storage_row_width + position_in_stored_glyph.x;
 
-                let byte_value = *this_glyph_pixels.get(byte_index)?;
-                let bit_value = (byte_value >> shift) & PIXEL_MASK;
+            let byte_index = pixel_index / u32size(PIXELS_PER_BYTE);
+            let shift = (pixel_index % u32size(PIXELS_PER_BYTE)) * 2;
 
-                // offset of -1 accounts for the thickness of the outline area
-                let position_in_glyph: Point2D<GridCoordinate, InGlyph> =
-                    position_in_stored_glyph.map(i32::from).cast_unit()
-                        + info.bounding_box_including_outline.min.to_vector().map(i32::from)
-                        - vec2(1, 1);
-                match bit_value {
-                    0b00 => None,
-                    0b01 => Some((position_in_glyph, Value::Outline)),
-                    0b11 => Some((position_in_glyph, Value::Foreground)),
-                    _ => unreachable!(),
-                }
-            },
-        )
+            let byte_value = *this_glyph_pixels.get(byte_index)?;
+            let bit_value = (byte_value >> shift) & PIXEL_MASK;
+
+            match bit_value {
+                0b00 => None,
+                0b01 => Some((position_in_glyph, Value::Outline)),
+                0b11 => Some((position_in_glyph, Value::Foreground)),
+                _ => unreachable!(),
+            }
+        })
     }
 }
 
