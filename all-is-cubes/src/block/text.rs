@@ -32,7 +32,7 @@ use font::FontDecl;
 pub use font::{Font, Value};
 
 mod layout;
-use layout::{Layout, compute_layout};
+use layout::{Layout, LayoutHeader, compute_layout};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -169,7 +169,7 @@ impl Text {
     /// This box is in the same units as [`Self::layout_bounds()`] but reflects the actual text
     /// layout rather than the configuration.
     pub fn bounding_voxels(&self) -> GridAab {
-        self.get_or_init_layout().bounding_box
+        self.get_or_init_layout().header().bounding_box
     }
     /// Returns the bounding box of the text, in blocks — the set of [`Primitive::Text`] offsets
     /// that will render all of it.
@@ -239,11 +239,13 @@ impl Text {
             return Ok(block::AIR_EVALUATED_MIN); // placeholder value
         }
 
-        let &Layout {
-            bounding_box: text_aab,
-            glyphs: ref text_glyphs,
-            z: layout_z,
-        } = self.get_or_init_layout();
+        let (
+            &LayoutHeader {
+                bounding_box: text_aab,
+                z: layout_z,
+            },
+            text_glyphs,
+        ) = self.get_or_init_layout().parts();
 
         // Apply `block_offset` to the result of the layout.
         // TODO: handle overflow
@@ -323,11 +325,13 @@ impl Text {
     /// general API.
     #[doc(hidden)]
     pub fn draw_voxels_to_transaction(&self, txn: &mut SpaceTransaction, transform: Gridgid) {
-        let &Layout {
-            bounding_box: _,
-            ref glyphs,
-            z: layout_z,
-        } = self.get_or_init_layout();
+        let (
+            &LayoutHeader {
+                bounding_box: _,
+                z: layout_z,
+            },
+            glyphs,
+        ) = self.get_or_init_layout().parts();
 
         let decl = self.data.font.font_decl();
         let font_glyphs = decl.glyphs();

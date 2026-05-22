@@ -48,7 +48,7 @@ fn size_of_block_is_pointerish() {
 fn size_of_primitive() {
     let size = size_of::<Primitive>();
     assert!(
-        size <= 144,
+        size <= 104, // on 64-bit architectures
         "size_of::<Primitive>() = {size} unexpectedly large"
     );
 }

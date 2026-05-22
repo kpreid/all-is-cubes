@@ -129,6 +129,7 @@ bitflags = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 derive_more = { workspace = true } # features specified in workspace
 displaydoc = { workspace = true }
+erasable = { workspace = true }
 # mint feature to guarantee that our callers can use mint types
 # libm feature to guarantee compilability and compatibility with no_std
 euclid = { workspace = true, default-features = false, features = ["libm", "mint"] }
@@ -160,6 +161,7 @@ rustc-hash = { workspace = true }
 # rc feature needed because we are [de]serializing `Arc`s
 # alloc feature needed for #[serde(flatten)] — https://github.com/serde-rs/serde/issues/1935
 serde = { workspace = true, optional = true, features = ["alloc", "derive", "rc"] }
+slice-dst = { workspace = true }
 visibility = { workspace = true, optional = true }
 yield-progress = { workspace = true }
 

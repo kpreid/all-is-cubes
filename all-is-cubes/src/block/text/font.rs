@@ -121,7 +121,7 @@ impl Font {
                 z: text::PositioningZ::Back,
             },
         );
-        for glyph in layout.glyphs.iter() {
+        for glyph in layout.glyphs() {
             // TODO: change the output convention so that we do not have to flip coords here?
             let translation: Translation2D<i32, InGlyph, euclid::UnknownUnit> = Translation2D::from(
                 glyph.position.to_vector().cast_unit().component_mul(vec2(1, -1)),
