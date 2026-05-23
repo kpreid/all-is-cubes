@@ -185,12 +185,14 @@ pub(crate) fn compute_layout(
                 continue;
             }
 
-            // TODO: we should use tight bounding boxes around each glyph, so the text bounding box
-            // is tight, but we currently don't have those to start with.
-
             // Advance cursor to the right edge of the glyph.
             // This will become more complex when we have proportional fonts and kerning.
             cursor_x = cursor_x.saturating_add(character_size_g.width);
+
+            if font_glyphs.rendering_bounding_box(glyph_index, outline).is_empty() {
+                // If the glyph doesn’t actually draw anything, then it does not need to be stored.
+                continue;
+            }
 
             glyphs.push(PositionedGlyph {
                 glyph_index,

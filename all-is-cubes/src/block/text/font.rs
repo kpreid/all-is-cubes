@@ -293,14 +293,22 @@ impl Glyphs {
                     })
             };
 
-            // Find bounding box of set pixels, expanded to account for outlining (1 pixel each
-            // side) and for the width of the pixel (1 pixel down-right).
-            // This is the bounding box of the data that will be actually stored.
+            // Find bounding box of set pixels (including outline).
+            // This is the bounding box of the data that will be actually stored for later drawing.
             //
             // Note that while the coordinate system type of this box is `InGlyph`, it is actually
-            // offset by the outline width from that.
-            let storage_bounding_box: Box2D<u8, InGlyph> = Box2D::from_points(iter_glyph_image())
-                .outer_box(euclid::SideOffsets2D::new(0, 3, 3, 0));
+            // offset by the outline width from that; we’ll fix that when storing it.
+            let storage_bounding_box: Box2D<u8, InGlyph> = {
+                let mut nonempty = false;
+                let base_box = Box2D::from_points(iter_glyph_image().inspect(|_| nonempty = true));
+                if nonempty {
+                    // Expanded to account for outlining (1 pixel each side)
+                    // and for the width of the pixels themselves (1 pixel down-right).
+                    base_box.outer_box(euclid::SideOffsets2D::new(0, 3, 3, 0))
+                } else {
+                    Box2D::zero()
+                }
+            };
 
             let byte_size_of_glyph =
                 u32size(storage_bounding_box.to_u32().area().div_ceil(PIXELS_PER_BYTE));
@@ -364,7 +372,7 @@ impl Glyphs {
         outline: bool,
     ) -> Box2D<GridCoordinate, InGlyph> {
         let bbox = self.lookup[glyph_index].bounding_box_including_outline.cast();
-        if outline {
+        if outline || bbox.is_empty() {
             bbox
         } else {
             // Subtract the outline.
