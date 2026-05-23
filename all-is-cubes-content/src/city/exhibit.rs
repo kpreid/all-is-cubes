@@ -25,6 +25,7 @@ pub(crate) struct Context<'a> {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Placement {
     Surface,
+    SurfaceWithBackWall,
     Underground,
 }
 
@@ -32,6 +33,7 @@ impl Placement {
     pub(crate) fn floor(self) -> GridCoordinate {
         match self {
             Placement::Surface => CityPlanner::SURFACE_Y,
+            Placement::SurfaceWithBackWall => CityPlanner::SURFACE_Y,
             Placement::Underground => CityPlanner::UNDERGROUND_FLOOR_Y,
         }
     }

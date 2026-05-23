@@ -4,7 +4,7 @@ use super::prelude::*;
 #[exhibit(
     name: "Primitive::Text",
     subtitle: "",
-    placement: Placement::Surface,
+    placement: Placement::SurfaceWithBackWall,
 )]
 fn TEXT(_: Context<'_>) {
     use all_is_cubes::block::text;

@@ -505,7 +505,7 @@ fn place_one_exhibit(
     // Amount by which the exhibit's own size is expanded to form walls and empty space
     // for displaying it and allowing players to move around it.
     let enclosure_thickness = match exhibit.placement {
-        Placement::Surface => FaceMap::splat(1),
+        Placement::Surface | Placement::SurfaceWithBackWall => FaceMap::splat(1),
         // Underground exhibits get no enclosure; they are expected to play nicely with being
         // buried in stone except for the entranceway.
         Placement::Underground => FaceMap::splat(0),
@@ -524,6 +524,7 @@ fn place_one_exhibit(
     };
     let plot = exhibit_footprint.transform(plot_transform).unwrap();
     let enclosure_at_plot = enclosure_footprint.transform(plot_transform).unwrap();
+    let front_face = plot_transform.rotation.transform(Face::PZ);
 
     // Prepare exhibit info content
     let info_voxels_widget: vui::WidgetTree = {
@@ -547,7 +548,7 @@ fn place_one_exhibit(
             direction: Face::PZ,
             children: vec![
                 match exhibit.placement {
-                    Placement::Surface => {
+                    Placement::Surface | Placement::SurfaceWithBackWall => {
                         vui::leaf_widget(widgets::Frame::with_block(demo_blocks[Signboard].clone()))
                     }
                     Placement::Underground => vui::LayoutTree::empty(),
@@ -565,25 +566,34 @@ fn place_one_exhibit(
     space.mutate(universe.read_ticket(), |m| {
         // Create enclosure, with a block replacing all ground blocks 1 block around,
         // and everything else cleared
-        let enclosure_lower = GridAab::from_lower_upper(
-            enclosure_at_plot.lower_bounds(),
+        let enclosure_upper = GridAab::from_lower_upper(
             [
-                enclosure_at_plot.upper_bounds().x,
+                enclosure_at_plot.lower_bounds().x,
                 // max()ing handles the case where the plot is floating but should still
                 // have enclosure floor
                 exhibit.placement.floor().max(plot.lower_bounds().y),
-                enclosure_at_plot.upper_bounds().z,
+                enclosure_at_plot.lower_bounds().z,
             ],
-        );
-        m.fill_uniform(enclosure_at_plot, &AIR)?;
-        m.fill_uniform(enclosure_lower, &demo_blocks[ExhibitBackground])?;
+            enclosure_at_plot.upper_bounds(),
+        )
+        .shrink(FaceMap::splat(0).with(
+            front_face.opposite(),
+            match exhibit.placement {
+                Placement::Surface => 0,
+                // if back wall requested, don't erase it
+                Placement::SurfaceWithBackWall => 1,
+                Placement::Underground => 0,
+            },
+        ))
+        .unwrap();
+        m.fill_uniform(enclosure_at_plot, &demo_blocks[ExhibitBackground])?;
+        m.fill_uniform(enclosure_upper, &AIR)?;
 
         // Cut an "entranceway" into the curb and grass, or corridor wall underground
         let entranceway_height = 2; // TODO: let exhibit customize
         {
-            let front_face = plot_transform.rotation.transform(Face::PZ);
             // Compute the surface that needs to be clear for walking
-            let entrance_plane = enclosure_lower
+            let entrance_plane = enclosure_upper
                 .shrink(FaceMap {
                     // don't alter y
                     ny: 0,
@@ -591,7 +601,7 @@ fn place_one_exhibit(
                     ..enclosure_thickness
                 })
                 .unwrap()
-                .abut(Face::PY, 0)
+                .abut(Face::NY, 0)
                 .unwrap()
                 .abut(front_face, enclosure_thickness.pz.cast_signed()) // re-add enclosure bounds
                 .unwrap()
@@ -624,7 +634,7 @@ fn place_one_exhibit(
                 .unwrap();
 
             let sign_position_in_plot_coordinates = match exhibit.placement {
-                Placement::Surface => GridVector::new(
+                Placement::Surface | Placement::SurfaceWithBackWall => GridVector::new(
                     // extending right from left edge
                     enclosure_footprint.lower_bounds().x,
                     // at ground level

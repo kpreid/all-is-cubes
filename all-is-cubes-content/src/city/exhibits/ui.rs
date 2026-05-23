@@ -10,7 +10,7 @@ use super::prelude::*;
     name: "UI Blocks",
     subtitle:
         "Blocks from the UI system (inactive)",
-    placement: Placement::Surface,
+    placement: Placement::SurfaceWithBackWall,
 )]
 fn UI_BLOCKS(ctx: Context<'_>) {
     // TODO: This was designed for a render test and is still shaped for that rather than
@@ -79,7 +79,7 @@ fn UI_BLOCKS(ctx: Context<'_>) {
 #[exhibit(
     name: "UI: Progress Bar",
     subtitle: "",
-    placement: Placement::Surface,
+    placement: Placement::SurfaceWithBackWall,
 )]
 fn UI_PROGRESS_BAR(ctx: Context<'_>) {
     let pb = |fraction: f64| -> vui::WidgetTree {
