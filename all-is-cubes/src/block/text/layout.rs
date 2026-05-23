@@ -282,7 +282,7 @@ pub(crate) fn compute_layout(
 }
 
 /// Y flip and apply translation
-fn glyph_bounding_box_to_3d(
+pub(in crate::block::text) fn glyph_bounding_box_to_3d(
     bbox: Box2D<GridCoordinate, InGlyph>,
     position_of_glyph_origin: GridPoint,
     outline: bool,

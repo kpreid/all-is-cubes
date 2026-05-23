@@ -287,21 +287,24 @@ impl Text {
         {
             Some(bounds_in_this_block) => {
                 // Evaluate blocks making up the brush.
-                let brush: Brush<Evoxel> = {
+                let (brush, outlined): (Brush<Evoxel>, bool) = {
                     let _recursion_scope = block::Budget::recurse(&filter.budget)?;
                     let evaluated_foreground =
                         self.data.foreground.evaluate_to_evoxel_internal(filter)?;
                     match self.data.outline {
-                        Some(ref block) => Brush::Outline {
-                            foreground: evaluated_foreground,
-                            outline: block.evaluate_to_evoxel_internal(filter)?,
-                        },
-                        None => Brush::Plain(evaluated_foreground),
+                        Some(ref block) => (
+                            Brush::Outline {
+                                foreground: evaluated_foreground,
+                                outline: block.evaluate_to_evoxel_internal(filter)?,
+                            },
+                            true,
+                        ),
+                        None => (Brush::Plain(evaluated_foreground), false),
                     }
                 };
 
                 let background = if self.data.debug {
-                    DEBUG_TEXT_BOUNDS_VOXEL
+                    DEBUG_TEXT_RENDERING_BOUNDS_VOXEL
                 } else {
                     Evoxel::AIR
                 };
@@ -314,6 +317,7 @@ impl Text {
                 for glyph in text_glyphs.iter() {
                     let glyph_position_3d: GridPoint =
                         glyph.position.extend(layout_z).cast_unit() + block_offset_in_voxels;
+
                     font_glyphs.get(glyph.glyph_index).for_each(|(position_in_glyph, value)| {
                         let position_in_block_of_voxel =
                             glyph_position_3d + vec3(position_in_glyph.x, -position_in_glyph.y, 0);
@@ -323,6 +327,27 @@ impl Text {
                             }
                         }
                     });
+
+                    if self.data.debug
+                        && let Some(glyph_bounds_intersecting_block) =
+                            layout::glyph_bounding_box_to_3d(
+                                font_glyphs.rendering_bounding_box(glyph.glyph_index, outlined),
+                                glyph_position_3d,
+                                outlined,
+                            )
+                            .intersection_cubes(bounds_in_this_block)
+                            .map(|aab| aab.interior_iter())
+                    {
+                        // Draw the glyph’s bounds.
+                        for cube in glyph_bounds_intersecting_block {
+                            let voxel = &mut voxels[cube];
+                            // conditional to not overwrite previously drawn glyphs which might
+                            // overlap
+                            if *voxel == DEBUG_TEXT_RENDERING_BOUNDS_VOXEL {
+                                *voxel = DEBUG_TEXT_GLYPH_BOUNDS_VOXEL
+                            }
+                        }
+                    }
                 }
 
                 Evoxels::from_many(self.data.resolution, voxels.map_container(Into::into))
@@ -831,14 +856,25 @@ mod serialization {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Voxel used in [`Text::debug`] mode when the block does not intersect the text’s rendering
+/// bounds.
 const DEBUG_NO_INTERSECTION_VOXEL: Evoxel = Evoxel {
-    color: rgba_const!(1.0, 0.0, 0.0, 0.5),
+    color: rgba_const!(1.0, 0.0, 0.0, 0.95),
     emission: Rgb::ZERO,
     selectable: true,
     collision: block::BlockCollision::None,
 };
-const DEBUG_TEXT_BOUNDS_VOXEL: Evoxel = Evoxel {
-    color: rgba_const!(0.0, 1.0, 0.0, 0.5),
+/// Voxel used in [`Text::debug`] mode in the volume which is within
+/// [`Text::rendering_bounding_voxels()`] but not any glyph.
+const DEBUG_TEXT_RENDERING_BOUNDS_VOXEL: Evoxel = Evoxel {
+    color: rgba_const!(0.25, 0.75, 0.25, 0.95),
+    emission: Rgb::ZERO,
+    selectable: true,
+    collision: block::BlockCollision::None,
+};
+/// Voxel used in [`Text::debug`] mode in the volume which is within the bounds of a glyph image.
+const DEBUG_TEXT_GLYPH_BOUNDS_VOXEL: Evoxel = Evoxel {
+    color: rgba_const!(1.0, 1.0, 0.0, 0.95),
     emission: Rgb::ZERO,
     selectable: true,
     collision: block::BlockCollision::None,
