@@ -229,6 +229,9 @@ pub(crate) fn compute_layout(
         //
         // Some glyphs’ positions could overflow, and we mark those for later removal instead of
         // adding them into the bounding box.
+        //
+        // TODO: the logical bounding box should not be based solely on glyphs but also the start
+        // and end positions, so that it includes leading and trailing whitespace.
         for glyph in &mut glyphs[first_glyph_of_line..] {
             let mut new_position = glyph.position;
             new_position.x = new_position.x.saturating_add(line_start_x);
