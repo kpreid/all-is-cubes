@@ -28,9 +28,8 @@ allow-comparison-to-zero = false
 # It'd be nice if these were per-package/per-crate, but clippy doesn't support that,
 # so we have to take the max.
 
-# Would like this to be much smaller, but I was getting a span-less and therefore uncontrollable warning.
-# TODO: find the cause and file a bug report.
-array-size-threshold = 8192
+# Largest array we have is currently in `all_is_cubes_mesh::block_mesh::Analysis::occupied_planes`.
+array-size-threshold = 3096
 # TODO: squeeze the UniverseTemplate futures a bit smaller — they're 4xxx bytes on 64-bit
 future-size-threshold = 6000
 pass-by-value-size-limit = 2048
