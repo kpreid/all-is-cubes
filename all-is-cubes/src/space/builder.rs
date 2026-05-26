@@ -432,6 +432,7 @@ mod tests {
     use crate::block;
     use crate::content::make_some_blocks;
     use crate::math::{Cube, Rgba};
+    use alloc::vec;
 
     use super::*;
 

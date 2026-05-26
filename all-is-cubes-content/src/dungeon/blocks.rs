@@ -1,5 +1,6 @@
 #![expect(unused_qualifications, reason = "derive macro false positive")]
 
+use alloc::vec;
 use core::f64::consts::TAU;
 
 /// Acts as polyfill for float methods

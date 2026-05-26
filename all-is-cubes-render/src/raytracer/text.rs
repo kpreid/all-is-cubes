@@ -207,7 +207,7 @@ mod tests {
             direction: vec3(1., 1., 1.),
         }
         .to_string();
-        print!("{output}");
+        std::print!("{output}");
         pretty_assertions::assert_eq!(
             output,
             "\
@@ -287,7 +287,7 @@ mod tests {
             direction: vec3(1., 1., 1.),
         }
         .to_string();
-        print!("{output}");
+        std::print!("{output}");
         pretty_assertions::assert_eq!(
             output,
             "\

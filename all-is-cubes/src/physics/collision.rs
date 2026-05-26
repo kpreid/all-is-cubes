@@ -544,6 +544,7 @@ mod tests {
     use crate::math::ps64;
     use crate::space::Space;
     use crate::universe::Universe;
+    use alloc::vec;
     use euclid::vec3;
     use rand::{RngExt as _, SeedableRng as _};
     use rand_distr::Distribution as _;

@@ -1,6 +1,8 @@
 //! Tests for the mesh system as a whole.
 
+use alloc::vec;
 use alloc::vec::Vec;
+use std::{dbg, println};
 
 use exhaust::Exhaust as _;
 use pretty_assertions::assert_eq;
@@ -331,8 +333,8 @@ fn space_mesh_equals_block_mesh() {
 
     let (tex, block_meshes, space_rendered) = mesh_blocks_and_space(&outer_space);
 
-    eprintln!("{block_meshes:#?}");
-    eprintln!("{space_rendered:#?}");
+    println!("{block_meshes:#?}");
+    println!("{space_rendered:#?}");
 
     // Compare the contents of the space mesh and block mesh.
     assert_eq!(
@@ -784,7 +786,7 @@ fn assert_is_using_volumetric_texturing_properly(
     assert!(mesh.texture_used.is_some());
 
     for (face, on_face, sub_mesh) in mesh.all_sub_meshes_keyed() {
-        eprintln!("Checking {face:?}...");
+        println!("Checking {face:?}...");
         if expect_transparent_only {
             assert_eq!(
                 sub_mesh.vertices.0.len(),

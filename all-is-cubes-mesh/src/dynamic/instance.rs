@@ -163,6 +163,7 @@ impl Eq for InstanceMap {}
 mod tests {
     use super::*;
     use all_is_cubes::math::GridCoordinate;
+    use alloc::vec;
 
     /// Convert [`InstanceCollector::iter()`] into a deterministic concrete structure.
     fn collect_collector(c: &InstanceCollector) -> Vec<(BlockIndex, Vec<[GridCoordinate; 3]>)> {

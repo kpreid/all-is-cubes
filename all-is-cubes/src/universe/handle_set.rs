@@ -104,9 +104,9 @@ impl Default for PartialUniverse<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::block;
-
     use super::*;
+    use crate::block;
+    use alloc::vec;
 
     #[test]
     fn handle_set_extract_type() {

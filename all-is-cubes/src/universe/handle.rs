@@ -1252,6 +1252,7 @@ mod tests {
     use crate::math::Rgba;
     use crate::space::Space;
     use crate::universe::{ReadTicket, UniverseTransaction};
+    use alloc::format;
     use alloc::string::ToString;
     use core::hash::BuildHasher as _;
     use pretty_assertions::assert_eq;

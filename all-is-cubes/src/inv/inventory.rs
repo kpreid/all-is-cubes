@@ -4,7 +4,7 @@ use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use core::fmt;
 use core::num::NonZeroU16;
 

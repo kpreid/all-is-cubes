@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use alloc::format;
 use alloc::string::ToString;
 use core::any::Any;
 use core::fmt;
@@ -1134,6 +1135,7 @@ mod tests {
     use crate::space::SpaceTransactionConflict;
     use crate::transaction::{ExecuteError, MapConflict};
     use indoc::indoc;
+    use std::println;
 
     #[test]
     fn has_default() {

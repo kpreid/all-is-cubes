@@ -187,6 +187,7 @@ mod tests {
     use crate::universe::Universe;
     use euclid::point3;
     use pretty_assertions::assert_eq;
+    use std::dbg;
 
     #[test]
     #[should_panic(expected = "Zoom offset (2, 1, 1) out of bounds for 2")]

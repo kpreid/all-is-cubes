@@ -1,6 +1,7 @@
 //! Details of block evaluation control flow, such as [`EvalFilter`], [`Budget`],
 //! and errors.
 
+use alloc::format;
 use core::cell::Cell;
 use core::fmt;
 

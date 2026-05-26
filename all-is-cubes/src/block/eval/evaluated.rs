@@ -640,6 +640,7 @@ mod tests {
     use super::*;
     use crate::math::{Cube, Vol};
     use crate::universe::{ReadTicket, Universe};
+    use alloc::format;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
 

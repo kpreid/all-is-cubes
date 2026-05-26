@@ -359,7 +359,7 @@ async fn lukewarm_reload(
         .args([
             "run",
             // find workspace manifest
-            &format!(
+            &alloc::format!(
                 "--manifest-path={}/../Cargo.toml",
                 env!("CARGO_MANIFEST_DIR")
             ),
@@ -475,6 +475,7 @@ async fn arbitrary_space(
 ) -> Result<Space, InGenError> {
     use all_is_cubes::euclid::Vector3D;
     use all_is_cubes::math::FaceMap;
+    use alloc::vec;
     use arbitrary::{Arbitrary, Error, Unstructured};
     use rand::{Rng as _, SeedableRng as _};
 
@@ -575,7 +576,7 @@ mod tests {
         // dimension.)
         // TODO: This test doesn't pass but it should.
         if false {
-            println!(
+            std::println!(
                 "too-big result: {:?}",
                 template
                     .clone()

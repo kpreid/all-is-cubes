@@ -812,6 +812,9 @@ mod tests {
     use all_is_cubes::euclid::point3;
     use all_is_cubes::math::{Aab, Cube, GridAab};
     use all_is_cubes::space::Space;
+    use alloc::format;
+    use alloc::vec;
+    use std::println;
 
     #[test]
     fn ordering_debug() {

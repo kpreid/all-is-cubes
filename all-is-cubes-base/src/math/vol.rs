@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use alloc::format;
 use alloc::sync::Arc;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
@@ -999,8 +1000,10 @@ fn unreachable_wrong_size<T>(error: VolLengthError) -> T {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
     use euclid::{point3, size3};
     use pretty_assertions::assert_eq;
+    use std::println;
 
     type VolBox<T> = Vol<Box<[T]>>;
 
@@ -1220,7 +1223,7 @@ mod tests {
             true
         }
 
-        eprintln!("Checking {:?}", vol.bounds());
+        println!("Checking {:?}", vol.bounds());
 
         // Check the elements are as expected
         for (cube, &value) in vol.iter() {

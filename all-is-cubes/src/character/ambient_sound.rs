@@ -3,6 +3,7 @@
 //! See also [`super::exposure`], which collects light instead of sound in a similar way.
 
 use alloc::boxed::Box;
+use alloc::vec;
 
 use bevy_ecs::prelude as ecs;
 use euclid::{Point3D, Vector3D};

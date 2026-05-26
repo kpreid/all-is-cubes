@@ -9,6 +9,7 @@
 //! solve bootstrapping needs.
 
 use alloc::boxed::Box;
+use alloc::format;
 use alloc::vec::Vec;
 use core::error::Error;
 use core::fmt;

@@ -373,6 +373,7 @@ mod tests {
     use euclid::{Transform3D, point3, vec3};
     use rand::{Rng, RngExt as _, SeedableRng as _};
     use rand_xoshiro::Xoshiro256Plus;
+    use std::dbg;
 
     const RANDOM_CASES: usize = if cfg!(miri) { 1 } else { 100 };
 

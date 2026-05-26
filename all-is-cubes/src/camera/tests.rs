@@ -2,6 +2,7 @@ use euclid::approxeq::ApproxEq;
 use euclid::{Point3D, Rotation3D, Size2D, point2, point3, vec2, vec3};
 use pretty_assertions::assert_eq;
 use rand::SeedableRng;
+use std::dbg;
 
 use crate::camera::{
     Camera, ExposureOption, FrustumPoints, GraphicsOptions, LightingOption, ViewTransform,

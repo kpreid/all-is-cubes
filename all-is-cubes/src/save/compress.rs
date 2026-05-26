@@ -1,4 +1,5 @@
 use alloc::borrow::{Cow, ToOwned};
+use alloc::format;
 use alloc::vec::Vec;
 use core::fmt;
 use std::io::{self, Write as _};
@@ -127,6 +128,7 @@ impl From<Leu16> for u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
     use serde_json::json;
 
     #[track_caller]

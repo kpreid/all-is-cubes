@@ -385,6 +385,7 @@ mod tests {
     use super::*;
     use all_is_cubes::math::GridSizeCoord;
     use alloc::vec::Vec;
+    use std::println;
 
     fn make_page_with_size(min_w: GridSizeCoord, min_h: GridSizeCoord) -> Page {
         Page {

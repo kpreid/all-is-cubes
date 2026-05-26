@@ -298,6 +298,7 @@ mod tests {
     use crate::math::{GridAab, Rgba};
     use crate::universe::Universe;
     use euclid::{Point3D, Vector3D, vec3};
+    use std::dbg;
 
     fn test_space<const N: usize>(universe: &mut Universe, blocks: [&Block; N]) -> Handle<Space> {
         let mut space =

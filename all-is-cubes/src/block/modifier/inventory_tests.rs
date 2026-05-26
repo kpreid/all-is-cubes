@@ -3,6 +3,8 @@
 //! The modifier implementation itself is in [`super::composite`] because the modifier’s own
 //! evaluation logic is about rendering icons which is done using the compositing tools.
 
+use alloc::vec;
+
 use pretty_assertions::assert_eq;
 
 use crate::arcstr::literal;

@@ -1,6 +1,8 @@
 //! Player-character stuff.
 
 use alloc::boxed::Box;
+use alloc::format;
+use alloc::vec;
 use core::fmt;
 
 use bevy_ecs::prelude as ecs;

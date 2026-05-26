@@ -23,12 +23,13 @@
 //! `all-is-cubes-content` into a public module of `all-is-cubes`, so that it can be used without
 //! bringing in the demo content.
 
-use all_is_cubes::euclid::vec3;
+use alloc::format;
 use alloc::vec::Vec;
 
 use all_is_cubes::block::{self, Resolution};
 use all_is_cubes::content::load_image::{LazyImage, block_from_image};
 use all_is_cubes::drawing::VoxelBrush;
+use all_is_cubes::euclid::vec3;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Rgba};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
@@ -313,6 +314,6 @@ mod tests {
         let error = config.load(txn).unwrap_err();
 
         // TODO: have a proper error type and assert what we got here?
-        println!("{}", ErrorChain(&error));
+        std::println!("{}", ErrorChain(&error));
     }
 }

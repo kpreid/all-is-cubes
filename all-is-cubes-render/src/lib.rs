@@ -20,12 +20,9 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 
-#[cfg(any(feature = "std", test))]
-#[cfg_attr(test, macro_use)]
-extern crate std;
-#[allow(unused_imports)]
-#[macro_use]
 extern crate alloc;
+#[cfg(any(feature = "std", test))]
+extern crate std;
 
 // -------------------------------------------------------------------------------------------------
 

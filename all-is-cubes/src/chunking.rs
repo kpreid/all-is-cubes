@@ -512,9 +512,11 @@ impl FusedIterator for AxisMirrorIter {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
     use pretty_assertions::assert_eq;
     use rand::{RngExt as _, SeedableRng as _};
     use std::collections::HashSet;
+    use std::{dbg, print, println};
 
     /// Test exact handling of a [`ChunkPos`] whose bounds exceed the possible [`Cube`] coordinates,
     /// but only partially.

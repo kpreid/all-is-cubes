@@ -510,6 +510,7 @@ impl BuildPrimitive for Voxels {
 #[cfg(test)]
 mod tests {
     use alloc::boxed::Box;
+    use alloc::vec;
     use euclid::{point3, vec3};
     use pretty_assertions::assert_eq;
 

@@ -1,3 +1,4 @@
+use alloc::vec;
 use core::fmt;
 
 use euclid::vec3;

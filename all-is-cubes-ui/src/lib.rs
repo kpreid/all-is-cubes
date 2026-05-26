@@ -34,7 +34,6 @@
 extern crate alloc;
 
 #[cfg(any(test, feature = "session"))]
-#[macro_use]
 extern crate std;
 
 // -------------------------------------------------------------------------------------------------

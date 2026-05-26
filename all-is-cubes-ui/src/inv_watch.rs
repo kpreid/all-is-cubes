@@ -244,6 +244,7 @@ mod tests {
     use all_is_cubes::space::Space;
     use all_is_cubes::universe::{Handle, Universe};
     use alloc::boxed::Box;
+    use alloc::vec;
 
     struct Tester {
         universe: Box<Universe>,

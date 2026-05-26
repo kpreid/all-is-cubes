@@ -156,6 +156,7 @@ mod tests {
     use crate::time;
     use crate::universe::Universe;
     use euclid::point3;
+    use std::println;
 
     /// [`compute_target_exposure`] is what actually determines the exposure under
     /// steady-state conditions, so test it in isolation with some examples, because
@@ -208,7 +209,7 @@ mod tests {
         for i in 0..100 {
             {
                 let exposure = &character.query::<State>(universe.read_ticket()).unwrap();
-                eprintln!(
+                println!(
                     "{i:3} {exp_log} {exp}",
                     exp_log = exposure.exposure_log,
                     exp = exposure.exposure(),
@@ -222,7 +223,7 @@ mod tests {
         let exposure = &character.query::<State>(universe.read_ticket()).unwrap();
 
         // Luminance sampling should match the scene we set up.
-        eprintln!("{:?}", exposure.luminance_samples);
+        println!("{:?}", exposure.luminance_samples);
         assert_eq!(exposure.luminance_average(), luminance);
 
         // Exposure produced by the stateful process should closely approach the value from

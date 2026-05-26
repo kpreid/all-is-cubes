@@ -1,6 +1,7 @@
 //! [`LightUpdateQueue`] and other types pertaining to the scheduling of light updates.
 
 use alloc::boxed::Box;
+use alloc::vec;
 use core::fmt;
 
 use crate::math::{Cube, GridAab, GridIter};

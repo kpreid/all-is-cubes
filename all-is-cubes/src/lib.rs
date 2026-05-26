@@ -153,11 +153,9 @@
     allow(private_interfaces, missing_docs, clippy::missing_panics_doc)
 )]
 
-#[cfg(any(feature = "std", test))]
-#[cfg_attr(test, macro_use)]
-extern crate std;
-#[macro_use]
 extern crate alloc;
+#[cfg(any(feature = "std", test))]
+extern crate std;
 
 #[doc(inline)]
 pub use all_is_cubes_base::raycast;

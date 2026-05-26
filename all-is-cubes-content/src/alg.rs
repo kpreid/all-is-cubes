@@ -377,6 +377,7 @@ mod tests {
     use Resolution::*;
     use all_is_cubes::math::Face7;
     use itertools::Itertools as _;
+    use alloc::vec;
 
     #[test]
     fn gradient_lookup_cases() {

@@ -330,6 +330,8 @@ fn evaluate_rotate(
 mod tests {
     use super::*;
     use crate::block;
+    use alloc::format;
+    use alloc::vec;
     use pretty_assertions::assert_eq;
 
     /// Track the size of the `Modifier` enum to make sure we don't accidentally make it bigger

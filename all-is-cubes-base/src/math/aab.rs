@@ -553,6 +553,7 @@ mod tests {
     use crate::math::lines::Wireframe as _;
     use crate::math::ps64;
     use alloc::vec::Vec;
+    use alloc::{format, vec};
     use euclid::point3;
 
     #[test]

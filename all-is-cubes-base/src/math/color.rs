@@ -1161,12 +1161,12 @@ static CONST_SRGB_LOOKUP_TABLE: &[f32; 256] = &[
 
 #[cfg(test)]
 mod tests {
-    use crate::math::{ps32, zo32};
-
     use super::*;
+    use crate::math::{ps32, zo32};
     use alloc::vec::Vec;
     use exhaust::Exhaust as _;
     use itertools::Itertools as _;
+    use std::{eprintln, format, print, println, vec};
 
     // TODO: Add more tests of the color not-NaN mechanisms in other cases than new().
 

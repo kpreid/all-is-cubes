@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec;
 use core::fmt;
 
 use all_is_cubes::block::text;

@@ -360,6 +360,7 @@ mod tests {
     use super::*;
     use crate::block::Resolution::*;
     use core::hash::{BuildHasher as _, Hasher};
+    use std::{dbg, println};
 
     #[test]
     fn cheap_eq_hash() {
@@ -401,7 +402,7 @@ mod tests {
         let mut checks = 0;
         for all1 @ (_index1, (class1, value1)) in samples.iter().enumerate() {
             for all2 @ (_index2, (class2, value2)) in samples.iter().enumerate() {
-                eprintln!("checking {value1:?} == {value2:?}");
+                println!("checking {value1:?} == {value2:?}");
 
                 let equal12 = value1.cheap_or_ptr_eq(value2);
                 let hash1 = cheap_hash_one(value1);

@@ -1164,6 +1164,7 @@ mod tests {
     use alloc::string::ToString as _;
     use euclid::{point3, size3};
     use indoc::indoc;
+    use std::{format, println};
 
     #[test]
     fn zero_is_valid() {

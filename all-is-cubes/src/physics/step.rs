@@ -453,6 +453,7 @@ pub(crate) fn step_one_body(
     {
         use crate::content::palette;
         use crate::math::ps64;
+        use alloc::{format, vec};
 
         // Log step info as text.
         rerun_destination.log(

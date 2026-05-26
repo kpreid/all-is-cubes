@@ -553,6 +553,8 @@ fn fmt_index_list<Ix: IndexInt>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::format;
+    use alloc::vec;
 
     #[test]
     fn debug_empty() {

@@ -508,8 +508,9 @@ pub(crate) fn sky_with_grass(sky_color: Rgb) -> Sky {
 mod tests {
     use super::*;
     use all_is_cubes::space::Space;
+    use alloc::vec;
+    use alloc::vec::Vec;
     use pretty_assertions::assert_eq;
-    use std::vec::Vec;
 
     // Tests the cooperation of [`fill_with_height_function()`] and
     // [`grass_covered_stone_terrain_function()`] to produce the correct surface height.

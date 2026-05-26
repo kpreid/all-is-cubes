@@ -1,8 +1,9 @@
 //! Dynamic add-ons to game objects; we might also have called them “components”.
 
 use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::format;
 use alloc::sync::{Arc, Weak};
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use core::any::{Any, TypeId};
 use core::fmt;
 use core::mem;

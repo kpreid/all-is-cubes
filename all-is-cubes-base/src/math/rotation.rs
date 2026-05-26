@@ -655,6 +655,7 @@ mod tests {
     use Face::*;
     use num_traits::One;
     use std::collections::HashSet;
+    use std::{print, println};
 
     #[test]
     fn identity() {

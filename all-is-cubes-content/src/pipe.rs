@@ -184,7 +184,7 @@ pub(crate) fn make_pipe_blocks(txn: &mut UniverseTransaction) -> (Block, Block) 
                 pipe_scale,
                 resolution,
                 // pipe slots overlap by half to allow a smoothish movement
-                vec![inv::IconRow::new(
+                [inv::IconRow::new(
                     0..pipe_slots,
                     point3(12, 12, 0),
                     vec3(0, 0, voxels_per_movement_step),
@@ -210,7 +210,7 @@ pub(crate) fn make_pipe_blocks(txn: &mut UniverseTransaction) -> (Block, Block) 
                 pipe_slots,
                 pipe_scale,
                 R32,
-                vec![
+                [
                     inv::IconRow::new(
                         0..(pipe_slots / 2),
                         point3(12, 12, 0),

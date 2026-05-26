@@ -13,11 +13,9 @@
 #![cfg_attr(not(feature = "std"), allow(clippy::arc_with_non_send_sync))]
 #![warn(clippy::missing_inline_in_public_items)]
 
-#[cfg(any(feature = "std", test))]
-#[cfg_attr(test, macro_use)]
-extern crate std;
-#[macro_use]
 extern crate alloc;
+#[cfg(any(feature = "std", test))]
+extern crate std;
 
 /// Do not use this module directly; its contents are re-exported from `all-is-cubes`.
 pub mod math;

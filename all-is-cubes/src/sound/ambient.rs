@@ -338,6 +338,7 @@ mod tests {
     use alloc::string::String;
     use alloc::vec::Vec;
     use core::fmt::Write as _;
+    use std::dbg;
 
     #[test]
     fn band_frequencies_in_documentation() {

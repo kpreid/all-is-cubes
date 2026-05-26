@@ -169,7 +169,9 @@ impl FusedIterator for GridIter {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
     use alloc::vec::Vec;
+    use std::println;
 
     #[test]
     fn zero_items() {

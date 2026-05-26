@@ -286,7 +286,7 @@ mod tests {
             .to_string();
 
             assert_eq!(image_updating.refmt(&Unquote), image_fresh.refmt(&Unquote));
-            print!("{image_updating}");
+            std::print!("{image_updating}");
             Ok(changed)
         }
     }

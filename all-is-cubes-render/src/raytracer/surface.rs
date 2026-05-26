@@ -540,7 +540,7 @@ mod tests {
     use all_is_cubes::space::Space;
     use all_is_cubes::universe::Universe;
     use pretty_assertions::assert_eq;
-    use std::vec::Vec;
+    use std::{vec, vec::Vec};
 
     type SurfaceIterR<'a> = SurfaceIter<'a, (), raycast::Raycaster>;
 

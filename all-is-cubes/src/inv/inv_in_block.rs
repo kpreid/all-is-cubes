@@ -307,6 +307,8 @@ fn checked_add_point_vector(p: GridPoint, v: GridVector) -> Option<GridPoint> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::format;
+    use alloc::vec;
     use euclid::{point3, vec3};
     use pretty_assertions::assert_eq;
 

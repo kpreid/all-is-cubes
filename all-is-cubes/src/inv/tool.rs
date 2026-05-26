@@ -1,6 +1,7 @@
 //! [`Tool`] and related.
 
 use alloc::borrow::Cow;
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use core::{fmt, hash};

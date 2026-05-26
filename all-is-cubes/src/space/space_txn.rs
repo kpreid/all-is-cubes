@@ -793,6 +793,7 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::inv::EphemeralOpaque;
     use crate::transaction::TransactionTester;
+    use alloc::vec;
     use core::sync::atomic::{AtomicU32, Ordering};
     use pretty_assertions::assert_eq;
 

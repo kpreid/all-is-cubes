@@ -890,6 +890,7 @@ mod impl_rotate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::format;
     use alloc::string::String;
 
     #[test]

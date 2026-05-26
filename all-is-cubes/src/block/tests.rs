@@ -1,6 +1,9 @@
 //! Tests for [`Block`] as a whole.
 //! Other submodules also have their own tests.
 
+use alloc::format;
+use alloc::vec;
+
 use pretty_assertions::assert_eq;
 
 use crate::block::{

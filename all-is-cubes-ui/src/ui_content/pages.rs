@@ -2,6 +2,7 @@
 
 use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec;
 
 use all_is_cubes::arcstr::{ArcStr, literal};
 use all_is_cubes::block::Resolution::*;

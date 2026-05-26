@@ -1,6 +1,8 @@
 //! A space with miscellaneous demonstrations/tests of functionality.
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
+use alloc::format;
+use alloc::vec;
 use alloc::{sync::Arc, vec::Vec};
 use core::iter;
 

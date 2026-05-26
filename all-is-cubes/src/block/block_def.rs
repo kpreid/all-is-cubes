@@ -858,6 +858,7 @@ mod tests {
     use crate::math::Rgba;
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
+    use std::println;
 
     /// Test [`BlockDef::evaluate()`] and [`Read::evaluate()`] being the same as
     /// [`Primitive::Indirect`].

@@ -1374,6 +1374,7 @@ mod tests {
     use crate::util::MultiFailure;
     use alloc::string::String;
     use alloc::vec::Vec;
+    use alloc::{format, vec};
     use exhaust::Exhaust;
     use pretty_assertions::assert_eq;
     use std::string::ToString as _;

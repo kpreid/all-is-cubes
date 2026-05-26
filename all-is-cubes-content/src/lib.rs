@@ -26,11 +26,9 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-#[cfg(any(test, feature = "std", feature = "lukewarm-reload"))]
-#[macro_use]
-extern crate std;
-#[macro_use]
 extern crate alloc;
+#[cfg(any(test, feature = "std", feature = "lukewarm-reload"))]
+extern crate std;
 
 mod alg;
 mod animation;

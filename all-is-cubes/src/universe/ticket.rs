@@ -480,6 +480,7 @@ impl fmt::Display for ReadTicketError {
 mod tests {
     use super::*;
     use alloc::boxed::Box;
+    use alloc::format;
     use core::array;
 
     #[test]

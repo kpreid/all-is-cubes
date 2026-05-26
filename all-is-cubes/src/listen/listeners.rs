@@ -60,6 +60,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::format;
 
     #[test]
     fn fn_debug() {

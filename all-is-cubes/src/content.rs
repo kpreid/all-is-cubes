@@ -3,7 +3,9 @@
 //! This module is private; the public interface to this stuff is the separate
 //! `all-is-cubes-content` crate.
 
+use alloc::format;
 use alloc::string::ToString;
+use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::arcstr::{ArcStr, literal};

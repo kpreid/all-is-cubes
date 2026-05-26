@@ -1,7 +1,9 @@
 #![expect(clippy::identity_op)]
 
 use alloc::boxed::Box;
+use alloc::vec;
 use alloc::vec::Vec;
+use std::println;
 use std::sync::Mutex;
 
 use all_is_cubes::arcstr;
@@ -341,7 +343,7 @@ fn did_not_finish_detection() {
     );
 
     {
-        eprintln!("--- timing out update");
+        println!("--- timing out update");
         let info = tester.csm.update(
             tester.universe.read_ticket(),
             &tester.camera,
@@ -363,7 +365,7 @@ fn did_not_finish_detection() {
     }
 
     {
-        eprintln!("--- normal update");
+        println!("--- normal update");
         // Now while we're at it, try finishing things and check that state too.
         let info = tester.update(dynamic::noop_render_data_updater);
         assert_eq!(

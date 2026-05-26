@@ -1,4 +1,6 @@
+use alloc::format;
 use alloc::vec::Vec;
+use std::{dbg, println};
 
 use all_is_cubes::euclid::point3;
 use all_is_cubes::math::{Face, GridPoint};
@@ -22,7 +24,7 @@ fn run(vertices: &[planar::Vertex]) -> Vec<[u8; 3]> {
     let mut triangulator = planar::Triangulator::new();
     let basis = test_basis();
 
-    eprintln!("Initial state: {triangulator:#?}");
+    println!("Initial state: {triangulator:#?}");
 
     let maybe_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         triangulator.triangulate(
@@ -48,7 +50,7 @@ fn run(vertices: &[planar::Vertex]) -> Vec<[u8; 3]> {
         )
     }));
 
-    eprintln!("Final state: {triangulator:#?}");
+    println!("Final state: {triangulator:#?}");
 
     println!(
         "\n{}\n",
@@ -65,7 +67,7 @@ fn run(vertices: &[planar::Vertex]) -> Vec<[u8; 3]> {
     );
 
     if let Err(payload) = maybe_panic {
-        eprintln!("Unwinding; triangles before panic: {actual_triangles:#?}");
+        println!("Unwinding; triangles before panic: {actual_triangles:#?}");
 
         std::panic::resume_unwind(payload);
     }

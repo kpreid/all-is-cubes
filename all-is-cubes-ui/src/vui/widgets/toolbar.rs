@@ -375,6 +375,7 @@ mod tests {
     use all_is_cubes::universe::{Universe, UniverseTransaction};
     use all_is_cubes::util::yield_progress_for_testing;
     use all_is_cubes::{inv, space, time};
+    use std::vec;
 
     /// Test that [`Toolbar`] will not panic if given inventory slot ranges exceeding the size of
     /// the inventory.

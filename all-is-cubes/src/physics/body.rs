@@ -548,7 +548,9 @@ mod tests {
     use super::*;
     use crate::math::ps64;
     use crate::transaction::{PredicateRes, TransactionTester};
+    use alloc::format;
     use euclid::{point3, vec3};
+    use std::println;
 
     fn test_body() -> Body {
         Body {

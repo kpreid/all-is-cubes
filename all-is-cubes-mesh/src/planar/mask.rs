@@ -173,7 +173,8 @@ impl ops::BitXorAssign for Mask {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::string::String;
+    use alloc::format;
+    use alloc::string::String;
 
     fn all_masks() -> impl Iterator<Item = Mask> {
         // We could have `Mask` implement `Exhaust` instead, but I can’t think of a reason why

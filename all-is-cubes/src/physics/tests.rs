@@ -1,6 +1,8 @@
 use alloc::boxed::Box;
+use alloc::vec;
 use itertools::Itertools;
 use std::collections::VecDeque;
+use std::{dbg, print, println};
 
 use bevy_ecs::prelude as ecs;
 use euclid::{Vector3D, point3, vec3};
@@ -225,7 +227,7 @@ fn falling_collision_partial_block() {
     }
 
     for t in 1..=1000 {
-        eprintln!("--- step {t}");
+        println!("--- step {t}");
         tester.step();
         assert!(
             (tester.body().position().y - 1.0).abs() < 1e-6,

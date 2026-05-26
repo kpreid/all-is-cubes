@@ -1510,6 +1510,7 @@ mod tests {
     use all_is_cubes::util::assert_send_sync;
     use core::sync::atomic::{AtomicUsize, Ordering};
     use futures_channel::oneshot;
+    use std::{eprintln, vec};
 
     fn advance_time(session: &mut Session) {
         session.frame_clock.advance_by(session.universe().clock().schedule().delta_t());

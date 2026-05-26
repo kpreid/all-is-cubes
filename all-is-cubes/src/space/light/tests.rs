@@ -1,5 +1,8 @@
 //! Tests for the behavior of light in a [`Space`].
 
+use alloc::vec;
+use std::dbg;
+
 use pretty_assertions::assert_eq;
 
 use super::{LightUpdatesInfo, PackedLight, Priority, data::LightStatus};

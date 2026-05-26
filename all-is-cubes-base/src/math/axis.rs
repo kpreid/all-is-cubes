@@ -182,6 +182,7 @@ mod impl_index_axis {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::format;
 
     #[test]
     fn axis_conversion() {

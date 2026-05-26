@@ -1,6 +1,7 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
+use alloc::format;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;

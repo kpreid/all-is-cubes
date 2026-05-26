@@ -3,10 +3,13 @@
 //! Note that some sub-modules have their own test modules.
 
 use alloc::boxed::Box;
+use alloc::format;
 use alloc::string::ToString;
 use alloc::sync::Arc;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::num::NonZeroU16;
+use std::println;
 
 use euclid::Vector3D;
 use indoc::indoc;

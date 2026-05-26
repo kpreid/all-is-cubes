@@ -7,6 +7,7 @@
 )]
 
 use alloc::sync::{Arc, Weak};
+use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::Cell;
 use core::fmt;
@@ -316,6 +317,8 @@ impl Palette {
     #[cfg(test)]
     #[track_caller]
     pub(crate) fn consistency_check(&self, contents: &[BlockIndex]) {
+        use alloc::format;
+
         let mut problems = Vec::new();
 
         let mut actual_counts: hashbrown::HashMap<BlockIndex, usize> = Default::default();

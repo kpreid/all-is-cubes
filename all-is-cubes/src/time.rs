@@ -355,6 +355,8 @@ pub(crate) mod schedule {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::format;
+    use alloc::vec;
     use alloc::vec::Vec;
 
     #[test]

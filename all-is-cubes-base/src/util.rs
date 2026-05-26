@@ -203,6 +203,7 @@ cfg_select! {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::format;
 
     fn _assert_executor_trait_is_object_safe(_: &dyn Executor) {}
 

@@ -614,6 +614,7 @@ mod serialize_infinity_as_none {
 mod tests {
     use super::*;
     use crate::math::{OpacityCategory, rgba_const, zo32};
+    use alloc::format;
     use pretty_assertions::assert_eq;
 
     #[test]

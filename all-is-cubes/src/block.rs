@@ -7,7 +7,7 @@
 use alloc::borrow::Cow;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use core::fmt;
 
 use crate::inv;

@@ -219,7 +219,9 @@ mod tests {
     use super::*;
     use crate::math::GridCoordinate;
     use crate::raycast::{Ray, Raycaster};
+    use alloc::vec;
     use alloc::vec::Vec;
+    use std::dbg;
 
     /// Run a comparison between [`Raycaster`] and [`AxisAlignedRaycaster`], and
     /// return the steps’ cubes. (There is no need to return the full [`RaycastStep`]

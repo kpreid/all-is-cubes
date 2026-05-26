@@ -114,6 +114,7 @@ impl fmt::Debug for MeshId {
 mod tests {
     use super::*;
     use alloc::string::ToString as _;
+    use alloc::vec;
 
     #[test]
     fn mesh_id_sort() {
