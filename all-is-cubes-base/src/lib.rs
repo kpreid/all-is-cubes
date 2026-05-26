@@ -20,7 +20,6 @@ extern crate std;
 extern crate alloc;
 
 /// Do not use this module directly; its contents are re-exported from `all-is-cubes`.
-#[macro_use]
 pub mod math;
 
 /// Do not use this module directly; its contents are re-exported from `all-is-cubes`.

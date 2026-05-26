@@ -15,7 +15,6 @@ mod aab;
 pub use aab::*;
 mod axis;
 pub use axis::*;
-#[macro_use]
 mod color;
 pub use color::*;
 mod coord;
