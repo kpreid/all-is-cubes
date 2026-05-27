@@ -956,7 +956,7 @@ impl<V> FaceMap<V> {
     #[doc(hidden)] // used by all-is-cubes-content
     pub fn symmetric([x, y, z]: [V; 3]) -> Self
     where
-        V: Default + Clone,
+        V: Clone,
     {
         Self {
             nx: x.clone(),
