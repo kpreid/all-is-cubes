@@ -5,6 +5,8 @@ use alloc::format;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
+use core::iter;
+use core::mem;
 use core::num::NonZeroU16;
 
 use exhaust::Exhaust;
@@ -25,8 +27,8 @@ use all_is_cubes::euclid::{Vector3D, point3};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Cube, Face, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord, GridVector,
-    Rgb, Rgb01, Rgba, ps32, rgb_const, rgba_const,
+    Cube, Face, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord,
+    GridVector, Rgb, Rgb01, Rgba, ps32, rgb_const, rgba_const,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::sound;
@@ -749,33 +751,72 @@ fn demo_blocks_generator(
                 )?
                 .build_txn(txn);
 
-                block::Composite::stack(
+                compose_block_from_faces(
                     Block::builder()
                         .color(rgba_const!(1.0, 0.0, 0.5, 1.0))
                         .display_name("Greebled")
                         .build(),
-                    Face::ALL
-                        .iter()
-                        .map(|face| carve_block.clone().rotate(face.rotation_from_nz()))
-                        .map(|carve_face_block| {
-                            block::Composite::new(carve_face_block, block::CompositeOperator::Out)
-                                .reversed()
-                        })
-                        .chain(
-                            Face::ALL
-                                .iter()
-                                .map(|face| image_block.clone().rotate(face.rotation_from_nz()))
-                                .map(|face_block| {
-                                    block::Composite::new(
-                                        face_block,
-                                        block::CompositeOperator::Over,
-                                    )
-                                }),
-                        ),
+                    FaceMap::splat(carve_block),
+                    FaceMap::splat(image_block),
+                    FaceMap::from_fn(Face::rotation_from_nz),
                 )
             }
         })
     }
+}
+
+/// Constructs a composite [`Block`] that has a block defining each of its faces.
+///
+/// We start with `interior_block`,
+/// then carve away everything `carve_blocks` touches
+/// (this can be used to make holes into the interior),
+/// and put `image_blocks` [Over][block::CompositeOperator::Over] each face.
+///
+/// Each face block is rotated according to the corresponding element of `rotations`.
+/// You can either have pre-rotated blocks and pass `FaceMap::splat(GridRotation::IDENTITY)`,
+/// or pass blocks in all the same orientation and rotations for them.
+//---
+// TODO: integrate this into the `load_block` system so it can be expressed as constant data
+// instead of a function call.
+#[inline(never)]
+pub(crate) fn compose_block_from_faces(
+    interior_block: Block,
+    mut carve_blocks: FaceMap<Block>,
+    mut image_blocks: FaceMap<Block>,
+    rotations: FaceMap<GridRotation>,
+) -> Block {
+    fn take(
+        blocks: &mut FaceMap<Block>,
+        face: Face,
+        rotation: GridRotation,
+        operator: block::CompositeOperator,
+    ) -> block::Composite {
+        let block = mem::replace(&mut blocks[face], AIR).rotate(rotation);
+        block::Composite::new(block, operator)
+    }
+
+    block::Composite::stack(
+        interior_block,
+        iter::chain(
+            Face::ALL.into_iter().map(|face| {
+                take(
+                    &mut carve_blocks,
+                    face,
+                    rotations[face],
+                    block::CompositeOperator::Out,
+                )
+                .reversed()
+            }),
+            Face::ALL.into_iter().map(|face| {
+                take(
+                    &mut image_blocks,
+                    face,
+                    rotations[face],
+                    block::CompositeOperator::Over,
+                )
+            }),
+        ),
+    )
 }
 
 #[cfg(test)]

@@ -100,60 +100,50 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
         rgb_const!(0.0, 0.0, 1.0),
         rgb_const!(1.0, 0.0, 1.0),
     ];
-    let surface_colors = [
-        rgb01!(1.0, 0.0, 0.0),
-        rgb01!(1.0, 1.0, 0.0),
-        rgb01!(0.0, 1.0, 0.0),
-        rgb01!(0.0, 1.0, 1.0),
-        rgb01!(0.0, 0.0, 1.0),
-        rgb01!(1.0, 0.0, 1.0),
-        rgb01!(0.25, 0.25, 0.25),
-        rgb01!(0.75, 0.75, 0.75),
-        rgb01!(1.0, 1.0, 1.0),
-    ];
 
     // Room wall block with test card
-    let wall_color_block = block::from_color!(0.5, 0.5, 0.5, 1.0);
-    let wall_resolution = R16;
-    let wall_resolution_g = GridCoordinate::from(wall_resolution);
-    let wall_block = {
-        let colors_as_blocks: Vec<Block> =
-            surface_colors.iter().copied().map(Block::from).collect();
-        let wall_block_space = Space::for_block(wall_resolution)
-            .read_ticket(ctx.universe.read_ticket())
-            .filled_with(wall_color_block.clone())
-            .build_and_mutate(|m| {
-                for rotation in Face::PY.clockwise().iterate() {
-                    let transform = rotation.to_positive_octant_transform(wall_resolution_g)
-                        * Gridgid::from_translation([4, 4, wall_resolution_g - 1]);
-
-                    for (i, swatch_block) in iter::zip(0i32.., colors_as_blocks.iter()) {
-                        m.fill_uniform(
-                            GridAab::from_lower_size(
-                                [i.rem_euclid(3) * 3, i.div_euclid(3) * 3, 0],
-                                [2, 2, 1],
-                            )
-                            .transform(transform)
-                            .unwrap(),
-                            swatch_block,
-                        )?;
-                    }
-                }
-                Ok(())
-            })?;
-
-        Block::builder()
-            .display_name("Color room wall")
-            .voxels_handle(wall_resolution, txn.insert_anonymous(wall_block_space))
-            .build()
-    };
+    const WALL_COLOR: Rgba = rgba_const!(0.5, 0.5, 0.5, 1.0); // TODO: take from image
+    let wall_color_block = block::from_color!(WALL_COLOR);
+    const WALL_RESOLUTION: Resolution = R16; // TODO: take from from image
+    let color_card = const {
+        lb::Block {
+            primitive: lb::PrimitiveOrSuch::Image {
+                image: include_image!("color-card.png"),
+                rotation: GridRotation::RXyZ,
+                extrusion: &[WALL_RESOLUTION.to_grid() - 1..WALL_RESOLUTION.to_grid()],
+                visible: lb::Vox::DEFAULT,
+                invisible: lb::Vox::DEFAULT,
+            },
+            modifiers: &[],
+        }
+    }
+    .load(&mut txn)?;
+    let wall_block = crate::blocks::compose_block_from_faces(
+        Block::builder().display_name("Color room wall").color(WALL_COLOR).build(),
+        FaceMap::splat(AIR),                                       // no effect
+        FaceMap::symmetric([color_card.clone(), AIR, color_card]), // plain top and bottom
+        const {
+            FaceMap {
+                // rotations about Y except for top and bottom.
+                // TODO: we should probably have a consistency test for this and/or
+                // a set of constants for this type of rotation set.
+                // `Face::rotation_from_nz()` is another case of this general class of thing.
+                nx: Face::PY.clockwise(),
+                ny: Face::PX.counterclockwise(),
+                nz: GridRotation::IDENTITY,
+                px: Face::PY.counterclockwise(),
+                py: Face::PX.clockwise(),
+                pz: Face::PY.r180(),
+            }
+        },
+    );
 
     // Wall corner
     let corner = Block::builder()
         .display_name("Color room wall corner")
         .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ }) // TODO: more specific
-        .voxels_fn(wall_resolution, |p| {
-            if p.x.pow(2) + p.z.pow(2) < GridCoordinate::from(wall_resolution).pow(2) {
+        .voxels_fn(WALL_RESOLUTION, |p| {
+            if p.x.pow(2) + p.z.pow(2) < GridCoordinate::from(WALL_RESOLUTION).pow(2) {
                 &wall_color_block
             } else {
                 &AIR
