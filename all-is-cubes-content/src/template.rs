@@ -375,7 +375,6 @@ async fn lukewarm_reload(
         .spawn()?
         .wait()? // TODO: should be an async wait
         .success()
-        .then_some(())
         .ok_or("lukewarm-reload process failed")?; // TODO: get error output from subprocess
     build_and_generate_progress.finish().await;
 
