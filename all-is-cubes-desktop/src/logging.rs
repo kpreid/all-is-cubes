@@ -243,7 +243,7 @@ impl RerunDataKind {
 /// Produced by [`install()`] and used by calling [`inner_main()`](crate::inner_main).
 #[derive(Debug)]
 #[must_use]
-#[allow(clippy::module_name_repetitions)] // not expect() because of <https://github.com/rust-lang/rust-clippy/issues/16627>
+#[expect(clippy::module_name_repetitions)]
 pub struct LateLogging {
     kinds: HashSet<RerunDataKind>,
     #[cfg(feature = "rerun")]

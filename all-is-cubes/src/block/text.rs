@@ -1,10 +1,5 @@
 //! Support for [`Primitive::Text`] and other text rendering.
 
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
-)]
-
 use alloc::boxed::Box;
 use core::fmt;
 
@@ -78,6 +73,7 @@ struct TextData {
 /// Builder for [`Text`] values.
 #[derive(Debug, Clone)]
 #[must_use]
+#[expect(clippy::module_name_repetitions)]
 pub struct TextBuilder {
     string: ArcStr,
 
