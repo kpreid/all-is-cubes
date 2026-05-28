@@ -492,10 +492,6 @@ fn convert_frontier_vertices(
     vertices: &mut dyn ExactSizeIterator<Item = &Vertex>,
     color: rg::components::Color,
 ) -> rg::archetypes::Ellipsoids3D {
-    #[allow(
-        clippy::len_zero,
-        reason = "false positive https://github.com/rust-lang/rust-clippy/issues/15890"
-    )]
     let empty = vertices.len() == 0;
     // Frontier vertices are always copies (ish) of the original analysis vertices, so don't
     // try to visualize their octants; just add markers for them

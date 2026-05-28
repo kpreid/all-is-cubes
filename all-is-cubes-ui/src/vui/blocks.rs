@@ -1,8 +1,3 @@
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
-)]
-
 use core::fmt;
 
 use exhaust::Exhaust;
@@ -21,6 +16,7 @@ use crate::vui::widgets::{ButtonIcon, make_button_label_block};
 #[exhaust(factory_is_self)]
 #[doc(hidden)] // public for testing only
 #[allow(clippy::enum_variant_names)]
+#[expect(clippy::module_name_repetitions)]
 #[non_exhaustive]
 pub enum UiBlocks {
     /// Label of the action button for navigating “back” in the user interface (closing

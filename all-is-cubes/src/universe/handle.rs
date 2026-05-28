@@ -1,8 +1,3 @@
-#![allow(
-    unused_assignments,
-    reason = "nightly FP <https://github.com/rust-lang/rust/issues/147648>"
-)]
-
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::any::Any;
