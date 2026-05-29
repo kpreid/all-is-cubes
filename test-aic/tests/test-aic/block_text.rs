@@ -5,6 +5,7 @@ use all_is_cubes::block::text::{
     Font, Positioning, PositioningX, PositioningY, PositioningZ, Text,
 };
 use all_is_cubes::block::{self, Block, Primitive, Resolution};
+use all_is_cubes::euclid::size2;
 use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector, Vol};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{ReadTicket, Universe};
@@ -61,6 +62,17 @@ fn single_block_test_case(text: Text) -> (Box<Universe>, Block) {
     }
 
     (universe, block)
+}
+
+/// Test the publicly-visible metrics of built-in fonts (rather than any more indirect thing like
+/// the bounding box of drawn text).
+#[test]
+fn public_metrics() {
+    assert_eq!(Font::System16.metrics().character_cell_size(), size2(7, 16));
+    assert_eq!(
+        Font::SmallerBodyText.metrics().character_cell_size(),
+        size2(6, 14)
+    );
 }
 
 #[test]

@@ -109,7 +109,8 @@ pub(crate) fn compute_layout(
     layout_bounds: GridAab,
     positioning: text::Positioning,
 ) -> Layout {
-    let character_size_g = decl.character_size.to_i32();
+    let metrics = decl.metrics();
+    let character_size_g = metrics.character_size.to_i32();
     let outline_expansion: GridCoordinate = outline.into();
     let thickness = 1 + outline_expansion;
     let font_glyphs = decl.glyphs();
@@ -134,7 +135,7 @@ pub(crate) fn compute_layout(
                     .saturating_add((character_size_g.height - 1) / 2)
             }
             text::PositioningY::Baseline => {
-                lb.lower_bounds().y.saturating_add(GridCoordinate::from(decl.baseline))
+                lb.lower_bounds().y.saturating_add(GridCoordinate::from(metrics.baseline))
             }
             text::PositioningY::BodyBottom => {
                 lb.lower_bounds().y.saturating_add(character_size_g.height).saturating_sub(1)
@@ -248,7 +249,7 @@ pub(crate) fn compute_layout(
                 glyph_bounding_box_to_3d(
                     Box2D {
                         min: Point2D::zero(),
-                        max: decl.character_size.to_vector().to_point().to_i32(),
+                        max: character_size_g.to_vector().to_point(),
                     }
                     .outer_box(SideOffsets2D::new_all_same(outline_expansion)),
                     glyph.position.cast_unit().extend(layout_offset.z),

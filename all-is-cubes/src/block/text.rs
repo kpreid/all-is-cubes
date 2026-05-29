@@ -24,7 +24,7 @@ use super::Evoxels;
 
 mod font;
 use font::FontDecl;
-pub use font::{Font, Value};
+pub use font::{Font, Metrics, Value};
 
 mod layout;
 use layout::{Layout, LayoutHeader, compute_layout};

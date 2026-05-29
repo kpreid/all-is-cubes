@@ -45,8 +45,10 @@ impl Font {
                     png_data: include_bytes!("font-system-7x16.png"),
                     png_path: "font-system-7x16.png",
                     glyphs: OnceLock::new(),
-                    character_size: size2(7, 16),
-                    baseline: 12,
+                    metrics: Metrics {
+                        character_size: size2(7, 16),
+                        baseline: 12,
+                    },
                 };
 
                 &DECL
@@ -56,22 +58,14 @@ impl Font {
                     png_data: include_bytes!("font-body-text-6x14.png"),
                     png_path: "font-body-text-6x14.png",
                     glyphs: OnceLock::new(),
-                    character_size: size2(6, 14),
-                    baseline: 10,
+                    metrics: Metrics {
+                        character_size: size2(6, 14),
+                        baseline: 10,
+                    },
                 };
                 &DECL
             }
         }
-    }
-
-    /// Returns the size of a character cell that should be used when this font is used with a
-    /// strictly monospaced renderer.
-    ///
-    /// Currently, this will always agree with the spacing that [`Font::draw_str_monospaced()`]
-    /// produces.
-    pub fn character_cell_size(&self) -> ImageSize {
-        let s = self.font_decl().character_size;
-        size2(u32::from(s.width), u32::from(s.height))
     }
 
     /// Draws text in this font, calling `set_pixel` for each pixel that should be set
@@ -131,6 +125,12 @@ impl Font {
             });
         }
     }
+
+    /// Returns the metrics of the font: measurements of dimensions which all characters
+    /// in the font share.
+    pub fn metrics(&self) -> &Metrics {
+        &self.font_decl().metrics
+    }
 }
 
 impl universe::VisitHandles for Font {
@@ -138,6 +138,38 @@ impl universe::VisitHandles for Font {
         match self {
             Self::System16 | Self::SmallerBodyText | Self::Logo => {}
         }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// The metrics of a [`Font`]: measurements of dimensions which all characters in the font share.
+#[derive(Clone, Debug)]
+pub struct Metrics {
+    /// Size of a whole monospaced character cell.
+    ///
+    /// Currently, All is Cubes uses strictly monospaced layout for all text, and so
+    /// the `width` of this is equal to the advance width of the font.
+    /// This may change in the future.
+    pub(in crate::block::text) character_size: Size2D<u8, InGlyph>,
+
+    /// Y position of the baseline in the glyph.
+    ///
+    /// TODO: Clarify pixel-edge/pixel-center interpretation of this coordinate
+    pub(in crate::block::text) baseline: u8,
+}
+
+impl Metrics {
+    /// Returns the size of a character cell that should be used when this font is used with a
+    /// strictly monospaced renderer.
+    ///
+    /// Currently, this will always agree with the spacing that [`Font::draw_str_monospaced()`]
+    /// produces.
+    /// Currently, All is Cubes uses strictly monospaced layout for all text, and so
+    /// the `width` of this is equal to the advance width of the font.
+    pub fn character_cell_size(&self) -> ImageSize {
+        let s = self.character_size;
+        size2(u32::from(s.width), u32::from(s.height))
     }
 }
 
@@ -163,24 +195,23 @@ pub(in crate::block::text) struct FontDecl {
     /// Lazily decoded from `png_data`.
     glyphs: OnceLock<Glyphs>,
 
-    pub(in crate::block::text) character_size: Size2D<u8, InGlyph>,
-
-    /// Y position of the baseline in the glyph.
-    ///
-    /// TODO: Clarify interpretation of this coordinate
-    pub(in crate::block::text) baseline: u8,
+    metrics: Metrics,
 }
 
 impl FontDecl {
+    pub(crate) fn metrics(&self) -> &Metrics {
+        &self.metrics
+    }
+
     /// Returns the glyph data for this font, loading it if necessary.
     pub(crate) fn glyphs(&self) -> &Glyphs {
         self.glyphs.get_or_init(|| {
             let decoded_png = DecodedPng::decode_static(self.png_data, self.png_path);
             assert_eq!(
                 decoded_png.size().width,
-                u32::from(self.character_size.width) * GLYPHS_PER_ROW
+                u32::from(self.metrics.character_size.width) * GLYPHS_PER_ROW
             );
-            Glyphs::new(&decoded_png, self.character_size)
+            Glyphs::new(&decoded_png, self.metrics.character_size)
         })
     }
 }
