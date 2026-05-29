@@ -86,6 +86,9 @@ impl Font {
     /// * Call this function twice, first taking the outline pixels only, and then taking the
     ///   foreground pixels only.
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the given [`ReadTicket`] does not include access to the font.
     //---
     // Design note: In most cases, “set pixel” is an inefficient way of drawing images.
     // In this case, we are using it somewhat for historical reasons, but also because:
@@ -97,11 +100,17 @@ impl Font {
     // `Arc<[PositionedGlyph]>` is tricky.
     //
     // TODO: Return a more appropriate unit.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "user-defined fonts don't exist yet"
+    )]
     pub fn draw_str_monospaced(
         &self,
+        read_ticket: universe::ReadTicket<'_>,
         text: &str,
         mut set_pixel: impl FnMut(Point2D<i32, euclid::UnknownUnit>, Value),
-    ) {
+    ) -> Result<(), universe::HandleError> {
+        let _ = read_ticket; // won't be used until we actually have custom fonts
         let decl = self.font_decl();
         let glyphs = decl.glyphs();
         let layout = text::compute_layout(
@@ -124,6 +133,7 @@ impl Font {
                 set_pixel(translation.transform_point(position), value);
             });
         }
+        Ok(())
     }
 
     /// Returns the metrics of the font: measurements of dimensions which all characters

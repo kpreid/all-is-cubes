@@ -668,7 +668,7 @@ pub(crate) fn draw_info_text<T: Clone>(
     let origin = vec2(5, 5);
     let font = text::Font::System16;
 
-    font.draw_str_monospaced(info_text, |mut pixel, value| {
+    font.draw_str_monospaced(ReadTicket::stub(), info_text, |mut pixel, value| {
         pixel += origin;
         if output_bounds.contains(pixel.to_u32().cast_unit()) {
             output
@@ -679,7 +679,8 @@ pub(crate) fn draw_info_text<T: Clone>(
                 }]
                 .clone();
         }
-    });
+    })
+    .expect("system font access should never fail");
 }
 
 // -------------------------------------------------------------------------------------------------
