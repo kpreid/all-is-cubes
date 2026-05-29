@@ -102,10 +102,10 @@ euclid = { version = "0.22.11", default-features = false }
 exhaust = { version = "0.2.5", default-features = false }
 fearless_simd = { version = "0.4", default-features = false }
 flume = { version = "0.12.0", default-features = false, features = ["async"] }
-futures-channel = { version = "0.3.31", default-features = false, features = ["alloc"] }
-futures-core = { version = "0.3.31", default-features = false, features = ["alloc"] }
-futures-task = { version = "0.3.31", default-features = false }
-futures-util = { version = "0.3.31", default-features = false, features = ["alloc"] }
+futures-channel = { version = "0.3.32", default-features = false, features = ["alloc"] }
+futures-core = { version = "0.3.32", default-features = false, features = ["alloc"] }
+futures-task = { version = "0.3.32", default-features = false }
+futures-util = { version = "0.3.32", default-features = false, features = ["alloc"] }
 # TODO: evaluate which gilrs features should be enabled
 gilrs = { version = "0.11.0" }
 gloo-timers = { version = "0.4.0", default-features = false }
@@ -137,9 +137,9 @@ rand = { version = "0.10.0", default-features = false }
 rand_distr = { version = "0.6.0", default-features = false }
 rand_xoshiro = { version = "0.8.0", default-features = false }
 rayon = { version = "1.11.0", default-features = false }
-re_log_types = { version = "0.32.0", default-features = false }
-re_sdk = { version = "0.32.0", default-features = false }
-re_sdk_types = { version = "0.32.0", default-features = false }
+re_log_types = { version = "0.33.0", default-features = false }
+re_sdk = { version = "0.33.0", default-features = false }
+re_sdk_types = { version = "0.33.0", default-features = false }
 rectangle-pack = { version = "0.4.2" } # currently only used in all-is-cubes-port which is currently std only
 rendiff = { version = "0.2.2", default-features = false }
 # We use rstest for parameterized tests where each case can fail or succeed independently.
