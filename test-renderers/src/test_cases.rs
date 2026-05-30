@@ -124,7 +124,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         [
             "atrium",
             "cornell-box", // not super interesting till we enable lighting
-            "lighting-bench",
+            "light-bench",
         ],
     );
     c.insert_variants(
@@ -1032,7 +1032,7 @@ async fn template(mut context: RenderTestContext, template_name: &'static str) {
         .await
         .unwrap();
 
-    // TODO: Lighting is too slow to be reasonable to run in these tests.
+    // TODO: Light calculation is too slow to be reasonable to run in these tests.
     // Fix that by adding a feature to precalculate lighting for specific templates and store
     // the light data to be loaded when the template is instantiated.
     if false {

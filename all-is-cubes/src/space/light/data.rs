@@ -22,7 +22,7 @@ use crate::space::{self, Space};
 pub(crate) type PackedLightScalar = u8;
 
 /// Special reasons for a cube having zero light in it.
-/// These may be used to help compute smoothed lighting across blocks.
+/// These may be used to help compute light interpolation across blocks.
 ///
 /// The numeric values of this enum are used to transmit it to shaders by packing
 /// it into an "RGBA" color value. They should not be considered a stable API element.

@@ -109,7 +109,7 @@ impl HeadlessRenderer for GltfBevyRenderer {
                             let world_space = world_space.read(read_tickets.world).unwrap();
                             Some(Vol::from_fn(
                                 world_space.bounds().expand(FaceMap::splat(1)),
-                                |cube| world_space.get_lighting(cube),
+                                |cube| world_space.get_light(cube),
                             ))
                         }
                         None => None,

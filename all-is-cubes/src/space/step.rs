@@ -341,7 +341,7 @@ fn update_light_system(
         |(palette, mut light_storage, mut contents, notifiers)| {
             let (uc, mut change_buffer) =
                 Space::borrow_light_update_context_ecs(palette, &mut contents, notifiers);
-            let info = light_storage.update_lighting_from_queue(
+            let info = light_storage.update_light_from_queue(
                 uc,
                 &mut change_buffer,
                 // TODO: check whether we are actually running in parallel and give either subdivided or non-subdivided deadlines?

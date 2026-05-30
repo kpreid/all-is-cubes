@@ -12,8 +12,9 @@ use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::Universe;
 use crate::util::YieldProgress;
 
-/// Test space for the `all-is-cubes/benches/light` benchmark, designed to exercise a variety of
-/// geometric and color circumstances for the lighting algorithm.
+/// Test space originally designed for the `all-is-cubes/benches/light` benchmark,
+/// designed to exercise a variety of geometric and color circumstances for the light
+/// propagation algorithm.
 ///
 /// (Since being created, it has found uses in many other tests as a fast-to-create yet
 /// nontrivial space).
@@ -21,12 +22,12 @@ use crate::util::YieldProgress;
 /// TODO: Once we have the ability to write save files, give the benchmark code an option
 /// to do that instead, so this can just live in the benchmark instead of indirect.
 #[doc(hidden)]
-pub async fn lighting_bench_space(
+pub async fn light_bench_space(
     universe: &mut Universe,
     progress: YieldProgress,
     requested_space_size: GridSize,
 ) -> Result<Space, InGenError> {
-    let layout = LightingBenchLayout::new(requested_space_size)?;
+    let layout = LightBenchLayout::new(requested_space_size)?;
 
     let mut space = Space::builder(layout.space_bounds())
         .light_physics(LightPhysics::None)
@@ -135,20 +136,20 @@ pub async fn lighting_bench_space(
     Ok(space)
 }
 
-/// Layout calculations for [`lighting_bench_space()`].
+/// Layout calculations for [`light_bench_space()`].
 ///
 /// Expressing them as this bundle of functions avoids putting many local variables into
 /// the `async fn` future and increasing its overall size.
 ///
 /// TODO: all of the functions are sloppily named because they used to be simple variables.
-struct LightingBenchLayout {
+struct LightBenchLayout {
     array_side_lengths: euclid::default::Vector2D<u8>,
     height: u8,
 }
 
-impl LightingBenchLayout {
-    fn new(requested_space_size: GridSize) -> Result<LightingBenchLayout, InGenError> {
-        let layout = LightingBenchLayout {
+impl LightBenchLayout {
+    fn new(requested_space_size: GridSize) -> Result<LightBenchLayout, InGenError> {
+        let layout = LightBenchLayout {
             array_side_lengths: vec2(
                 (requested_space_size.width - u32::from(Self::MARGIN))
                     / u32::from(Self::SECTION_SPACING),

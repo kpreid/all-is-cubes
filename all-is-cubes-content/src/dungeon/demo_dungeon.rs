@@ -1,6 +1,6 @@
-use alloc::vec;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
+use alloc::vec;
 use core::mem;
 
 use rand::seq::{IndexedRandom as _, IteratorRandom as _};
@@ -715,7 +715,7 @@ pub(crate) async fn demo_dungeon(
     )
     .await?;
 
-    // Enable lighting
+    // Enable light
     let mut light_progress = progress;
     light_progress.set_label("lighting");
     light_progress.progress(0.0).await;

@@ -1,4 +1,4 @@
-//! Lighting algorithms for `Space`. This module is closely tied to `Space`
+//! Light propagation algorithms for `Space`. This module is closely tied to `Space`
 //! and separated out for readability, not modularity.
 
 use alloc::boxed::Box;
@@ -27,7 +27,7 @@ use crate::space::{
 use crate::time;
 use crate::util::StatusText;
 
-/// Storage and update queue for a [`Space`]'s light.
+/// Storage and update queue for a [`Space`]'s light field.
 ///
 /// Design note: Currently this is simply owned by the ECS, but eventually we want to make
 /// it accessible by a background thread which can continuously update it.
@@ -59,7 +59,6 @@ pub(crate) struct LightStorage {
     pub(in crate::space) block_sky: BlockSky,
 }
 
-/// Methods on Space that specifically implement the lighting algorithm.
 impl LightStorage {
     pub(crate) fn new(
         physics: &SpacePhysics,
@@ -91,10 +90,8 @@ impl LightStorage {
             // TODO: If the new physics is broadly similar, then reuse the old data as a
             // starting point instead of immediately throwing it out.
             // TODO: propagate allocation failure cleanly instead of unwrap()
-            self.contents = self
-                .physics
-                .initialize_lighting(uc.contents.without_elements(), opacity)
-                .unwrap();
+            self.contents =
+                self.physics.initialize_light(uc.contents.without_elements(), opacity).unwrap();
 
             match self.physics {
                 LightPhysics::None => {
@@ -151,7 +148,7 @@ impl LightStorage {
 
             // Cancel any previously scheduled light update.
             // (Note: This does not empirically have any significant effect on overall
-            // lighting performance — these trivial updates are not most of the cost.
+            // performance — these trivial updates are not most of the cost.
             // But it'll at least save a little bit of memory.)
             self.light_update_queue.remove(cube);
 
@@ -174,8 +171,8 @@ impl LightStorage {
         self.light_update_queue.contains(cube)
     }
 
-    /// Do some lighting updates.
-    pub(in crate::space) fn update_lighting_from_queue(
+    /// Do some light updates.
+    pub(in crate::space) fn update_light_from_queue(
         &mut self,
         uc: UpdateCtx<'_>,
         change_buffer: &mut ChangeBuffer<'_>,
@@ -222,7 +219,7 @@ impl LightStorage {
 
                 data.par_iter_mut().for_each(|calc| {
                     if let Calc::In(LightUpdateRequest { cube, .. }) = *calc {
-                        *calc = Calc::Out(self.compute_lighting(uc, cube));
+                        *calc = Calc::Out(self.compute_light(uc, cube));
                     }
                 });
                 for calc in data {
@@ -238,7 +235,7 @@ impl LightStorage {
                     }
                     light_update_count += 1;
                     let (difference, cube_cost) =
-                        self.apply_lighting_update(uc, change_buffer, output);
+                        self.apply_light_update(uc, change_buffer, output);
                     max_difference = max_difference.max(difference);
                     cost += cube_cost;
                 }
@@ -256,10 +253,10 @@ impl LightStorage {
                 }
                 light_update_count += 1;
 
-                let computation = self.compute_lighting(uc, cube);
+                let computation = self.compute_light(uc, cube);
 
                 let (difference, cube_cost) =
-                    self.apply_lighting_update(uc, change_buffer, computation);
+                    self.apply_light_update(uc, change_buffer, computation);
                 max_difference = max_difference.max(difference);
                 cost += cube_cost;
                 if cost >= max_cost {
@@ -289,7 +286,7 @@ impl LightStorage {
     /// Given a fresh [`ComputedLight`], actually insert it into the space light data
     /// and enqueue more cubes, then return a cost value accounting for the update.
     #[inline]
-    fn apply_lighting_update(
+    fn apply_light_update(
         &mut self,
         uc: UpdateCtx<'_>,
         change_buffer: &mut ChangeBuffer<'_>,
@@ -359,10 +356,10 @@ impl LightStorage {
         (difference_priority, cost)
     }
 
-    /// Compute the new lighting value for a cube, returning it rather than storing it.
+    /// Compute the new light value for a cube, returning it rather than storing it.
     #[inline]
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu for debugging
-    pub(in crate::space) fn compute_lighting<D>(
+    pub(in crate::space) fn compute_light<D>(
         &self,
         uc: UpdateCtx<'_>,
         cube: Cube,
@@ -625,13 +622,13 @@ impl<'a> UpdateCtx<'a> {
 }
 
 impl LightPhysics {
-    /// Generate the lighting data array that a [`Space`] with this light physics should have.
+    /// Generate the light field array that a [`Space`] with this light physics should have.
     ///
-    /// `opacity` specifies Whether the blacks in the space are uniformly fully opaque or
+    /// `opacity` specifies whether the blacks in the space are uniformly fully opaque or
     /// uniformly fully transparent, in which case the initialization can be optimal.
     ///
     /// TODO: Also return whether light updates are needed.
-    pub(crate) fn initialize_lighting(
+    pub(crate) fn initialize_light(
         &self,
         space_bounds: Vol<()>,
         opacity: OpacityCategory,
@@ -694,7 +691,7 @@ struct LightBuffer {
     incoming_light: Rgb,
     /// Number of rays, weighted by the ray angle versus local cube faces.
     total_ray_weight: f32,
-    /// Cubes whose lighting value contributed to the `incoming_light` value.
+    /// Cubes whose light values contributed to the `incoming_light` value.
     dependencies: Vec<Cube>,
     /// Approximation of CPU cost of doing the calculation, with one unit defined as
     /// one raycast step.
@@ -941,7 +938,7 @@ impl LightBuffer {
     }
 }
 
-/// Result of [`Space::compute_lighting()`] — new light for one cube.
+/// Result of [`Space::compute_light()`] — new light for one cube.
 /// TODO: better name
 #[derive(Clone, Debug)]
 #[doc(hidden)] // used for debug rendering
@@ -1018,10 +1015,10 @@ impl Fmt<StatusText> for LightUpdatesInfo {
     }
 }
 
-/// A special definition of opacity for the lighting algorithm:
+/// A special definition of opacity for the light propagation algorithm:
 /// we want to treat opaque light-emitting blocks similarly to transparent blocks
 /// *when deciding to compute light for them*, because this produces better results
-/// for interpolated lighting.
+/// for interpolated light.
 ///
 /// This function is fairly straightforward; it exists for purposes of *documenting
 /// the places that care about this* rather than for code reduction.

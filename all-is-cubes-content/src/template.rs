@@ -115,8 +115,9 @@ pub enum UniverseTemplate {
     /// [Menger sponge]: https://en.wikipedia.org/wiki/Menger_sponge
     MengerSponge,
 
-    /// A test scene containing various shapes and colors to exercise the lighting algorithm.
-    LightingBench,
+    /// A test scene containing various shapes and colors to exercise the light propagation
+    /// algorithm.
+    LightBench,
 
     /// Use entirely random choices.
     ///
@@ -134,9 +135,7 @@ impl UniverseTemplate {
     pub fn include_in_lists(&self) -> bool {
         use UniverseTemplate::*;
         match self {
-            DemoCity | Dungeon | Atrium | Islands | CornellBox | MengerSponge | LightingBench => {
-                true
-            }
+            DemoCity | Dungeon | Atrium | Islands | CornellBox | MengerSponge | LightBench => true,
 
             // Itself a list of templates!
             Menu => false,
@@ -202,8 +201,8 @@ impl UniverseTemplate {
                     )
                     .await,
                 ),
-                LightingBench => Some(
-                    all_is_cubes::content::testing::lighting_bench_space(
+                LightBench => Some(
+                    all_is_cubes::content::testing::light_bench_space(
                         &mut universe,
                         p.take().unwrap(),
                         params.size.unwrap_or(GridSize::new(54, 16, 54)),
@@ -593,7 +592,7 @@ mod tests {
     }
 
     /// Assert that every `Space` used in a `Block` has appropriate properties;
-    /// in particular, that it is not unnecessarily having lighting computations.
+    /// in particular, that it is not unnecessarily having light computations.
     fn check_block_spaces(universe: &Universe) {
         // TODO: also check blocks that are found in `Composite` and directly in `Space`, etc.
         // Use case for `VisitHandles` being more general?

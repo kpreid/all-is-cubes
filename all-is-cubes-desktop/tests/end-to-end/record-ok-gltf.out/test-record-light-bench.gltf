@@ -101,12 +101,12 @@
     {
       "byteLength": 65520,
       "name": "chunk [0, -1, 0] data",
-      "uri": "test-record-lighting-bench-mesh-0.glbin"
+      "uri": "test-record-light-bench-mesh-0.glbin"
     },
     {
       "byteLength": 43056,
       "name": "chunk [0, 0, 0] data",
-      "uri": "test-record-lighting-bench-mesh-1.glbin"
+      "uri": "test-record-light-bench-mesh-1.glbin"
     }
   ],
   "bufferViews": [

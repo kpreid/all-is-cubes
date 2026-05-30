@@ -204,7 +204,7 @@ fn evaluate_light_with_progress(m: &mut space::Mutation<'_, '_>) {
 }
 
 /// Convert `LightUpdatesInfo` data to an approximate completion progress.
-/// TODO: Improve this and put it in the lighting module (independent of indicatif).
+/// TODO: Improve this and put it in the light module (independent of indicatif).
 fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(space::LightUpdatesInfo) + '_ {
     let mut worst = 1;
     move |info| {

@@ -138,7 +138,7 @@ fn light_texture_write_read(
                 + texture_size.width
                     * (cube.y.rem_euclid(texture_size.height)
                         + texture_size.height * cube.z.rem_euclid(texture_size.depth));
-            let expected = space.get_lighting(cube).as_texel();
+            let expected = space.get_light(cube).as_texel();
             let actual = light_texels[zyx_index as usize];
             if expected != actual {
                 wrong_texels.push((cube, expected, actual));

@@ -83,8 +83,8 @@ pub struct GraphicsOptions {
     /// TODO: make deserialization not break on infinity
     pub view_distance: PositiveSign<FreeCoordinate>,
 
-    /// Style in which to draw the lighting of [`Space`](crate::space::Space)s.
-    /// This does not affect the *computation* of lighting.
+    /// Style in which to apply the light field of a [`Space`](crate::space::Space)s to its blocks.
+    /// This does not affect the *computation* of light.
     pub lighting_display: LightingOption,
 
     /// Method/fidelity to use for transparency.

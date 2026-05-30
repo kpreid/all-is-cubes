@@ -281,7 +281,7 @@ fn scale_to_integer_step(s_in: f32, ds_in: f32) -> f32 {
 // LightStatus::NoRays = -1
 // LightStatus::Visible = 1
 // 
-// This encoding allows use of the 0-1 range for interpolated lighting's blending
+// This encoding allows use of the 0-1 range for interpolated light's blending
 // excluding opaque blocks, while the -1 value indicates values that should be
 // truly ignored.
 fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {

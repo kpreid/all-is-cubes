@@ -7,7 +7,7 @@ use crate::space::PackedLight;
 #[cfg(doc)]
 use crate::space::{Space, SpacePhysics};
 
-/// The infinitely-distant background/lighting environment outside a [`Space`].
+/// The infinitely-distant background scene/light environment outside a [`Space`].
 ///
 /// When used to configure a [`Space`], this is stored in the [`SpacePhysics`] struct.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

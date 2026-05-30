@@ -202,7 +202,7 @@ fn listen_recur() {
         .unwrap();
     assert_eq!(log.drain().len(), 1);
 
-    // TODO: Also test that we don't propagate lighting changes
+    // TODO: Also test that we don't propagate light changes
 
     // A mutation out of bounds should not trigger a notification
     universe

@@ -83,7 +83,7 @@ pub fn cursor_raycast(
                 position: cube,
                 block: space[cube].clone(),
                 evaluated: evaluated.clone(),
-                light: space.get_lighting(cube),
+                light: space.get_light(cube),
             },
             preceding: if step.face() != Face7::Within {
                 let pcube = step.cube_behind();
@@ -91,7 +91,7 @@ pub fn cursor_raycast(
                     position: pcube,
                     block: space[pcube].clone(),
                     evaluated: space.get_evaluated(pcube).clone(),
-                    light: space.get_lighting(pcube),
+                    light: space.get_light(pcube),
                 })
             } else {
                 None
@@ -201,7 +201,7 @@ impl fmt::Display for Cursor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Block at {c:?} face {f:?}\n{ev:#?}\nLighting within {la:?}, behind {lb:?}",
+            "Block at {c:?} face {f:?}\n{ev:#?}\nLight within {la:?}, behind {lb:?}",
             c = self.cube(),
             f = self.face_entered,
             ev = self.hit().evaluated,

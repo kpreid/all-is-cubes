@@ -29,7 +29,7 @@ async fn renderer_test() {
     // Skip this test if no adapter available
     let Some(adapter) = adapter else { return };
 
-    let mut universe = UniverseTemplate::LightingBench
+    let mut universe = UniverseTemplate::LightBench
         .build(yield_progress_for_testing(), TemplateParameters::default())
         .await
         .unwrap();

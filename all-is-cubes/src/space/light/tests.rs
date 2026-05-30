@@ -19,7 +19,7 @@ use crate::universe::{ReadTicket, Universe};
 fn initial_value_in_empty_space() {
     let space = Space::builder(GridAab::ORIGIN_CUBE).build();
     std::dbg!(&space);
-    assert_eq!(PackedLight::NO_RAYS, space.get_lighting([0, 0, 0]));
+    assert_eq!(PackedLight::NO_RAYS, space.get_light([0, 0, 0]));
 }
 
 #[test]
@@ -27,7 +27,7 @@ fn initial_value_in_filled_space() {
     let space = Space::builder(GridAab::ORIGIN_CUBE)
         .filled_with(block::from_color!(Rgba::WHITE))
         .build();
-    assert_eq!(PackedLight::OPAQUE, space.get_lighting([0, 0, 0]));
+    assert_eq!(PackedLight::OPAQUE, space.get_light([0, 0, 0]));
 }
 
 #[test]
@@ -38,9 +38,9 @@ fn initial_value_initialized_after_creation() {
     let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 3, 3]))
         .light_physics(LightPhysics::None)
         .build();
-    assert_eq!(PackedLight::ONE, space.get_lighting([0, 0, 0]));
+    assert_eq!(PackedLight::ONE, space.get_light([0, 0, 0]));
 
-    // Put a block in it so this is not a trivial case, and activate lighting.
+    // Put a block in it so this is not a trivial case, and activate light.
     space
         .mutate(ReadTicket::stub(), |m| {
             m.set([1, 1, 1], block::from_color!(1.0, 0.0, 0.0, 1.0))
@@ -57,19 +57,19 @@ fn initial_value_initialized_after_creation() {
     // and will probably break when we improve it.
     assert_eq!(
         space.light.block_sky.in_direction(Face::PY),
-        space.get_lighting([1, 2, 1]),
+        space.get_light([1, 2, 1]),
         "sky above obstacle"
     );
     assert_eq!(
         PackedLight::UNINITIALIZED_AND_BLACK,
-        space.get_lighting([1, 0, 1]),
+        space.get_light([1, 0, 1]),
         "unknown below obstacle"
     );
 
     // TODO: also test what happens on updates?
 }
 
-/// Tests that the values returned from [`Space::get_lighting()`] on out-of-bounds cubes
+/// Tests that the values returned from [`Space::get_light()`] on out-of-bounds cubes
 /// match the sky, when they should.
 #[rstest::rstest]
 fn out_of_bounds_light_is_sky(#[values(0.0, 0.5, 1.0)] opacity: f32) {
@@ -92,7 +92,7 @@ fn out_of_bounds_light_is_sky(#[values(0.0, 0.5, 1.0)] opacity: f32) {
             continue;
         }
         assert_eq!(
-            space.get_lighting(neighboring_cube),
+            space.get_light(neighboring_cube),
             // TODO: This should also be NO_RAYS in the case where it would be NO_RAYS inside the
             // space, that is, when the adjacent cube inside the space is transparent.
             if let Ok(face) = Face::from_adjacency(Cube::ORIGIN, neighboring_cube) {
@@ -129,9 +129,9 @@ fn step(#[values(false, true)] paused: bool) {
     // Not changed yet... except for the now-opaque block
     {
         let space = space.read(universe.read_ticket()).unwrap();
-        assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
-        assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::NO_RAYS);
-        assert_eq!(space.get_lighting([2, 0, 0]), PackedLight::NO_RAYS);
+        assert_eq!(space.get_light([0, 0, 0]), PackedLight::OPAQUE);
+        assert_eq!(space.get_light([1, 0, 0]), PackedLight::NO_RAYS);
+        assert_eq!(space.get_light([2, 0, 0]), PackedLight::NO_RAYS);
     }
 
     let info = universe.step(paused, time::Deadline::Whenever);
@@ -149,9 +149,9 @@ fn step(#[values(false, true)] paused: bool) {
 
     {
         let space = space.read(universe.read_ticket()).unwrap();
-        assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE); // opaque
-        assert_eq!(space.get_lighting([1, 0, 0]), sky_light); // updated
-        assert_eq!(space.get_lighting([2, 0, 0]), PackedLight::NO_RAYS); // not updated/not relevant
+        assert_eq!(space.get_light([0, 0, 0]), PackedLight::OPAQUE); // opaque
+        assert_eq!(space.get_light([1, 0, 0]), sky_light); // updated
+        assert_eq!(space.get_light([2, 0, 0]), PackedLight::NO_RAYS); // not updated/not relevant
     }
 }
 
@@ -184,7 +184,7 @@ fn set_cube_opaque_notification() {
         _ => None,
     }));
     // Self-test that the initial condition is not trivially the answer we're looking for
-    assert_ne!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
+    assert_ne!(space.get_light([0, 0, 0]), PackedLight::OPAQUE);
 
     space
         .mutate(ReadTicket::stub(), |m| {
@@ -192,7 +192,7 @@ fn set_cube_opaque_notification() {
         })
         .unwrap();
 
-    assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
+    assert_eq!(space.get_light([0, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(
         log.drain(),
         vec![SpaceChange::CubeLight {
@@ -226,7 +226,7 @@ fn light_source_self_illumination_transparent() {
         .build();
 
     let space = light_source_test_space(block);
-    assert_eq!(space.get_lighting([1, 1, 1]), PackedLight::some(light));
+    assert_eq!(space.get_light([1, 1, 1]), PackedLight::some(light));
 }
 
 #[test]
@@ -238,9 +238,9 @@ fn light_source_self_illumination_opaque() {
         .build();
 
     let space = light_source_test_space(block);
-    assert_eq!(space.get_lighting([1, 1, 1]), PackedLight::some(light));
+    assert_eq!(space.get_light([1, 1, 1]), PackedLight::some(light));
     let adjacents = FaceMap::from_fn(|face| {
-        space.get_lighting(GridPoint::new(1, 1, 1) + face.normal_vector()).value()
+        space.get_light(GridPoint::new(1, 1, 1) + face.normal_vector()).value()
     });
     assert_eq!(
         adjacents,
@@ -275,8 +275,8 @@ fn animation_treated_as_visible() {
             .unwrap();
 
         [
-            space.get_lighting([1, 1, 1]).status(),
-            space.get_lighting([0, 1, 1]).status(),
+            space.get_light([1, 1, 1]).status(),
+            space.get_light([0, 1, 1]).status(),
         ]
     }
     let no_block = eval_mid_block(AIR);
@@ -313,7 +313,7 @@ fn reflectance_is_clamped() {
         })
         .unwrap();
 
-    let light = space.get_lighting([2, 1, 1]).value();
+    let light = space.get_light([2, 1, 1]).value();
     dbg!(light);
     assert!(light.red() <= sky_color.red());
 }
@@ -329,15 +329,15 @@ fn space_with_disabled_light() -> Space {
 }
 
 #[test]
-fn disabled_lighting_returns_one_always() {
+fn disabled_light_returns_one_always() {
     assert_eq!(
-        space_with_disabled_light().get_lighting([0, 0, 0]),
+        space_with_disabled_light().get_light([0, 0, 0]),
         PackedLight::ONE
     );
 }
 
 #[test]
-fn disabled_lighting_does_not_update() {
+fn disabled_light_does_not_update() {
     let mut universe = Universe::new();
     let mut space = space_with_disabled_light();
     space.light.light_needs_update(Cube::new(0, 0, 0), Priority::UNINIT);
@@ -346,9 +346,9 @@ fn disabled_lighting_does_not_update() {
         universe.step(false, time::Deadline::Whenever).space_step.light,
         LightUpdatesInfo::default()
     );
-    // TODO: this test could really easily fail to report anything meaningful; also test non-disabled lighting.
+    // TODO: this test could really easily fail to report anything meaningful; also test non-disabled light.
 }
 
-// TODO: test sky lighting propagation onto blocks after quiescing
+// TODO: test sky light propagation onto blocks after quiescing
 
 // TODO: test a single semi-transparent block will receive and diffuse light

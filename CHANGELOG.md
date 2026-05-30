@@ -49,7 +49,11 @@
     * `universe::Universe` no longer implements `Default` and `Deserialize`; instead, `Box<Universe>` does.
 
     * Renamed `math::Face6` to `Face`.
+    * Renamed `space::{Space, Read}::get_lighting()` to `get_light()`.
     * Renamed `time::Tick::delta_t()` to `delta_t_duration()`, to make room for other variations.
+
+* `all-is-cubes-content` library:
+    * Renamed `UniverseTemplate::LightingBench` to `LightBench`.
 
 * `all-is-cubes-port` library:
     * `export_to_path()` takes an additional parameter of type `ExportOptions`.

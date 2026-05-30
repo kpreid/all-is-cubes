@@ -131,7 +131,7 @@ mod tests {
     use super::*;
     use all_is_cubes::block::{Block, BlockDef};
     use all_is_cubes::content::make_some_voxel_blocks;
-    use all_is_cubes::content::testing::lighting_bench_space;
+    use all_is_cubes::content::testing::light_bench_space;
     use all_is_cubes::euclid::size3;
     use all_is_cubes::universe::{Handle, Name, Universe};
     use all_is_cubes::util::yield_progress_for_testing;
@@ -141,7 +141,7 @@ mod tests {
     #[macro_rules_attribute::apply(smol_macros::test)]
     async fn space_to_stl_smoke_test() {
         let mut u = Universe::new();
-        let space = lighting_bench_space(&mut u, yield_progress_for_testing(), size3(54, 16, 54))
+        let space = light_bench_space(&mut u, yield_progress_for_testing(), size3(54, 16, 54))
             .await
             .unwrap();
         let mesh = space_to_stl_triangles(&space.read());

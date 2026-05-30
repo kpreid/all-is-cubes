@@ -857,7 +857,7 @@ pub(crate) fn update_palette_phase_1(
             );
 
             // TODO: Process side effects on individual cubes such as reevaluating the
-            // lighting influenced by the block.
+            // light influenced by the block.
 
             evaluations.record_consecutive_interval(&mut last_start_time, time::Instant::now());
         }

@@ -5,7 +5,7 @@ use core::hint::black_box;
 use criterion::async_executor::AsyncExecutor;
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 
-use all_is_cubes::content::testing::lighting_bench_space;
+use all_is_cubes::content::testing::light_bench_space;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::math::Cube;
 use all_is_cubes::space::light;
@@ -37,12 +37,12 @@ fn evaluate_light_bench(c: &mut Criterion) {
             10
         });
 
-        group.bench_function(format!("{mode_str}/lighting_bench_space"), |b| {
+        group.bench_function(format!("{mode_str}/light_bench_space"), |b| {
             b.iter_batched_ref(
                 || {
                     let mut u = Universe::new();
                     let space = Executor
-                        .block_on(lighting_bench_space(
+                        .block_on(light_bench_space(
                             &mut u,
                             yield_progress_for_testing(),
                             size3(54, 16, 54),

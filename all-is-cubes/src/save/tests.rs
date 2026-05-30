@@ -826,7 +826,7 @@ fn space_light_queue_remembered() {
     // The space now has [1, 0, 0] in its light update queue, but not [2, 0, 0],
     // and [0, 0, 0] has been updated immediately.
     assert_eq!(
-        [0, 1, 2].map(|x| space.get_lighting([x, 0, 0]).status()),
+        [0, 1, 2].map(|x| space.get_light([x, 0, 0]).status()),
         [Opaque, NoRays, NoRays]
     );
 
@@ -836,7 +836,7 @@ fn space_light_queue_remembered() {
 
     // On deserialization, all cubes that were in the queue are marked uninitialized.
     assert_eq!(
-        [0, 1, 2].map(|x| space2.get_lighting([x, 0, 0]).status()),
+        [0, 1, 2].map(|x| space2.get_light([x, 0, 0]).status()),
         [Opaque, Uninitialized, NoRays]
     );
 
@@ -845,7 +845,7 @@ fn space_light_queue_remembered() {
     universe2.step(false, time::Deadline::Whenever);
     let space2 = space2.read(universe2.read_ticket()).unwrap();
     assert_eq!(
-        [0, 1, 2].map(|x| space2.get_lighting([x, 0, 0]).status()),
+        [0, 1, 2].map(|x| space2.get_light([x, 0, 0]).status()),
         [Opaque, Visible, NoRays]
     );
 }

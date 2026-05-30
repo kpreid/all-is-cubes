@@ -89,7 +89,7 @@ Options:
           
           [default: demo-city]
           [possible values: demo-city, dungeon, islands, atrium, cornell-box, menger-sponge,
-          lighting-bench]
+          light-bench]
 
       --teleport <POS,DIR>
           Move the player character to a new position on loading.

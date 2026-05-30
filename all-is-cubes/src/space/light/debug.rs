@@ -1,5 +1,5 @@
 //! Data structures and helper traits for getting detailed debug info
-//! out of the lighting algorithm.
+//! out of the light propagation algorithm.
 //!
 //! Note that this entire module is `doc(hidden)`; pub items inside it
 //! are for intra-project use only.
@@ -11,7 +11,7 @@ use crate::raycast::Ray;
 use crate::space::PackedLight;
 
 /// Trait used to encourage the generation of with-debug-info and without-info versions
-/// of the lighting algorithm.
+/// of the light propagation algorithm.
 #[expect(unnameable_types, reason = "sealed trait")]
 pub trait LightComputeOutput {
     type RayInfoBuffer: Default;

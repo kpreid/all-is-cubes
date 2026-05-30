@@ -311,7 +311,7 @@ impl PageInst {
             .execute_1(&space, txn)
             .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;
 
-        // Initialize lighting
+        // Initialize light
         universe
             .mutate_space(&space, |m| {
                 m.fast_evaluate_light();

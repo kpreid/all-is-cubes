@@ -44,7 +44,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
             );
         }
 
-        // Lighting trace at cursor
+        // Light propagation trace at cursor
         if graphics_options.debug_light_rays_at_cursor
             && let Some(cursor) = cursor_result
         {

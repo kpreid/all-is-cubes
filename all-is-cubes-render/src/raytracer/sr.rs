@@ -240,7 +240,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
     #[inline]
     pub(crate) fn get_packed_light(&self, cube: Cube) -> PackedLight {
         match self.cubes.get(cube) {
-            Some(b) => b.lighting,
+            Some(b) => b.light,
             None => self.block_sky.light_outside(self.cubes.bounds(), cube),
         }
     }
@@ -543,7 +543,7 @@ impl Fmt<StatusText> for RaytraceInfo {
 fn prepare_cubes(space: &space::Read<'_>) -> Vol<Box<[TracingCubeData]>> {
     space.extract(space.bounds(), |e| TracingCubeData {
         block_index: e.block_index(),
-        lighting: e.light(),
+        light: e.light(),
         always_invisible: e.block_data().block() == &AIR,
     })
 }
@@ -552,7 +552,7 @@ fn prepare_cubes(space: &space::Read<'_>) -> Vol<Box<[TracingCubeData]>> {
 #[derive(Clone, Debug)]
 pub(in crate::raytracer) struct TracingCubeData {
     pub block_index: BlockIndex,
-    pub lighting: PackedLight,
+    pub light: PackedLight,
     /// True if the block is [`AIR`].
     ///
     /// This special information allows us to skip an indirect memory access in this

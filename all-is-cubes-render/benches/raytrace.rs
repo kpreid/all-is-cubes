@@ -6,7 +6,7 @@ use criterion::measurement::WallTime;
 use criterion::{Bencher, Criterion, criterion_group, criterion_main};
 
 use all_is_cubes::character::Character;
-use all_is_cubes::content::testing::lighting_bench_space;
+use all_is_cubes::content::testing::light_bench_space;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::listen;
 use all_is_cubes::universe::{StrongHandle, Universe};
@@ -25,7 +25,7 @@ struct TestData {
 impl TestData {
     async fn new() -> Self {
         let mut universe = Universe::new();
-        let mut space = lighting_bench_space(
+        let mut space = light_bench_space(
             &mut universe,
             yield_progress_for_testing(),
             size3(54, 16, 54),

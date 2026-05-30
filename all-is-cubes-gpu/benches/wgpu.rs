@@ -89,7 +89,7 @@ async fn create_updated_renderer(
     Arc<Mutex<headless::Renderer>>,
 ) {
     let mut universe = Universe::new();
-    let space = all_is_cubes::content::testing::lighting_bench_space(
+    let space = all_is_cubes::content::testing::light_bench_space(
         &mut universe,
         all_is_cubes::util::yield_progress_for_testing(),
         size3(50, 50, 50),

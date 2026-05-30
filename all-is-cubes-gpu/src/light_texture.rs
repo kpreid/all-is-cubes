@@ -382,7 +382,7 @@ impl LightTexture {
                             // we're updating either a volume or a plane, which will have at least
                             // one of a long Y axis or a long Z axis.
                             for (x, light_value) in core::iter::zip(region.x_range(), x_chunk.iter_mut()) {
-                                *light_value = space.get_lighting([x, y, z]).as_texel();
+                                *light_value = space.get_light([x, y, z]).as_texel();
                             }
                         });
                     });
@@ -394,7 +394,7 @@ impl LightTexture {
                 for z in region.z_range() {
                     for y in region.y_range() {
                         for x in region.x_range() {
-                            buffer.push(space.get_lighting([x, y, z]).as_texel());
+                            buffer.push(space.get_light([x, y, z]).as_texel());
                         }
                     }
                 }
@@ -466,7 +466,7 @@ impl LightTexture {
                             .div_euclid(LIGHT_CHUNK_SIZE_I32.width * LIGHT_CHUNK_SIZE_I32.height),
                     );
 
-                    space.get_lighting(first_cube + offset).as_texel()
+                    space.get_light(first_cube + offset).as_texel()
                 });
 
                 // TODO: When compute shaders are available, use a compute shader to do these

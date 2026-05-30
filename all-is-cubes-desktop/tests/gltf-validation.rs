@@ -49,10 +49,10 @@ fn print_output(output: &process::Output) {
 
 #[test]
 fn non_animated() {
-    gltf_round_trip_test(&["--template=lighting-bench"])
+    gltf_round_trip_test(&["--template=light-bench"])
 }
 
 #[test]
 fn animated() {
-    gltf_round_trip_test(&["--template=lighting-bench", "--duration=0.2"])
+    gltf_round_trip_test(&["--template=light-bench", "--duration=0.2"])
 }

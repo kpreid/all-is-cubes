@@ -348,7 +348,7 @@ fn extract() {
 
     let extract_bounds = GridAab::from_lower_size([1, 0, 0], [1, 1, 1]);
     let extracted: Vol<Box<[Block]>> = space.extract(extract_bounds, |e| {
-        // TODO: arrange to sanity check index and lighting
+        // TODO: arrange to sanity check index and light
         let block = e.block_data().block().clone();
         assert_eq!(
             block.evaluate(ReadTicket::stub()).unwrap(),
@@ -684,10 +684,10 @@ fn set_physics_light_rays() {
 
     assert_eq!(space.light.contents.volume(), 2);
     assert_eq!(
-        space.get_lighting([0, 0, 0]),
+        space.get_light([0, 0, 0]),
         space.light.block_sky.in_direction(Face::NX)
     );
-    assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::OPAQUE);
+    assert_eq!(space.get_light([1, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(space.light.light_update_queue.len(), 1);
     // TODO: test what change notifications are sent
 }

@@ -87,9 +87,10 @@ pub type BlockIndex = u16;
 ///   Set using [`Space::mutate()`] or [`SpaceTransaction`]; and
 ///   read using [the indexing operator](#impl-Index%3CT%3E-for-Space), [`Space::get_evaluated()`], [`Space::get_block_index()`],
 ///   and [`Space::extract()`].
-/// * Information about light passing through the space and falling on each block.
+/// * The light field, specifying light passing through the space and falling on each block,
+///   at a resolution of one sample per cube.
 ///   Light can be emitted by blocks and by the surrounding “sky”.
-///   Updated automatically and read using [`Space::get_lighting()`] or [`Space::extract()`].
+///   Updated automatically and read using [`Space::get_light()`] or [`Space::extract()`].
 /// * [`SpacePhysics`] defining global properties of the space.
 ///   Set using [`Space::set_physics()`] and read using [`Space::physics()`].
 /// * A default [`Spawn`] location for characters entering the space.
@@ -280,7 +281,7 @@ impl Space {
                     Box::from(contents_buffer),
                     LightStorage::new(
                         &physics,
-                        physics.light.initialize_lighting(bounds, opacity)?,
+                        physics.light.initialize_light(bounds, opacity)?,
                         LightUpdateQueue::new(), // TODO: nonempty if opacity is partial
                     ),
                 )
@@ -311,10 +312,9 @@ impl Space {
                     }
                     _ => LightStorage::new(
                         &physics,
-                        physics.light.initialize_lighting(
-                            bounds,
-                            palette.all_block_opacities_as_category(),
-                        )?,
+                        physics
+                            .light
+                            .initialize_light(bounds, palette.all_block_opacities_as_category())?,
                         LightUpdateQueue::new(), // TODO: nonempty if needed
                     ),
                 };
@@ -394,18 +394,19 @@ impl Space {
         }
     }
 
-    /// Returns the light occupying the given cube.
+    /// Returns the light passing into the given cube.
     ///
-    /// This value may be considered as representing the average of the light reflecting
-    /// off of all surfaces within, or immediately adjacent to and facing toward, this cube.
-    /// If there are no such surfaces, or if the given position is out of bounds, the result
-    /// is arbitrary. If the position is within an opaque block, the result is black.
+    /// This value may be considered as representing the average of the light falling on all
+    /// surfaces within, or immediately adjacent to and facing toward, this cube.
+    /// If there are no such surfaces, if the given position is out of bounds,
+    /// or if it position is within an opaque block, the result is black and has a status value
+    /// indicating this circumstance.
     ///
-    /// Lighting is updated asynchronously after modifications, so all above claims about
+    /// Light is updated asynchronously after modifications, so all above claims about
     /// the meaning of this value are actually “will eventually be, if no more changes are
     /// made”.
     #[inline(always)]
-    pub fn get_lighting(&self, cube: impl Into<Cube>) -> PackedLight {
+    pub fn get_light(&self, cube: impl Into<Cube>) -> PackedLight {
         self.light.get(cube.into())
     }
 
@@ -602,7 +603,7 @@ impl Space {
 
     /// Sets the physics parameters, as per [`physics`](Self::physics).
     ///
-    /// This may cause immediate recomputation of lighting.
+    /// This may cause immediate recomputation of light.
     pub fn set_physics(&mut self, physics: SpacePhysics) {
         if physics == self.physics {
             return;
@@ -713,18 +714,19 @@ impl Read<'_> {
         }
     }
 
-    /// Returns the light occupying the given cube.
+    /// Returns the light passing into the given cube.
     ///
-    /// This value may be considered as representing the average of the light reflecting
-    /// off of all surfaces within, or immediately adjacent to and facing toward, this cube.
-    /// If there are no such surfaces, or if the given position is out of bounds, the result
-    /// is arbitrary. If the position is within an opaque block, the result is black.
+    /// This value may be considered as representing the average of the light falling on all
+    /// surfaces within, or immediately adjacent to and facing toward, this cube.
+    /// If there are no such surfaces, if the given position is out of bounds,
+    /// or if it position is within an opaque block, the result is black and has a status value
+    /// indicating this circumstance.
     ///
-    /// Lighting is updated asynchronously after modifications, so all above claims about
+    /// Light is updated asynchronously after modifications, so all above claims about
     /// the meaning of this value are actually “will eventually be, if no more changes are
     /// made”.
     #[inline(always)]
-    pub fn get_lighting(&self, cube: impl Into<Cube>) -> PackedLight {
+    pub fn get_light(&self, cube: impl Into<Cube>) -> PackedLight {
         self.light.get(cube.into())
     }
 
@@ -817,7 +819,7 @@ impl Read<'_> {
                 },
             )
         };
-        light.compute_lighting(uc, cube)
+        light.compute_light(uc, cube)
     }
 
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu for debugging visualization
@@ -1499,7 +1501,7 @@ impl<'space> Mutation<'_, 'space> {
 
         let mut total = 0;
         loop {
-            let info = light.update_lighting_from_queue(
+            let info = light.update_light_from_queue(
                 uc,
                 change_buffer,
                 Some(Duration::from_secs_f32(0.25)),
@@ -1538,7 +1540,7 @@ impl<'space> Mutation<'_, 'space> {
     #[doc(hidden)] // kludge used by session for tool usage
     pub fn evaluate_light_for_time(&mut self, budget: Duration) -> LightUpdatesInfo {
         let (light, uc, change_buffer) = self.borrow_light_update_context();
-        light.update_lighting_from_queue(uc, change_buffer, Some(budget))
+        light.update_light_from_queue(uc, change_buffer, Some(budget))
     }
 
     /// Produce a bundle of borrows to run light updating functions.

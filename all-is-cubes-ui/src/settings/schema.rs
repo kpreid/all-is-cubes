@@ -270,8 +270,8 @@ pub enum Key {
     )]
     ViewDistance,
 
-    /// Style in which to draw the lighting of [`Space`]s.
-    /// This does not affect the *computation* of lighting.
+    /// Style in which to draw the light in a [`Space`] on the blocks iun the space.
+    /// This does not affect the *computation* of light.
     ///
     /// * Directly sets [`GraphicsOptions::lighting_display`].
     #[custom(
