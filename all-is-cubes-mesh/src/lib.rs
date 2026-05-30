@@ -76,6 +76,7 @@ mod depth_sorting;
 pub use depth_sorting::{DepthOrdering, DepthSortInfo, DepthSortResult};
 #[cfg(feature = "dynamic")]
 pub mod dynamic;
+mod heap;
 mod index_vec;
 pub use index_vec::*;
 pub mod planar;

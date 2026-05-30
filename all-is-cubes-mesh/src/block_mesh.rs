@@ -11,6 +11,7 @@ use all_is_cubes::math::{Face, FaceMap};
 use all_is_cubes::space;
 use all_is_cubes_render::Flaws;
 
+use crate::heap::{self, HeapUsage};
 use crate::texture::{self, Tile as _};
 use crate::{Aabbs, IndexVec, MeshOptions, MeshTypes, Vertex, planar};
 
@@ -229,6 +230,24 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     #[cfg_attr(not(feature = "dynamic"), allow(dead_code))]
     pub(crate) fn count_indices(&self) -> usize {
         self.all_sub_meshes().map(SubMesh::count_indices).sum()
+    }
+
+    /// Returns the total memory occupied by this [`BlockMesh`] value and all its owned objects,
+    /// not counting the texture it references or allocator overhead.
+    pub fn total_byte_size(&self) -> usize {
+        let BlockMesh {
+            face_vertices,
+            interior_vertices,
+            texture_used: _,
+            voxel_opacity_mask, // TODO: we should be counting this
+            flaws: _,
+        } = self;
+
+        size_of::<Self>()
+            + (face_vertices.values().chain(interior_vertices.values()))
+                .map(HeapUsage::heap_bytes_owned)
+                .sum::<usize>()
+            + voxel_opacity_mask.heap_bytes_owned()
     }
 
     /// Update this mesh's textures in-place to the given new block data, if this is
@@ -502,6 +521,24 @@ impl<V: Vertex> SubMesh<V> {
 impl<V: Vertex> Default for SubMesh<V> {
     fn default() -> Self {
         Self::EMPTY
+    }
+}
+
+impl<V: Vertex> HeapUsage for SubMesh<V> {
+    fn heap_bytes_owned(&self) -> usize {
+        let Self {
+            vertices: (v0, v1),
+            indices_opaque,
+            indices_transparent,
+            fully_opaque: _,
+            has_non_rect_transparency: _,
+            bounding_box: _,
+        } = self;
+        // vertices cannot own anything further
+        heap::capacity_bytes(v0)
+            + heap::capacity_bytes(v1)
+            + indices_opaque.heap_bytes_owned()
+            + indices_transparent.heap_bytes_owned()
     }
 }
 

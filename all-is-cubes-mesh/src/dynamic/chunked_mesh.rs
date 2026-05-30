@@ -634,6 +634,13 @@ where
                 block_updates,
 
                 // TODO: remember this rather than computing it
+                block_count: self.block_meshes.meshes.len(),
+                block_total_cpu_byte_size: self
+                    .block_meshes
+                    .meshes
+                    .iter()
+                    .map(|vbm| vbm.mesh.total_byte_size())
+                    .sum(),
                 chunk_count: self.chunks.len(),
                 chunk_total_cpu_byte_size: self
                     .chunks
@@ -720,6 +727,11 @@ pub struct CsmUpdateInfo {
     /// Time spent on building block meshes this frame.
     block_updates: dynamic::blocks::VbmUpdateInfo,
 
+    /// Number of block meshes that currently exist.
+    pub block_count: usize,
+    /// Total in-memory size of block mesh data.
+    pub block_total_cpu_byte_size: usize,
+
     /// Number of chunks that currently exist.
     pub chunk_count: usize,
     /// Total in-memory size of chunk data (not counting [`ChunkMesh::render_data`]).
@@ -744,6 +756,8 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                 },
             depth_sort_times,
             block_updates,
+            block_count,
+            block_total_cpu_byte_size,
             chunk_count,
             chunk_total_cpu_byte_size,
         } = self;
@@ -757,7 +771,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                       inst gen {chunk_instance_generation_times}
                       Z sort   {depth_sort_times} ({elements_sorted:6} elems grouped in {groups_sorted:3} dyn + {static_groups_sorted:3} static)
                       upload   {chunk_mesh_callback_times}
-                Mem: {chunk_mib} MiB for {chunk_count} chunks\
+                Mem: {block_mib} MiB for {block_count} blocks, {chunk_mib} MiB for {chunk_count} chunks\
             "},
             flaws = flaws,
             prep_time = prep_time.refmt(fopt),
@@ -772,6 +786,8 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             depth_sort_times = depth_sort_times,
             chunk_mib = chunk_total_cpu_byte_size / (1024 * 1024),
             chunk_count = chunk_count,
+            block_mib = block_total_cpu_byte_size / (1024 * 1024),
+            block_count = block_count,
         )
     }
 }
@@ -793,6 +809,8 @@ impl CsmUpdateInfo {
             depth_sort_info,
             depth_sort_times,
             block_updates,
+            block_count,
+            block_total_cpu_byte_size,
             chunk_count,
             chunk_total_cpu_byte_size,
         } = self;
@@ -806,6 +824,8 @@ impl CsmUpdateInfo {
         *depth_sort_info += other.depth_sort_info;
         *depth_sort_times += other.depth_sort_times;
         *block_updates += other.block_updates;
+        *block_count = other.block_count; // replace!
+        *block_total_cpu_byte_size = other.block_total_cpu_byte_size; // replace!
         *chunk_count = other.chunk_count; // replace!
         *chunk_total_cpu_byte_size = other.chunk_total_cpu_byte_size; // replace!
     }
