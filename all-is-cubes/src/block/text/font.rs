@@ -8,7 +8,7 @@ use crate::block::text::{self, layout::InGlyph};
 use crate::camera::{ImagePixel, ImageSize};
 use crate::content::load_image::DecodedPng;
 use crate::math::{GridAab, GridCoordinate, u32size};
-use crate::universe;
+use crate::universe::{self, ReadTicket};
 
 #[cfg(doc)]
 use crate::block::text::Text;
@@ -106,7 +106,7 @@ impl Font {
     )]
     pub fn draw_str_monospaced(
         &self,
-        read_ticket: universe::ReadTicket<'_>,
+        read_ticket: ReadTicket<'_>,
         text: &str,
         mut set_pixel: impl FnMut(Point2D<i32, euclid::UnknownUnit>, Value),
     ) -> Result<(), universe::HandleError> {
