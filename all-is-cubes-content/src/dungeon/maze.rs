@@ -1,8 +1,8 @@
 //! Generates a random abstract maze, for refinement into a dungeon elsewhere.
 
-use alloc::vec;
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
+use alloc::vec;
 
 use rand::SeedableRng;
 use rand::seq::{IteratorRandom as _, SliceRandom as _};

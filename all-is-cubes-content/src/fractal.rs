@@ -1,5 +1,5 @@
-use alloc::vec;
 use alloc::boxed::Box;
+use alloc::vec;
 use core::iter;
 
 use either::Either;
