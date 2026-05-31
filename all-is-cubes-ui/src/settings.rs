@@ -12,7 +12,7 @@ use hashbrown::HashMap;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::listen::{self, Source as _};
-use all_is_cubes_render::camera::{GraphicsOptions, LightingOption, RenderMethod};
+use all_is_cubes_render::camera::GraphicsOptions;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -454,17 +454,11 @@ impl<T: Clone + Send + Sync + 'static> Incrementer<T> {
         T: PartialEq,
     {
         /// Whether a value should be included in incrementing, rather than skipped.
-        fn include_value<T: 'static>(data: &Data, value: &T) -> bool {
-            // Special rule for excluding `LightingOption::Bounce` when `RenderMethod` is not
-            // `Reference`, because it does nothing in those cases.
-            // TODO: Have a general system for all settings, instead of a special case.
-            if let Some(lighting_option) = <dyn Any>::downcast_ref::<LightingOption>(value)
-                && *RENDER_METHOD.read(data) != RenderMethod::Reference
-            {
-                *lighting_option != LightingOption::Bounce
-            } else {
-                true
-            }
+        fn include_value<T: 'static>(_data: &Data, _value: &T) -> bool {
+            // TODO: Have a general system for settings to specify conditions under which some
+            // values should be skipped as inapplicable to the current combination of settings
+            // or supported features.
+            true
         }
 
         let list = self.0.offered_value_list();
@@ -588,7 +582,6 @@ mod tests {
     use super::*;
     use all_is_cubes::arcstr::literal;
     use all_is_cubes::math::ps64;
-    use all_is_cubes_render::camera::{LightingOption, RenderMethod};
 
     /// Construct `Data` with a single non-default setting.
     fn one<T: Send + Sync + 'static>(key: &TypedKey<T>, value: T) -> Data {
@@ -689,17 +682,24 @@ mod tests {
     }
 
     #[test]
-    fn increment_cycle() {
-        let i = LIGHTING_DISPLAY.incrementer().unwrap();
+    fn increment_enum() {
+        use LightInterpolation as I;
+        let i = LIGHT_INTERPOLATION.incrementer().unwrap();
+        let adj = |value, forward, wrapping| {
+            i.adjustment(&one(LIGHT_INTERPOLATION, value), forward, wrapping)
+        };
 
-        assert_eq!(
-            i.adjustment(&one(LIGHTING_DISPLAY, LightingOption::Flat), true, false),
-            Some(LightingOption::Coarse),
-        );
-        assert_eq!(
-            i.adjustment(&one(LIGHTING_DISPLAY, LightingOption::Flat), false, false),
-            Some(LightingOption::None),
-        );
+        // Flat is the first value of the enum, so backward wraps or returns None.
+        assert_eq!(adj(I::Flat, true, false), Some(I::Coarse));
+        assert_eq!(adj(I::Flat, false, false), None);
+        assert_eq!(adj(I::Flat, true, true), Some(I::Coarse));
+        assert_eq!(adj(I::Flat, false, true), Some(I::Smoothstep));
+
+        // Smoothstep is the last value of the enum, so forward wraps or returns None.
+        assert_eq!(adj(I::Smoothstep, true, false), None);
+        assert_eq!(adj(I::Smoothstep, false, false), Some(I::Linear));
+        assert_eq!(adj(I::Smoothstep, true, true), Some(I::Flat));
+        assert_eq!(adj(I::Smoothstep, false, true), Some(I::Linear));
     }
 
     #[test]
@@ -742,11 +742,13 @@ mod tests {
         assert_eq!(new, ps64(61.0));
     }
 
-    /// Test the special case conditionally excluding [`LightingOption::Bounce`] from incrementing.
+    /// Test conditional exclusion of values from incrementing.
     ///
-    /// TODO: This test should belong in `schema` once this is handled more generically.
+    /// TODO: There are currently no such conditional exclusions and this test cannot be written.
+    /// (`LightingOption::Bounce` used to be such a special case when it was used as a setting.)
     #[test]
-    fn increment_lighting_option_bounce() {
+    #[cfg(false)]
+    fn increment_conditional_exclusion() {
         fn setup(lighting: LightingOption, render: RenderMethod) -> Data {
             Data::from_iter([
                 (

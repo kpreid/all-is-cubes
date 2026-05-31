@@ -10,7 +10,7 @@ use all_is_cubes::math::{FreeCoordinate, FreeVector};
 use all_is_cubes::physics;
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{self, Handle, Universe};
-use all_is_cubes_render::camera::{NdcPoint2, NominalPixel, Viewport};
+use all_is_cubes_render::camera::{self, NdcPoint2, NominalPixel, Viewport};
 
 use crate::settings;
 use crate::{apps::ControlMessage, settings::Settings};
@@ -360,7 +360,38 @@ impl InputProcessor {
                     }
                 }
                 Key::Character('i') => {
-                    increment(settings, settings::LIGHTING_DISPLAY);
+                    // TODO: Eventually, instead of hardcoding this particular complex key binding,
+                    // this should look more like a single usage of a system for user-defined
+                    // shortcuts to change settings, that might be keys or on-screen buttons or
+                    // something else.
+
+                    if let Some(settings) = settings {
+                        let current = &settings.get();
+                        let enabled = *settings::LIGHTING_ENABLED.read(current);
+                        let bounce = *settings::LIGHTING_BOUNCE.read(current);
+                        // TODO: what we should actually be asking is, is raytracing enabled
+                        // *and actually supported*, but we don't have a way to ask that question.
+                        let rt = matches!(
+                            settings::RENDER_METHOD.read(current),
+                            camera::RenderMethod::Reference
+                        );
+
+                        // Cycles through three configurations:
+                        // * no lighting
+                        // * interpolated lighting
+                        // * bounce rays (but only if raytracing is enabled, otherwise skip)
+                        match (enabled, bounce, rt) {
+                            (false, _, _) => settings.set(settings::LIGHTING_ENABLED, true),
+                            (true, false, false) => settings.set(settings::LIGHTING_ENABLED, false),
+                            (true, false, true) => settings.set(settings::LIGHTING_BOUNCE, true),
+                            (true, true, _) => {
+                                if rt {
+                                    settings.set(settings::LIGHTING_BOUNCE, false);
+                                }
+                                settings.set(settings::LIGHTING_ENABLED, false);
+                            }
+                        }
+                    }
                 }
                 Key::Character('l') => {
                     // TODO: duplicated with fn toggle_mouselook_mode() because of borrow conflicts

@@ -61,7 +61,7 @@ pub struct SettingsArgs {
     ///
     /// The value is specified as a key-value pair where the key is an unquoted string, the
     /// separator is “=”, and the value is a string depending on the particular setting;
-    /// for example: -Sgraphics/lighting-display=None
+    /// for example: -Sgraphics/lighting=false
     ///
     /// Using this option disables writing settings back to disk.
     #[arg(long = "set", short = 'S', value_parser = parse_configure, value_name="NAME=VALUE")]

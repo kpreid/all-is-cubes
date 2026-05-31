@@ -270,18 +270,51 @@ pub enum Key {
     )]
     ViewDistance,
 
-    /// Style in which to draw the light in a [`Space`] on the blocks iun the space.
+    /// Whether to render the light in [`Space`]s.
     /// This does not affect the *computation* of light.
     ///
-    /// * Directly sets [`GraphicsOptions::lighting_display`].
+    /// * Indirectly controls [`GraphicsOptions::lighting_display`].
     #[custom(
-        key = "graphics/lighting-display",
-        type = camera::LightingOption,
+        key = "graphics/lighting",
+        type = bool,
         display_name = "Lighting",
-        default = GraphicsOptions::default().lighting_display,
+        default = true,
         offered_value_list = Exhaust::exhaust(),
     )]
-    LightingDisplay,
+    LightingEnabled,
+
+    /// Style in which to interpolate the light in a [`Space`].
+    ///
+    /// * Indirectly controls [`GraphicsOptions::lighting_display`].
+    /// * Has no effect if [`Self::LightingEnabled`] is [`false`].
+    /// * Has no effect if [`Self::LightingBounce`] is [`true`]
+    ///   and the renderer supports [`camera::LightingOption::Bounce`].
+    #[custom(
+        key = "graphics/light-interpolation",
+        type = LightInterpolation,
+        display_name = "Light Interpolation",
+        default = LightInterpolation::default(),
+        offered_value_list = Exhaust::exhaust(),
+    )]
+    LightInterpolation,
+
+    /// Whether to raytrace from surfaces for lighting them, instead of using the cube-resolution
+    /// light data stored in the [`Space`].
+    ///
+    /// When supported by the renderer, enabling this replaces [`Self::LightInterpolation`]
+    /// interpolation.
+    /// (TODO: Actually, we currently don't track whether the renderer supports this.)
+    ///
+    /// * Indirectly controls [`GraphicsOptions::lighting_display`].
+    /// * Has no effect if [`Self::LightingEnabled`] is [`false`].
+    #[custom(
+        key = "graphics/bounce-lighting",
+        type = bool,
+        display_name = "Bounce Lighting",
+        default = false,
+        offered_value_list = Exhaust::exhaust(),
+    )]
+    LightingBounce,
 
     /// Method/fidelity to use for transparency.
     ///
@@ -445,6 +478,40 @@ impl<'de> serde::Deserialize<'de> for Key {
 // -------------------------------------------------------------------------------------------------
 // Settings translating to `GraphicsOptions`
 
+/// Value of the [`LIGHT_INTERPOLATION`] setting.
+///
+/// Differs from [`camera::LightingOption`] in that it is a value-less enum and does not have
+/// [`camera::LightingOption::None`] or [`camera::LightingOption::Bounce`].
+#[derive(
+    Clone, Copy, Debug, Default, Eq, PartialEq, strum::Display, strum::EnumString, Exhaust,
+)]
+#[non_exhaustive]
+pub enum LightInterpolation {
+    /// Light is taken from the volume immediately above a cube face.
+    /// Edges between cubes are visible.
+    ///
+    /// (This option is named after [flat shading], rather than “flat” as opposed to curved or
+    /// rough.)
+    ///
+    /// [flat shading]: https://en.wikipedia.org/w/index.php?title=Shading&oldid=1337938191#Flat_shading
+    Flat,
+
+    /// Light is interpolated in four steps (i.e. 16 squares on one block face),
+    /// for a deliberately pixelated look.
+    Coarse,
+
+    /// Light data is linearly interpolated across surfaces, between adjacent cubes.
+    #[default]
+    Linear,
+
+    /// Light is interpolated using the [smoothstep] function, which makes things slightly
+    /// blockier than [`Linear`][Self::Linear].
+    ///
+    /// [smoothstep]: https://en.wikipedia.org/wiki/Smoothstep
+    Smoothstep,
+}
+impl_string_form_via_from_str_and_display!(LightInterpolation);
+
 /// Value of the [`EXPOSURE_MODE`] setting.
 ///
 /// Differs from [`camera::ExposureOption`] in that it is a value-less enum; the fixed exposure is
@@ -499,7 +566,18 @@ pub(super) fn assemble_graphics_options(data: &super::Data) -> GraphicsOptions {
     };
     options.bloom_intensity = *data.get(BLOOM_INTENSITY);
     options.view_distance = *data.get(VIEW_DISTANCE);
-    options.lighting_display = data.get(LIGHTING_DISPLAY).clone();
+    options.lighting_display = if !*data.get(LIGHTING_ENABLED) {
+        camera::LightingOption::None
+    } else if *data.get(LIGHTING_BOUNCE) {
+        camera::LightingOption::Bounce
+    } else {
+        match *data.get(LIGHT_INTERPOLATION) {
+            LightInterpolation::Flat => camera::LightingOption::Flat,
+            LightInterpolation::Coarse => camera::LightingOption::Coarse,
+            LightInterpolation::Linear => camera::LightingOption::Linear,
+            LightInterpolation::Smoothstep => camera::LightingOption::Smoothstep,
+        }
+    };
     options.transparency = match data.get(TRANSPARENCY) {
         TransparencyMode::Surface => camera::TransparencyOption::Surface,
         TransparencyMode::Volumetric => camera::TransparencyOption::Volumetric,

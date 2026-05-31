@@ -99,11 +99,21 @@ pub(crate) fn setting_widget(
             settings::BLOOM_INTENSITY,
         )),
         Key::ViewDistance => None, // TODO
-        Key::LightingDisplay => Some(setting_enum_button(
+        Key::LightingEnabled => Some(setting_toggle_button(
             hud_inputs,
             style,
-            literal!("Light"),
-            settings::LIGHTING_DISPLAY,
+            settings::LIGHTING_ENABLED,
+        )),
+        Key::LightInterpolation => Some(setting_enum_button(
+            hud_inputs,
+            style,
+            literal!("Light Interpolation"),
+            settings::LIGHT_INTERPOLATION,
+        )),
+        Key::LightingBounce => Some(setting_toggle_button(
+            hud_inputs,
+            style,
+            settings::LIGHTING_BOUNCE,
         )),
         Key::Transparency => Some(setting_enum_button(
             hud_inputs,
