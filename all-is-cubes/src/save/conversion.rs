@@ -82,7 +82,7 @@ mod block {
     use super::*;
     use crate::block::{
         AnimationChange, AnimationHint, Atom, Block, BlockCollision, Composite, Modifier, Move,
-        PlacementAction, Primitive, Quote, RotationPlacementRule, TickAction, Zoom, text,
+        PlacementAction, Primitive, Quote, RotationPlacementRule, TickAction, Zoom,
     };
     use crate::math::{Rgb, Rgba};
     use crate::tag;
@@ -441,108 +441,6 @@ mod block {
     }
 
     // Since `Text` has private fields, its `From` impls are in its module.
-
-    impl From<&text::Font> for schema::FontSer {
-        fn from(value: &text::Font) -> Self {
-            match value {
-                text::Font::System16 => schema::FontSer::System16V1,
-                text::Font::Logo => schema::FontSer::LogoV1,
-                text::Font::SmallerBodyText => schema::FontSer::UnstableSmallerBodyTextV1,
-            }
-        }
-    }
-
-    impl From<schema::FontSer> for text::Font {
-        fn from(value: schema::FontSer) -> Self {
-            match value {
-                schema::FontSer::System16V1 => text::Font::System16,
-                schema::FontSer::LogoV1 => text::Font::Logo,
-                schema::FontSer::UnstableSmallerBodyTextV1 => text::Font::SmallerBodyText,
-            }
-        }
-    }
-
-    impl From<text::Positioning> for schema::PositioningSerV1 {
-        fn from(value: text::Positioning) -> Self {
-            let text::Positioning { x, line_y, z } = value;
-            schema::PositioningSerV1 {
-                x: x.into(),
-                line_y: line_y.into(),
-                z: z.into(),
-            }
-        }
-    }
-
-    impl From<schema::PositioningSerV1> for text::Positioning {
-        fn from(value: schema::PositioningSerV1) -> Self {
-            let schema::PositioningSerV1 { x, line_y, z } = value;
-            text::Positioning {
-                x: x.into(),
-                line_y: line_y.into(),
-                z: z.into(),
-            }
-        }
-    }
-
-    impl From<text::PositioningX> for schema::PositioningXSer {
-        fn from(value: text::PositioningX) -> Self {
-            match value {
-                text::PositioningX::Left => schema::PositioningXSer::LeftV1,
-                text::PositioningX::Center => schema::PositioningXSer::CenterV1,
-                text::PositioningX::Right => schema::PositioningXSer::RightV1,
-            }
-        }
-    }
-
-    impl From<schema::PositioningXSer> for text::PositioningX {
-        fn from(value: schema::PositioningXSer) -> Self {
-            match value {
-                schema::PositioningXSer::LeftV1 => text::PositioningX::Left,
-                schema::PositioningXSer::CenterV1 => text::PositioningX::Center,
-                schema::PositioningXSer::RightV1 => text::PositioningX::Right,
-            }
-        }
-    }
-
-    impl From<text::PositioningY> for schema::PositioningYSer {
-        fn from(value: text::PositioningY) -> Self {
-            match value {
-                text::PositioningY::BodyTop => schema::PositioningYSer::BodyTopV1,
-                text::PositioningY::BodyMiddle => schema::PositioningYSer::BodyMiddleV1,
-                text::PositioningY::Baseline => schema::PositioningYSer::BaselineV1,
-                text::PositioningY::BodyBottom => schema::PositioningYSer::BodyBottomV1,
-            }
-        }
-    }
-
-    impl From<schema::PositioningYSer> for text::PositioningY {
-        fn from(value: schema::PositioningYSer) -> Self {
-            match value {
-                schema::PositioningYSer::BodyTopV1 => text::PositioningY::BodyTop,
-                schema::PositioningYSer::BodyMiddleV1 => text::PositioningY::BodyMiddle,
-                schema::PositioningYSer::BaselineV1 => text::PositioningY::Baseline,
-                schema::PositioningYSer::BodyBottomV1 => text::PositioningY::BodyBottom,
-            }
-        }
-    }
-
-    impl From<text::PositioningZ> for schema::PositioningZSer {
-        fn from(value: text::PositioningZ) -> Self {
-            match value {
-                text::PositioningZ::Front => schema::PositioningZSer::FrontV1,
-                text::PositioningZ::Back => schema::PositioningZSer::BackV1,
-            }
-        }
-    }
-
-    impl From<schema::PositioningZSer> for text::PositioningZ {
-        fn from(value: schema::PositioningZSer) -> Self {
-            match value {
-                schema::PositioningZSer::FrontV1 => text::PositioningZ::Front,
-                schema::PositioningZSer::BackV1 => text::PositioningZ::Back,
-            }
-        }
-    }
 }
 
 // `character::Character` and `character::Spawn` serialization are inside their module
@@ -1127,6 +1025,113 @@ mod tag {
         {
             match schema::TagDefSer::deserialize(deserializer)? {
                 schema::TagDefSer::TagDefV1 {} => Ok(TagDef),
+            }
+        }
+    }
+}
+
+mod text {
+    use super::*;
+    use crate::text;
+
+    impl From<&text::Font> for schema::FontSer {
+        fn from(value: &text::Font) -> Self {
+            match value {
+                text::Font::System16 => schema::FontSer::System16V1,
+                text::Font::Logo => schema::FontSer::LogoV1,
+                text::Font::SmallerBodyText => schema::FontSer::UnstableSmallerBodyTextV1,
+            }
+        }
+    }
+
+    impl From<schema::FontSer> for text::Font {
+        fn from(value: schema::FontSer) -> Self {
+            match value {
+                schema::FontSer::System16V1 => text::Font::System16,
+                schema::FontSer::LogoV1 => text::Font::Logo,
+                schema::FontSer::UnstableSmallerBodyTextV1 => text::Font::SmallerBodyText,
+            }
+        }
+    }
+
+    impl From<text::Positioning> for schema::PositioningSerV1 {
+        fn from(value: text::Positioning) -> Self {
+            let text::Positioning { x, line_y, z } = value;
+            schema::PositioningSerV1 {
+                x: x.into(),
+                line_y: line_y.into(),
+                z: z.into(),
+            }
+        }
+    }
+
+    impl From<schema::PositioningSerV1> for text::Positioning {
+        fn from(value: schema::PositioningSerV1) -> Self {
+            let schema::PositioningSerV1 { x, line_y, z } = value;
+            text::Positioning {
+                x: x.into(),
+                line_y: line_y.into(),
+                z: z.into(),
+            }
+        }
+    }
+
+    impl From<text::PositioningX> for schema::PositioningXSer {
+        fn from(value: text::PositioningX) -> Self {
+            match value {
+                text::PositioningX::Left => schema::PositioningXSer::LeftV1,
+                text::PositioningX::Center => schema::PositioningXSer::CenterV1,
+                text::PositioningX::Right => schema::PositioningXSer::RightV1,
+            }
+        }
+    }
+
+    impl From<schema::PositioningXSer> for text::PositioningX {
+        fn from(value: schema::PositioningXSer) -> Self {
+            match value {
+                schema::PositioningXSer::LeftV1 => text::PositioningX::Left,
+                schema::PositioningXSer::CenterV1 => text::PositioningX::Center,
+                schema::PositioningXSer::RightV1 => text::PositioningX::Right,
+            }
+        }
+    }
+
+    impl From<text::PositioningY> for schema::PositioningYSer {
+        fn from(value: text::PositioningY) -> Self {
+            match value {
+                text::PositioningY::BodyTop => schema::PositioningYSer::BodyTopV1,
+                text::PositioningY::BodyMiddle => schema::PositioningYSer::BodyMiddleV1,
+                text::PositioningY::Baseline => schema::PositioningYSer::BaselineV1,
+                text::PositioningY::BodyBottom => schema::PositioningYSer::BodyBottomV1,
+            }
+        }
+    }
+
+    impl From<schema::PositioningYSer> for text::PositioningY {
+        fn from(value: schema::PositioningYSer) -> Self {
+            match value {
+                schema::PositioningYSer::BodyTopV1 => text::PositioningY::BodyTop,
+                schema::PositioningYSer::BodyMiddleV1 => text::PositioningY::BodyMiddle,
+                schema::PositioningYSer::BaselineV1 => text::PositioningY::Baseline,
+                schema::PositioningYSer::BodyBottomV1 => text::PositioningY::BodyBottom,
+            }
+        }
+    }
+
+    impl From<text::PositioningZ> for schema::PositioningZSer {
+        fn from(value: text::PositioningZ) -> Self {
+            match value {
+                text::PositioningZ::Front => schema::PositioningZSer::FrontV1,
+                text::PositioningZ::Back => schema::PositioningZSer::BackV1,
+            }
+        }
+    }
+
+    impl From<schema::PositioningZSer> for text::PositioningZ {
+        fn from(value: schema::PositioningZSer) -> Self {
+            match value {
+                schema::PositioningZSer::FrontV1 => text::PositioningZ::Front,
+                schema::PositioningZSer::BackV1 => text::PositioningZ::Back,
             }
         }
     }

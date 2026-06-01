@@ -1,13 +1,11 @@
 use pretty_assertions::assert_eq;
 
 use all_is_cubes::arcstr::literal;
-use all_is_cubes::block::text::{
-    Font, Positioning, PositioningX, PositioningY, PositioningZ, Text,
-};
-use all_is_cubes::block::{self, Block, Primitive, Resolution};
+use all_is_cubes::block::{self, Block, Primitive, Resolution, Text};
 use all_is_cubes::euclid::size2;
 use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector, Vol};
 use all_is_cubes::space::Space;
+use all_is_cubes::text::{Font, Positioning, PositioningX, PositioningY, PositioningZ};
 use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_render::raytracer::print_space;
 

@@ -2,13 +2,14 @@ use alloc::sync::Arc;
 use alloc::vec;
 
 use all_is_cubes::arcstr::ArcStr;
-use all_is_cubes::block::{AIR, Block, Resolution, text};
+use all_is_cubes::block::{AIR, Block, Resolution};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{Size2D, size2};
 use all_is_cubes::math::{
     Cube, Face, FreeCoordinate, FreeVector, GridAab, GridCoordinate, GridSize, Rgba,
 };
 use all_is_cubes::space::{self, Space, SpacePhysics};
+use all_is_cubes::text;
 use all_is_cubes::universe::{Handle, ReadTicket, StrongHandle, Universe};
 use all_is_cubes_render::camera::{self, ViewTransform};
 

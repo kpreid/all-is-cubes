@@ -16,7 +16,7 @@ use rand::{RngExt as _, SeedableRng as _};
 use num_traits::float::Float as _;
 
 use all_is_cubes::arcstr::literal;
-use all_is_cubes::block::{self, AIR, Resolution::*, text};
+use all_is_cubes::block::{self, AIR, Resolution::*};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{Point2D, vec3};
@@ -28,6 +28,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{self, LightPhysics, Space, SpacePhysics};
+use all_is_cubes::text;
 use all_is_cubes::time::Instant;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::UniverseTransaction;
@@ -882,7 +883,7 @@ fn draw_exhibit_info(read_ticket: ReadTicket<'_>, exhibit: &Exhibit) -> Result<S
         direction: Face::NY,
         children: vec![
             vui::leaf_widget(widgets::LargeText {
-                text: text::Text::builder()
+                text: block::Text::builder()
                     .string(exhibit.name.into())
                     .font(text::Font::System16)
                     .foreground(block::from_color!(palette::ALMOST_BLACK))
@@ -894,7 +895,7 @@ fn draw_exhibit_info(read_ticket: ReadTicket<'_>, exhibit: &Exhibit) -> Result<S
                     .build(),
             }),
             vui::leaf_widget(widgets::LargeText {
-                text: text::Text::builder()
+                text: block::Text::builder()
                     .string(
                         {
                             let t = exhibit.subtitle;

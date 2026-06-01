@@ -7,13 +7,11 @@ use super::prelude::*;
     placement: Placement::SurfaceWithBackWall,
 )]
 fn TEXT(_: Context<'_>) {
-    use all_is_cubes::block::text;
-
     let foreground_block = block::from_color!(palette::HUD_TEXT_FILL);
     let outline_block = block::from_color!(palette::HUD_TEXT_STROKE);
 
     struct Texhibit {
-        text: text::Text,
+        text: block::Text,
         f: Box<dyn Fn(Block) -> Block>,
         offset: GridVector,
     }
@@ -22,7 +20,7 @@ fn TEXT(_: Context<'_>) {
 
     let texts = [
         Texhibit {
-            text: text::Text::builder()
+            text: block::Text::builder()
                 .debug(debug)
                 .string(literal!("right back"))
                 .positioning(text::Positioning {
@@ -35,7 +33,7 @@ fn TEXT(_: Context<'_>) {
             offset: vec3(0, 0, 0),
         },
         Texhibit {
-            text: text::Text::builder()
+            text: block::Text::builder()
                 .debug(debug)
                 .string(literal!("left front"))
                 .positioning(text::Positioning {
@@ -53,7 +51,7 @@ fn TEXT(_: Context<'_>) {
                 CompositeOperator::Out,
             );
             Texhibit {
-                text: text::Text::builder()
+                text: block::Text::builder()
                     .string(literal!("engraved"))
                     .resolution(R32)
                     .positioning(text::Positioning {
@@ -67,7 +65,7 @@ fn TEXT(_: Context<'_>) {
             }
         },
         Texhibit {
-            text: text::Text::builder()
+            text: block::Text::builder()
                 .debug(debug)
                 .string(literal!("left back outline"))
                 .foreground(foreground_block)
@@ -82,7 +80,7 @@ fn TEXT(_: Context<'_>) {
             offset: vec3(0, 3, 0),
         },
         Texhibit {
-            text: text::Text::builder()
+            text: block::Text::builder()
                 .debug(debug)
                 .string(literal!("weird vert bounds"))
                 .layout_bounds(R16, GridAab::from_lower_upper([0, 16, 0], [64, 64, 64]))

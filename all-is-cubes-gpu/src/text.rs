@@ -4,8 +4,8 @@ use core::iter;
 
 use itertools::iproduct;
 
-use all_is_cubes::block::text;
 use all_is_cubes::euclid::{self, Size2D, Vector2D, point2, size2};
+use all_is_cubes::text;
 use all_is_cubes::universe;
 use all_is_cubes_render::camera::{ImageSize, Viewport};
 

@@ -7,31 +7,24 @@ use arcstr::ArcStr;
 use bevy_platform::sync::OnceLock;
 use euclid::vec3;
 
-use crate::block::{self, Block, BlockAttributes, Evoxel, MinEval, Resolution};
+use crate::block::{self, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Resolution};
 use crate::content::palette;
 use crate::math::{
     Cube, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid, Rgb, Vol, rgba_const,
 };
 use crate::space::{self, SpaceTransaction};
+use crate::text::{self, Font, Value};
 use crate::universe;
 
 #[cfg(doc)]
-use crate::block::{Modifier, Primitive};
-
-use super::Evoxels;
-
-// -------------------------------------------------------------------------------------------------
-
-mod font;
-use font::FontDecl;
-pub use font::{Font, Metrics, Value};
-
-mod layout;
-use layout::{Layout, LayoutHeader, compute_layout};
+use crate::{
+    block::{Modifier, Primitive},
+    text::Positioning,
+};
 
 // -------------------------------------------------------------------------------------------------
 
-/// A piece of text rendered as voxels.
+/// A piece of text rendered as voxels, usually inside of a [`Block`].
 ///
 /// Each `Text` contains:
 ///
@@ -44,10 +37,9 @@ use layout::{Layout, LayoutHeader, compute_layout};
 ///
 /// To create a block or multiblock group from this, use [`Primitive::Text`].
 /// To combine the text with other shapes, use [`Modifier::Composite`].
-///
 pub struct Text {
     data: TextData,
-    layout_cache: OnceLock<Layout>,
+    layout_cache: OnceLock<text::Layout>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -65,7 +57,7 @@ struct TextData {
     /// Voxel-scale bounds in which the text is positioned (not necessarily actual drawing bounds).
     layout_bounds: GridAab,
 
-    positioning: Positioning,
+    positioning: text::Positioning,
 
     debug: bool,
 }
@@ -73,7 +65,6 @@ struct TextData {
 /// Builder for [`Text`] values.
 #[derive(Debug, Clone)]
 #[must_use]
-#[expect(clippy::module_name_repetitions)]
 pub struct TextBuilder {
     string: ArcStr,
 
@@ -87,7 +78,7 @@ pub struct TextBuilder {
 
     layout_bounds: Option<GridAab>,
 
-    positioning: Positioning,
+    positioning: text::Positioning,
 
     debug: bool,
 }
@@ -150,7 +141,7 @@ impl Text {
     }
 
     /// Returns the [`Positioning`] parameters this uses.
-    pub fn positioning(&self) -> Positioning {
+    pub fn positioning(&self) -> text::Positioning {
         self.data.positioning
     }
 
@@ -261,7 +252,7 @@ impl Text {
         }
 
         let (
-            &LayoutHeader {
+            &text::LayoutHeader {
                 logical_bounding_box: _,
                 rendering_bounding_box: text_aab,
                 z: layout_z,
@@ -326,7 +317,7 @@ impl Text {
 
                     if self.data.debug
                         && let Some(glyph_bounds_intersecting_block) =
-                            layout::glyph_bounding_box_to_3d(
+                            text::glyph_bounding_box_to_3d(
                                 font_glyphs.rendering_bounding_box(glyph.glyph_index, outlined),
                                 glyph_position_3d,
                                 outlined,
@@ -373,7 +364,7 @@ impl Text {
     #[doc(hidden)]
     pub fn draw_voxels_to_transaction(&self, txn: &mut SpaceTransaction, transform: Gridgid) {
         let (
-            &LayoutHeader {
+            &text::LayoutHeader {
                 logical_bounding_box: _,
                 rendering_bounding_box: _,
                 z: layout_z,
@@ -406,9 +397,9 @@ impl Text {
         }
     }
 
-    fn get_or_init_layout(&self) -> &Layout {
+    fn get_or_init_layout(&self) -> &text::Layout {
         self.layout_cache.get_or_init(|| {
-            compute_layout(
+            text::compute_layout(
                 &self.data.string,
                 self.data.font.font_decl(),
                 self.data.outline.is_some(),
@@ -517,7 +508,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Text {
             outline: Option::<Block>::arbitrary(u)?,
             resolution: Resolution::arbitrary(u)?,
             layout_bounds: GridAab::arbitrary(u)?,
-            positioning: Positioning::arbitrary(u)?,
+            positioning: text::Positioning::arbitrary(u)?,
             debug: bool::arbitrary(u)?,
         }))
     }
@@ -634,7 +625,7 @@ impl TextBuilder {
     /// The default is:
     ///
     /// ```rust
-    /// # use all_is_cubes::block::text::*;
+    /// # use all_is_cubes::text::*;
     /// # let p =
     /// Positioning {
     ///     x: PositioningX::Center,
@@ -642,9 +633,9 @@ impl TextBuilder {
     ///     z: PositioningZ::Back,
     /// }
     /// # ;
-    /// # assert_eq!(p, TextBuilder::default().build().positioning());
+    /// # assert_eq!(p, all_is_cubes::block::TextBuilder::default().build().positioning());
     /// ```
-    pub fn positioning(mut self, positioning: Positioning) -> Self {
+    pub fn positioning(mut self, positioning: text::Positioning) -> Self {
         self.positioning = positioning;
         self
     }
@@ -684,122 +675,28 @@ impl Default for TextBuilder {
             outline: None,
             resolution: Resolution::R16,
             layout_bounds: None,
-            positioning: Positioning {
-                x: PositioningX::Center,
-                line_y: PositioningY::BodyMiddle,
-                z: PositioningZ::Back,
+            positioning: text::Positioning {
+                x: text::PositioningX::Center,
+                line_y: text::PositioningY::BodyMiddle,
+                z: text::PositioningZ::Back,
             },
             debug: false,
         }
     }
 }
 
-/// How a [`Text`] is to be positioned within a block.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[expect(
-    clippy::exhaustive_structs,
-    reason = "TODO: probably want to do something else"
-)]
-pub struct Positioning {
-    /// How to place the text horizontally relative to the layout bounds.
-    pub x: PositioningX,
-
-    // TODO: implement this
-    // /// How to place the text's first or last line relative to the layout bounds.
-    // pub total_y: (),
-    /// How to place the characters of the first line relative to the layout bounds.
-    pub line_y: PositioningY,
-
-    /// How to place the text depthwise relative to the layout bounds.
-    pub z: PositioningZ,
-}
-
-/// How a [`Text`] is to be positioned within the layout bounds, along the X axis (horizontally).
-///
-/// A component of [`Positioning`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[non_exhaustive]
-pub enum PositioningX {
-    // TODO: Distinguish 'end of graphic' (last bit of ink) from 'nominal character spacing'?
-    /// Left (most negative X) end of the line of text is positioned at the left edge of the
-    /// layout bounds.
-    ///
-    /// In the event that RTL text support is added, this is not necessarily the start of the text.
-    Left,
-
-    /// Center the text within the layout bounds.
-    Center,
-
-    /// Right (most positive X) end of the line of text is positioned at the right edge of the
-    /// layout bounds.
-    ///
-    /// In the event that RTL text support is added, this is not necessarily the end of the text.
-    Right,
-}
-
-/// How a [`Text`] is to be positioned within the layout bounds, along the Y axis (vertically).
-///
-/// A component of [`Positioning`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[non_exhaustive]
-pub enum PositioningY {
-    /// The top of a line of text (past which no voxels extend) is aligned with the top edge
-    /// of the layout bounds.
-    BodyTop,
-
-    /// The text is positioned halfway between `BodyTop` and `BodyBottom`, centered within the
-    /// layout bounds.
-    /// This may not necessarily visually center the font, but it will leave the most actually
-    /// blank margin.
-    BodyMiddle,
-
-    /// The bottom edge (of most characters, excluding descenders and accents) is positioned
-    /// at the bottom edge of the layout bounds.
-    Baseline,
-
-    /// The bottom of a line of text (past which no voxels extend) is aligned with the bottom edge
-    /// of the layout bounds.
-    BodyBottom,
-}
-
-/// How a [`Text`] is to be positioned within the layout bounds, along the Z axis (depth).
-///
-/// A component of [`Positioning`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[non_exhaustive]
-pub enum PositioningZ {
-    /// Against the back (negative Z) face of the layout bounds.
-    Back,
-
-    /// Against the front (positive Z) face of the layout bounds.
-    Front,
-}
-
-impl Positioning {
-    #[doc(hidden)] // not sure if good idea
-    pub const LOW: Self = Positioning {
-        x: PositioningX::Left,
-        line_y: PositioningY::BodyBottom,
-        z: PositioningZ::Back,
-    };
-}
-
 // -------------------------------------------------------------------------------------------------
 
 #[cfg(feature = "save")]
 mod serialization {
-    use crate::block::text;
+    use crate::block;
     use crate::save::schema;
 
-    impl From<&text::Text> for schema::TextSer {
-        fn from(value: &text::Text) -> Self {
-            let &text::Text {
+    impl From<&block::Text> for schema::TextSer {
+        fn from(value: &block::Text) -> Self {
+            let &block::Text {
                 data:
-                    text::TextData {
+                    super::TextData {
                         ref string,
                         ref font,
                         ref foreground,
@@ -824,7 +721,7 @@ mod serialization {
         }
     }
 
-    impl From<schema::TextSer> for text::Text {
+    impl From<schema::TextSer> for block::Text {
         fn from(value: schema::TextSer) -> Self {
             match value {
                 schema::TextSer::TextV1 {
@@ -836,7 +733,7 @@ mod serialization {
                     layout_bounds,
                     positioning,
                     debug,
-                } => text::Text::builder()
+                } => block::Text::builder()
                     .string(string)
                     .font(font.into())
                     .foreground(foreground)

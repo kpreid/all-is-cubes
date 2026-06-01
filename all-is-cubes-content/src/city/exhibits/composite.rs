@@ -58,7 +58,7 @@ fn COMPOSITE(ctx: Context<'_>) {
                             .attributes()
                             .display_name
                     );
-                    let label = text::Text::builder()
+                    let label = block::Text::builder()
                         .string(label_str)
                         .resolution(R64)
                         .font(text::Font::SmallerBodyText)

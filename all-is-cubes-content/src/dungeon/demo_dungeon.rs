@@ -7,7 +7,7 @@ use rand::seq::{IndexedRandom as _, IteratorRandom as _};
 use rand::{RngExt as _, SeedableRng as _};
 
 use all_is_cubes::arcstr;
-use all_is_cubes::block::{self, AIR, Block, Resolution::*, text};
+use all_is_cubes::block::{self, AIR, Block, Resolution::*};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{BoxPart, BoxStyle, palette};
 use all_is_cubes::euclid::{Size3D, Vector3D, vec3};
@@ -19,6 +19,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::op;
 use all_is_cubes::space::{self, LightPhysics, Space};
+use all_is_cubes::text;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
@@ -453,7 +454,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                         kind = room_data.maze_kind,
                         position_on_path = room_data.position_on_path
                     );
-                    let info_text_block = text::Text::builder()
+                    let info_text_block = block::Text::builder()
                         .string(description)
                         .font(text::Font::SmallerBodyText)
                         .foreground(block::from_color!(palette::STEEL))

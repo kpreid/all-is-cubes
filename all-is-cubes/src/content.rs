@@ -86,7 +86,7 @@ pub fn make_some_voxel_blocks_txn<const COUNT: usize>(
 
 #[inline(never)] // discourage unnecessarily repeated code
 fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usize) -> Block {
-    use crate::block::text;
+    use crate::text;
 
     let resolution = R16;
     let color = color_for_make_blocks(i, n);
@@ -104,7 +104,7 @@ fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usiz
         .build();
 
     let text_block = Block::from(block::Primitive::Text {
-        text: text::Text::builder()
+        text: block::Text::builder()
             .string(label)
             .font(text::Font::System16)
             .foreground(label_voxel)

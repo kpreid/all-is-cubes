@@ -7,8 +7,8 @@ use alloc::vec::Vec;
 
 use euclid::{Box2D, Point2D, SideOffsets2D, Vector3D, point2, vec3};
 
-use crate::block::text;
 use crate::math::{Cube, GridAab, GridCoordinate, GridPoint};
+use crate::text;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -19,18 +19,19 @@ use crate::math::{Cube, GridAab, GridCoordinate, GridPoint};
 // Using `slice_dst` lets the `Layout` be a single wide pointer, storing the metadata and
 // the glyphs in a single slice.
 #[derive(Clone)]
-pub(in crate::block::text) struct Layout(
+pub(crate) struct Layout(
     erasable::Thin<Arc<slice_dst::SliceWithHeader<LayoutHeader, PositionedGlyph>>>,
 );
 
-pub(in crate::block::text) struct LayoutHeader {
+// TODO: refactor so visibility can be crate::text only?
+pub(crate) struct LayoutHeader {
     /// Logical bounding box of the text as determined by font metrics and outline style.
     ///
     /// This box may be significantly larger than the actual visual space taken up; it measures
     /// whole line heights without considering the presence or absence of ascenders, descenders, or
     /// accents.
     ///
-    /// This is not necessarily contained by the [`text::Text::layout_bounds`], in case the text
+    /// This is not necessarily contained by the [`block::Text::layout_bounds`], in case the text
     /// is larger than fits in those bounds.
     ///
     /// TODO: Currently, leading and trailing newlines are not counted, but they should be.
@@ -38,7 +39,7 @@ pub(in crate::block::text) struct LayoutHeader {
 
     /// Bounding box of all glyphs to be drawn according to this layout.
     ///
-    /// This is not necessarily contained by the [`text::Text::layout_bounds`].
+    /// This is not necessarily contained by the [`block::Text::layout_bounds`].
     /// It is also not necessarily equal to the logical size of the text;
     /// for example, if the text starts or ends with blank lines,
     /// this box will not contain the height of those blank lines.
@@ -52,8 +53,10 @@ pub(in crate::block::text) struct LayoutHeader {
 }
 
 /// A single positioned glyph making up part of a text [`Layout`].
+//---
+// TODO: refactor so visibility can be crate::text only?
 #[derive(Clone, Copy, Debug)]
-pub(in crate::block::text) struct PositionedGlyph {
+pub(crate) struct PositionedGlyph {
     /// Index into the font's glyph table (ISO-8859-1 minus 0x20).
     ///
     /// TODO: optimize using smaller index type.
@@ -288,7 +291,7 @@ pub(crate) fn compute_layout(
 }
 
 /// Y flip and apply translation
-pub(in crate::block::text) fn glyph_bounding_box_to_3d(
+pub(crate) fn glyph_bounding_box_to_3d(
     bbox: Box2D<GridCoordinate, InGlyph>,
     position_of_glyph_origin: GridPoint,
     outline: bool,
@@ -324,11 +327,11 @@ fn union_opt_aab(accumulator: &mut Option<GridAab>, addition: GridAab) {
 
 impl Layout {
     /// Use this for destructuring the whole layout.
-    pub(in crate::block::text) fn parts(&self) -> (&LayoutHeader, &[PositionedGlyph]) {
+    pub(crate) fn parts(&self) -> (&LayoutHeader, &[PositionedGlyph]) {
         (&self.0.header, &self.0.slice)
     }
 
-    pub(in crate::block::text) fn header(&self) -> &LayoutHeader {
+    pub(crate) fn header(&self) -> &LayoutHeader {
         &self.0.header
     }
 
@@ -337,7 +340,7 @@ impl Layout {
     }
 
     #[cfg(debug_assertions)]
-    pub(crate) fn consistency_check(&self, font: &text::FontDecl, outline: bool) {
+    fn consistency_check(&self, font: &text::FontDecl, outline: bool) {
         let (
             &LayoutHeader {
                 // Cannot truly validate the logical bounding box because it is determined in part
@@ -415,7 +418,7 @@ fn char_to_glyph_index(c: char) -> usize {
 mod tests {
     use super::*;
     use crate::block::Resolution::R32;
-    use crate::block::text::Font;
+    use crate::text::Font;
 
     #[track_caller]
     #[inline(never)]

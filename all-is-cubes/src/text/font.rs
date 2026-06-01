@@ -4,14 +4,14 @@ use bevy_platform::sync::OnceLock;
 use euclid::{Box2D, Point2D, Size2D, Translation2D, point2, size2, vec2};
 use itertools::iproduct;
 
-use crate::block::text::{self, layout::InGlyph};
 use crate::camera::{ImagePixel, ImageSize};
 use crate::content::load_image::DecodedPng;
 use crate::math::{GridAab, GridCoordinate, u32size};
+use crate::text::{self, InGlyph};
 use crate::universe::{self, ReadTicket};
 
 #[cfg(doc)]
-use crate::block::text::Text;
+use crate::block::Text;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -38,7 +38,7 @@ pub enum Font {
 
 impl Font {
     /// Returns the static (compile-time constant) data for this font.
-    pub(in crate::block::text) fn font_decl(&self) -> &'static FontDecl {
+    pub(crate) fn font_decl(&self) -> &'static FontDecl {
         match self {
             Self::System16 | Self::Logo => {
                 static DECL: FontDecl = FontDecl {
@@ -161,12 +161,12 @@ pub struct Metrics {
     /// Currently, All is Cubes uses strictly monospaced layout for all text, and so
     /// the `width` of this is equal to the advance width of the font.
     /// This may change in the future.
-    pub(in crate::block::text) character_size: Size2D<u8, InGlyph>,
+    pub(in crate::text) character_size: Size2D<u8, InGlyph>,
 
     /// Y position of the baseline in the glyph.
     ///
     /// TODO: Clarify pixel-edge/pixel-center interpretation of this coordinate
-    pub(in crate::block::text) baseline: u8,
+    pub(in crate::text) baseline: u8,
 }
 
 impl Metrics {
@@ -198,7 +198,7 @@ const GLYPHS_PER_ROW_USIZE: usize = u32size(GLYPHS_PER_ROW);
 ///
 /// For convenience of the implementation, glyph sizes are not allowed to exceed 255, allowing
 /// all dimensions to be `u8`.
-pub(in crate::block::text) struct FontDecl {
+pub(crate) struct FontDecl {
     png_data: &'static [u8],
     png_path: &'static str,
 
@@ -407,7 +407,7 @@ impl Glyphs {
     ///
     /// This box covers exactly the pixels that would be drawn, and does not have any guaranteed
     /// relationship to the font’s metrics.
-    pub(in crate::block::text) fn rendering_bounding_box(
+    pub(crate) fn rendering_bounding_box(
         &self,
         glyph_index: usize,
         outline: bool,
@@ -425,7 +425,7 @@ impl Glyphs {
     ///
     /// TODO: the results of this should typed, not as points, but as unit squares like `Cube`
     /// is a unit cube (or literally `Cube` if we choose to denote voxels this early).
-    pub(in crate::block::text) fn get(
+    pub(crate) fn get(
         &self,
         glyph_index: usize,
     ) -> impl Iterator<Item = (Point2D<GridCoordinate, InGlyph>, Value)> {

@@ -3,10 +3,10 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 
 use all_is_cubes::arcstr::ArcStr;
-use all_is_cubes::block::text::{self, Text as BlockText};
-use all_is_cubes::block::{self, Resolution::*};
+use all_is_cubes::block::{self, Resolution::*, Text};
 use all_is_cubes::math::{GridAab, GridSize, Gridgid};
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
+use all_is_cubes::text;
 
 use crate::vui::{self, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetController, widgets};
 
@@ -25,7 +25,7 @@ pub struct LargeText {
     /// The `resolution` field is ignored.
     /// The `positioning` field does not override UI layout gravity but does affect the
     /// relationships among the text’s lines.
-    pub text: text::Text,
+    pub text: Text,
 }
 
 impl LargeText {
@@ -59,7 +59,7 @@ impl Widget for LargeText {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Widget which draws a static [`Text`](BlockText) for use as a text label in UI.
+/// Widget which draws a static [`Text`] for use as a text label in UI.
 ///
 /// It is also used as part of [`ButtonLabel`](crate::vui::widgets::ButtonLabel)s.
 ///
@@ -98,7 +98,7 @@ impl Label {
     }
 
     /// Creates and returns the [`Text`] object this widget displays.
-    pub(crate) fn text(&self, gravity: vui::Gravity) -> text::Text {
+    pub(crate) fn text(&self, gravity: vui::Gravity) -> Text {
         text_for_widget(
             self.text.clone(),
             self.font.clone(),
@@ -158,7 +158,7 @@ impl universe::VisitHandles for Label {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Widget which draws [`Text`](BlockText) that can change, to be used for textual content,
+/// Widget which draws [`Text`] that can change, to be used for textual content,
 /// or labels which change.
 ///
 // TODO: And editable text, eventually.
@@ -273,8 +273,8 @@ impl universe::VisitHandles for TextBoxController {
 
 // -------------------------------------------------------------------------------------------------
 
-fn text_for_widget(text: ArcStr, font: text::Font, positioning: text::Positioning) -> text::Text {
-    text::Text::builder()
+fn text_for_widget(text: ArcStr, font: text::Font, positioning: text::Positioning) -> Text {
+    Text::builder()
         .resolution(R32)
         .string(text)
         .font(font)
@@ -310,7 +310,7 @@ fn gravity_to_positioning(gravity: vui::Gravity, ignore_y: bool) -> text::Positi
 /// If `shrink` is true, does not affect cubes outside the bounds of the text.
 /// If `shrink` is false, draws to the entire grant.
 pub(crate) fn draw_text_txn(
-    text: &BlockText,
+    text: &Text,
     full_grant: &LayoutGrant,
     shrink: bool,
 ) -> SpaceTransaction {
@@ -318,7 +318,7 @@ pub(crate) fn draw_text_txn(
     let shrunk_grant = full_grant.shrink_to(text_aabb.size(), true);
     let translation = shrunk_grant.bounds.lower_bounds() - text_aabb.lower_bounds();
 
-    // This is like `BlockText::installation()` but if the text ends up too big it is truncated.
+    // This is like `Text::installation()` but if the text ends up too big it is truncated.
     // TODO: But it shouldn't necessarily be truncated to the lower-left corner which is what
     // our choice of translation calculation is doing
     SpaceTransaction::filling(
@@ -346,7 +346,6 @@ pub(crate) fn draw_text_txn(
 mod tests {
     use super::*;
     use all_is_cubes::arcstr::literal;
-    use all_is_cubes::block::text;
     use all_is_cubes::euclid::size3;
     use all_is_cubes::math::{GridSizeCoord, Rgba};
     use all_is_cubes::space::{self, SpacePhysics};
@@ -356,7 +355,7 @@ mod tests {
     fn large_text_size() {
         let text = "abc";
         let widget = LargeText {
-            text: text::Text::builder()
+            text: Text::builder()
                 .string(text.into())
                 .font(text::Font::System16)
                 .foreground(block::from_color!(Rgba::WHITE))

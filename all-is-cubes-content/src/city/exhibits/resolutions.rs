@@ -34,7 +34,7 @@ fn RESOLUTIONS(ctx: Context<'_>) {
                     Block::from(color)
                 })?
                 .build_txn(&mut txn);
-            let label = text::Text::builder()
+            let label = block::Text::builder()
                 .resolution(R32)
                 .string(arcstr::format!("{resolution}"))
                 .font(text::Font::SmallerBodyText)

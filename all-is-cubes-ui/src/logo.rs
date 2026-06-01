@@ -4,8 +4,9 @@ use alloc::sync::Arc;
 
 use all_is_cubes::{
     arcstr::literal,
-    block::{Block, text},
+    block::{self, Block},
     content::palette,
+    text,
 };
 
 use crate::vui;
@@ -17,7 +18,7 @@ pub fn logo_text() -> Arc<dyn vui::Widget> {
     let background_text_block: Block = palette::LOGO_STROKE.into();
 
     Arc::new(vui::widgets::LargeText {
-        text: text::Text::builder()
+        text: block::Text::builder()
             .string(literal!("All is Cubes"))
             .font(text::Font::Logo)
             .foreground(foreground_text_block)

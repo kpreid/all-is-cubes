@@ -26,7 +26,7 @@ fn ROTATIONS(ctx: Context<'_>) {
                     pos,
                     [
                         &pointing_block.clone().rotate(rot),
-                        &text::Text::builder()
+                        &block::Text::builder()
                             .string(arcstr::format!("{rot:?}"))
                             .font(text::Font::SmallerBodyText)
                             .foreground(demo_blocks[DemoBlocks::LabelTextVoxel].clone())

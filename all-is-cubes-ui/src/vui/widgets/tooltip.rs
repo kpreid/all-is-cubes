@@ -3,12 +3,13 @@ use alloc::sync::Arc;
 use std::sync::Mutex;
 
 use all_is_cubes::arcstr::{ArcStr, literal};
-use all_is_cubes::block::{self, Block, text};
+use all_is_cubes::block::{self, Block};
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
+use all_is_cubes::text;
 use all_is_cubes::time::{Duration, Tick};
 use all_is_cubes::universe::{ReadTicket, StrongHandle};
 use all_is_cubes::{inv, universe};
@@ -181,7 +182,7 @@ pub struct Tooltip {
     width_in_hud: u16,
     icons: BlockProvider<inv::Icons>,
 
-    text_builder: text::TextBuilder,
+    text_builder: block::TextBuilder,
     /// Tracks what we should be displaying and serves as dirty flag.
     state: Arc<Mutex<TooltipState>>,
 }
@@ -196,7 +197,7 @@ impl Tooltip {
         Arc::new(Self {
             width_in_hud: 25, // TODO: magic number
             icons,
-            text_builder: text::Text::builder()
+            text_builder: block::Text::builder()
                 .foreground(Block::from(palette::HUD_TEXT_FILL))
                 .outline(Some(Block::from(palette::HUD_TEXT_STROKE)))
                 .font(text::Font::SmallerBodyText)

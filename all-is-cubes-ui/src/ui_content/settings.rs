@@ -4,8 +4,9 @@ use core::fmt;
 use exhaust::Exhaust;
 
 use all_is_cubes::arcstr::{self, literal};
-use all_is_cubes::block::{Block, text};
+use all_is_cubes::block::Block;
 use all_is_cubes::math::Face;
+use all_is_cubes::text;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::ShowStatus;
 use all_is_cubes_render::camera::AntialiasingOption;

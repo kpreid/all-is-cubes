@@ -4,13 +4,13 @@ use alloc::sync::Arc;
 use alloc::vec;
 use core::fmt;
 
-use all_is_cubes::block::text;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{self, point2, vec2};
 use all_is_cubes::listen::{self, Source as _};
 use all_is_cubes::math::{Rgba, ZeroOne};
 use all_is_cubes::space::Space;
+use all_is_cubes::text;
 use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes::util::StatusText;
 

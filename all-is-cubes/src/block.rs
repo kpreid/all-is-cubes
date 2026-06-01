@@ -61,7 +61,8 @@ pub use all_is_cubes_base::resolution::Resolution;
 // Note: can't use a glob re-export due to <https://github.com/rust-lang/rust/issues/149895>
 pub use all_is_cubes_base::resolution::IntoResolutionError;
 
-pub mod text;
+mod text;
+pub use text::{Text, TextBuilder};
 
 #[cfg(test)]
 mod tests;
@@ -153,7 +154,7 @@ pub enum Primitive {
     /// To combine the text with other shapes, use [`Modifier::Composite`].
     Text {
         /// The text to draw, and the font and text-layout-dependent positioning.
-        text: text::Text,
+        text: Text,
 
         /// Translation, in whole cubes, of the region of the text to draw.
         ///
@@ -970,7 +971,7 @@ mod arbitrary_block {
                     space: Handle::arbitrary(u)?,
                 },
                 4 => Primitive::Text {
-                    text: text::Text::arbitrary(u)?,
+                    text: Text::arbitrary(u)?,
                     // TODO: fix unhandled overflows so this can be full i32 range,
                     // then replace this `Arbitrary` impl with a derived one
                     offset: GridVector::from(<[i16; 3]>::arbitrary(u)?.map(i32::from)),

@@ -42,6 +42,9 @@
 * `all-is-cubes` library:
     * `block::BlockDefTransaction`’s constructors now take `impl Into<Animation>` instead of `Block`.
       They accept `Block` as a specific case, but may be newly ambiguous.
+    * The `block::text` module has been broken up.
+      * `block::text::{Font, Positioning*}` are now in the top-level `text` module.
+      * `block::text::{Text, TextBuilder}` are now in the top-level `block` module.
     * `Handle::<BlockDef>::read()` no longer returns a `&BlockDef`, but a separate `Read` type.
     * `chunking::point_to_chunk()` now returns `None` in case of out-of-range input instead of panicking.
     * `math::Aab::expand()` now takes `PositiveSign<f64>` instead of `f64` and cannot be used to shrink the box.

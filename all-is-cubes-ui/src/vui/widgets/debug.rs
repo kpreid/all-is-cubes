@@ -1,8 +1,9 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use all_is_cubes::block::{self, Block, Resolution::R64, text};
+use all_is_cubes::block::{self, Block, Resolution::R64};
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
+use all_is_cubes::text;
 use all_is_cubes::util::{ConciseDebug, Refmt};
 
 use crate::vui::widgets::WidgetTheme;
@@ -34,7 +35,7 @@ impl vui::Widget for LayoutDebugFrame {
         let box_style = &self.theme.layout_debug_box_style;
         let bounds = grant.bounds;
 
-        let info_text = text::Text::builder()
+        let info_text = block::Text::builder()
             .string(all_is_cubes::arcstr::format!(
                 "Req {:?}\nGrant {:?}\nGrav {:?}",
                 self.requirements().refmt(&ConciseDebug),

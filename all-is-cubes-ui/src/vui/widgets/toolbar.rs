@@ -5,7 +5,7 @@ use core::iter;
 use core::range::Range;
 use std::sync::Mutex;
 
-use all_is_cubes::block::{self, Block, Resolution, text};
+use all_is_cubes::block::{self, Block, Resolution};
 use all_is_cubes::character::Character;
 use all_is_cubes::content::palette;
 use all_is_cubes::inv;
@@ -14,6 +14,7 @@ use all_is_cubes::math::{
     Cube, GridAab, GridCoordinate, GridPoint, GridSize, GridSizeCoord, GridVector,
 };
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
+use all_is_cubes::text;
 use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
 use all_is_cubes::universe::{ReadTicket, StrongHandle};
@@ -38,7 +39,7 @@ pub(crate) struct Toolbar {
     /// Number of slots this toolbar draws.
     slot_range: Range<u16>,
 
-    slot_info_text_template: text::TextBuilder,
+    slot_info_text_template: block::TextBuilder,
 }
 
 impl Toolbar {
@@ -61,7 +62,7 @@ impl Toolbar {
             hud_blocks,
             cue_channel,
             slot_range: slot_range.into(),
-            slot_info_text_template: text::Text::builder()
+            slot_info_text_template: block::Text::builder()
                 .foreground(block::from_color!(palette::HUD_TEXT_FILL))
                 .outline(Some(block::from_color!(palette::HUD_TEXT_STROKE)))
                 .resolution(Resolution::R32)

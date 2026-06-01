@@ -185,6 +185,7 @@ pub mod save;
 pub mod sound;
 pub mod space;
 pub mod tag;
+pub mod text;
 pub mod time;
 pub mod transaction;
 pub mod universe;

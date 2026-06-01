@@ -22,7 +22,7 @@ pub(super) use all_is_cubes::arcstr::{self, literal};
 pub(super) use all_is_cubes::block::{
     self, AIR, Block, BlockCollision, Composite, CompositeOperator, Move,
     Resolution::{self, *},
-    RotationPlacementRule, Zoom, space_to_blocks, text,
+    RotationPlacementRule, Zoom, space_to_blocks,
 };
 pub(super) use all_is_cubes::drawing::VoxelBrush;
 pub(super) use all_is_cubes::euclid::{
@@ -38,6 +38,7 @@ pub(super) use all_is_cubes::math::{
 };
 pub(super) use all_is_cubes::op::Operation;
 pub(super) use all_is_cubes::space::{self, Space, SpacePhysics, SpaceTransaction};
+pub(super) use all_is_cubes::text;
 pub(super) use all_is_cubes::time;
 pub(super) use all_is_cubes::transaction::{self, Transaction as _};
 pub(super) use all_is_cubes::universe::ReadTicket;

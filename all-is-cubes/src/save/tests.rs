@@ -14,6 +14,7 @@ use euclid::{point3, vec3};
 use pretty_assertions::assert_eq;
 use serde_json::{from_value, json, to_value};
 
+use crate::behavior;
 use crate::block::{
     self, AIR, AnimationChange, AnimationHint, Block, BlockDef, Modifier, Resolution,
 };
@@ -21,12 +22,14 @@ use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
 use crate::inv::{self, EphemeralOpaque, Inventory, Tool};
 use crate::math::{Cube, Face, GridAab, GridRotation, Rgb, Rgba, notnan, ps32, zo32};
+use crate::op;
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
+use crate::tag;
+use crate::text;
 use crate::time;
 use crate::transaction::Transaction as _;
 use crate::universe::{Handle, Name, PartialUniverse, ReadTicket, Universe};
-use crate::{behavior, op, tag};
 
 #[track_caller]
 /// Serialize and deserialize and assert the value is equal.
@@ -269,26 +272,22 @@ fn block_atom_with_all_attributes() {
 
 #[test]
 fn block_text_without_optional() {
-    use block::text;
-
     assert_round_trip_value(
         &Block::from_primitive(block::Primitive::Text {
-            text: {
-                text::Text::builder()
-                    .string(literal!("hello"))
-                    .font(text::Font::System16) // TODO: use a nondefault font once such are stable
-                    .foreground(block::from_color!(1.0, 0.0, 0.0, 1.0))
-                    .layout_bounds(
-                        Resolution::R32,
-                        GridAab::from_lower_upper([0, 1, 2], [3, 4, 5]),
-                    )
-                    .positioning(text::Positioning {
-                        x: text::PositioningX::Center,
-                        line_y: text::PositioningY::BodyTop,
-                        z: text::PositioningZ::Front,
-                    })
-                    .build()
-            },
+            text: block::Text::builder()
+                .string(literal!("hello"))
+                .font(text::Font::System16) // TODO: use a nondefault font once such are stable
+                .foreground(block::from_color!(1.0, 0.0, 0.0, 1.0))
+                .layout_bounds(
+                    Resolution::R32,
+                    GridAab::from_lower_upper([0, 1, 2], [3, 4, 5]),
+                )
+                .positioning(text::Positioning {
+                    x: text::PositioningX::Center,
+                    line_y: text::PositioningY::BodyTop,
+                    z: text::PositioningZ::Front,
+                })
+                .build(),
             offset: vec3(100, 0, 0),
         }),
         json!({
@@ -325,28 +324,24 @@ fn block_text_without_optional() {
 
 #[test]
 fn block_text_with_optional() {
-    use block::text;
-
     assert_round_trip_value(
         &Block::from_primitive(block::Primitive::Text {
-            text: {
-                text::Text::builder()
-                    .string(literal!("hello"))
-                    .font(text::Font::System16) // TODO: use a nondefault font once such are stable
-                    .foreground(block::from_color!(1.0, 0.0, 0.0, 1.0))
-                    .outline(Some(block::from_color!(0.0, 1.0, 0.0, 1.0)))
-                    .layout_bounds(
-                        Resolution::R32,
-                        GridAab::from_lower_upper([0, 1, 2], [3, 4, 5]),
-                    )
-                    .positioning(text::Positioning {
-                        x: text::PositioningX::Center,
-                        line_y: text::PositioningY::BodyTop,
-                        z: text::PositioningZ::Front,
-                    })
-                    .debug(true)
-                    .build()
-            },
+            text: block::Text::builder()
+                .string(literal!("hello"))
+                .font(text::Font::System16) // TODO: use a nondefault font once such are stable
+                .foreground(block::from_color!(1.0, 0.0, 0.0, 1.0))
+                .outline(Some(block::from_color!(0.0, 1.0, 0.0, 1.0)))
+                .layout_bounds(
+                    Resolution::R32,
+                    GridAab::from_lower_upper([0, 1, 2], [3, 4, 5]),
+                )
+                .positioning(text::Positioning {
+                    x: text::PositioningX::Center,
+                    line_y: text::PositioningY::BodyTop,
+                    z: text::PositioningZ::Front,
+                })
+                .debug(true)
+                .build(),
             offset: vec3(100, 0, 0),
         }),
         json!({
