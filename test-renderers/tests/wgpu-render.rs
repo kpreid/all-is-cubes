@@ -1,4 +1,10 @@
-//! Runs [`test_renderers::harness_main`] against [`all_is_cubes_gpu`].
+//! Runs [`test_renderers_runner::harness_main`] against [`all_is_cubes_gpu`].
+
+/// Pulling other crates through test-renderers makes dynamic linking work.
+use test_renderers_dylib::{
+    all_is_cubes_gpu, all_is_cubes_render, clap, log, test_renderers_cases, test_renderers_runner,
+    test_renderers_types, tokio, wgpu,
+};
 
 use clap::Parser as _;
 use tokio::sync::OnceCell;
@@ -6,12 +12,13 @@ use tokio::sync::OnceCell;
 use all_is_cubes_gpu::{headless, init};
 use all_is_cubes_render::HeadlessRenderer;
 use all_is_cubes_render::camera::StandardCameras;
-use test_renderers::{KnownIncorrectness, RendererFactory, RendererId};
+
+use test_renderers_types::{KnownIncorrectness, RendererFactory, RendererId};
 
 #[tokio::main]
-async fn main() -> test_renderers::HarnessResult {
-    let args = test_renderers::HarnessArgs::parse();
-    test_renderers::initialize_logging(&args);
+async fn main() -> test_renderers_runner::HarnessResult {
+    let args = test_renderers_runner::HarnessArgs::parse();
+    test_renderers_runner::initialize_logging(&args);
 
     WGPU_INSTANCE.set(init::create_instance_for_test_or_exit(true).await).unwrap();
 
@@ -22,11 +29,11 @@ async fn main() -> test_renderers::HarnessResult {
         None
     };
 
-    test_renderers::harness_main(
+    test_renderers_runner::harness_main(
         &args,
         RendererId::Wgpu,
-        test_renderers::SuiteId::Renderers,
-        test_renderers::test_cases::all_tests,
+        test_renderers_types::SuiteId::Renderers,
+        test_renderers_cases::all_tests,
         async move |label| get_factory(label).await.unwrap(),
         parallelism,
     )

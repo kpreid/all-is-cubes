@@ -1,0 +1,53 @@
+[package]
+name = "test-renderers-dylib"
+description = "Dynamic library bundling all dependencies of the renderer test targets."
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+doc = false
+test = false
+doctest = false
+bench = false
+
+[features]
+# Enables "auto-threads" feature of all-is-cubes libraries.
+# This is a feature so that, if we want to, we can disable it and test the non-threaded build.
+auto-threads = [
+    "all-is-cubes/auto-threads",
+    "all-is-cubes-gpu/auto-threads",
+    "all-is-cubes-port?/auto-threads",
+    "all-is-cubes-render/auto-threads",
+]
+# Enables dependencies for `gltf-render` test target.
+gltf = [
+    "dep:all-is-cubes-content",
+    "dep:all-is-cubes-port",
+    "dep:bytemuck",
+    "dep:tempfile",
+    "tokio/fs",
+]
+
+[dependencies]
+test-renderers-cases = { path = "../cases" }
+test-renderers-runner = { path = "../runner" }
+test-renderers-types = { path = "../types" }
+
+all-is-cubes = { workspace = true, features = ["save"] }
+all-is-cubes-gpu = { workspace = true, features = ["wgpu"] }
+all-is-cubes-content = { workspace = true, optional = true }
+all-is-cubes-port = { workspace = true, optional = true, features = ["export", "gltf"] }
+all-is-cubes-render = { workspace = true, features = ["raytracer", "serde", "std"] }
+all-is-cubes-ui = { workspace = true, features = ["session"] }
+anyhow = { workspace = true }
+bytemuck = { workspace = true, optional = true }
+clap = { workspace = true }
+log = { workspace = true }
+simplelog = { workspace = true }
+tempfile = { workspace = true, optional = true }
+tokio = { workspace = true }
+# We need to enable wgpu backends for the tests to actually find an adapter.
+# Enabling default features suffices (as of wgpu 24.0).
+wgpu = { workspace = true, default-features = true }

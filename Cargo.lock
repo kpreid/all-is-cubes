@@ -4349,12 +4349,11 @@ dependencies = [
 
 [[package]]
 name = "oxipng"
-version = "10.1.0"
+version = "10.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efc4ea5566cd49b80c4b5e8eac2167d137d2ca3007ec8976d4cd9fe8b654ba2b"
+checksum = "85eaaaa67c73558edaf5270e28abdf8d0663d88e8e7570cf894eff25305f4ed2"
 dependencies = [
  "bitvec",
- "crossbeam-channel",
  "indexmap",
  "libdeflater",
  "log",
@@ -6385,6 +6384,27 @@ dependencies = [
 name = "test-renderers"
 version = "0.0.0"
 dependencies = [
+ "oxipng",
+ "test-renderers-dylib",
+]
+
+[[package]]
+name = "test-renderers-cases"
+version = "0.0.0"
+dependencies = [
+ "all-is-cubes",
+ "all-is-cubes-content",
+ "all-is-cubes-render",
+ "all-is-cubes-ui",
+ "exhaust",
+ "rendiff",
+ "test-renderers-types",
+]
+
+[[package]]
+name = "test-renderers-dylib"
+version = "0.0.0"
+dependencies = [
  "all-is-cubes",
  "all-is-cubes-content",
  "all-is-cubes-gpu",
@@ -6392,27 +6412,54 @@ dependencies = [
  "all-is-cubes-render",
  "all-is-cubes-ui",
  "anyhow",
- "async_fn_traits",
  "bytemuck",
  "clap",
- "exhaust",
+ "log",
+ "simplelog",
+ "tempfile",
+ "test-renderers-cases",
+ "test-renderers-runner",
+ "test-renderers-types",
+ "tokio",
+ "wgpu",
+]
+
+[[package]]
+name = "test-renderers-runner"
+version = "0.0.0"
+dependencies = [
+ "all-is-cubes",
+ "async_fn_traits",
+ "clap",
+ "futures-util",
+ "itertools 0.14.0",
+ "log",
+ "serde",
+ "serde_json",
+ "test-renderers-types",
+ "time",
+ "tinytemplate",
+ "tokio",
+]
+
+[[package]]
+name = "test-renderers-types"
+version = "0.0.0"
+dependencies = [
+ "all-is-cubes",
+ "all-is-cubes-render",
+ "async_fn_traits",
+ "clap",
  "futures-core",
  "futures-util",
  "image",
  "imgref",
  "itertools 0.14.0",
  "log",
- "oxipng",
  "rendiff",
- "send_wrapper",
  "serde",
  "serde_json",
- "simplelog",
- "tempfile",
- "time",
- "tinytemplate",
  "tokio",
- "wgpu",
 ]
 
 [[package]]

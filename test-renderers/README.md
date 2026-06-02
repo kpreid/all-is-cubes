@@ -1,4 +1,4 @@
-`test-renderers` is an unpublished package which contains image-comparison-based test cases for:
+`test-renderers` and its children are unpublished packages which contains image-comparison-based test cases for:
 
 * All is Cubes’ different renderers, including those which use a GPU.
 * User interface elements.
@@ -6,10 +6,12 @@
 Organization
 ------------
 
-* The individual renderer test cases, or scenes to render, are located in `src/test_cases.rs`.
-* `tests/*-render.rs` for each renderer being tested.
-* `tests/ui.rs` for UI tests.
-* `src/lib.rs` and its modules contain the shared test infrastructure.
+* `tests/*-render.rs` test targets for each renderer being tested.
+* `tests/ui.rs` test target for UI tests.
+* `dylib/` bundles all of the test helper crates into one dynamic library for efficiency.
+* `cases/` contains the renderer test cases (scenes to render).
+* `runner/` contains the test runner, which implements the `main()` logic for all test targets.
+* `types/` contains code that `runner` and `cases` both need.
 * `expected/` contains the expected rendered outputs.
 * The tests write to `../target/test-renderers-output/` the actual outputs and a report `index.html`.
 

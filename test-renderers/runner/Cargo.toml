@@ -1,0 +1,34 @@
+[package]
+name = "test-renderers-runner"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+doc = false # internal
+test = false # harness contains none
+doctest = false # harness contains none
+bench = false # harness contains none
+
+[dependencies]
+test-renderers-types = { path = "../types" }
+
+all-is-cubes = { workspace = true, features = ["save"] }
+async_fn_traits = { workspace = true }
+clap = { workspace = true }
+futures-util = { workspace = true, features = ["std"] }
+itertools = { workspace = true }
+log = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true, features = ["formatting", "macros"] }
+tinytemplate = { workspace = true }
+
+# Using tokio for async test-running.
+# Reasons we are using tokio and not a lighter runtime such as smol:
+# * Task-local variables.
+# * tokio::sync::OnceCell
+# * Misc other utilities.
+# We should consider replacing it anyway.
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync", "time"] }

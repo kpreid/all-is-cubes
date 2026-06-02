@@ -1,0 +1,32 @@
+[package]
+name = "test-renderers-types"
+description = "Types shared between the render test harness and the render test cases."
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["dylib"]
+doc = false # internal
+test = false # contains none
+doctest = false # contains none
+bench = false # contains none
+
+[dependencies]
+all-is-cubes = { workspace = true, features = ["save"] }
+# needs "raytracer" feature because `RtFactory` is defined here
+all-is-cubes-render = { workspace = true, features = ["serde", "std", "raytracer"] }
+async_fn_traits = { workspace = true }
+clap = { workspace = true }
+futures-core = { workspace = true }
+futures-util = { workspace = true, features = ["std"] }
+# TODO: We can trim this away by using `png-decoder` for reading and `oxipng` for writing.
+image = { workspace = true, features = ["png"] }
+imgref = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+rendiff = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt", "time"] }

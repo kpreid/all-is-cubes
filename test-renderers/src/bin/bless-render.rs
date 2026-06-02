@@ -1,9 +1,12 @@
 //! Copies and compresses an image file from the test-renderers output directory
 //! to the `expected/` directory.
 
-use clap::Parser as _;
-
-use test_renderers::{ImageId, RendererId, SuiteId, TestId, image_path};
+use test_renderers_dylib::{
+    anyhow,
+    clap::{self, Parser as _},
+    simplelog,
+    test_renderers_types::{ImageId, RendererId, SuiteId, TestId, Version, image_path},
+};
 
 #[derive(Debug, clap::Parser)]
 #[command(author, about, version)]
@@ -58,7 +61,7 @@ fn main() -> Result<(), anyhow::Error> {
                 // the original file really had a number
                 serial_number: 1,
             },
-            test_renderers::Version::Actual,
+            Version::Actual,
         );
         let dst_path = image_path(
             &ImageId {
@@ -66,7 +69,7 @@ fn main() -> Result<(), anyhow::Error> {
                 renderer: dst_id,
                 serial_number: 1,
             },
-            test_renderers::Version::ExpectedSrc,
+            Version::ExpectedSrc,
         );
 
         oxipng::optimize(

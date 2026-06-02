@@ -4,6 +4,12 @@
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+/// Pulling other crates through test-renderers makes dynamic linking work.
+use test_renderers_dylib::{
+    all_is_cubes, all_is_cubes_render, all_is_cubes_ui, clap, log, test_renderers_cases,
+    test_renderers_runner, test_renderers_types, tokio,
+};
+
 use clap::Parser as _;
 
 use all_is_cubes::arcstr::literal;
@@ -22,20 +28,20 @@ use all_is_cubes_ui::apps::{Key, Session};
 use all_is_cubes_ui::notification::NotificationContent;
 use all_is_cubes_ui::vui::{self, widgets};
 
-use test_renderers::RenderTestContext;
-use test_renderers::test_cases::u;
+use test_renderers_cases::u;
+use test_renderers_types::RenderTestContext;
 
 #[tokio::main]
-async fn main() -> test_renderers::HarnessResult {
-    let args = test_renderers::HarnessArgs::parse();
-    test_renderers::initialize_logging(&args);
+async fn main() -> test_renderers_runner::HarnessResult {
+    let args = test_renderers_runner::HarnessArgs::parse();
+    test_renderers_runner::initialize_logging(&args);
 
-    test_renderers::harness_main(
+    test_renderers_runner::harness_main(
         &args,
-        test_renderers::RendererId::Raytracer,
-        test_renderers::SuiteId::Ui,
+        test_renderers_types::RendererId::Raytracer,
+        test_renderers_types::SuiteId::Ui,
         ui_render_tests,
-        |_| std::future::ready(test_renderers::RtFactory),
+        |_| std::future::ready(test_renderers_types::RtFactory),
         None,
     )
     .await
@@ -44,7 +50,7 @@ async fn main() -> test_renderers::HarnessResult {
 // Unlike the renderer tests, these tests are run just once with one renderer,
 // so they are not in a library but right here.
 
-fn ui_render_tests(c: &mut test_renderers::TestCaseCollector<'_>) {
+fn ui_render_tests(c: &mut test_renderers_types::TestCaseCollector<'_>) {
     let wu = u("widget_theme_universe", create_widget_theme_universe());
 
     c.insert("session_initial_state", None, session_initial_state);
