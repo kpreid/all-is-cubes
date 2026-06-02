@@ -1,82 +1,9 @@
+use std::io;
 use std::path::{Path, PathBuf};
-use std::{fmt, io};
-
-use clap::builder::PossibleValue;
 
 use all_is_cubes::math::u32size;
 
-use crate::{SuiteId, TestId};
-
-/// Uniquely identifies each distinct image produced/consumed by the renderer test suite.
-///
-/// There is one image-comparison assertion to be performed per [`ImageId`] value.
-/// That is, this does not distinguish “expected” from “actual”, but does distinguish
-/// between different expected/actual pairs.
-// TODO: better name
-#[derive(Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-#[expect(clippy::exhaustive_structs)]
-pub struct ImageId {
-    pub test_id: TestId,
-    pub renderer: RendererId,
-    /// Serial numbers start at 1 and increase whenever a single test case compares
-    /// more than one image.
-    pub serial_number: u64,
-}
-
-impl fmt::Debug for ImageId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            test_id,
-            renderer,
-            serial_number,
-        } = self;
-        write!(f, "{{{test_id} in {renderer} #{serial_number}}}")
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-#[expect(clippy::exhaustive_enums)]
-pub enum RendererId {
-    /// A single expected output expected to be equal for all renderers.
-    /// No renderer uses this value.
-    All,
-
-    /// Used by tests/gltf-render.rs
-    Gltf,
-    /// Used by tests/ray-render.rs
-    Raytracer,
-    /// Used by tests/wgpu-render.rs
-    Wgpu,
-}
-impl RendererId {
-    fn as_str(self) -> &'static str {
-        match self {
-            RendererId::All => "all",
-            RendererId::Gltf => "gltf",
-            RendererId::Raytracer => "ray",
-            RendererId::Wgpu => "wgpu",
-        }
-    }
-}
-impl clap::ValueEnum for RendererId {
-    fn value_variants<'a>() -> &'a [Self] {
-        &[
-            RendererId::All,
-            RendererId::Gltf,
-            RendererId::Raytracer,
-            RendererId::Wgpu,
-        ]
-    }
-
-    fn to_possible_value(&self) -> Option<PossibleValue> {
-        Some(PossibleValue::new(self.as_str()))
-    }
-}
-impl fmt::Display for RendererId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
+use crate::{ImageId, SuiteId, TestId};
 
 #[expect(rustdoc::private_intra_doc_links)]
 /// Selector of which image role is wanted from [`image_path`] and [`test_data_dir_path`].
@@ -129,16 +56,18 @@ pub fn image_path(image_id: &ImageId, version: Version) -> PathBuf {
 
 /// Return the path to the directory in which the files of the sort specified by `version`
 /// should be read or written.
-pub(crate) fn test_data_dir_path(suite_id: SuiteId, version: Version) -> PathBuf {
-    // CARGO_MANIFEST_DIR will be the directory of the test-renderers package
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let output_root = manifest_dir.join(format!("../target/test-renderers-output/{suite_id}/"));
+pub fn test_data_dir_path(suite_id: SuiteId, version: Version) -> PathBuf {
+    // This is the manifest directory of the `test-renderers` package.
+    // Ideally we would express this in a workspace-relative fashion, but that is not simple.
+    let tr_manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../");
+
+    let output_root = tr_manifest_dir.join(format!("../target/test-renderers-output/{suite_id}/"));
     let path = match version {
         // These paths must also match the report template's relative paths
         Version::Actual => output_root.join("actual/"),
         Version::Diff => output_root.join("diff/"),
         Version::ExpectedSnapshot => output_root.join("expected/"),
-        Version::ExpectedSrc => manifest_dir.join(format!("expected/{suite_id}/")),
+        Version::ExpectedSrc => tr_manifest_dir.join(format!("expected/{suite_id}/")),
         Version::Root => output_root,
     };
 

@@ -1,13 +1,19 @@
 //! Graphical test cases that can be run in any renderer.
 
+// Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![expect(clippy::unused_async)]
 #![expect(clippy::cast_possible_wrap)]
+#![warn(
+    unused_crate_dependencies,
+    reason = "should be no false positives for this crate"
+)]
 
 use std::iter;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use exhaust::Exhaust as _;
+use rendiff::Threshold;
 
 use all_is_cubes::block::{self, AIR, Block, Resolution::*};
 use all_is_cubes::character::{Character, Spawn};
@@ -28,8 +34,8 @@ use all_is_cubes_render::camera::{
 };
 use all_is_cubes_render::{Flaws, RenderError};
 
-use crate::{
-    COMMON_VIEWPORT, Overlays, RenderTestContext, TestCaseCollector, Threshold, UniverseFuture,
+use test_renderers_types::{
+    COMMON_VIEWPORT, Overlays, RenderTestContext, TestCaseCollector, UniverseFuture,
     finish_universe_from_space,
 };
 

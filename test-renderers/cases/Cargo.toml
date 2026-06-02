@@ -1,0 +1,22 @@
+[package]
+name = "test-renderers-cases"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+doc = false # internal
+test = false # harness contains none
+doctest = false # harness contains none
+bench = false # harness contains none
+
+[dependencies]
+test-renderers-types = { path = "../types" }
+
+all-is-cubes = { workspace = true, features = ["save"] }
+all-is-cubes-content = { workspace = true }
+all-is-cubes-render = { workspace = true, features = ["raytracer", "serde", "std"] }
+all-is-cubes-ui = { workspace = true, features = ["session"] }
+exhaust = { workspace = true }
+rendiff = { workspace = true }

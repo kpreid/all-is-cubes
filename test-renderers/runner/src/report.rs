@@ -6,7 +6,11 @@ use std::{fs, io};
 
 use tinytemplate::TinyTemplate;
 
-use crate::{ComparisonRecord, RendererId, SuiteId, TestId, Version, test_data_dir_path};
+use test_renderers_types::{
+    ComparisonRecord, RendererId, SuiteId, TestId, Version, test_data_dir_path,
+};
+
+// -------------------------------------------------------------------------------------------------
 
 /// Record of the results of a single run of a specific `test-renderers` test binary
 /// (a specific test suite and renderer).
@@ -128,7 +132,7 @@ pub fn results_json_path(suite_id: SuiteId, renderer_id: RendererId) -> PathBuf 
 mod tmpl {
     use itertools::Itertools;
 
-    use crate::{ComparisonOutcome, ComparisonRecord};
+    use test_renderers_types::{ComparisonImage, ComparisonOutcome, ComparisonRecord};
 
     #[derive(serde::Serialize)]
     pub struct Context {
@@ -214,7 +218,7 @@ mod tmpl {
     // TODO: Once we are passing size information, change what this impl is from
 
     impl TmplImage {
-        fn new(ci: &crate::ComparisonImage) -> Self {
+        fn new(ci: &ComparisonImage) -> Self {
             Self {
                 file_name: ci.file_name.clone(),
                 width: ci.width,

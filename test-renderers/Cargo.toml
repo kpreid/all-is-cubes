@@ -6,21 +6,14 @@ rust-version.workspace = true
 description = "Rendering tests for all-is-cubes."
 publish = false
 
-# Tests use a custom test harness; among other reasons, we want to explicitly skip the
-# tests if there is no GPU on the system rather than just making them “pass” falsely.
-
-[lib]
-doc = false # internal
-test = false
-doctest = false
-# Disable running as benchmark so that the default doesn't interfere with Criterion usage.
-bench = false
-
 [[bin]]
 name = "bless-render"
 test = false
 doctest = false
 bench = false
+
+# Tests use a custom test harness; among other reasons, we want to explicitly skip the
+# tests if there is no GPU on the system rather than just making them “pass” falsely.
 
 [[test]]
 # Note: This test has its dependencies disabled and thus doesn’t compile.
@@ -55,6 +48,7 @@ harness = false
 test = false # Exclude from normal test runs because it does not pass yet!
 required-features = ["gltf"]
 
+
 [[test]]
 name = "ray-render"
 doctest = false
@@ -72,57 +66,20 @@ harness = false
 
 [features]
 default = ["auto-threads"]
-# This is a feature so that, if we want to, we can test the non-threaded build.
-auto-threads = [
-    "all-is-cubes/auto-threads",
-    "all-is-cubes-gpu/auto-threads",
-    "all-is-cubes-port/auto-threads",
-    "all-is-cubes-render/auto-threads",
-]
+# Enables "auto-threads" feature of all-is-cubes libraries.
+# This is a feature so that, if we want to, we can disable it and test the non-threaded build.
+auto-threads = ["test-renderers-dylib/auto-threads"]
 # Enables `gltf-render` test target. Doesn’t work — see comments above on the [[test]].
-gltf = [
-    "dep:all-is-cubes-port",
-    "dep:bytemuck",
-    # "dep:bevy",
-    # "dep:half",
-    # "dep:manyfmt",
-    "tokio/fs",
-]
+gltf = ["test-renderers-dylib/gltf"]
 
 [dependencies]
-all-is-cubes = { workspace = true, features = ["save"] }
-all-is-cubes-content = { workspace = true }
-all-is-cubes-gpu = { workspace = true, features = ["wgpu"] }
-# used only for gltf export+render tests
-all-is-cubes-port = { workspace = true, optional = true, features = ["export", "gltf"] }
-all-is-cubes-render = { workspace = true, features = ["raytracer", "serde", "std"] }
-all-is-cubes-ui = { workspace = true, features = ["session"] }
-anyhow = { workspace = true }
-async_fn_traits = { workspace = true }
-bytemuck = { workspace = true, optional = true }
-clap = { workspace = true }
-exhaust = { workspace = true }
-futures-core = { workspace = true }
-futures-util = { workspace = true, features = ["std"] }
-image = { workspace = true, features = ["png"] }
-imgref = { workspace = true }
-itertools = { workspace = true }
-log = { workspace = true }
+# Caution: In order for the dynamic linking to succeed, there must be no dependencies from here
+# upon all-is-cubes-* or other libraries that the harness depends on and which are not
+# `crate-type = ["dylib"]` themselves.
+test-renderers-dylib = { path = "dylib" }
+
 # Used by the `bless-render` tool to compress images that are to be stored in the repository.
 oxipng = { version = "10.0.0", default-features = false, features = ["parallel", "zopfli"] }
-rendiff = { workspace = true }
-send_wrapper = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-simplelog = { workspace = true }
-tempfile = { workspace = true }
-time = { workspace = true }
-tinytemplate = { workspace = true }
-# Using tokio for async test-running.
-tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync", "time"] }
-# In addition to depending on wgpu directly, we also need to enable backends for the tests to
-# actually find an adapter. Enabling default features suffices (as of wgpu 24.0).
-wgpu = { workspace = true, default-features = true }
 
 [lints]
 workspace = true
