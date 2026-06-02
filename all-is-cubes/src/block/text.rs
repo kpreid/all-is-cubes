@@ -298,8 +298,8 @@ impl Text {
                 let mut voxels: Vol<Box<[Evoxel]>> =
                     Vol::from_fn(bounds_in_this_block, |_| background);
 
-                let decl = self.data.font.font_decl();
-                let font_glyphs = decl.glyphs();
+                let def = self.data.font.font_def();
+                let font_glyphs = &def.glyphs;
 
                 for glyph in text_glyphs.iter() {
                     let glyph_position_3d: GridPoint =
@@ -372,8 +372,7 @@ impl Text {
             glyphs,
         ) = self.get_or_init_layout().parts();
 
-        let decl = self.data.font.font_decl();
-        let font_glyphs = decl.glyphs();
+        let font_glyphs = &self.data.font.font_def().glyphs;
 
         let brush: Brush<&Block> = match self.data.outline {
             Some(ref outline) => Brush::Outline {
@@ -401,7 +400,7 @@ impl Text {
         self.layout_cache.get_or_init(|| {
             text::compute_layout(
                 &self.data.string,
-                self.data.font.font_decl(),
+                self.data.font.font_def(),
                 self.data.outline.is_some(),
                 self.data.layout_bounds,
                 self.data.positioning,

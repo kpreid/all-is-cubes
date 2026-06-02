@@ -107,16 +107,16 @@ const DELETE_ME_POSITION: Point2D<GridCoordinate, ()> =
 /// For a given piece of text, computes what glyphs to actually draw at what positions.
 pub(crate) fn compute_layout(
     mut string: &str,
-    decl: &text::FontDecl,
+    font: &text::FontDef,
     outline: bool,
     layout_bounds: GridAab,
     positioning: text::Positioning,
 ) -> Layout {
-    let metrics = decl.metrics();
+    let metrics = &font.metrics;
+    let font_glyphs = &font.glyphs;
     let character_size_g = metrics.character_size.to_i32();
     let outline_expansion: GridCoordinate = outline.into();
     let thickness = 1 + outline_expansion;
-    let font_glyphs = decl.glyphs();
 
     // Find the *point* within the layout_bounds the text is positioned relative to.
     //
@@ -285,7 +285,7 @@ pub(crate) fn compute_layout(
     let result = Layout(arc_with_length.into());
 
     #[cfg(debug_assertions)]
-    result.consistency_check(decl, outline);
+    result.consistency_check(font, outline);
 
     result
 }
@@ -340,7 +340,7 @@ impl Layout {
     }
 
     #[cfg(debug_assertions)]
-    fn consistency_check(&self, font: &text::FontDecl, outline: bool) {
+    fn consistency_check(&self, font: &text::FontDef, outline: bool) {
         let (
             &LayoutHeader {
                 // Cannot truly validate the logical bounding box because it is determined in part
@@ -351,13 +351,12 @@ impl Layout {
             },
             glyphs,
         ) = self.parts();
-        let font_glyphs = font.glyphs();
 
         let rendering_bounding_box_from_glyphs = glyphs
             .iter()
             .map(|glyph| {
                 glyph_bounding_box_to_3d(
-                    font_glyphs.rendering_bounding_box(glyph.glyph_index, outline),
+                    font.glyphs.rendering_bounding_box(glyph.glyph_index, outline),
                     glyph.position.extend(z).cast_unit(),
                     outline,
                 )
@@ -449,7 +448,7 @@ mod tests {
     fn one_letter_for_positioning(p: text::Positioning) -> Layout {
         compute_layout(
             "A",
-            Font::System16.font_decl(),
+            Font::System16.font_def(),
             false,
             GridAab::for_block(R32),
             p,
@@ -458,7 +457,7 @@ mod tests {
     fn one_outlined_letter_for_positioning(p: text::Positioning) -> Layout {
         compute_layout(
             "A",
-            Font::System16.font_decl(),
+            Font::System16.font_def(),
             true,
             GridAab::for_block(R32),
             p,
@@ -502,7 +501,7 @@ mod tests {
         assert_bb(
             compute_layout(
                 "AB",
-                Font::System16.font_decl(),
+                Font::System16.font_def(),
                 false,
                 GridAab::for_block(R32),
                 positioning!(Center, BodyTop, Back),
@@ -517,7 +516,7 @@ mod tests {
         assert_bb(
             compute_layout(
                 "A",
-                Font::System16.font_decl(),
+                Font::System16.font_def(),
                 false,
                 GridAab::from_lower_upper([0, 0, 0], [31, 32, 32]),
                 positioning!(Center, BodyTop, Back),
@@ -532,7 +531,7 @@ mod tests {
         assert_bb(
             compute_layout(
                 "AB",
-                Font::System16.font_decl(),
+                Font::System16.font_def(),
                 false,
                 GridAab::from_lower_upper([0, 0, 0], [31, 32, 32]),
                 positioning!(Center, BodyTop, Back),

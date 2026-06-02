@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::fmt;
 
 use bevy_platform::sync::OnceLock;
 use euclid::{Box2D, Point2D, Size2D, Translation2D, point2, size2, vec2};
@@ -20,6 +21,7 @@ use crate::block::Text;
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Font {
+    // TODO: Handle(universe::Handle<FontDef>),
     /// A font whose characteristics are unspecified, other than that it is general-purpose and
     /// has a line height (vertical distance from a point on one line to the corresponding
     /// point of the next line) of 16 voxels.
@@ -37,33 +39,38 @@ pub enum Font {
 }
 
 impl Font {
-    /// Returns the static (compile-time constant) data for this font.
-    pub(crate) fn font_decl(&self) -> &'static FontDecl {
+    /// Retrieves the [`FontDef`] for this font.
+    ///
+    /// Note that for system fonts, this may imply loading it on the first use.
+    //---
+    // TODO: should accept a ReadTicket and return a Result for handle errors
+    pub(crate) fn font_def<'t>(&self) -> &'t FontDef {
         match self {
+            //Handle(Handle) => handle.read(),
             Self::System16 | Self::Logo => {
                 static DECL: FontDecl = FontDecl {
                     png_data: include_bytes!("font-system-7x16.png"),
                     png_path: "font-system-7x16.png",
-                    glyphs: OnceLock::new(),
+                    cache: OnceLock::new(),
                     metrics: Metrics {
                         character_size: size2(7, 16),
                         baseline: 12,
                     },
                 };
 
-                &DECL
+                DECL.get()
             }
             Self::SmallerBodyText => {
                 static DECL: FontDecl = FontDecl {
                     png_data: include_bytes!("font-body-text-6x14.png"),
                     png_path: "font-body-text-6x14.png",
-                    glyphs: OnceLock::new(),
+                    cache: OnceLock::new(),
                     metrics: Metrics {
                         character_size: size2(6, 14),
                         baseline: 10,
                     },
                 };
-                &DECL
+                DECL.get()
             }
         }
     }
@@ -111,11 +118,10 @@ impl Font {
         mut set_pixel: impl FnMut(Point2D<i32, euclid::UnknownUnit>, Value),
     ) -> Result<(), universe::HandleError> {
         let _ = read_ticket; // won't be used until we actually have custom fonts
-        let decl = self.font_decl();
-        let glyphs = decl.glyphs();
+        let font_def = self.font_def();
         let layout = text::compute_layout(
             text,
-            decl,
+            font_def,
             false,
             GridAab::ORIGIN_CUBE,
             text::Positioning {
@@ -129,7 +135,7 @@ impl Font {
             let translation: Translation2D<i32, InGlyph, euclid::UnknownUnit> = Translation2D::from(
                 glyph.position.to_vector().cast_unit().component_mul(vec2(1, -1)),
             );
-            glyphs.get(glyph.glyph_index).for_each(|(position, value)| {
+            font_def.glyphs.get(glyph.glyph_index).for_each(|(position, value)| {
                 set_pixel(translation.transform_point(position), value);
             });
         }
@@ -138,8 +144,10 @@ impl Font {
 
     /// Returns the metrics of the font: measurements of dimensions which all characters
     /// in the font share.
+    //---
+    // TODO: this will need to go away when we have user-defined fonts
     pub fn metrics(&self) -> &Metrics {
-        &self.font_decl().metrics
+        self.font_def().metrics()
     }
 }
 
@@ -185,6 +193,26 @@ impl Metrics {
 
 // -------------------------------------------------------------------------------------------------
 
+/// The data of a font.
+///
+/// TODO: Currently, this type is not very useful, but it will eventually be a
+/// [`Universe`][crate::universe::Universe] member for custom fonts.
+#[derive(Clone, Debug)]
+pub struct FontDef {
+    pub(crate) glyphs: Glyphs,
+    pub(crate) metrics: Metrics,
+}
+
+impl FontDef {
+    /// Returns the metrics of the font: measurements of dimensions which all characters
+    /// in the font share.
+    pub fn metrics(&self) -> &Metrics {
+        &self.metrics
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Number of glyphs which we place on each row of our .png and bitmap images.
 ///
 /// TODO: Instead of this constant being used in many places, we should, when loading the font
@@ -202,26 +230,25 @@ pub(crate) struct FontDecl {
     png_data: &'static [u8],
     png_path: &'static str,
 
-    /// Lazily decoded from `png_data`.
-    glyphs: OnceLock<Glyphs>,
-
     metrics: Metrics,
+
+    /// Lazily computed from `png_data` and `metrics`.
+    cache: OnceLock<FontDef>,
 }
 
 impl FontDecl {
-    pub(crate) fn metrics(&self) -> &Metrics {
-        &self.metrics
-    }
-
-    /// Returns the glyph data for this font, loading it if necessary.
-    pub(crate) fn glyphs(&self) -> &Glyphs {
-        self.glyphs.get_or_init(|| {
+    /// Returns the [`FontDef`] for this font, loading it if necessary.
+    pub(crate) fn get(&self) -> &FontDef {
+        self.cache.get_or_init(|| {
             let decoded_png = DecodedPng::decode_static(self.png_data, self.png_path);
             assert_eq!(
                 decoded_png.size().width,
                 u32::from(self.metrics.character_size.width) * GLYPHS_PER_ROW
             );
-            Glyphs::new(&decoded_png, self.metrics.character_size)
+            FontDef {
+                metrics: self.metrics.clone(),
+                glyphs: Glyphs::new(&decoded_png, self.metrics.character_size),
+            }
         })
     }
 }
@@ -248,6 +275,7 @@ pub enum Value {
 // -------------------------------------------------------------------------------------------------
 
 /// All the glyphs of one font, ready for use by the renderer.
+#[derive(Clone)]
 pub(crate) struct Glyphs {
     /// Bit-packed glyph data.
     ///
@@ -463,6 +491,13 @@ impl Glyphs {
                 _ => unreachable!(),
             }
         })
+    }
+}
+
+impl fmt::Debug for Glyphs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // TODO: print at least some basic info.
+        f.debug_struct("Glyphs").finish_non_exhaustive()
     }
 }
 
