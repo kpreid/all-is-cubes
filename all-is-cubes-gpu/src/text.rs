@@ -6,7 +6,6 @@ use itertools::iproduct;
 
 use all_is_cubes::euclid::{self, Size2D, Vector2D, point2, size2};
 use all_is_cubes::text;
-use all_is_cubes::universe;
 use all_is_cubes_render::camera::{ImageSize, Viewport};
 
 use crate::everything::InfoTextTexture;
@@ -108,7 +107,7 @@ impl GpuFontMetrics {
 pub(crate) fn generate_texture_atlas(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    font: &text::Font,
+    font: &text::FontDef,
 ) -> (Identified<wgpu::TextureView>, GpuFontMetrics) {
     let outline_radius_u = 1u32;
     let outline_radius_i = outline_radius_u.cast_signed();
@@ -131,7 +130,7 @@ pub(crate) fn generate_texture_atlas(
             y * atlas_cell_size.height.cast_signed() + outline_radius_i,
         );
 
-        font.draw_str_monospaced(universe::ReadTicket::stub(), string, |p, value| {
+        font.draw_str_monospaced(string, |p, value| {
             // TODO: also clip to the cell boundary?
             if let Some(p) = translate_glyph_to_atlas.transform_point(p).try_cast::<u32>() {
                 dt.draw_target().set_pixel(
@@ -142,8 +141,7 @@ pub(crate) fn generate_texture_atlas(
                     },
                 );
             }
-        })
-        .expect("system font access should never fail");
+        });
     }
 
     dt.upload(queue);

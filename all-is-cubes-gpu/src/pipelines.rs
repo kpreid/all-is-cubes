@@ -8,6 +8,7 @@ use wgpu::util::DeviceExt;
 
 use all_is_cubes::content::load_image::include_image;
 use all_is_cubes::listen::{self, Listen as _};
+use all_is_cubes::universe;
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
 use crate::common::Identified;
@@ -817,8 +818,11 @@ impl Pipelines {
             )
         };
 
-        let (info_text_font, info_text_font_metrics) =
-            crate::text::generate_texture_atlas(device, queue, &all_is_cubes::text::Font::System16);
+        let (info_text_font, info_text_font_metrics) = crate::text::generate_texture_atlas(
+            device,
+            queue,
+            universe::Builtin::FontSystem16.read::<all_is_cubes::text::FontDef>(),
+        );
 
         let block_linear_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Pipelines::block_linear_sampler"),

@@ -61,7 +61,7 @@ fn COMPOSITE(ctx: Context<'_>) {
                     let label = block::Text::builder()
                         .string(label_str)
                         .resolution(R64)
-                        .font(text::Font::SmallerBodyText)
+                        .font(Builtin::font_body_text().clone())
                         .foreground(demo_blocks[DemoBlocks::LabelTextVoxel].clone())
                         .positioning(text::Positioning {
                             // TODO: this should be "last line at the bottom" but that isn't implemented

@@ -48,6 +48,8 @@ pub struct Text {
     layout_cache: OnceLock<text::Layout>,
 }
 
+// TODO: This struct is currently the largest thing in `block::Primitive`.
+// Think of how to make it more compact.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct TextData {
     string: ArcStr,
@@ -307,8 +309,9 @@ impl Text {
                 let mut voxels: Vol<Box<[VoxelIndex]>> =
                     Vol::repeat(bounds_in_this_block, background_index);
 
-                let def = self.data.font.font_def();
-                let font_glyphs = &def.glyphs;
+                // TODO: We will need a listener for changes to the font here.
+                let font_def = self.data.font.read(filter.read_ticket)?;
+                let font_glyphs = &font_def.glyphs;
 
                 for glyph in text_glyphs.iter() {
                     let glyph_position_3d: GridPoint =
@@ -390,7 +393,7 @@ impl Text {
             glyphs,
         ) = self.get_or_init_layout(read_ticket)?.parts();
 
-        let font_glyphs = &self.data.font.font_def().glyphs;
+        let font_glyphs = &self.data.font.read(read_ticket)?.glyphs;
 
         let brush: Brush<&Block> = match self.data.outline {
             Some(ref outline) => Brush::Outline {
@@ -416,22 +419,18 @@ impl Text {
         Ok(())
     }
 
-    #[expect(
-        clippy::unnecessary_wraps,
-        reason = "fallible case not yet implemented"
-    )]
     fn get_or_init_layout(
         &self,
         read_ticket: universe::ReadTicket<'_>,
     ) -> Result<&text::Layout, universe::HandleError> {
-        // This ticket is not yet used, but will be necessary when we have user-defined fonts
-        // to read.
-        let _ = read_ticket;
+        // Fetch the font even if the cache is filled, to avoid making the error conditional on
+        // previous calls.
+        let font: &text::FontDef = self.data.font.read(read_ticket)?;
 
         Ok(self.layout_cache.get_or_init(|| {
             text::compute_layout(
                 &self.data.string,
-                self.data.font.font_def(),
+                font,
                 self.data.outline.is_some(),
                 self.data.layout_bounds,
                 self.data.positioning,
@@ -606,7 +605,7 @@ impl TextBuilder {
 
     /// Sets the font to use.
     ///
-    /// The default is [`Font::System16`].
+    /// The default is [`FontSystem16`][universe::Builtin::FontSystem16].
     pub fn font(mut self, font: Font) -> Self {
         self.font = font;
         self
@@ -700,7 +699,7 @@ impl Default for TextBuilder {
     fn default() -> Self {
         Self {
             string: ArcStr::new(),
-            font: Font::System16,
+            font: universe::Builtin::font_system16().clone(),
             foreground: block::from_color!(palette::ALMOST_BLACK),
             outline: None,
             resolution: Resolution::R16,
@@ -740,7 +739,7 @@ mod serialization {
             } = value;
             schema::TextSer::TextV1 {
                 string: string.clone(),
-                font: font.into(),
+                font: font.clone(),
                 foreground: foreground.clone(),
                 outline: outline.clone(),
                 resolution,
@@ -765,7 +764,7 @@ mod serialization {
                     debug,
                 } => block::Text::builder()
                     .string(string)
-                    .font(font.into())
+                    .font(font)
                     .foreground(foreground)
                     .outline(outline)
                     .layout_bounds(resolution, layout_bounds)

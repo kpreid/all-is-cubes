@@ -16,7 +16,7 @@ use crate::math::{
 };
 use crate::space::{self, SetCubeError, Space};
 use crate::transaction::Transactional as _;
-use crate::universe::{Universe, UniverseTransaction};
+use crate::universe::{self, Universe, UniverseTransaction};
 
 mod draw_box;
 pub use draw_box::*;
@@ -106,7 +106,7 @@ fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usiz
     let text_block = Block::from(block::Primitive::Text {
         text: block::Text::builder()
             .string(label)
-            .font(text::Font::System16)
+            .font(universe::Builtin::font_system16().clone())
             .foreground(label_voxel)
             .positioning(text::Positioning {
                 x: text::PositioningX::Center,

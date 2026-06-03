@@ -21,7 +21,7 @@ use all_is_cubes::op;
 use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::text;
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{Universe, UniverseTransaction};
+use all_is_cubes::universe::{self, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 use crate::alg::four_walls;
@@ -456,7 +456,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     );
                     let info_text_block = block::Text::builder()
                         .string(description)
-                        .font(text::Font::SmallerBodyText)
+                        .font(universe::Builtin::font_body_text().clone())
                         .foreground(block::from_color!(palette::STEEL))
                         .resolution(R128)
                         .positioning(text::Positioning {

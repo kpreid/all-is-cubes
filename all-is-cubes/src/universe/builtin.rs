@@ -7,6 +7,7 @@ use bevy_platform::sync::LazyLock;
 use crate::block::{self, BlockDef};
 use crate::math::{ps32, zo32};
 use crate::sound::SoundDef;
+use crate::text::{self, FontDef};
 use crate::universe::{self, AnyPending, Handle, ReadTicket};
 
 #[cfg(doc)]
@@ -50,7 +51,7 @@ macro_rules! derive_for_builtin_name {
                         static DATA: LazyLock<AnyPending> = LazyLock::new(|| {
                             AnyPending::$member_ty {
                                 handle: Handle::new_for_builtin_initialization(Builtin::$variant),
-                                value: Some(Box::new($value_expr)),
+                                value: Some(Box::<$member_ty>::new($value_expr)),
                             }
                         });
                         &*DATA
@@ -193,6 +194,22 @@ pub enum Builtin {
         },
     )]
     Thump,
+
+    /// A font whose characteristics are unspecified, other than that it is general-purpose and
+    /// has a line height (vertical distance from a point on one line to the corresponding
+    /// point of the next line) of 16 voxels.
+    #[custom(
+        string = "all-is-cubes/font/system-16",
+        value: FontDef = text::FONT_SYSTEM_16.load(),
+    )]
+    FontSystem16,
+
+    /// A font somewhat smaller than [`Builtin::FontSystem16`], intended for longer texts.
+    #[custom(
+        string = "all-is-cubes/font/body-text",
+        value: FontDef = text::FONT_BODY_TEXT.load(),
+    )]
+    FontBodyText,
 }
 
 impl<T: universe::UniverseMember> TryFrom<Builtin> for &Handle<T> {

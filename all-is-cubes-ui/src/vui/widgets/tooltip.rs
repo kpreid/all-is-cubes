@@ -200,7 +200,7 @@ impl Tooltip {
             text_builder: block::Text::builder()
                 .foreground(Block::from(palette::HUD_TEXT_FILL))
                 .outline(Some(Block::from(palette::HUD_TEXT_STROKE)))
-                .font(text::Font::SmallerBodyText)
+                .font(universe::Builtin::font_body_text().clone())
                 .positioning(text::Positioning {
                     x: text::PositioningX::Center,
                     line_y: text::PositioningY::BodyMiddle,

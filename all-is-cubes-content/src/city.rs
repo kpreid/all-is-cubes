@@ -31,8 +31,7 @@ use all_is_cubes::space::{self, LightPhysics, Space, SpacePhysics};
 use all_is_cubes::text;
 use all_is_cubes::time::Instant;
 use all_is_cubes::transaction::{self, Transaction};
-use all_is_cubes::universe::UniverseTransaction;
-use all_is_cubes::universe::{ReadTicket, Universe};
+use all_is_cubes::universe::{self, ReadTicket, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::vui::Layoutable as _;
 use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
@@ -886,7 +885,7 @@ fn draw_exhibit_info(read_ticket: ReadTicket<'_>, exhibit: &Exhibit) -> Result<S
                 read_ticket,
                 block::Text::builder()
                     .string(exhibit.name.into())
-                    .font(text::Font::System16)
+                    .font(universe::Builtin::font_system16().clone())
                     .foreground(block::from_color!(palette::ALMOST_BLACK))
                     .positioning(text::Positioning {
                         x: text::PositioningX::Left,
@@ -905,7 +904,7 @@ fn draw_exhibit_info(read_ticket: ReadTicket<'_>, exhibit: &Exhibit) -> Result<S
                         }
                         .into(),
                     )
-                    .font(text::Font::SmallerBodyText)
+                    .font(universe::Builtin::font_body_text().clone())
                     .foreground(block::from_color!(palette::ALMOST_BLACK))
                     .positioning(text::Positioning {
                         x: text::PositioningX::Left,

@@ -16,7 +16,7 @@ use all_is_cubes::euclid::{point3, vec3};
 use all_is_cubes::inv;
 use all_is_cubes::math::{Face, GridAab, GridVector, Rgb, Rgba};
 use all_is_cubes::text;
-use all_is_cubes::universe::{ReadTicket, Universe};
+use all_is_cubes::universe::{self, ReadTicket, Universe};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -191,7 +191,7 @@ fn text_blocks() -> [Block; BLOCK_COUNT] {
         Block::from(block::Primitive::Text {
             text: block::Text::builder()
                 .string(arcstr::format!("{i}{i}{i}"))
-                .font(text::Font::System16)
+                .font(universe::Builtin::font_system16().clone())
                 .foreground(label_voxel.clone())
                 .positioning(text::Positioning {
                     x: text::PositioningX::Center,

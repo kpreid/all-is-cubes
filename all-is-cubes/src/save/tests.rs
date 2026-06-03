@@ -278,7 +278,7 @@ fn block_text_without_optional() {
         &Block::from_primitive(block::Primitive::Text {
             text: block::Text::builder()
                 .string(literal!("hello"))
-                .font(text::Font::System16) // TODO: use a nondefault font once such are stable
+                .font(Builtin::font_system16().clone()) // TODO: use a nondefault font once such are stable
                 .foreground(block::from_color!(1.0, 0.0, 0.0, 1.0))
                 .layout_bounds(
                     Resolution::R32,
@@ -299,7 +299,10 @@ fn block_text_without_optional() {
                 "text": {
                     "type": "TextV1",
                     "string": "hello",
-                    "font": "System16V1",
+                    "font": {
+                        "type": "HandleV1",
+                        "Builtin": "all-is-cubes/font/system-16",
+                    },
                     "foreground": {
                         "type": "BlockV1",
                         "primitive": {
@@ -330,7 +333,7 @@ fn block_text_with_optional() {
         &Block::from_primitive(block::Primitive::Text {
             text: block::Text::builder()
                 .string(literal!("hello"))
-                .font(text::Font::System16) // TODO: use a nondefault font once such are stable
+                .font(Builtin::font_system16().clone()) // TODO: use a nondefault font once such are stable
                 .foreground(block::from_color!(1.0, 0.0, 0.0, 1.0))
                 .outline(Some(block::from_color!(0.0, 1.0, 0.0, 1.0)))
                 .layout_bounds(
@@ -353,7 +356,10 @@ fn block_text_with_optional() {
                 "text": {
                     "type": "TextV1",
                     "string": "hello",
-                    "font": "System16V1",
+                    "font": {
+                        "type": "HandleV1",
+                        "Builtin": "all-is-cubes/font/system-16",
+                    },
                     "foreground": {
                         "type": "BlockV1",
                         "primitive": {

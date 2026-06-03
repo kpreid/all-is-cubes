@@ -37,7 +37,7 @@ fn RESOLUTIONS(ctx: Context<'_>) {
             let label = block::Text::builder()
                 .resolution(R32)
                 .string(arcstr::format!("{resolution}"))
-                .font(text::Font::SmallerBodyText)
+                .font(Builtin::font_body_text().clone())
                 .foreground(demo_blocks[DemoBlocks::LabelTextVoxel].clone())
                 .positioning(text::Positioning::LOW)
                 .build()

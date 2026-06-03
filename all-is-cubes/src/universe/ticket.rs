@@ -81,6 +81,7 @@ impl<'w, 's> QueryBlockDataSources<'w, 's> {
             blocks: Some(self.block_defs),
             spaces: Some(self.spaces),
             characters: None,
+            fonts: None,
             sounds: None,
             tags: None,
         }

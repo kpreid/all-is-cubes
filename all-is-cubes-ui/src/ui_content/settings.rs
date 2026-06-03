@@ -7,7 +7,7 @@ use all_is_cubes::arcstr::{self, literal};
 use all_is_cubes::block::Block;
 use all_is_cubes::math::Face;
 use all_is_cubes::text;
-use all_is_cubes::universe::ReadTicket;
+use all_is_cubes::universe::{self, ReadTicket};
 use all_is_cubes::util::ShowStatus;
 use all_is_cubes_render::camera::AntialiasingOption;
 
@@ -312,7 +312,7 @@ fn setting_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'static
 
     let label = vui::leaf_widget(widgets::Label::with_font(
         label,
-        text::Font::System16,
+        universe::Builtin::font_system16().clone(),
         text::Positioning {
             x: text::PositioningX::Right,
             line_y: text::PositioningY::BodyMiddle,

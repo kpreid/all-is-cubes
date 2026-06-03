@@ -66,7 +66,7 @@ impl Toolbar {
                 .foreground(block::from_color!(palette::HUD_TEXT_FILL))
                 .outline(Some(block::from_color!(palette::HUD_TEXT_STROKE)))
                 .resolution(Resolution::R32)
-                .font(text::Font::SmallerBodyText)
+                .font(universe::Builtin::font_body_text().clone())
                 .positioning(text::Positioning {
                     x: text::PositioningX::Right,
                     line_y: text::PositioningY::BodyBottom,

@@ -56,6 +56,8 @@
     * The `block::text` module has been broken up.
       * `block::text::{Font, Positioning*}` are now in the top-level `text` module.
       * `block::text::{Text, TextBuilder}` are now in the top-level `block` module.
+      * `Font`s are now `Handle<FontDef>`s instead of an enum.
+        Built-in fonts are now accessible through `universe::Builtin` handles.
     * `Handle::<BlockDef>::read()` no longer returns a `&BlockDef`, but a separate `Read` type.
     * `chunking::point_to_chunk()` now returns `None` in case of out-of-range input instead of panicking.
     * `inv::InvInBlock::new()` now enforces invariants about its input.

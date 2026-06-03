@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 use all_is_cubes::block::{self, Block, Resolution::R64};
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::text;
+use all_is_cubes::universe;
 use all_is_cubes::util::{ConciseDebug, Refmt};
 
 use crate::vui::widgets::WidgetTheme;
@@ -42,7 +43,7 @@ impl vui::Widget for LayoutDebugFrame {
                 grant.bounds,
                 grant.gravity.to_array(),
             ))
-            .font(text::Font::System16)
+            .font(universe::Builtin::font_system16().clone())
             .resolution(R64)
             .positioning(text::Positioning {
                 x: text::PositioningX::Left,

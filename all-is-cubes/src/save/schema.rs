@@ -233,7 +233,7 @@ pub(crate) struct MoveSerV1 {
 pub(crate) enum TextSer {
     TextV1 {
         string: ArcStr,
-        font: FontSer,
+        font: crate::text::Font,
         foreground: Block,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         outline: Option<Block>,
@@ -243,14 +243,6 @@ pub(crate) enum TextSer {
         #[serde(default, skip_serializing_if = "is_default")]
         debug: bool,
     },
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub(crate) enum FontSer {
-    System16V1,
-    LogoV1,
-    #[doc(hidden)] // experimental, and not intended to be actually serialized
-    UnstableSmallerBodyTextV1,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

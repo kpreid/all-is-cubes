@@ -513,7 +513,8 @@ impl fmt::Debug for Measurement {
 mod tests {
     use super::*;
     use crate::block::Resolution::R32;
-    use crate::text::Font;
+    use crate::text::FontDef;
+    use crate::universe::Builtin;
 
     #[track_caller]
     #[inline(never)]
@@ -544,7 +545,7 @@ mod tests {
     fn one_letter_for_positioning(p: text::Positioning) -> Layout {
         compute_layout(
             "A",
-            Font::System16.font_def(),
+            Builtin::FontSystem16.read::<FontDef>(),
             false,
             GridAab::for_block(R32),
             p,
@@ -553,7 +554,7 @@ mod tests {
     fn one_outlined_letter_for_positioning(p: text::Positioning) -> Layout {
         compute_layout(
             "A",
-            Font::System16.font_def(),
+            Builtin::FontSystem16.read::<FontDef>(),
             true,
             GridAab::for_block(R32),
             p,
@@ -597,7 +598,7 @@ mod tests {
         assert_bb(
             compute_layout(
                 "AB",
-                Font::System16.font_def(),
+                Builtin::FontSystem16.read::<FontDef>(),
                 false,
                 GridAab::for_block(R32),
                 positioning!(Center, BodyTop, Back),
@@ -612,7 +613,7 @@ mod tests {
         assert_bb(
             compute_layout(
                 "A",
-                Font::System16.font_def(),
+                Builtin::FontSystem16.read::<FontDef>(),
                 false,
                 GridAab::from_lower_upper([0, 0, 0], [31, 32, 32]),
                 positioning!(Center, BodyTop, Back),
@@ -627,7 +628,7 @@ mod tests {
         assert_bb(
             compute_layout(
                 "AB",
-                Font::System16.font_def(),
+                Builtin::FontSystem16.read::<FontDef>(),
                 false,
                 GridAab::from_lower_upper([0, 0, 0], [31, 32, 32]),
                 positioning!(Center, BodyTop, Back),

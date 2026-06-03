@@ -10,7 +10,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{self, Space, SpacePhysics};
 use all_is_cubes::text;
-use all_is_cubes::universe::{Handle, ReadTicket, StrongHandle, Universe};
+use all_is_cubes::universe::{self, Handle, ReadTicket, StrongHandle, Universe};
 use all_is_cubes_render::camera::{self, ViewTransform};
 
 use crate::vui::{
@@ -371,7 +371,7 @@ pub(crate) mod parts {
     pub fn paragraph(text: impl Into<ArcStr>) -> WidgetTree {
         vui::leaf_widget(widgets::Label::with_font(
             text.into(),
-            text::Font::SmallerBodyText,
+            universe::Builtin::font_body_text().clone(),
             text::Positioning {
                 x: text::PositioningX::Left,
                 line_y: text::PositioningY::BodyTop,

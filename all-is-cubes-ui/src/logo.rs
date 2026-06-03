@@ -11,6 +11,12 @@ use all_is_cubes::{
 
 use crate::vui;
 
+/// Returns the logo font.
+/// Someday we may have a unique font.
+fn logo_font() -> text::Font {
+    universe::Builtin::font_system16().clone()
+}
+
 /// All is Cubes logo text as a widget, at "1:1" scale (1 block per font pixel).
 #[expect(clippy::module_name_repetitions)]
 #[expect(clippy::missing_panics_doc, reason = "infallible")]
@@ -23,7 +29,7 @@ pub fn logo_text() -> Arc<dyn vui::Widget> {
             universe::ReadTicket::stub(), // only using a builtin font
             block::Text::builder()
                 .string(literal!("All is Cubes"))
-                .font(text::Font::Logo)
+                .font(logo_font())
                 .foreground(foreground_text_block)
                 .outline(Some(background_text_block))
                 .positioning(text::Positioning {

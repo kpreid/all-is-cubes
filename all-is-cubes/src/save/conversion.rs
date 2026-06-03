@@ -972,26 +972,6 @@ mod text {
     use super::*;
     use crate::text;
 
-    impl From<&text::Font> for schema::FontSer {
-        fn from(value: &text::Font) -> Self {
-            match value {
-                text::Font::System16 => schema::FontSer::System16V1,
-                text::Font::Logo => schema::FontSer::LogoV1,
-                text::Font::SmallerBodyText => schema::FontSer::UnstableSmallerBodyTextV1,
-            }
-        }
-    }
-
-    impl From<schema::FontSer> for text::Font {
-        fn from(value: schema::FontSer) -> Self {
-            match value {
-                schema::FontSer::System16V1 => text::Font::System16,
-                schema::FontSer::LogoV1 => text::Font::Logo,
-                schema::FontSer::UnstableSmallerBodyTextV1 => text::Font::SmallerBodyText,
-            }
-        }
-    }
-
     impl From<text::Positioning> for schema::PositioningSerV1 {
         fn from(value: text::Positioning) -> Self {
             let text::Positioning { x, line_y, z } = value;
@@ -1136,6 +1116,11 @@ mod universe {
                                 value: schema::SerializeHandle(read_ticket, member_handle.clone()),
                             },
                         },
+                        AnyHandle::FontDef(_) => {
+                            return Err(serde::ser::Error::custom(
+                                "saving fonts is not yet implemented",
+                            ));
+                        }
                         AnyHandle::SoundDef(member_handle) => MemberEntrySer {
                             name,
                             value: schema::MemberSer::Sound {

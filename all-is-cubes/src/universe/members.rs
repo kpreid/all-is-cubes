@@ -17,6 +17,7 @@ use crate::character::Character;
 use crate::sound::SoundDef;
 use crate::space::Space;
 use crate::tag::TagDef;
+use crate::text::FontDef;
 use crate::time;
 use crate::transaction;
 use crate::universe::{
@@ -721,6 +722,7 @@ macro_rules! member_enums_and_impls {
 member_enums_and_impls!(
     (BlockDef, blocks),
     (Character, characters),
+    (FontDef, fonts),
     (SoundDef, sounds),
     (Space, spaces),
     (TagDef, tags),

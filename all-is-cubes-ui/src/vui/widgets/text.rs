@@ -91,7 +91,7 @@ impl Label {
     pub fn new(string: ArcStr) -> Self {
         Self {
             text: string,
-            font: text::Font::System16,
+            font: universe::Builtin::font_system16().clone(),
             positioning: None,
         }
     }
@@ -208,7 +208,7 @@ impl TextBox {
     pub fn dynamic_label(text_source: listen::DynSource<ArcStr>, minimum_size: GridSize) -> Self {
         Self {
             text_source,
-            font: text::Font::System16,
+            font: universe::Builtin::font_system16().clone(),
             positioning: None,
             minimum_size,
         }
@@ -386,7 +386,7 @@ mod tests {
             ReadTicket::stub(),
             Text::builder()
                 .string(text.into())
-                .font(text::Font::System16)
+                .font(universe::Builtin::font_system16().clone())
                 .foreground(block::from_color!(Rgba::WHITE))
                 .positioning(text::Positioning {
                     x: text::PositioningX::Left,

@@ -11,7 +11,7 @@ use all_is_cubes::listen::{self, Source as _};
 use all_is_cubes::math::{Rgba, ZeroOne};
 use all_is_cubes::space::Space;
 use all_is_cubes::text;
-use all_is_cubes::universe::{Handle, ReadTicket};
+use all_is_cubes::universe::{self, Handle, ReadTicket};
 use all_is_cubes::util::StatusText;
 
 use crate::camera::{
@@ -666,9 +666,9 @@ pub(crate) fn draw_info_text<T: Clone>(
 
     let output_bounds = euclid::Box2D::from_size(viewport.framebuffer_size);
     let origin = vec2(5, 5);
-    let font = text::Font::System16;
+    let font = universe::Builtin::FontSystem16.read::<text::FontDef>();
 
-    font.draw_str_monospaced(ReadTicket::stub(), info_text, |mut pixel, value| {
+    font.draw_str_monospaced(info_text, |mut pixel, value| {
         pixel += origin;
         if output_bounds.contains(pixel.to_u32().cast_unit()) {
             output
@@ -679,8 +679,7 @@ pub(crate) fn draw_info_text<T: Clone>(
                 }]
                 .clone();
         }
-    })
-    .expect("system font access should never fail");
+    });
 }
 
 // -------------------------------------------------------------------------------------------------

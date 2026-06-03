@@ -5,6 +5,7 @@
 //! [`block::Primitive::Text`][crate::block::Primitive::Text].
 
 mod font;
+pub(crate) use font::{FONT_BODY_TEXT, FONT_SYSTEM_16};
 pub use font::{Font, FontDef, Metrics, Value};
 
 mod layout;

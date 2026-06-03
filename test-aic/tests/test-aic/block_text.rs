@@ -5,8 +5,8 @@ use all_is_cubes::block::{self, Block, Primitive, Resolution, Text};
 use all_is_cubes::euclid::size2;
 use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector};
 use all_is_cubes::space::Space;
-use all_is_cubes::text::{Font, Positioning, PositioningX, PositioningY, PositioningZ};
-use all_is_cubes::universe::{ReadTicket, Universe};
+use all_is_cubes::text::{FontDef, Positioning, PositioningX, PositioningY, PositioningZ};
+use all_is_cubes::universe::{Builtin, ReadTicket, Universe};
 use all_is_cubes_render::raytracer::print_space;
 
 /// Convert voxels with z range = 1 to a string for readable comparisons.
@@ -67,9 +67,12 @@ fn single_block_test_case(text: Text) -> (Box<Universe>, Block) {
 /// the bounding box of drawn text).
 #[test]
 fn public_metrics() {
-    assert_eq!(Font::System16.metrics().character_cell_size(), size2(7, 16));
     assert_eq!(
-        Font::SmallerBodyText.metrics().character_cell_size(),
+        Builtin::FontSystem16.read::<FontDef>().metrics().character_cell_size(),
+        size2(7, 16)
+    );
+    assert_eq!(
+        Builtin::FontBodyText.read::<FontDef>().metrics().character_cell_size(),
         size2(6, 14)
     );
 }
@@ -78,7 +81,7 @@ fn public_metrics() {
 fn single_line_text_smoke_test() {
     let text = Text::builder()
         .string(literal!("ab"))
-        .font(Font::System16)
+        .font(Builtin::font_system16().clone())
         .resolution(Resolution::R16)
         .positioning(Positioning {
             x: PositioningX::Left,
@@ -125,7 +128,7 @@ fn multiple_line() {
         Text::builder()
             .resolution(Resolution::R32)
             .string(literal!("abcd\nefgh"))
-            .font(Font::System16)
+            .font(Builtin::font_system16().clone())
             .positioning(Positioning {
                 x: PositioningX::Left,
                 line_y: PositioningY::BodyTop, // TODO: test case for BodyBottom, which we may want to fix
@@ -177,7 +180,7 @@ fn bounding_voxels_of_positioning_high() {
     let text = Text::builder()
         .resolution(Resolution::R32)
         .string(literal!("abc"))
-        .font(Font::System16)
+        .font(Builtin::font_system16().clone())
         .positioning(Positioning {
             x: PositioningX::Right,
             line_y: PositioningY::BodyTop,
@@ -225,11 +228,14 @@ fn positioning_x(
         })
         // TODO: when we have custom fonts, use custom fonts instead of depending on properties
         // of fonts with other intents.
-        .font(if odd_character_width {
-            Font::System16 // 7 wide
-        } else {
-            Font::SmallerBodyText // 6 wide
-        })
+        .font(
+            if odd_character_width {
+                Builtin::font_system16() // 7 wide
+            } else {
+                Builtin::font_body_text() // 6 wide
+            }
+            .clone(),
+        )
         .layout_bounds(
             Resolution::R16,
             GridAab::from_ranges([bounds_range, 0..16, 0..16]),
@@ -252,7 +258,7 @@ fn no_intersection_with_block() {
     let (universe, block) = single_block_test_case({
         Text::builder()
             .string(literal!("ab"))
-            .font(Font::System16)
+            .font(Builtin::font_system16().clone())
             .layout_bounds(
                 Resolution::R16,
                 GridAab::from_lower_size([100000, 0, 0], [16, 16, 16]),
@@ -278,7 +284,7 @@ fn overflowing_coordinates(
         offset: GridVector::zero(),
         text: Text::builder()
             .string(literal!("ab"))
-            .font(Font::System16)
+            .font(Builtin::font_system16().clone())
             .layout_bounds(
                 Resolution::R16,
                 GridAab::from_lower_size(GridPoint::splat(coordinate), [0, 0, 0]),

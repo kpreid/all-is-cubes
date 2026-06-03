@@ -48,7 +48,7 @@ fn COLORS(ctx: Context<'_>) {
                 [0, 1, 0] => Some({
                     block::Text::builder()
                         .string(description)
-                        .font(text::Font::SmallerBodyText)
+                        .font(Builtin::font_body_text().clone())
                         .foreground(demo_blocks[DemoBlocks::LabelTextVoxel].clone())
                         .resolution(R64)
                         .positioning(text::Positioning {

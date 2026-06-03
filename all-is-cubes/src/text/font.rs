@@ -1,7 +1,6 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use bevy_platform::sync::OnceLock;
 use euclid::{Box2D, Point2D, Size2D, Translation2D, point2, size2, vec2};
 use itertools::iproduct;
 
@@ -9,162 +8,62 @@ use crate::camera::{ImagePixel, ImageSize};
 use crate::content::load_image::DecodedPng;
 use crate::math::{GridAab, GridCoordinate, u32size};
 use crate::text::{self, InGlyph};
-use crate::universe::{self, ReadTicket};
+use crate::transaction;
+use crate::universe;
+#[cfg_attr(not(any(doc, feature = "arbitrary")), allow(unused_imports))]
+use crate::universe::Builtin;
 
 #[cfg(doc)]
 use crate::block::Text;
 
 // -------------------------------------------------------------------------------------------------
 
-/// A font that may be used with [`Text`] blocks.
-//---
-// TODO: Now that we have builtin handles, replace this enum with just `Handle<FontDef>`.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[non_exhaustive]
-pub enum Font {
-    // TODO: Handle(universe::Handle<FontDef>),
-    /// A font whose characteristics are unspecified, other than that it is general-purpose and
-    /// has a line height (vertical distance from a point on one line to the corresponding
-    /// point of the next line) of 16 voxels.
-    ///
-    /// This is a placeholder for further improvement in the font system.
-    System16,
+// The following `FontDecl` constants are used via `Builtin` handles.
 
-    #[doc(hidden)]
-    // experimental while we figure things out. Probably to be replaced with fonts stored in Universe
-    Logo,
+pub(crate) static FONT_SYSTEM_16: FontDecl = FontDecl {
+    png_data: include_bytes!("font-system-7x16.png"),
+    png_path: "font-system-7x16.png",
+    metrics: Metrics {
+        character_size: size2(7, 16),
+        baseline: 12,
+    },
+};
 
-    #[doc(hidden)]
-    // experimental while we figure things out. Probably to be replaced with fonts stored in Universe
-    SmallerBodyText,
-}
+pub(crate) static FONT_BODY_TEXT: FontDecl = FontDecl {
+    png_data: include_bytes!("font-body-text-6x14.png"),
+    png_path: "font-body-text-6x14.png",
+    metrics: Metrics {
+        character_size: size2(6, 14),
+        baseline: 10,
+    },
+};
 
-impl Font {
-    /// Retrieves the [`FontDef`] for this font.
-    ///
-    /// Note that for system fonts, this may imply loading it on the first use.
-    //---
-    // TODO: should accept a ReadTicket and return a Result for handle errors
-    pub(crate) fn font_def<'t>(&self) -> &'t FontDef {
-        match self {
-            //Handle(Handle) => handle.read(),
-            Self::System16 | Self::Logo => {
-                static DECL: FontDecl = FontDecl {
-                    png_data: include_bytes!("font-system-7x16.png"),
-                    png_path: "font-system-7x16.png",
-                    cache: OnceLock::new(),
-                    metrics: Metrics {
-                        character_size: size2(7, 16),
-                        baseline: 12,
-                    },
-                };
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for universe::Handle<FontDef> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // This is an appropriate implementation because fonts currently can't be constructed from
+        // user-provided data. In the future it will need to be replaced.
 
-                DECL.get()
-            }
-            Self::SmallerBodyText => {
-                static DECL: FontDecl = FontDecl {
-                    png_data: include_bytes!("font-body-text-6x14.png"),
-                    png_path: "font-body-text-6x14.png",
-                    cache: OnceLock::new(),
-                    metrics: Metrics {
-                        character_size: size2(6, 14),
-                        baseline: 10,
-                    },
-                };
-                DECL.get()
-            }
-        }
-    }
-
-    /// Draws text in this font, calling `set_pixel` for each pixel that should be set
-    /// according to some [`Value`].
-    ///
-    /// The output coordinates are X-right Y-down starting from `(0, 0)` at the top-left of the
-    /// first line of text.
-    ///
-    /// **Caution:**
-    /// Glyphs may overlap, and in particular, the [`Value::Outline`] of one glyph may be produced
-    /// before or after an adjacent glyph’s [`Value::Foreground`]. Therefore, you must adopt one
-    /// of these strategies to handle this case:
-    ///
-    /// * Ignore outline pixels.
-    /// * If an outline pixel is drawn after a foreground pixel, do not overwrite the foreground
-    ///   pixel (draw to different layers, or have some priority mechanism such as taking the
-    ///   maximum or minimum).
-    /// * Call this function twice, first taking the outline pixels only, and then taking the
-    ///   foreground pixels only.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the given [`ReadTicket`] does not include access to the font.
-    //---
-    // Design note: In most cases, “set pixel” is an inefficient way of drawing images.
-    // In this case, we are using it somewhat for historical reasons, but also because:
-    // * our text generally has few foreground pixels relative to the area it covers
-    // * all of our users want to track bounding boxes or otherwise work with the foreground
-    //   area distinct from the background.
-    //
-    // TODO: Ideally this should return an iterator, but a non-borrowing iterator over
-    // `Arc<[PositionedGlyph]>` is tricky.
-    //
-    // TODO: Return a more appropriate unit.
-    #[expect(
-        clippy::unnecessary_wraps,
-        reason = "user-defined fonts don't exist yet"
-    )]
-    pub fn draw_str_monospaced(
-        &self,
-        read_ticket: ReadTicket<'_>,
-        text: &str,
-        mut set_pixel: impl FnMut(Point2D<i32, euclid::UnknownUnit>, Value),
-    ) -> Result<(), universe::HandleError> {
-        let _ = read_ticket; // won't be used until we actually have custom fonts
-        let font_def = self.font_def();
-        let layout = text::compute_layout(
-            text,
-            font_def,
-            false,
-            GridAab::ORIGIN_CUBE,
-            text::Positioning {
-                x: text::PositioningX::Left,
-                line_y: text::PositioningY::BodyTop,
-                z: text::PositioningZ::Back,
-            },
-        );
-        for glyph in layout.glyphs() {
-            // TODO: change the output convention so that we do not have to flip coords here?
-            let translation: Translation2D<i32, InGlyph, euclid::UnknownUnit> = Translation2D::from(
-                glyph.position.to_vector().cast_unit().component_mul(vec2(1, -1)),
-            );
-            font_def.glyphs.get(glyph.glyph_index).for_each(|(position, value)| {
-                set_pixel(translation.transform_point(position), value);
-            });
-        }
-        Ok(())
-    }
-
-    /// Returns the metrics of the font: measurements of dimensions which all characters
-    /// in the font share.
-    //---
-    // TODO: this will need to go away when we have user-defined fonts
-    pub fn metrics(&self) -> &Metrics {
-        self.font_def().metrics()
+        // This is a list of all fonts available as builtins.
+        u.choose(&[Builtin::font_system16, Builtin::font_body_text])
+            .map(|f| f().clone())
     }
 }
 
-impl universe::VisitHandles for Font {
-    fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
-        match self {
-            Self::System16 | Self::SmallerBodyText | Self::Logo => {}
-        }
-    }
-}
+/// A font handle.
+///
+/// You can obtain font handles from [`Builtin`], then use them in [`Text`] blocks.
+// TODO: When user-defined fonts are a thing, revise the mention of `Builtin`.
+///
+/// This type alias is a convenient shorthand for code working with text; additionally,
+/// using it may help with migration in case future versions of All is Cubes no longer have
+/// a 1:1 relationship between fonts and handles.
+pub type Font = universe::Handle<FontDef>;
 
 // -------------------------------------------------------------------------------------------------
 
-/// The metrics of a [`Font`]: measurements of dimensions which all characters in the font share.
-#[derive(Clone, Debug)]
+/// The metrics of a [`FontDef`]: measurements of dimensions which all characters in the font share.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Metrics {
     /// Size of a whole monospaced character cell.
     ///
@@ -183,7 +82,7 @@ impl Metrics {
     /// Returns the size of a character cell that should be used when this font is used with a
     /// strictly monospaced renderer.
     ///
-    /// Currently, this will always agree with the spacing that [`Font::draw_str_monospaced()`]
+    /// Currently, this will always agree with the spacing that [`FontDef::draw_str_monospaced()`]
     /// produces.
     /// Currently, All is Cubes uses strictly monospaced layout for all text, and so
     /// the `width` of this is equal to the advance width of the font.
@@ -195,11 +94,12 @@ impl Metrics {
 
 // -------------------------------------------------------------------------------------------------
 
-/// The data of a font.
+/// The data of a font that may be used with [`Text`] blocks.
 ///
-/// TODO: Currently, this type is not very useful, but it will eventually be a
-/// [`Universe`][crate::universe::Universe] member for custom fonts.
-#[derive(Clone, Debug)]
+/// Currently, the only available fonts are obtained through [`Builtin`];
+/// there is no way to construct a new [`FontDef`] value.
+/// In the future, fonts will be editable or at least loadable.
+#[derive(Clone, Debug, Eq, PartialEq, bevy_ecs::component::Component)]
 pub struct FontDef {
     pub(crate) glyphs: Glyphs,
     pub(crate) metrics: Metrics,
@@ -211,7 +111,78 @@ impl FontDef {
     pub fn metrics(&self) -> &Metrics {
         &self.metrics
     }
+
+    /// Draws text in this font, calling `set_pixel` for each pixel that should be set
+    /// according to some [`Value`].
+    ///
+    /// The output coordinates are X-right Y-down starting from `(0, 0)` at the top-left of the
+    /// first line of text.
+    ///
+    /// **Caution:**
+    /// Glyphs may overlap, and in particular, the [`Value::Outline`] of one glyph may be produced
+    /// before or after an adjacent glyph’s [`Value::Foreground`]. Therefore, you must adopt one
+    /// of these strategies to handle this case:
+    ///
+    /// * Ignore outline pixels.
+    /// * If an outline pixel is drawn after a foreground pixel, do not overwrite the foreground
+    ///   pixel (draw to different layers, or have some priority mechanism such as taking the
+    ///   maximum or minimum).
+    /// * Call this function twice, first taking the outline pixels only, and then taking the
+    ///   foreground pixels only. This is inefficient because it performs text layout twice.
+    //---
+    // Design note: In most cases, “set pixel” is an inefficient way of drawing images.
+    // In this case, we are using it somewhat for historical reasons, but also because:
+    // * our text generally has few foreground pixels relative to the area it covers
+    // * all of our users want to track bounding boxes or otherwise work with the foreground
+    //   area distinct from the background.
+    //
+    // TODO: Ideally this should return an iterator, but a non-borrowing iterator over
+    // `Arc<[PositionedGlyph]>` is tricky.
+    //
+    // TODO: Return a more appropriate unit.
+    pub fn draw_str_monospaced(
+        &self,
+        text: &str,
+        mut set_pixel: impl FnMut(Point2D<i32, euclid::UnknownUnit>, Value),
+    ) {
+        let layout = text::compute_layout(
+            text,
+            self,
+            false,
+            GridAab::ORIGIN_CUBE,
+            text::Positioning {
+                x: text::PositioningX::Left,
+                line_y: text::PositioningY::BodyTop,
+                z: text::PositioningZ::Back,
+            },
+        );
+        for glyph in layout.glyphs() {
+            // TODO: change the output convention so that we do not have to flip coords here?
+            let translation: Translation2D<i32, InGlyph, euclid::UnknownUnit> = Translation2D::from(
+                glyph.position.to_vector().cast_unit().component_mul(vec2(1, -1)),
+            );
+            self.glyphs.get(glyph.glyph_index).for_each(|(position, value)| {
+                set_pixel(translation.transform_point(position), value);
+            });
+        }
+    }
 }
+
+impl universe::VisitHandles for FontDef {
+    fn visit_handles(&self, _visitor: &mut dyn universe::HandleVisitor) {
+        let Self {
+            // no handles yet
+            glyphs: _,
+            metrics: _,
+        } = self;
+    }
+}
+
+impl transaction::Transactional for FontDef {
+    type Transaction = transaction::ValueTransaction<FontDef>;
+}
+
+universe::impl_universe_member_for_single_component_type!(FontDef);
 
 // -------------------------------------------------------------------------------------------------
 
@@ -233,25 +204,19 @@ pub(crate) struct FontDecl {
     png_path: &'static str,
 
     metrics: Metrics,
-
-    /// Lazily computed from `png_data` and `metrics`.
-    cache: OnceLock<FontDef>,
 }
 
 impl FontDecl {
-    /// Returns the [`FontDef`] for this font, loading it if necessary.
-    pub(crate) fn get(&self) -> &FontDef {
-        self.cache.get_or_init(|| {
-            let decoded_png = DecodedPng::decode_static(self.png_data, self.png_path);
-            assert_eq!(
-                decoded_png.size().width,
-                u32::from(self.metrics.character_size.width) * GLYPHS_PER_ROW
-            );
-            FontDef {
-                metrics: self.metrics.clone(),
-                glyphs: Glyphs::new(&decoded_png, self.metrics.character_size),
-            }
-        })
+    pub(crate) fn load(&self) -> FontDef {
+        let decoded_png = DecodedPng::decode_static(self.png_data, self.png_path);
+        assert_eq!(
+            decoded_png.size().width,
+            u32::from(self.metrics.character_size.width) * GLYPHS_PER_ROW
+        );
+        FontDef {
+            metrics: self.metrics.clone(),
+            glyphs: Glyphs::new(&decoded_png, self.metrics.character_size),
+        }
     }
 }
 
@@ -262,7 +227,7 @@ impl FontDecl {
 /// These are not specific colors, but identify which color role (“foreground”, “outline”)
 /// to use at a specific position, given the particular piece of text’s style.
 ///
-/// This enum is produced by [`Font::draw_str_monospaced()`].
+/// This enum is produced by [`FontDef::draw_str_monospaced()`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[expect(clippy::exhaustive_enums)]
 pub enum Value {
@@ -277,7 +242,7 @@ pub enum Value {
 // -------------------------------------------------------------------------------------------------
 
 /// All the glyphs of one font, ready for use by the renderer.
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub(crate) struct Glyphs {
     /// Bit-packed glyph data.
     ///
@@ -288,7 +253,7 @@ pub(crate) struct Glyphs {
 }
 
 /// Information for locating a packed glyph in [`Glyphs`].
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GlyphInfo {
     /// Offset of the first byte of each glyph in `self.pixels`.
     data_offset: usize,
