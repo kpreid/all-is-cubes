@@ -105,6 +105,8 @@ fn check_or_overwrite_file(
             fs::set_permissions(path, permissions)
                 .with_context(|| format!("write permissions for file “{}”", path.display()))?;
         }
+        #[cfg(not(unix))]
+        let _ = set_executable;
     } else {
         eprintln!(
             "⚠️ “{}” is not up to date. Run “cargo xtask init --overwrite” to fix.",
