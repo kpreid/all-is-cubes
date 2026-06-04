@@ -8,6 +8,8 @@ use either::Either;
 
 use all_is_cubes::math::u32size;
 
+use crate::heap;
+
 // -------------------------------------------------------------------------------------------------
 
 /// Data storage for meshes’ index lists, automatically choosing an element type which is
@@ -130,14 +132,6 @@ impl IndexVec {
         match self {
             Self::U16(vec) => vec.clear(),
             Self::U32(vec) => vec.clear(),
-        }
-    }
-
-    #[inline]
-    pub(crate) fn capacity_bytes(&self) -> usize {
-        match self {
-            Self::U16(vec) => vec.capacity() * 2,
-            Self::U32(vec) => vec.capacity() * 4,
         }
     }
 
@@ -283,6 +277,16 @@ impl Extend<u16> for IndexVec {
         match self {
             IndexVec::U16(vec) => vec.extend(iter),
             IndexVec::U32(vec) => vec.extend(iter.into_iter().map(u32::from)),
+        }
+    }
+}
+
+impl heap::HeapUsage for IndexVec {
+    #[inline]
+    fn heap_bytes_owned(&self) -> usize {
+        match self {
+            Self::U16(vec) => heap::capacity_bytes(vec),
+            Self::U32(vec) => heap::capacity_bytes(vec),
         }
     }
 }

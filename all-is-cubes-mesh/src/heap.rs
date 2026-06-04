@@ -36,15 +36,12 @@ impl<T: HeapUsage> HeapUsage for Option<T> {
     }
 }
 
-impl<T: HeapUsage> HeapUsage for alloc::vec::Vec<T> {
+/// This impl applies only to `Copy` types which essentially can’t own anything.
+/// An alternative would be `impl<T: HeapUsage>`, but that’s less useful for our purposes and
+/// would require recursion.
+impl<T: Copy> HeapUsage for alloc::vec::Vec<T> {
     fn heap_bytes_owned(&self) -> usize {
-        capacity_bytes(self) + self.iter().map(|item| item.heap_bytes_owned()).sum::<usize>()
-    }
-}
-
-impl HeapUsage for crate::IndexVec {
-    fn heap_bytes_owned(&self) -> usize {
-        self.capacity_bytes()
+        capacity_bytes(self)
     }
 }
 

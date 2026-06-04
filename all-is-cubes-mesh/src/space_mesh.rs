@@ -11,6 +11,7 @@ use all_is_cubes::math::{Cube, Face, FaceMap, GridAab, Vol, range_len};
 use all_is_cubes::space::{self, BlockIndex, Space};
 use all_is_cubes_render::Flaws;
 
+use crate::heap::HeapUsage;
 use crate::texture::Channels;
 use crate::{
     Aabb, Aabbs, BlockMesh, DepthOrdering, IndexSlice, IndexVec, IndexVecDeque, MeshOptions,
@@ -150,7 +151,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
     }
 
     /// Returns the total memory (not counting allocator overhead) occupied by this
-    /// [`SpaceMesh`] value and all its owned objects.
+    /// [`SpaceMesh`] value and all its owned objects,
+    /// not counting the texture it references or allocator overhead.
     pub fn total_byte_size(&self) -> usize {
         let SpaceMesh {
             vertices: (v0, v1),
@@ -168,11 +170,11 @@ impl<M: MeshTypes> SpaceMesh<M> {
         } = self;
 
         size_of::<Self>()
-            + v0.capacity() * size_of::<M::Vertex>()
-            + v1.capacity() * size_of::<<M::Vertex as Vertex>::SecondaryData>()
-            + indices.capacity_bytes()
-            + block_indices_used.capacity_bytes()
-            + textures_used.capacity() * size_of::<M::Tile>()
+            + v0.heap_bytes_owned()
+            + v1.heap_bytes_owned()
+            + indices.heap_bytes_owned()
+            + block_indices_used.heap_bytes_owned()
+            + crate::heap::capacity_bytes(textures_used)
     }
 
     /// Computes triangles for the contents of `space` within `bounds` and stores them

@@ -64,8 +64,10 @@ impl<T: Copy + Zero + Into<u32> + TryFrom<u32> + ops::Add<Output = T>> BitSet<T>
     pub fn iter(&self) -> Iter<'_, T> {
         self.into_iter()
     }
+}
 
-    pub fn capacity_bytes(&self) -> usize {
+impl<T> crate::heap::HeapUsage for BitSet<T> {
+    fn heap_bytes_owned(&self) -> usize {
         self.bits.capacity() * size_of::<u32>()
     }
 }
