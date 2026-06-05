@@ -7,6 +7,7 @@ rust-version.workspace = true
 publish = false
 
 [lib]
+crate-type = ["dylib"]
 doc = false
 test = false
 doctest = false
