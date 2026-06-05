@@ -4,12 +4,6 @@
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-/// Pulling other crates through test-renderers makes dynamic linking work.
-use test_renderers_dylib::{
-    all_is_cubes, all_is_cubes_render, all_is_cubes_ui, clap, log, test_renderers_cases,
-    test_renderers_runner, test_renderers_types, tokio,
-};
-
 use clap::Parser as _;
 
 use all_is_cubes::arcstr::literal;

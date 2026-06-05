@@ -1,8 +1,6 @@
 //! Runs [`test_renderers_runner::harness_main`] against [`all_is_cubes_render::raytracer`].
 
-use test_renderers_dylib::{
-    clap::Parser as _, test_renderers_cases, test_renderers_runner, test_renderers_types, tokio,
-};
+use clap::Parser as _;
 
 #[tokio::main]
 async fn main() -> test_renderers_runner::HarnessResult {

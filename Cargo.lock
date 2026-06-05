@@ -6383,8 +6383,24 @@ dependencies = [
 name = "test-renderers"
 version = "0.0.0"
 dependencies = [
+ "all-is-cubes",
+ "all-is-cubes-content",
+ "all-is-cubes-gpu",
+ "all-is-cubes-port",
+ "all-is-cubes-render",
+ "all-is-cubes-ui",
+ "anyhow",
+ "bytemuck",
+ "clap",
+ "log",
  "oxipng",
- "test-renderers-dylib",
+ "simplelog",
+ "tempfile",
+ "test-renderers-cases",
+ "test-renderers-runner",
+ "test-renderers-types",
+ "tokio",
+ "wgpu",
 ]
 
 [[package]]
@@ -6398,29 +6414,6 @@ dependencies = [
  "exhaust",
  "rendiff",
  "test-renderers-types",
-]
-
-[[package]]
-name = "test-renderers-dylib"
-version = "0.0.0"
-dependencies = [
- "all-is-cubes",
- "all-is-cubes-content",
- "all-is-cubes-gpu",
- "all-is-cubes-port",
- "all-is-cubes-render",
- "all-is-cubes-ui",
- "anyhow",
- "bytemuck",
- "clap",
- "log",
- "simplelog",
- "tempfile",
- "test-renderers-cases",
- "test-renderers-runner",
- "test-renderers-types",
- "tokio",
- "wgpu",
 ]
 
 [[package]]
