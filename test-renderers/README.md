@@ -8,7 +8,6 @@ Organization
 
 * `tests/*-render.rs` test targets for each renderer being tested.
 * `tests/ui.rs` test target for UI tests.
-* `dylib/` bundles all of the test helper crates into one dynamic library for efficiency.
 * `cases/` contains the renderer test cases (scenes to render).
 * `runner/` contains the test runner, which implements the `main()` logic for all test targets.
 * `types/` contains code that `runner` and `cases` both need.

@@ -17,7 +17,6 @@ members = [
   "test-mesh",
   "test-renderers",
   "test-renderers/cases",
-  "test-renderers/dylib",
   "test-renderers/runner",
   "test-renderers/types",
   "tools/xtask",

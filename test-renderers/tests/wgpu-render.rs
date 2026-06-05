@@ -1,11 +1,5 @@
 //! Runs [`test_renderers_runner::harness_main`] against [`all_is_cubes_gpu`].
 
-/// Pulling other crates through test-renderers makes dynamic linking work.
-use test_renderers_dylib::{
-    all_is_cubes_gpu, all_is_cubes_render, clap, log, test_renderers_cases, test_renderers_runner,
-    test_renderers_types, tokio, wgpu,
-};
-
 use clap::Parser as _;
 use tokio::sync::OnceCell;
 

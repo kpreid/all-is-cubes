@@ -1,12 +1,8 @@
 //! Copies and compresses an image file from the test-renderers output directory
 //! to the `expected/` directory.
 
-use test_renderers_dylib::{
-    anyhow,
-    clap::{self, Parser as _},
-    simplelog,
-    test_renderers_types::{ImageId, RendererId, SuiteId, TestId, Version, image_path},
-};
+use clap::{self, Parser as _};
+use test_renderers_types::{ImageId, RendererId, SuiteId, TestId, Version, image_path};
 
 #[derive(Debug, clap::Parser)]
 #[command(author, about, version)]

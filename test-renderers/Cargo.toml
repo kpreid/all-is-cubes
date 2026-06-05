@@ -68,18 +68,44 @@ harness = false
 default = ["auto-threads"]
 # Enables "auto-threads" feature of all-is-cubes libraries.
 # This is a feature so that, if we want to, we can disable it and test the non-threaded build.
-auto-threads = ["test-renderers-dylib/auto-threads"]
+auto-threads = [
+    "all-is-cubes/auto-threads",
+    "all-is-cubes-gpu/auto-threads",
+    "all-is-cubes-port?/auto-threads",
+    "all-is-cubes-render/auto-threads",
+]
 # Enables `gltf-render` test target. Doesn’t work — see comments above on the [[test]].
-gltf = ["test-renderers-dylib/gltf"]
+gltf = [
+    "dep:all-is-cubes-content",
+    "dep:all-is-cubes-port",
+    "dep:bytemuck",
+    "dep:tempfile",
+    "tokio/fs",
+]
 
 [dependencies]
-# Caution: In order for the dynamic linking to succeed, there must be no dependencies from here
-# upon all-is-cubes-* or other libraries that the harness depends on and which are not
-# `crate-type = ["dylib"]` themselves.
-test-renderers-dylib = { path = "dylib" }
+test-renderers-cases = { path = "cases" }
+test-renderers-runner = { path = "runner" }
+test-renderers-types = { path = "types" }
 
+all-is-cubes = { workspace = true, features = ["save"] }
+all-is-cubes-gpu = { workspace = true, features = ["wgpu"] }
+all-is-cubes-content = { workspace = true, optional = true }
+all-is-cubes-port = { workspace = true, optional = true, features = ["export", "gltf"] }
+all-is-cubes-render = { workspace = true, features = ["raytracer", "serde", "std"] }
+all-is-cubes-ui = { workspace = true, features = ["session"] }
+anyhow = { workspace = true }
+bytemuck = { workspace = true, optional = true }
+clap = { workspace = true }
+log = { workspace = true }
 # Used by the `bless-render` tool to compress images that are to be stored in the repository.
 oxipng = { version = "10.0.0", default-features = false, features = ["parallel", "zopfli"] }
+simplelog = { workspace = true }
+tempfile = { workspace = true, optional = true }
+tokio = { workspace = true }
+# We need to enable wgpu backends for the tests to actually find an adapter.
+# Enabling default features suffices (as of wgpu 24.0).
+wgpu = { workspace = true, default-features = true }
 
 [lints]
 workspace = true
