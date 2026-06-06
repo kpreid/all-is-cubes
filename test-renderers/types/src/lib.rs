@@ -13,7 +13,7 @@ use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes::util::{ConciseDebug, Refmt as _};
 use all_is_cubes_render::camera::{Layers, StandardCameras};
-use all_is_cubes_render::{Flaws, HeadlessRenderer, Rendering};
+use all_is_cubes_render::{HeadlessRenderer, Rendering};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -215,26 +215,10 @@ impl RenderTestContext {
                 self.image_serial
             },
         };
-        let flaws = image.flaws;
 
-        let mut outcome = crate::compare_rendered_image(combo, &allowed_difference.into(), image);
-
-        if flaws.contains(Flaws::UNFINISHED) {
-            // Special rule: Flaws::UNFINISHED shouldn't happen, so it is counted as a special
-            // kind of failure, rather than counted as “known comparison failure”.
-            outcome.outcome = ComparisonOutcome::Unfinished;
-        } else if matches!(
-            outcome.outcome,
-            ComparisonOutcome::Different { .. } | ComparisonOutcome::NoExpected
-        ) && flaws != Flaws::empty()
-        {
-            // If the image is flawed, this is a special case which is a “warning” not an error.
-            //
-            // As an additional kludge-feature building on this, missing expected image is also
-            // ignored, as a means to skip comparisons that don't have any meaningful expected
-            // image yet. (We should have a more explicit feature for this.)
-            outcome.outcome = ComparisonOutcome::Flawed(format!("{flaws:?}"));
-        }
+        let mut outcome =
+            save_and_compare_rendered_image(combo, &allowed_difference.into(), &image);
+        outcome.outcome = modify_outcome_accounting_for_flaws(image.flaws, outcome.outcome);
 
         // The comparison log will be consulted to determine if the test should be marked failed.
         #[expect(clippy::missing_panics_doc)]

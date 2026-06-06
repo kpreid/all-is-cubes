@@ -7,8 +7,8 @@ use rendiff::{Histogram, Threshold};
 
 use all_is_cubes::euclid::size2;
 use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText};
-use all_is_cubes_render::Rendering;
 use all_is_cubes_render::camera::ImageSize;
+use all_is_cubes_render::{Flaws, Rendering};
 
 use crate::{
     ImageId, LoadedExpectedImage, RendererId, Version, image_path, load_and_copy_expected_image,
@@ -117,11 +117,12 @@ impl ComparisonImage {
 }
 
 /// Finish a rendering test by storing/displaying/comparing the output image.
-#[expect(clippy::needless_pass_by_value)]
-pub(crate) fn compare_rendered_image(
+///
+/// Note that this function does not make the final determination as to whether the test succeeds.
+pub(crate) fn save_and_compare_rendered_image(
     test: ImageId,
     allowed_difference: &Threshold,
-    actual_rendering: Rendering,
+    actual_rendering: &Rendering,
 ) -> ComparisonRecord {
     let start_time = Instant::now();
 
@@ -164,7 +165,7 @@ pub(crate) fn compare_rendered_image(
 
     // Compare expected and actual images
     let start_diff_time = Instant::now();
-    let diff_result = rendiff::diff((&actual_rendering).into(), expected_image.as_ref());
+    let diff_result = rendiff::diff(actual_rendering.into(), expected_image.as_ref());
     let end_diff_time = Instant::now();
 
     // Save diff image to disk
@@ -232,4 +233,28 @@ pub(crate) fn compare_rendered_image(
     );
 
     record
+}
+
+pub(crate) fn modify_outcome_accounting_for_flaws(
+    flaws: Flaws,
+    outcome: ComparisonOutcome,
+) -> ComparisonOutcome {
+    if flaws.contains(Flaws::UNFINISHED) {
+        // Special rule: Flaws::UNFINISHED shouldn't happen, so it is counted as a special
+        // kind of failure, rather than counted as “known comparison failure”.
+        ComparisonOutcome::Unfinished
+    } else if matches!(
+        outcome,
+        ComparisonOutcome::Different { .. } | ComparisonOutcome::NoExpected
+    ) && flaws != Flaws::empty()
+    {
+        // If the image is flawed, this is a special case which is a “warning” not an error.
+        //
+        // As an additional kludge-feature building on this, missing expected image is also
+        // ignored, as a means to skip comparisons that don't have any meaningful expected
+        // image yet. (We should have a more explicit feature for this.)
+        ComparisonOutcome::Flawed(format!("{flaws:?}"))
+    } else {
+        outcome
+    }
 }
