@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::{self};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Instant;
 
 use rendiff::{Histogram, Threshold};
@@ -10,7 +10,10 @@ use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText};
 use all_is_cubes_render::Rendering;
 use all_is_cubes_render::camera::ImageSize;
 
-use crate::{ImageId, NotFound, RendererId, Version, image_path, load_and_copy_expected_image};
+use crate::{
+    ImageId, LoadedExpectedImage, NotFound, RendererId, Version, image_path,
+    load_and_copy_expected_image,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -116,7 +119,7 @@ impl ComparisonImage {
 
 /// Finish a rendering test by storing/displaying/comparing the output image.
 #[expect(clippy::needless_pass_by_value)]
-pub fn compare_rendered_image(
+pub(crate) fn compare_rendered_image(
     test: ImageId,
     allowed_difference: &Threshold,
     actual_rendering: Rendering,
@@ -140,36 +143,33 @@ pub fn compare_rendered_image(
             .expect("failed to write renderer output image");
     }
 
-    // TODO: all this needs a bunch of code deduplication for conveniently trying-to-open and carrying around the image and path
-
     // Load expected image, if any
-    let (expected_image, expected_file_path): (imgref::ImgVec<[u8; 4]>, PathBuf) =
-        match load_and_copy_expected_image(&test) {
-            Ok(r) => r,
-            Err(NotFound(_)) => {
-                // Look for a generic all-renderers output file
-                match load_and_copy_expected_image(&ImageId {
-                    renderer: RendererId::All,
-                    ..test.clone()
-                }) {
-                    Ok(r) => r,
-                    Err(NotFound(expected_file_path)) => {
-                        return ComparisonRecord::new(
-                            ComparisonImage::new(&expected_file_path, ImageSize::zero()), // TODO: should be optional
-                            ComparisonImage::new(&actual_file_path, actual_rendering.size),
-                            None,
-                            Histogram::ZERO,
-                            ComparisonOutcome::NoExpected,
-                            info_string,
-                        );
-                    }
+    let expected: LoadedExpectedImage = match load_and_copy_expected_image(&test) {
+        Ok(r) => r,
+        Err(NotFound(_)) => {
+            // Look for a generic all-renderers output file
+            match load_and_copy_expected_image(&ImageId {
+                renderer: RendererId::All,
+                ..test.clone()
+            }) {
+                Ok(r) => r,
+                Err(NotFound(expected_file_path)) => {
+                    return ComparisonRecord::new(
+                        ComparisonImage::new(&expected_file_path, ImageSize::zero()), // TODO: should be optional
+                        ComparisonImage::new(&actual_file_path, actual_rendering.size),
+                        None,
+                        Histogram::ZERO,
+                        ComparisonOutcome::NoExpected,
+                        info_string,
+                    );
                 }
             }
-        };
+        }
+    };
 
     // Compare expected and actual images
     let start_diff_time = Instant::now();
-    let diff_result = rendiff::diff((&actual_rendering).into(), expected_image.as_ref());
+    let diff_result = rendiff::diff((&actual_rendering).into(), expected.image.as_ref());
     let end_diff_time = Instant::now();
 
     // Save diff image to disk
@@ -202,10 +202,10 @@ pub fn compare_rendered_image(
 
     let record = ComparisonRecord::new(
         ComparisonImage::new(
-            &expected_file_path,
+            &expected.snapshot_file_path,
             size2(
-                expected_image.width() as u32,
-                expected_image.height() as u32,
+                expected.image.width() as u32,
+                expected.image.height() as u32,
             ),
         ),
         ComparisonImage::new(&actual_file_path, actual_rendering.size),

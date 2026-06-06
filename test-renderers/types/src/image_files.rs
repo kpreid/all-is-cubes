@@ -84,27 +84,47 @@ pub fn test_data_dir_path(suite_id: SuiteId, version: Version) -> PathBuf {
 /// Returns error if not found, or panics if an IO error occurs.
 pub(crate) fn load_and_copy_expected_image(
     image_id: &ImageId,
-) -> Result<(imgref::ImgVec<[u8; 4]>, PathBuf), NotFound> {
-    let expected_file_path = image_path(image_id, Version::ExpectedSrc);
+) -> Result<LoadedExpectedImage, NotFound> {
+    let src_file_path = image_path(image_id, Version::ExpectedSrc);
     let snapshot_file_path = image_path(image_id, Version::ExpectedSnapshot);
 
-    match image::open(&expected_file_path) {
+    match image::open(&src_file_path) {
         Ok(image) => {
             let image = image.to_rgba8();
             // We write the image back from pixels, not bytewise.
             // This makes it canonical and contain only the information we actually compared.
             image.save(&snapshot_file_path).unwrap();
 
-            Ok((image_to_imgref(image), snapshot_file_path))
+            Ok(LoadedExpectedImage {
+                image: image_to_imgref(image),
+                src_file_path,
+                snapshot_file_path,
+            })
         }
         Err(image::ImageError::IoError(e)) if e.kind() == io::ErrorKind::NotFound => {
-            Err(NotFound(expected_file_path))
+            Err(NotFound(src_file_path))
         }
         Err(e) => panic!(
             "Failed to read expected image '{p}': {e}",
-            p = expected_file_path.display()
+            p = src_file_path.display()
         ),
     }
+}
+
+pub(crate) struct LoadedExpectedImage {
+    /// Loaded image in memory.
+    pub image: imgref::ImgVec<[u8; 4]>,
+
+    #[expect(
+        unused,
+        reason = "TODO: this should be used for overwriting expected images"
+    )]
+    /// Path we loaded the image from, which should be under version control.
+    pub src_file_path: PathBuf,
+
+    /// Path we copied the image to, for its use in the test report (so it is snapshotted and
+    /// standalone).
+    pub snapshot_file_path: PathBuf,
 }
 
 fn image_to_imgref(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> imgref::ImgVec<[u8; 4]> {
