@@ -61,6 +61,10 @@ pub enum ComparisonOutcome {
     ///
     /// The string is a list of flaws, of unspecified syntax, to avoid serialization issues.
     ResourceLimited(String),
+
+    /// The expected image has been overwritten by the rendered image.
+    /// Future runs may produce different outcomes.
+    Overwritten,
 }
 
 impl ComparisonOutcome {
@@ -74,6 +78,24 @@ impl ComparisonOutcome {
             ComparisonOutcome::Different { amount: _ } => false,
             ComparisonOutcome::NoExpected => false,
             ComparisonOutcome::ResourceLimited(_) => false,
+            ComparisonOutcome::Overwritten => false,
+        }
+    }
+
+    /// Whether this is an outcome that, if we are overwriting expected images with new renderings,
+    /// should be overwritten
+    pub fn could_be_overwritten(&self) -> bool {
+        match self {
+            // If the expected image is different or nonexistent, replace it with the rendering.
+            ComparisonOutcome::Different { .. } | ComparisonOutcome::NoExpected => true,
+
+            // If the expected image is equal (within threshold), leave it.
+            ComparisonOutcome::Equal => false,
+
+            // If the rendering is flawed, do not use it as a replacement.
+            ComparisonOutcome::Flawed(_) | ComparisonOutcome::ResourceLimited(_) => false,
+
+            ComparisonOutcome::Overwritten => unreachable!("overwriting should not happen twice"),
         }
     }
 }
@@ -97,6 +119,7 @@ impl ComparisonRecord {
         }
     }
 
+    // TODO: Distinguish “overwritten” from failures.
     pub fn describe_failure(&self) -> Option<String> {
         match self.outcome {
             ComparisonOutcome::Equal | ComparisonOutcome::Flawed(_) => None,
@@ -111,6 +134,7 @@ impl ComparisonRecord {
             ComparisonOutcome::ResourceLimited(ref flaws) => {
                 Some(format!("Unexpected resource limit! ({flaws})"))
             }
+            ComparisonOutcome::Overwritten => Some(String::from("Overwritten")),
         }
     }
 }
@@ -132,7 +156,7 @@ pub(crate) fn save_and_compare_rendered_image(
     test: ImageId,
     allowed_difference: &Threshold,
     actual_rendering: &Rendering,
-) -> ComparisonRecord {
+) -> (ComparisonRecord, LoadedExpectedImage) {
     let start_time = Instant::now();
 
     let info_string = format!("{}", actual_rendering.info.refmt(&StatusText::ALL));
@@ -162,13 +186,16 @@ pub(crate) fn save_and_compare_rendered_image(
         });
     }
     let Some(ref expected_image) = expected.image else {
-        return ComparisonRecord::new(
-            ComparisonImage::new(&expected.snapshot_file_path, ImageSize::zero()), // TODO: should be optional
-            ComparisonImage::new(&actual_file_path, actual_rendering.size),
-            None,
-            Histogram::ZERO,
-            ComparisonOutcome::NoExpected,
-            info_string,
+        return (
+            ComparisonRecord::new(
+                ComparisonImage::new(&expected.snapshot_file_path, ImageSize::zero()), // TODO: should be optional
+                ComparisonImage::new(&actual_file_path, actual_rendering.size),
+                None,
+                Histogram::ZERO,
+                ComparisonOutcome::NoExpected,
+                info_string,
+            ),
+            expected,
         );
     };
 
@@ -241,7 +268,7 @@ pub(crate) fn save_and_compare_rendered_image(
         end_diff_time.saturating_duration_since(start_diff_time).refmt(&ConciseDebug),
     );
 
-    record
+    (record, expected)
 }
 
 pub(crate) fn modify_outcome_accounting_for_flaws(

@@ -74,6 +74,11 @@ struct Action {
     /// `<workspace>/test-renderers/`, not left unchanged or set to the workspace root.
     #[arg(long, value_name = "DIRECTORY")]
     dump_test_universes: Option<PathBuf>,
+
+    /// Run tests, but when an image comparison fails, overwrite the expected image instead of
+    /// failing the test.
+    #[arg(long)]
+    overwrite: bool,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -111,10 +116,12 @@ where
         nocapture: _, // We never capture
         ref filters,
         exact,
-        action: Action {
-            list: list_only,
-            ref dump_test_universes,
-        },
+        action:
+            Action {
+                list: list_only,
+                ref dump_test_universes,
+                overwrite,
+            },
         verbose: _, // handled by initialize_logging()
     } = *args;
 
@@ -209,6 +216,7 @@ where
                         test_case,
                         factory_future,
                         comparison_log_tc,
+                        overwrite,
                     ),
                 ));
                 let outcome: Result<Duration, tokio::task::JoinError> = test_case_handle.await;
@@ -244,6 +252,8 @@ where
             .into_inner()
             .unwrap();
 
+        // Find if any of the image comparisons failed.
+        // TODO: Distinguish “overwritten” from failures.
         let comparison_failure: Option<String> =
             comparisons.iter().find_map(|entry| entry.describe_failure());
 

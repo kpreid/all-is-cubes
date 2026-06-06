@@ -1,6 +1,7 @@
 //! Types which are used by both `test-renderers-runner` and `test-renderers-cases`,
 //! broken out to minimize rebuilds when the test cases are edited.
 
+use std::fs;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -64,6 +65,8 @@ pub struct RenderTestContext {
     comparison_log: Arc<Mutex<Vec<ComparisonRecord>>>,
     universe: TestUniverse,
     image_serial: u64,
+    /// If true, overwrite expected images instead of failing.
+    overwrite: bool,
 }
 
 #[derive(Debug)]
@@ -80,6 +83,7 @@ pub async fn run_test<Factory: RendererFactory + 'static>(
     test_case: TestCase,
     factory_future: impl Future<Output = Factory> + Send + 'static,
     comparison_log: Arc<Mutex<Vec<ComparisonRecord>>>,
+    overwrite: bool,
 ) -> Duration {
     let context = RenderTestContext {
         test_id,
@@ -90,6 +94,7 @@ pub async fn run_test<Factory: RendererFactory + 'static>(
             None => TestUniverse::Mutable(Universe::new()),
         },
         image_serial: 0,
+        overwrite,
     };
 
     // Run the test case; its pass or fail (if it doesn't panic) is determined
@@ -216,13 +221,33 @@ impl RenderTestContext {
             },
         };
 
-        let mut outcome =
+        let (mut record, expected) =
             save_and_compare_rendered_image(combo, &allowed_difference.into(), &image);
-        outcome.outcome = modify_outcome_accounting_for_flaws(image.flaws, outcome.outcome);
+        record.outcome = modify_outcome_accounting_for_flaws(image.flaws, record.outcome);
+
+        if self.overwrite && record.outcome.could_be_overwritten() {
+            assert!(
+                expected.src_file_path.is_absolute()
+                    && expected.src_file_path.extension().is_some_and(|e| e == "png"),
+                "refusing to overwrite suspicious path in {expected:?}"
+            );
+
+            // TODO: better error reporting
+            fs::write(
+                &expected.src_file_path,
+                rendering_to_oxipng(image)
+                    .expect("converting rendering for overwrite")
+                    .create_optimized_png(&high_compression_options())
+                    .expect("compressing rendering for overwrite"),
+            )
+            .expect("overwriting expected file");
+
+            record.outcome = ComparisonOutcome::Overwritten;
+        }
 
         // The comparison log will be consulted to determine if the test should be marked failed.
         #[expect(clippy::missing_panics_doc)]
-        self.comparison_log.lock().unwrap().push(outcome);
+        self.comparison_log.lock().unwrap().push(record);
     }
 
     /// Returns whether the renderer is known to be unable to produce correct results

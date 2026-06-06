@@ -6,12 +6,6 @@ rust-version.workspace = true
 description = "Rendering tests for all-is-cubes."
 publish = false
 
-[[bin]]
-name = "bless-render"
-test = false
-doctest = false
-bench = false
-
 # Tests use a custom test harness; among other reasons, we want to explicitly skip the
 # tests if there is no GPU on the system rather than just making them “pass” falsely.
 
@@ -94,13 +88,9 @@ all-is-cubes-content = { workspace = true, optional = true }
 all-is-cubes-port = { workspace = true, optional = true, features = ["export", "gltf"] }
 all-is-cubes-render = { workspace = true, features = ["raytracer", "serde", "std"] }
 all-is-cubes-ui = { workspace = true, features = ["session"] }
-anyhow = { workspace = true }
 bytemuck = { workspace = true, optional = true }
 clap = { workspace = true }
 log = { workspace = true }
-# Used by the `bless-render` tool to compress images that are to be stored in the repository.
-oxipng = { version = "10.0.0", default-features = false, features = ["parallel", "zopfli"] }
-simplelog = { workspace = true }
 tempfile = { workspace = true, optional = true }
 tokio = { workspace = true }
 # We need to enable wgpu backends for the tests to actually find an adapter.

@@ -25,6 +25,8 @@ image = { workspace = true, features = ["png"] }
 imgref = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+# Used to compress new expected images that will be stored in the repository.
+oxipng = { version = "10.0.0", default-features = false, features = ["parallel", "zopfli"] }
 rendiff = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

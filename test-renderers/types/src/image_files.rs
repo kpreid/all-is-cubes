@@ -2,6 +2,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use all_is_cubes::math::u32size;
+use all_is_cubes_render::Rendering;
 
 use crate::{ImageId, SuiteId, TestId};
 
@@ -27,9 +28,7 @@ pub enum Version {
 ///
 /// This does not check whether the file exists, but it does have the side effect of
 /// ensuring the directory exists.
-///
-/// Public so bless-render can sue it.
-pub fn image_path(image_id: &ImageId, version: Version) -> PathBuf {
+pub(crate) fn image_path(image_id: &ImageId, version: Version) -> PathBuf {
     let &ImageId {
         test_id: TestId { suite, ref test },
         renderer,
@@ -116,16 +115,13 @@ pub(crate) fn load_and_copy_expected_image(image_id: &ImageId) -> LoadedExpected
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct LoadedExpectedImage {
     /// Loaded image in memory.
     ///
     /// [`None`] if the image file is missing.
     pub image: Option<imgref::ImgVec<[u8; 4]>>,
 
-    #[expect(
-        unused,
-        reason = "TODO: this should be used for overwriting expected images"
-    )]
     /// Path we loaded the image from, which should be under version control.
     pub src_file_path: PathBuf,
 
@@ -141,4 +137,32 @@ fn image_to_imgref(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> imgre
     let (pixels, remainder) = data.as_chunks::<4>();
     debug_assert!(remainder.is_empty());
     imgref::ImgVec::new(pixels.to_vec(), width, height)
+}
+
+pub fn rendering_to_oxipng(input: Rendering) -> Result<oxipng::RawImage, oxipng::PngError> {
+    oxipng::RawImage::new(
+        input.size.width,
+        input.size.height,
+        oxipng::ColorType::RGBA,
+        oxipng::BitDepth::Eight,
+        input.data.into_flattened(),
+    )
+}
+
+pub(crate) fn high_compression_options() -> oxipng::Options {
+    oxipng::Options {
+        // Even if no optimization is found, write the file to the new path.
+        force: true,
+
+        fix_errors: false,
+        optimize_alpha: false,
+        color_type_reduction: true,
+        palette_reduction: true,
+        grayscale_reduction: true,
+        idat_recoding: true,
+        deflater: oxipng::Deflater::Zopfli(oxipng::ZopfliOptions::default()),
+        fast_evaluation: false,
+        timeout: None,
+        ..oxipng::Options::default()
+    }
 }
