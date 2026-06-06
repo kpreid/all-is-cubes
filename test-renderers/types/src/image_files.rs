@@ -81,10 +81,11 @@ pub fn test_data_dir_path(suite_id: SuiteId, version: Version) -> PathBuf {
 /// Load a specific expected image, and *also* copy it to the output expected-images dir,
 /// so that the final report is self-contained and snapshotted.
 ///
-/// Returns error if not found, or panics if an IO error occurs.
-pub(crate) fn load_and_copy_expected_image(
-    image_id: &ImageId,
-) -> Result<LoadedExpectedImage, NotFound> {
+/// # Errors
+///
+/// If the image is not found, this is recorded within the [`LoadedExpectedImage`].
+/// If an IO error occurs, panics.
+pub(crate) fn load_and_copy_expected_image(image_id: &ImageId) -> LoadedExpectedImage {
     let src_file_path = image_path(image_id, Version::ExpectedSrc);
     let snapshot_file_path = image_path(image_id, Version::ExpectedSnapshot);
 
@@ -95,14 +96,18 @@ pub(crate) fn load_and_copy_expected_image(
             // This makes it canonical and contain only the information we actually compared.
             image.save(&snapshot_file_path).unwrap();
 
-            Ok(LoadedExpectedImage {
-                image: image_to_imgref(image),
+            LoadedExpectedImage {
+                image: Some(image_to_imgref(image)),
                 src_file_path,
                 snapshot_file_path,
-            })
+            }
         }
         Err(image::ImageError::IoError(e)) if e.kind() == io::ErrorKind::NotFound => {
-            Err(NotFound(src_file_path))
+            LoadedExpectedImage {
+                image: None,
+                src_file_path,
+                snapshot_file_path,
+            }
         }
         Err(e) => panic!(
             "Failed to read expected image '{p}': {e}",
@@ -113,7 +118,9 @@ pub(crate) fn load_and_copy_expected_image(
 
 pub(crate) struct LoadedExpectedImage {
     /// Loaded image in memory.
-    pub image: imgref::ImgVec<[u8; 4]>,
+    ///
+    /// [`None`] if the image file is missing.
+    pub image: Option<imgref::ImgVec<[u8; 4]>>,
 
     #[expect(
         unused,
@@ -135,5 +142,3 @@ fn image_to_imgref(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> imgre
     debug_assert!(remainder.is_empty());
     imgref::ImgVec::new(pixels.to_vec(), width, height)
 }
-
-pub(crate) struct NotFound(pub PathBuf);

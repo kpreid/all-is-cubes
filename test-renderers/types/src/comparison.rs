@@ -11,8 +11,7 @@ use all_is_cubes_render::Rendering;
 use all_is_cubes_render::camera::ImageSize;
 
 use crate::{
-    ImageId, LoadedExpectedImage, NotFound, RendererId, Version, image_path,
-    load_and_copy_expected_image,
+    ImageId, LoadedExpectedImage, RendererId, Version, image_path, load_and_copy_expected_image,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -144,32 +143,28 @@ pub(crate) fn compare_rendered_image(
     }
 
     // Load expected image, if any
-    let expected: LoadedExpectedImage = match load_and_copy_expected_image(&test) {
-        Ok(r) => r,
-        Err(NotFound(_)) => {
-            // Look for a generic all-renderers output file
-            match load_and_copy_expected_image(&ImageId {
-                renderer: RendererId::All,
-                ..test.clone()
-            }) {
-                Ok(r) => r,
-                Err(NotFound(expected_file_path)) => {
-                    return ComparisonRecord::new(
-                        ComparisonImage::new(&expected_file_path, ImageSize::zero()), // TODO: should be optional
-                        ComparisonImage::new(&actual_file_path, actual_rendering.size),
-                        None,
-                        Histogram::ZERO,
-                        ComparisonOutcome::NoExpected,
-                        info_string,
-                    );
-                }
-            }
-        }
+    let mut expected: LoadedExpectedImage = load_and_copy_expected_image(&test);
+    if expected.image.is_none() {
+        // Look for a generic all-renderers output file
+        expected = load_and_copy_expected_image(&ImageId {
+            renderer: RendererId::All,
+            ..test.clone()
+        });
+    }
+    let Some(ref expected_image) = expected.image else {
+        return ComparisonRecord::new(
+            ComparisonImage::new(&expected.snapshot_file_path, ImageSize::zero()), // TODO: should be optional
+            ComparisonImage::new(&actual_file_path, actual_rendering.size),
+            None,
+            Histogram::ZERO,
+            ComparisonOutcome::NoExpected,
+            info_string,
+        );
     };
 
     // Compare expected and actual images
     let start_diff_time = Instant::now();
-    let diff_result = rendiff::diff((&actual_rendering).into(), expected.image.as_ref());
+    let diff_result = rendiff::diff((&actual_rendering).into(), expected_image.as_ref());
     let end_diff_time = Instant::now();
 
     // Save diff image to disk
@@ -204,8 +199,8 @@ pub(crate) fn compare_rendered_image(
         ComparisonImage::new(
             &expected.snapshot_file_path,
             size2(
-                expected.image.width() as u32,
-                expected.image.height() as u32,
+                expected_image.width() as u32,
+                expected_image.height() as u32,
             ),
         ),
         ComparisonImage::new(&actual_file_path, actual_rendering.size),
