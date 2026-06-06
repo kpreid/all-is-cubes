@@ -1,7 +1,6 @@
 //! Types which are used by both `test-renderers-runner` and `test-renderers-cases`,
 //! broken out to minimize rebuilds when the test cases are edited.
 
-use std::fs;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -233,12 +232,10 @@ impl RenderTestContext {
             );
 
             // TODO: better error reporting
-            fs::write(
+            write_compressed_png(
+                rendering_to_oxipng(image).unwrap(),
+                &high_compression_options(),
                 &expected.src_file_path,
-                rendering_to_oxipng(image)
-                    .expect("converting rendering for overwrite")
-                    .create_optimized_png(&high_compression_options())
-                    .expect("compressing rendering for overwrite"),
             )
             .expect("overwriting expected file");
 

@@ -1,3 +1,6 @@
+use std::error::Error;
+use std::fmt;
+use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -88,26 +91,28 @@ pub(crate) fn load_and_copy_expected_image(image_id: &ImageId) -> LoadedExpected
     let src_file_path = image_path(image_id, Version::ExpectedSrc);
     let snapshot_file_path = image_path(image_id, Version::ExpectedSnapshot);
 
-    match image::open(&src_file_path) {
+    match read_png(&src_file_path) {
         Ok(image) => {
-            let image = image.to_rgba8();
             // We write the image back from pixels, not bytewise.
             // This makes it canonical and contain only the information we actually compared.
-            image.save(&snapshot_file_path).unwrap();
+            write_compressed_png(
+                imgref_to_oxipng(image.clone()).unwrap(),
+                &low_compression_options(),
+                &snapshot_file_path,
+            )
+            .unwrap();
 
             LoadedExpectedImage {
-                image: Some(image_to_imgref(image)),
+                image: Some(image),
                 src_file_path,
                 snapshot_file_path,
             }
         }
-        Err(image::ImageError::IoError(e)) if e.kind() == io::ErrorKind::NotFound => {
-            LoadedExpectedImage {
-                image: None,
-                src_file_path,
-                snapshot_file_path,
-            }
-        }
+        Err(ReadError::Io(e)) if e.kind() == io::ErrorKind::NotFound => LoadedExpectedImage {
+            image: None,
+            src_file_path,
+            snapshot_file_path,
+        },
         Err(e) => panic!(
             "Failed to read expected image '{p}': {e}",
             p = src_file_path.display()
@@ -130,14 +135,8 @@ pub(crate) struct LoadedExpectedImage {
     pub snapshot_file_path: PathBuf,
 }
 
-fn image_to_imgref(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> imgref::ImgVec<[u8; 4]> {
-    let width = u32size(image.width());
-    let height = u32size(image.height());
-    let data: Vec<u8> = image.into_vec();
-    let (pixels, remainder) = data.as_chunks::<4>();
-    debug_assert!(remainder.is_empty());
-    imgref::ImgVec::new(pixels.to_vec(), width, height)
-}
+// -------------------------------------------------------------------------------------------------
+// Image type conversion, and image file reading and writing.
 
 pub fn rendering_to_oxipng(input: Rendering) -> Result<oxipng::RawImage, oxipng::PngError> {
     oxipng::RawImage::new(
@@ -149,6 +148,48 @@ pub fn rendering_to_oxipng(input: Rendering) -> Result<oxipng::RawImage, oxipng:
     )
 }
 
+pub fn imgref_to_oxipng(
+    input: imgref::ImgVec<[u8; 4]>,
+) -> Result<oxipng::RawImage, oxipng::PngError> {
+    oxipng::RawImage::new(
+        u32::try_from(input.width()).unwrap(),
+        u32::try_from(input.height()).unwrap(),
+        oxipng::ColorType::RGBA,
+        oxipng::BitDepth::Eight,
+        input.into_buf().into_flattened(),
+    )
+}
+
+pub(crate) fn read_png(file_path: &Path) -> Result<imgref::ImgVec<[u8; 4]>, ReadError> {
+    let (header, data) = png_decoder::decode(&fs::read(file_path).map_err(ReadError::Io)?)
+        .map_err(ReadError::Png)?;
+    Ok(imgref::ImgVec::new(
+        data,
+        u32size(header.width),
+        u32size(header.height),
+    ))
+}
+
+pub(crate) enum ReadError {
+    Io(io::Error),
+    Png(png_decoder::DecodeError),
+}
+impl fmt::Display for ReadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ReadError::Io(error) => error.fmt(f),
+            // DecodeError only implements Debug
+            ReadError::Png(decode_error) => write!(f, "{decode_error:?}"),
+        }
+    }
+}
+
+/// Compression options using when writing images for the test results report.
+pub(crate) fn low_compression_options() -> oxipng::Options {
+    oxipng::Options::from_preset(0)
+}
+
+/// Compression options using when overwriting expected images, that will enter version control.
 pub(crate) fn high_compression_options() -> oxipng::Options {
     oxipng::Options {
         // Even if no optimization is found, write the file to the new path.
@@ -165,4 +206,13 @@ pub(crate) fn high_compression_options() -> oxipng::Options {
         timeout: None,
         ..oxipng::Options::default()
     }
+}
+
+pub(crate) fn write_compressed_png(
+    input: oxipng::RawImage,
+    options: &oxipng::Options,
+    file_path: &Path,
+) -> Result<(), Box<dyn Error>> {
+    fs::write(file_path, input.create_optimized_png(options)?)?;
+    Ok(())
 }

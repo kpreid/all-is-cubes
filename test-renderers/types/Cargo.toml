@@ -20,13 +20,13 @@ async_fn_traits = { workspace = true }
 clap = { workspace = true }
 futures-core = { workspace = true }
 futures-util = { workspace = true, features = ["std"] }
-# TODO: We can trim this away by using `png-decoder` for reading and `oxipng` for writing.
-image = { workspace = true, features = ["png"] }
 imgref = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 # Used to compress new expected images that will be stored in the repository.
+# Also used to write all other images without compression.
 oxipng = { version = "10.0.0", default-features = false, features = ["parallel", "zopfli"] }
+png-decoder = { workspace = true }
 rendiff = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

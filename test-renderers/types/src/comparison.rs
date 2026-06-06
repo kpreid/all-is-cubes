@@ -11,7 +11,9 @@ use all_is_cubes_render::camera::ImageSize;
 use all_is_cubes_render::{Flaws, Rendering};
 
 use crate::{
-    ImageId, LoadedExpectedImage, RendererId, Version, image_path, load_and_copy_expected_image,
+    ImageId, LoadedExpectedImage, RendererId, Version, image_path, imgref_to_oxipng,
+    load_and_copy_expected_image, low_compression_options, rendering_to_oxipng,
+    write_compressed_png,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -163,18 +165,13 @@ pub(crate) fn save_and_compare_rendered_image(
     let actual_file_path = image_path(&test, Version::Actual);
     let diff_file_path = image_path(&test, Version::Diff);
 
-    {
-        let actual_to_save = image::ImageBuffer::<image::Rgba<u8>, _>::from_raw(
-            actual_rendering.size.width,
-            actual_rendering.size.height,
-            actual_rendering.data.as_flattened(),
-        )
-        .expect("rendering contains incorrect data size");
-
-        actual_to_save
-            .save(&actual_file_path)
-            .expect("failed to write renderer output image");
-    }
+    write_compressed_png(
+        rendering_to_oxipng(actual_rendering.clone())
+            .expect("rendering contains incorrect data size"),
+        &low_compression_options(),
+        &actual_file_path,
+    )
+    .expect("failed to write actual image");
 
     // Load expected image, if any
     let mut expected: LoadedExpectedImage = load_and_copy_expected_image(&test);
@@ -206,14 +203,14 @@ pub(crate) fn save_and_compare_rendered_image(
 
     // Save diff image to disk
     let diff_c_image: Option<ComparisonImage> = if let Some(image) = diff_result.diff_image() {
-        image::RgbaImage::from_raw(
-            image.width() as u32,
-            image.height() as u32,
-            image.buf().to_vec().into_flattened(),
+        write_compressed_png(
+            imgref_to_oxipng(image.map_buf(<[_]>::to_vec))
+                .expect("rendering contains incorrect data size"),
+            &low_compression_options(),
+            &diff_file_path,
         )
-        .unwrap()
-        .save(&diff_file_path)
         .expect("failed to write renderer diff image");
+
         Some(ComparisonImage::new(
             &diff_file_path,
             size2(image.width() as u32, image.height() as u32),
