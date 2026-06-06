@@ -45,15 +45,22 @@ pub struct ComparisonImage {
 pub enum ComparisonOutcome {
     /// Images had no differences above the threshold.
     Equal,
+
     /// Images were different by more than the threshold.
     Different { amount: u8 },
+
     /// There was no expected image to compare against.
     NoExpected,
+
     /// The images were different, but the renderer signaled a known flaw.
-    /// The string is a list of flaws, of unspecified syntax.
+    ///
+    /// The string is a list of flaws, of unspecified syntax, to avoid serialization issues.
     Flawed(String),
-    /// The flaws included `Flaws::UNFINISHED`, which shouldn't happen.
-    Unfinished,
+
+    /// The flaws included [`Flaws::contains_resource_limitation()`], which shouldn't happen.
+    ///
+    /// The string is a list of flaws, of unspecified syntax, to avoid serialization issues.
+    ResourceLimited(String),
 }
 
 impl ComparisonOutcome {
@@ -66,7 +73,7 @@ impl ComparisonOutcome {
             ComparisonOutcome::Equal => false,
             ComparisonOutcome::Different { amount: _ } => false,
             ComparisonOutcome::NoExpected => false,
-            ComparisonOutcome::Unfinished => false,
+            ComparisonOutcome::ResourceLimited(_) => false,
         }
     }
 }
@@ -101,7 +108,9 @@ impl ComparisonRecord {
                 "Expected image not found; no comparison done: {p}",
                 p = self.expected_image.file_name
             )),
-            ComparisonOutcome::Unfinished => Some(String::from("Image unfinished!")),
+            ComparisonOutcome::ResourceLimited(ref flaws) => {
+                Some(format!("Unexpected resource limit! ({flaws})"))
+            }
         }
     }
 }
@@ -239,10 +248,10 @@ pub(crate) fn modify_outcome_accounting_for_flaws(
     flaws: Flaws,
     outcome: ComparisonOutcome,
 ) -> ComparisonOutcome {
-    if flaws.contains(Flaws::UNFINISHED) {
-        // Special rule: Flaws::UNFINISHED shouldn't happen, so it is counted as a special
-        // kind of failure, rather than counted as “known comparison failure”.
-        ComparisonOutcome::Unfinished
+    if flaws.contains_resource_limitation() {
+        // Special rule: These flaws shouldn't happen, so it is counted as a special
+        // kind of failure, rather than counted as “known comparison failure” which passes.
+        ComparisonOutcome::ResourceLimited(format!("{flaws:?}"))
     } else if matches!(
         outcome,
         ComparisonOutcome::Different { .. } | ComparisonOutcome::NoExpected

@@ -56,6 +56,16 @@ bitflags::bitflags! {
     }
 }
 
+impl Flaws {
+    /// Whether at least one flaw is present as a result of limits on the resources available during
+    /// rendering, rather than a limitation of the rendering algorithm.
+    ///
+    /// Currently, this means [`Flaws::UNFINISHED`] or [`Flaws::OUT_OF_MEMORY`].
+    pub fn contains_resource_limitation(self) -> bool {
+        self.intersects(Flaws::UNFINISHED | Flaws::OUT_OF_MEMORY)
+    }
+}
+
 impl Default for Flaws {
     /// Equivalent to [`Self::empty()`].
     fn default() -> Self {
