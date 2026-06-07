@@ -8,7 +8,9 @@ use all_is_cubes_base::math::ps64;
 
 use crate::block::{Block, EvaluatedBlock, Evoxel};
 use crate::content::palette;
-use crate::math::{Cube, Face, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign, lines};
+use crate::math::{
+    Cube, Face, Face7, FaceMap, FreeCoordinate, FreePoint, FreeVector, PositiveSign, lines,
+};
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
 use crate::universe::{Handle, HandleError, ReadTicket};
@@ -232,36 +234,22 @@ impl lines::Wireframe for Cursor {
             .translate(self.cube().lower_bounds().map(FreeCoordinate::from).to_vector());
 
         // Add wireframe of the block.
-        block_aabb
-            .expand(offset_from_surface_ps64)
-            .wireframe_points(&mut lines::colorize(output, palette::CURSOR_OUTLINE));
+        let expanded_aabb = block_aabb.expand(offset_from_surface_ps64);
+        expanded_aabb.wireframe_points(&mut lines::colorize(output, palette::CURSOR_OUTLINE));
 
         // Frame the selected face with a square.
         // TODO: Position this frame relative to block_aabb.
         if let Ok(face) = Face::try_from(self.face_selected()) {
-            let face_transform_full = face.face_transform(1).to_matrix().to_free().then(
-                &self
-                    .hit()
-                    .position
-                    .lower_bounds()
-                    .map(FreeCoordinate::from)
-                    .to_vector()
-                    .to_transform(),
-            );
+            let inset = -1. / 128.;
 
-            let inset = 1. / 128.;
-            output.extend(lines::line_loop(
-                [
-                    point3(inset, inset, -offset_from_surface_f64),
-                    point3(inset, 1. - inset, -offset_from_surface_f64),
-                    point3(1. - inset, 1. - inset, -offset_from_surface_f64),
-                    point3(1. - inset, inset, -offset_from_surface_f64),
-                ]
-                .map(|p| lines::Vertex {
-                    position: face_transform_full.transform_point3d(p).unwrap(),
-                    color: Some(palette::CURSOR_OUTLINE),
-                }),
-            ));
+            let face_coordinate = expanded_aabb.face_coordinate_on_axis(face);
+            let face_aabb = expanded_aabb
+                .expand_or_shrink(FaceMap::splat(inset))
+                .unwrap()
+                .with_axis_range(face.axis(), face_coordinate, face_coordinate)
+                .unwrap();
+
+            face_aabb.wireframe_points(&mut lines::colorize(output, palette::CURSOR_OUTLINE));
         }
 
         // Frame the cursor intersection point with a diamond.
