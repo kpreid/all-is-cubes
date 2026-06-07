@@ -146,17 +146,57 @@ impl Aab {
         self.upper_bounds.to_vector()
     }
 
-    /// Returns the position of the identified face of the box on the axis it is
-    /// perpendicular to.
+    /// Returns the position of the identified face of the box, as a projection onto the vector
+    /// `face.normal_vector()`.
     ///
-    /// Note that negative faces' coordinates _are_ inverted; that is, all results
-    /// will be positive if the box contains its origin.
+    /// In this scheme, unlike [`face_coordinate_on_axis()`][Self::face_coordinate_on_axis],
+    /// negative faces' coordinates are inverted.
+    /// For example, all results will be positive if the box contains its origin.
+    ///
+    /// This function is often useful for comparing the relative position of two [`Aab`]s.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// # use all_is_cubes::math::{Aab, Face};
+    ///
+    /// let aab = Aab::from_lower_upper([-1., -2., -3.], [4., 5., 6.]);
+    ///
+    /// assert_eq!(aab.face_coordinate_outward(Face::NX), 1.);
+    /// assert_eq!(aab.face_coordinate_outward(Face::PX), 4.);
+    /// ```
     #[inline]
-    pub fn face_coordinate(&self, face: Face) -> FreeCoordinate {
+    pub fn face_coordinate_outward(&self, face: Face) -> FreeCoordinate {
         match face {
             Face::NX => -self.lower_bounds.x,
             Face::NY => -self.lower_bounds.y,
             Face::NZ => -self.lower_bounds.z,
+            Face::PX => self.upper_bounds.x,
+            Face::PY => self.upper_bounds.y,
+            Face::PZ => self.upper_bounds.z,
+        }
+    }
+
+    /// Returns the position of the identified face of the box on the axis it is perpendicular to.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// # use all_is_cubes::math::{Aab, Face};
+    ///
+    /// let aab = Aab::from_lower_upper([-1., -2., -3.], [4., 5., 6.]);
+    ///
+    /// assert_eq!(aab.face_coordinate_on_axis(Face::NX), -1.);
+    /// assert_eq!(aab.face_coordinate_on_axis(Face::PX), 4.);
+    /// ```
+    #[inline]
+    pub fn face_coordinate_on_axis(&self, face: Face) -> FreeCoordinate {
+        match face {
+            Face::NX => self.lower_bounds.x,
+            Face::NY => self.lower_bounds.y,
+            Face::NZ => self.lower_bounds.z,
             Face::PX => self.upper_bounds.x,
             Face::PY => self.upper_bounds.y,
             Face::PZ => self.upper_bounds.z,

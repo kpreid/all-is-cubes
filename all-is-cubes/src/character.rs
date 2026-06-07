@@ -200,8 +200,8 @@ impl Character {
                 // Stand on the floor of the spawn bounds.
                 // TODO: Account for different gravity.
                 let mut pos: FreePoint = spawn.bounds.center();
-                pos.y = collision_box.face_coordinate(Face::NY)
-                    - spawn.bounds.to_free().face_coordinate(Face::NY);
+                pos.y = spawn.bounds.to_free().face_coordinate_on_axis(Face::NY)
+                    - collision_box.face_coordinate_on_axis(Face::NY);
                 pos
             }
         };

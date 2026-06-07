@@ -5,7 +5,6 @@
 use core::fmt;
 
 use all_is_cubes_base::math::ps64;
-use euclid::point3;
 
 use crate::block::{Block, EvaluatedBlock, Evoxel};
 use crate::content::palette;

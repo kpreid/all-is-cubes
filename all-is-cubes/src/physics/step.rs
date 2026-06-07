@@ -769,8 +769,8 @@ pub(super) fn crush_if_colliding(
         // thus the smallest crush to resolve the collision.
         let mut least_penetration_depth: Option<(Face, FreeCoordinate)> = None;
         for face in Face::ALL {
-            let this_depth =
-                body.occupying.face_coordinate(face) + contact_aab.face_coordinate(face.opposite());
+            let this_depth = body.occupying.face_coordinate_outward(face)
+                + contact_aab.face_coordinate_outward(face.opposite());
             if this_depth >= 0. && least_penetration_depth.is_none_or(|(_, d)| this_depth < d) {
                 least_penetration_depth = Some((face, this_depth));
             }
@@ -790,7 +790,9 @@ pub(super) fn crush_if_colliding(
             panic!("collision but found no penetration");
         }
     }
-    FaceMap::from_fn(|face| original.face_coordinate(face) - body.occupying.face_coordinate(face))
+    FaceMap::from_fn(|face| {
+        original.face_coordinate_outward(face) - body.occupying.face_coordinate_outward(face)
+    })
 }
 
 /// If [`Body::occupying`] is smaller than [`Body::collision_box`], and there is room to grow it,
@@ -834,9 +836,9 @@ fn uncrush(body: &mut Body, space: &space::Read<'_>) -> UncrushInfo {
         // anything. Note that this
         // * Tracks expansions that are valid on a *single axis only*, but might collide if multiple
         //   axes are done simultaneously.
-        // * Has flipped negative coordinates as per `Aab::face_coordinate()`.
+        // * Has flipped negative coordinates as per `Aab::face_coordinate_outward()`.
         let mut clear_space: FaceMap<FreeCoordinate> =
-            FaceMap::from_fn(|face| uncrushed.face_coordinate(face));
+            FaceMap::from_fn(|face| uncrushed.face_coordinate_outward(face));
 
         // Find what we would collide with if `body.occupying` were expanded.
         // Note that this is a single collision search which is then used to compute
@@ -872,7 +874,7 @@ fn uncrush(body: &mut Body, space: &space::Read<'_>) -> UncrushInfo {
                         // because the body is somewhere it should be escaping from,
                         // and uncrushing might make it harder to escape.
                         for face in [axis.negative_face(), axis.positive_face()] {
-                            clear_space[face] = body.occupying.face_coordinate(face);
+                            clear_space[face] = body.occupying.face_coordinate_outward(face);
                         }
                         continue;
                     };
@@ -883,11 +885,11 @@ fn uncrush(body: &mut Body, space: &space::Read<'_>) -> UncrushInfo {
                             "reducing: {:?} {:?} {:?}",
                             face,
                             clear_space[face],
-                            contact_aab.face_coordinate(face.opposite())
+                            contact_aab.face_coordinate_outward(face.opposite())
                         );
                     }
-                    clear_space[face] =
-                        clear_space[face].min(-contact_aab.face_coordinate(face.opposite()));
+                    clear_space[face] = clear_space[face]
+                        .min(-contact_aab.face_coordinate_outward(face.opposite()));
                 }
             },
             StopAt::Anything,

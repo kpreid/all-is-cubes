@@ -514,7 +514,8 @@ pub(crate) fn nudge_on_ray(
     let penetration_depth = {
         let subdivision = FreeCoordinate::from(subdivision);
         let fc_scaled =
-            aab.translate(segment.unit_endpoint().to_vector()).face_coordinate(face) * subdivision;
+            aab.translate(segment.unit_endpoint().to_vector()).face_coordinate_outward(face)
+                * subdivision;
         (fc_scaled - fc_scaled.round()) / subdivision
     };
 
@@ -764,7 +765,7 @@ mod tests {
                 );
 
                 // Check expected position properties
-                let position_on_axis = nudged_aab.face_coordinate(face_to_nudge);
+                let position_on_axis = nudged_aab.face_coordinate_outward(face_to_nudge);
                 let fraction = position_on_axis - position_on_axis.round();
                 assert!(
                     fraction.abs() > POSITION_EPSILON / 2.,
@@ -875,7 +876,7 @@ mod tests {
             for step in iter {
                 std::dbg!(step);
                 let face = Face::try_from(step.aab_face).expect("should see no more Within");
-                let face_coordinate = step.translated_aab.face_coordinate(face);
+                let face_coordinate = step.translated_aab.face_coordinate_on_axis(face);
                 assert_eq!(face_coordinate, face_coordinate.round());
             }
 

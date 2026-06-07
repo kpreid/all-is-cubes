@@ -11,6 +11,7 @@
     * `block::SetAttribute` is a modifier which overrides a single attribute of a block, instead of all of them.
       It replaces `Modifier::Attributes`.
     * `math::Aab::expand_or_shrink()`
+    * `math::Aab::face_coordinate_on_axis()`, a non-negating version of `face_coordinate()`.
     * `math::FaceMap::{as_array, as_array_mut}()`
     * `math::GridAab::clamp_cube()`.
     * `math::OctantMask::{any, from_face, from_octant}()`
@@ -51,6 +52,7 @@
       Use `Aab::expand_or_shrink()` instead.
     * `universe::Universe` no longer implements `Default` and `Deserialize`; instead, `Box<Universe>` does.
 
+    * Renamed `math::Aab::face_coordinate()` to `math::Aab::face_coordinate_outward()`.
     * Renamed `math::Face6` to `Face`.
     * Renamed `space::{Space, Read}::get_lighting()` to `get_light()`.
     * Renamed `time::Tick::delta_t()` to `delta_t_duration()`, to make room for other variations.

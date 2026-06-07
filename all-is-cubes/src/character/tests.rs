@@ -40,8 +40,8 @@ fn spawn_inferred_position() {
     let cbox = character.body.collision_box_abs();
     dbg!(character.body.position(), cbox);
     assert_eq!(
-        bounds.to_free().face_coordinate(Face::NY),
-        cbox.face_coordinate(Face::NY)
+        bounds.to_free().face_coordinate_on_axis(Face::NY),
+        cbox.face_coordinate_on_axis(Face::NY)
     );
 }
 
@@ -223,7 +223,7 @@ fn jumping() {
     let mut character = Character::spawn_default(universe.read_ticket(), space).unwrap();
     character.body.set_position(point3(
         0.,
-        character.body.collision_box_rel().face_coordinate(Face::NY) + 1.001,
+        character.body.collision_box_rel().face_coordinate_outward(Face::NY) + 1.001,
         0.,
     ));
     let character = universe.insert("character".into(), character).unwrap();
