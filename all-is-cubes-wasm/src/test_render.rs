@@ -1,7 +1,8 @@
 //! This is more of a test of [`all-is-cubes-gpu`], but it's easier to run in this package
 //! because `all-is-cubes-gpu` has wasm-incompatible dev-dependencies.
 //!
-//! TODO: Consider expanding this out to running all of test-renderers. This will need more work.
+//! TODO: Consider expanding this out to running all of the `test-renderers` test suite.
+//! This will need more work.
 
 use core::time::Duration;
 

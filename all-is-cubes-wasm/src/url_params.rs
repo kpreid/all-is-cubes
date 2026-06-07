@@ -1,7 +1,7 @@
 //! URL parameter interpretation.
 //!
-//! This module is designed to be compilable for non-web targets for
-//! testability.
+//! This module is designed to be compilable for non-web targets for potential sharing between
+//! client and server in the future (in which case it will be moved to a different, shared crate).
 
 use std::borrow::Borrow;
 use std::borrow::Cow;
@@ -73,10 +73,12 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
+    use all_is_cubes_content::UniverseTemplate;
+    use wasm_bindgen_test::wasm_bindgen_test;
 
-    #[test]
+    #[wasm_bindgen_test]
     fn parse_no_params() {
         assert_eq!(
             options_from_query_string(b""),
@@ -88,7 +90,7 @@ mod tests {
         )
     }
 
-    #[test]
+    #[wasm_bindgen_test]
     fn parse_specified_template() {
         assert_eq!(
             options_from_query_string(b"template=cornell-box").template,
@@ -96,12 +98,12 @@ mod tests {
         )
     }
 
-    #[test]
+    #[wasm_bindgen_test]
     fn parse_specified_seed() {
         assert_eq!(options_from_query_string(b"seed=123").seed, Some(123));
     }
 
-    #[test]
+    #[wasm_bindgen_test]
     fn parse_specified_renderer() {
         assert_eq!(
             options_from_query_string(b"renderer=wgpu").renderer,
