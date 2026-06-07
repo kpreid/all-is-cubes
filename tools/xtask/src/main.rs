@@ -728,16 +728,6 @@ fn do_for_all_packages(
 
     // Run wasm tests.
     if config.scope.includes_main_workspace() {
-        {
-            let _t = config.capture_time(format!("{op:?} all-is-cubes-wasm (host)"));
-            // Run host-side tests (which exist because they're cheaper, they’re more reliable, and
-            // they came first.)
-            // Note that we use `--manifest-path` instead of `pushd` because we don't want to
-            // use the `.cargo/config.toml` from that directory, which would change the target
-            // tuple to wasm32-unknown-unknown.
-            op.cargo_cmd(config).arg("--manifest-path=all-is-cubes-wasm/Cargo.toml").run()?;
-        }
-
         let _t = config.capture_time(format!("{op:?} all-is-cubes-wasm (browser)"));
         match op {
             TestOrCheck::Test => {

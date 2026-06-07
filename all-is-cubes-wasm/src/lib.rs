@@ -6,18 +6,24 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 
+// Note: Not all tests depend on having a browser, but it’s simpler to have all tests configured
+// this way rather than running tests twice.
+#[cfg(test)]
+wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+
 #[cfg(target_family = "wasm")]
 mod audio;
 #[cfg(target_family = "wasm")]
 mod init;
 #[cfg(target_family = "wasm")]
-#[doc(hidden)] // public for testing
-pub mod js_bindings;
+mod js_bindings;
 #[cfg(target_family = "wasm")]
 mod settings;
-#[cfg(any(target_family = "wasm", test))]
 mod url_params;
 #[cfg_attr(not(target_family = "wasm"), expect(unused))]
 mod web_glue;
 #[cfg(target_family = "wasm")]
 mod web_session;
+
+#[cfg(test)]
+mod test_render;
