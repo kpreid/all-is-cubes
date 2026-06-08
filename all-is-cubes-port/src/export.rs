@@ -166,6 +166,8 @@ impl ExportSet {
     /// TODO: This is incompatible with the "extract" approach to handling what to export.
     /// Fix that by separately tracking whether the set *started* with multiple items
     /// that need suffixing.
+    ///
+    /// TODO: Needs to sanitize names and ensure there are no overlaps.
     #[cfg_attr(not(feature = "stl"), allow(dead_code))]
     pub(crate) fn member_export_path(
         &self,
@@ -182,6 +184,8 @@ impl ExportSet {
                 universe::Name::Specific(s) => new_file_name.push(&*s),
                 universe::Name::Anonym(n) => new_file_name.push(n.to_string()),
                 universe::Name::Pending => todo!(),
+                // TODO: it is possible that a `Builtin` will conflict with a `Specific`
+                universe::Name::Builtin(b) => new_file_name.push(b.to_string()),
             }
             new_file_name.push(".");
             new_file_name.push(base_path.extension().expect("extension missing"));

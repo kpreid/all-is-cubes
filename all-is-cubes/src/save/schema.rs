@@ -609,6 +609,7 @@ pub(crate) enum HandleSer {
 pub(crate) enum NameSer {
     Specific(ArcStr),
     Anonym(usize),
+    Builtin(universe::Builtin),
 }
 
 // -------------------------------------------------------------------------------------------------

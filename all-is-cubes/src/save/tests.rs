@@ -29,7 +29,7 @@ use crate::tag;
 use crate::text;
 use crate::time;
 use crate::transaction::Transaction as _;
-use crate::universe::{Handle, Name, PartialUniverse, ReadTicket, Universe};
+use crate::universe::{self, Builtin, Handle, Name, PartialUniverse, ReadTicket, Universe};
 
 #[track_caller]
 /// Serialize and deserialize and assert the value is equal.
@@ -883,6 +883,7 @@ fn universe_with_one_of_each() -> Box<Universe> {
         .read_ticket(universe.read_ticket())
         .build_and_mutate(|m| {
             m.set([0, 0, 0], Block::from(block_handle))?;
+            m.set([0, 0, 1], Block::from(Builtin::Air.handle().clone()))?;
             Ok(())
         })
         .unwrap();
@@ -1019,10 +1020,17 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                                 "type": "IndirectV1",
                                 "definition": {"type": "HandleV1", "Specific": "a_block"},
                             }
+                        },
+                        {
+                            "type": "BlockV1",
+                            "primitive": {
+                                "type": "IndirectV1",
+                                "definition": {"type": "HandleV1", "Builtin": "air"},
+                            }
                         }
                     ],
                     "contents": space_contents_json([
-                        1, 0, 0, 0, //
+                        1, 2, 0, 0, //
                         0, 0, 0, 0,
                     ]),
                     "light": null,
@@ -1151,6 +1159,10 @@ fn universe_de_error_in_member() {
     );
 }
 
+// Note: These deserialization tests exercise the path for `Handle`s *not* tied to a universe,
+// which will be either builtin or in state `Gone`.
+// Handles in a universe are exercised by tests like [`universe_success()`].
+
 #[test]
 fn handle_de_named() {
     let r: Handle<BlockDef> = from_value(json!({
@@ -1158,7 +1170,12 @@ fn handle_de_named() {
         "Specific": "foo",
     }))
     .unwrap();
+
     assert_eq!(r.name(), Name::Specific("foo".into()));
+    assert_eq!(
+        r.read(ReadTicket::stub()).unwrap_err().gone(),
+        Some(universe::GoneReason::CreatedGone {})
+    );
 }
 
 #[test]
@@ -1168,7 +1185,25 @@ fn handle_de_anon() {
         "Anonym": 5,
     }))
     .unwrap();
+
     assert_eq!(r.name(), Name::Anonym(5));
+    assert_eq!(
+        r.read(ReadTicket::stub()).unwrap_err().gone(),
+        Some(universe::GoneReason::CreatedGone {})
+    );
+}
+
+#[test]
+fn handle_de_builtin() {
+    let handle: Handle<BlockDef> = from_value(json!({
+        "type": "HandleV1",
+        "Builtin": "air",
+    }))
+    .unwrap();
+
+    assert_eq!(handle, *Builtin::Air.handle());
+    // Unlike other handles, we can actually exercise these even without a universe!
+    assert_eq!(handle.read(ReadTicket::stub()).unwrap().block(), &AIR);
 }
 
 #[test]
@@ -1189,6 +1224,17 @@ fn handle_ser_anon() {
         json!({
             "type": "HandleV1",
             "Anonym": 5,
+        })
+    );
+}
+
+#[test]
+fn handle_ser_builtin() {
+    assert_eq!(
+        to_value(Builtin::Air.handle::<BlockDef>()).unwrap(),
+        json!({
+            "type": "HandleV1",
+            "Builtin": "air",
         })
     );
 }

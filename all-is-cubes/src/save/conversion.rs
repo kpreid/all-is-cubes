@@ -1297,19 +1297,29 @@ mod universe {
 
     impl<'de, T: universe::UniverseMember + 'static> Deserialize<'de> for Handle<T> {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-            match HandleSer::deserialize(deserializer)? {
-                HandleSer::HandleV1 { name } => {
-                    match tl::get_from_context(tl::Purpose::Deserialization, {
-                        let name = name.clone();
-                        |context| context.universe.get_or_insert_deserializing(name)
-                    }) {
-                        Some(result) => result.map_err(serde::de::Error::custom),
-                        None => {
+            let name = match HandleSer::deserialize(deserializer)? {
+                HandleSer::HandleV1 { name } => name,
+            };
+
+            match tl::get_from_context(tl::Purpose::Deserialization, {
+                let name = name.clone();
+                |context| context.universe.get_or_insert_deserializing(name)
+            }) {
+                Some(result) => result.map_err(serde::de::Error::custom),
+                None => {
+                    match name {
+                        Name::Specific(_) | Name::Anonym(_) => {
                             // If there is no `Universe` context, use a “gone” handle.
                             // I am unsure whether this has any practical application, but it
                             // is at least useful in deserialization tests.
                             Ok(Handle::new_gone(name))
                         }
+                        Name::Builtin(builtin) => Ok(builtin.handle().clone()),
+                        Name::Pending => Err(serde::de::Error::custom(
+                            "cannot deserialize a pending Handle, \
+                                    because they would have lost their association \
+                                    with their originating transaction",
+                        )),
                     }
                 }
             }
@@ -1326,6 +1336,7 @@ mod universe {
                         "cannot serialize a pending Handle",
                     ));
                 }
+                &Name::Builtin(name) => NameSer::Builtin(name),
             }
             .serialize(serializer)
         }
@@ -1336,6 +1347,7 @@ mod universe {
             Ok(match NameSer::deserialize(deserializer)? {
                 NameSer::Specific(s) => Name::Specific(s),
                 NameSer::Anonym(n) => Name::Anonym(n),
+                NameSer::Builtin(b) => Name::Builtin(b),
             })
         }
     }
@@ -1351,6 +1363,22 @@ mod universe {
         {
             let &schema::SerializeHandle(read_ticket, ref handle) = self;
             read_handle_for_serialization(read_ticket, handle)?.serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for universe::Builtin {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            let string = <Cow<'de, str> as Deserialize<'de>>::deserialize(deserializer)?;
+            string.parse::<Self>().map_err(serde::de::Error::custom)
+        }
+    }
+
+    impl Serialize for universe::Builtin {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            self.static_string().serialize(serializer)
         }
     }
 

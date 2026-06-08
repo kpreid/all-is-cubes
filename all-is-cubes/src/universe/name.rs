@@ -3,6 +3,8 @@ use core::fmt;
 
 use arcstr::ArcStr;
 
+use crate::universe::Builtin;
+
 #[cfg(doc)]
 use crate::universe::{Handle, Universe};
 
@@ -29,6 +31,10 @@ pub enum Name {
     ///
     /// This name is always replaced at the moment of insertion in the [`Universe`].
     Pending,
+
+    /// Refers to an immutable object defined in code which acts as if it is a member of every
+    /// [`Universe`].
+    Builtin(Builtin),
 }
 
 impl Name {
@@ -38,7 +44,9 @@ impl Name {
         match self {
             Name::Specific(_) => true,
             Name::Anonym(_) => false,
-            Name::Pending => unreachable!("inconsistency: Pending should not occur here"),
+            Name::Builtin(_) | Name::Pending => {
+                unreachable!("inconsistency: name of type {self} should not be subject to GC")
+            }
         }
     }
 }
@@ -61,12 +69,19 @@ impl From<ArcStr> for Name {
     }
 }
 
+impl From<Builtin> for Name {
+    fn from(value: Builtin) -> Self {
+        Name::Builtin(value)
+    }
+}
+
 impl fmt::Display for Name {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Name::Specific(name) => write!(f, "'{name}'"),
             Name::Anonym(index) => write!(f, "[anonymous #{index}]"),
             Name::Pending => write!(f, "[pending anonymous]"),
+            Name::Builtin(name) => write!(f, "builtin '{name}'"),
         }
     }
 }
@@ -75,11 +90,13 @@ impl fmt::Display for Name {
 #[cfg(feature = "arbitrary")]
 mod impl_arbitrary {
     use super::*;
+
     #[derive(arbitrary::Arbitrary)]
     enum ArbName {
         Specific(String),
         Anonym(usize),
         Pending,
+        Builtin(Builtin),
     }
 
     impl<'a> arbitrary::Arbitrary<'a> for Name {
@@ -89,6 +106,7 @@ mod impl_arbitrary {
                 ArbName::Specific(name) => Name::Specific(name.into()),
                 ArbName::Anonym(index) => Name::Anonym(index),
                 ArbName::Pending => Name::Pending,
+                ArbName::Builtin(builtin) => Name::Builtin(builtin),
             };
             if false {
                 // This non-executed code proves ArbName has as many variants as Name
@@ -96,6 +114,7 @@ mod impl_arbitrary {
                     Name::Specific(name) => ArbName::Specific(name.to_string()),
                     Name::Anonym(index) => ArbName::Anonym(index),
                     Name::Pending => ArbName::Pending,
+                    Name::Builtin(name) => ArbName::Builtin(name),
                 };
                 unreachable!()
             } else {

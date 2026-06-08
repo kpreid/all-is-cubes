@@ -17,7 +17,7 @@ use crate::space::Space;
 use crate::time;
 use crate::transaction::{self, Transaction};
 use crate::universe::{
-    self, GoneReason, Handle, HandleError, InsertError, InsertErrorKind, Name, ReadTicket,
+    self, Builtin, GoneReason, Handle, HandleError, InsertError, InsertErrorKind, Name, ReadTicket,
     Universe, UniverseTransaction, list_handles,
 };
 use crate::util::{assert_conditional_send_sync, yield_progress_for_testing};
@@ -139,6 +139,27 @@ fn get_any() {
 }
 
 #[test]
+fn get_builtin_handle() {
+    let u = Universe::new();
+    let name = Name::Builtin(Builtin::Air);
+    let expected_handle = Builtin::Air.handle::<BlockDef>();
+
+    assert_eq!(u.get(&name), Some(expected_handle.clone()));
+    assert_eq!(
+        u.get_any(&name),
+        Some::<&dyn universe::ErasedHandle>(expected_handle)
+    );
+}
+
+#[test]
+fn get_builtin_handle_with_wrong_type() {
+    let u = Universe::new();
+    let name = Name::Builtin(Builtin::Air);
+
+    assert_eq!(u.get::<Space>(&name), None);
+}
+
+#[test]
 fn insert_anonymous_makes_distinct_names() {
     let [block_0, block_1] = make_some_blocks();
     let mut u = Universe::new();
@@ -202,6 +223,41 @@ fn insert_duplicate_name_via_txn() {
 }
 
 #[test]
+fn insert_builtin_prohibited() {
+    assert_eq!(
+        Universe::new().insert(
+            Name::Builtin(Builtin::Air),
+            BlockDef::new(ReadTicket::stub(), AIR)
+        ),
+        Err(InsertError {
+            name: Name::Builtin(Builtin::Air),
+            kind: InsertErrorKind::InvalidName,
+        })
+    );
+}
+
+#[test]
+fn insert_builtin_prohibited_via_txn() {
+    let (_, txn) = UniverseTransaction::insert(
+        Name::Builtin(Builtin::Air),
+        BlockDef::new(ReadTicket::stub(), AIR),
+    );
+
+    assert_eq!(
+        txn.execute(&mut Universe::new(), (), &mut drop),
+        Err(transaction::ExecuteError::Check(
+            universe::UniverseMismatch::Member(transaction::MapMismatch {
+                key: Name::Builtin(Builtin::Air),
+                mismatch: universe::MemberMismatch::Insert(InsertError {
+                    name: Name::Builtin(Builtin::Air),
+                    kind: InsertErrorKind::InvalidName
+                })
+            })
+        ))
+    );
+}
+
+#[test]
 fn insert_anonym_prohibited_direct() {
     assert_eq!(
         Universe::new().insert(Name::Anonym(0), BlockDef::new(ReadTicket::stub(), AIR)),
@@ -215,18 +271,17 @@ fn insert_anonym_prohibited_direct() {
 #[test]
 fn insert_anonym_prohibited_via_txn() {
     let (_, txn) = UniverseTransaction::insert(Name::Anonym(0), Space::empty_positive(1, 1, 1));
-    let error = txn.execute(&mut Universe::new(), (), &mut drop).unwrap_err();
 
     assert_eq!(
-        error,
-        transaction::ExecuteError::Check(universe::UniverseMismatch::Member(
-            transaction::MapMismatch {
+        txn.execute(&mut Universe::new(), (), &mut drop),
+        Err(transaction::ExecuteError::Check(
+            universe::UniverseMismatch::Member(transaction::MapMismatch {
                 key: Name::Anonym(0),
                 mismatch: universe::MemberMismatch::Insert(InsertError {
                     name: Name::Anonym(0),
                     kind: InsertErrorKind::InvalidName
                 })
-            }
+            })
         ))
     );
 }
@@ -386,6 +441,26 @@ fn gc_implicit() {
 fn gc_preserves_named() {
     let mut u = Universe::new();
     u.insert("foo".into(), BlockDef::new(u.read_ticket(), AIR)).unwrap();
+    assert_eq!(1, u.iter_by_type::<BlockDef>().count());
+    u.gc();
+    assert_eq!(1, u.iter_by_type::<BlockDef>().count());
+    u.get::<BlockDef>(&"foo".into()).unwrap();
+}
+
+/// Builtins are not considered erroneous if encountered, despite not being stored in the universe.
+#[test]
+fn gc_allows_builtins() {
+    let mut u = Universe::new();
+    u.insert(
+        "foo".into(),
+        BlockDef::new(
+            u.read_ticket(),
+            Block::from_primitive(block::Primitive::Indirect(
+                Builtin::Air.handle::<BlockDef>().clone(),
+            )),
+        ),
+    )
+    .unwrap();
     assert_eq!(1, u.iter_by_type::<BlockDef>().count());
     u.gc();
     assert_eq!(1, u.iter_by_type::<BlockDef>().count());
