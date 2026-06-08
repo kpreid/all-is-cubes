@@ -313,9 +313,6 @@ pub enum UniverseMismatch {
 
     /// The member is not in an appropriate state.
     Member(transaction::MapMismatch<Name, MemberMismatch>),
-
-    /// Universe transactions may not modify handles that are in the [`Name::Pending`] state.
-    InvalidPending,
 }
 
 /// Transaction conflict error type for [`UniverseTransaction`].
@@ -334,7 +331,6 @@ impl core::error::Error for UniverseMismatch {
         match self {
             UniverseMismatch::DifferentUniverse { .. } => None,
             UniverseMismatch::Member(mc) => Some(&mc.mismatch),
-            UniverseMismatch::InvalidPending => None,
         }
     }
 }
@@ -363,13 +359,6 @@ impl fmt::Display for UniverseMismatch {
                     f,
                     "transaction precondition not met in member {key}",
                     key = c.key
-                )
-            }
-            UniverseMismatch::InvalidPending => {
-                write!(
-                    f,
-                    "universe transactions may not modify handles that \
-                        are in the [`Name::Pending`] state"
                 )
             }
         }
@@ -687,16 +676,6 @@ impl Transaction for UniverseTransaction {
         }
         let mut member_checks = HbHashMap::with_capacity(self.members.len());
         for (name, member) in self.members.iter() {
-            match name {
-                Name::Specific(_) | Name::Anonym(_) => {}
-                Name::Pending => {
-                    // TODO: This is a weird place to implement this constraint.
-                    // It would be better (?) to check when the transaction is created,
-                    // but that will be quite a lot of fallibility...
-                    return Err(UniverseMismatch::InvalidPending);
-                }
-            }
-
             member_checks.insert(
                 name.clone(),
                 member.check(self, target, name).map_err(|e| {
@@ -854,21 +833,42 @@ struct MemberMergeCheck(Option<AnyTransactionCheck>);
 struct MemberCommitCheck(Option<AnyTransactionCheck>);
 
 impl MemberTxn {
+    /// Checks that the operation in `self` applies to the member with name `name`
+    /// in `universe`. Also checks that the `name` is one that can be affected by
+    /// a transaction at all.
     fn check(
         &self,
         whole_transaction: &UniverseTransaction, // Note: we could avoid this with another ReadTicket variant for MemberTxn. Should we?
         universe: &Universe,
         name: &Name,
     ) -> Result<MemberCommitCheck, MemberMismatch> {
-        match self {
-            MemberTxn::Noop => Ok(MemberCommitCheck(None)),
+        match (self, name) {
+            (MemberTxn::Noop, _) => Ok(MemberCommitCheck(None)),
+
+            (MemberTxn::Modify(_), Name::Pending) => {
+                // This is a weird time to implement this constraint, but the alternative
+                // would be to check it when the `MemberTxn` is created, which would mean
+                // that `bind()` and other functions would need to become fallible.
+                // So, instead, we lean on the idea that transactions have all sorts of
+                // reasons for failing.
+                Err(MemberMismatch::Pending)
+            }
+
             // Kludge: The individual `AnyTransaction`s embed the `Handle<T>` they operate on --
             // so we don't actually pass anything here.
-            MemberTxn::Modify(txn) => Ok(MemberCommitCheck(Some(
-                txn.check(universe, ())
-                    .map_err(|e| MemberMismatch::Modify(ModifyMemberMismatch(e)))?,
-            ))),
-            MemberTxn::Insert(pending) => {
+            (MemberTxn::Modify(txn), Name::Specific(_) | Name::Anonym(_)) => {
+                Ok(MemberCommitCheck(Some(txn.check(universe, ()).map_err(
+                    |e| MemberMismatch::Modify(ModifyMemberMismatch(e)),
+                )?)))
+            }
+
+            // Note: this check is also present in Universe::allocate_name.
+            (MemberTxn::Insert(_), Name::Anonym(_)) => Err(MemberMismatch::Insert(InsertError {
+                name: name.clone(),
+                kind: InsertErrorKind::InvalidName,
+            })),
+
+            (MemberTxn::Insert(pending), Name::Specific(_) | Name::Pending) => {
                 {
                     let handle_name = pending.handle().name();
                     if handle_name != *name {
@@ -876,17 +876,6 @@ impl MemberTxn {
                             "in transaction, pending handle for name {name} \
                             already has its name set to {handle_name}"
                         );
-                    }
-                }
-
-                // TODO: Deduplicate this check logic vs. Universe::allocate_name
-                match name {
-                    Name::Specific(_) | Name::Pending => {}
-                    Name::Anonym(_) => {
-                        return Err(MemberMismatch::Insert(InsertError {
-                            name: name.clone(),
-                            kind: InsertErrorKind::InvalidName,
-                        }));
                     }
                 }
 
@@ -901,15 +890,16 @@ impl MemberTxn {
                     .map_err(MemberMismatch::Insert)?;
                 Ok(MemberCommitCheck(None))
             }
-            MemberTxn::Delete => {
-                if let Name::Specific(_) = name {
-                    if universe.get_any(name).is_some() {
-                        Ok(MemberCommitCheck(None))
-                    } else {
-                        Err(MemberMismatch::DeleteNonexistent(name.clone()))
-                    }
+
+            (MemberTxn::Delete, Name::Anonym(_) | Name::Pending) => {
+                Err(MemberMismatch::DeleteInvalid(name.clone()))
+            }
+
+            (MemberTxn::Delete, Name::Specific(_)) => {
+                if universe.get_any(name).is_some() {
+                    Ok(MemberCommitCheck(None))
                 } else {
-                    Err(MemberMismatch::DeleteInvalid(name.clone()))
+                    Err(MemberMismatch::DeleteNonexistent(name.clone()))
                 }
             }
         }
@@ -1055,6 +1045,9 @@ pub enum MemberMismatch {
     /// Preconditions of the member transaction weren't met
     #[displaydoc("{0}")]
     Modify(ModifyMemberMismatch),
+
+    /// universe transactions may not modify members that have not yet been inserted into the universe
+    Pending,
 }
 
 impl core::error::Error for MemberMismatch {
@@ -1064,6 +1057,7 @@ impl core::error::Error for MemberMismatch {
             MemberMismatch::DeleteNonexistent(_) => None,
             MemberMismatch::DeleteInvalid(_) => None,
             MemberMismatch::Modify(e) => e.source(),
+            MemberMismatch::Pending => None,
         }
     }
 }
