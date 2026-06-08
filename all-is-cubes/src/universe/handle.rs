@@ -18,9 +18,9 @@ use bevy_ecs::prelude as ecs;
 use bevy_platform::sync::{Mutex, MutexGuard, OnceLock};
 
 use crate::universe::{
-    self, AnyHandle, InsertError, InsertErrorKind, MemberBoilerplate, Membership, Name, ReadTicket,
-    ReadTicketError, SealedMember, Type, Universe, UniverseId, UniverseMember, VisitHandles,
-    id::OnceUniverseId,
+    self, AnyHandle, Builtin, InsertError, InsertErrorKind, MemberBoilerplate, Membership, Name,
+    ReadTicket, ReadTicketError, SealedMember, Type, Universe, UniverseId, UniverseMember,
+    VisitHandles, id::OnceUniverseId,
 };
 
 #[cfg(doc)]
@@ -107,6 +107,10 @@ enum State {
 
     /// Deleted or never existed.
     Gone { reason: GoneReason },
+
+    /// The handle is the unique handle corresponding to a [`Builtin`].
+    /// Its data is stored statically.
+    Builtin,
 }
 
 /// System parameter which allows reading a specific type of universe member.
@@ -150,6 +154,13 @@ impl<T: 'static> Handle<T> {
         Self::new_from_state(name, State::Pending)
     }
 
+    /// Constructs a new [`Handle`] for a builtin.
+    ///
+    /// This is used internally when lazily initializing [`Builtin`]s.
+    pub(in crate::universe) fn new_for_builtin_initialization(name: Builtin) -> Handle<T> {
+        Self::new_from_state(Name::Builtin(name), State::Builtin)
+    }
+
     /// Constructs a [`Handle`] that does not refer to a value, as if it used to but
     /// is now defunct.
     ///
@@ -157,14 +168,24 @@ impl<T: 'static> Handle<T> {
     /// When compared, this will be equal only to clones of itself.
     ///
     /// This may be used in tests to exercise error handling.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the name is [`Name::Builtin`]. Builtin handles are globally unique.
     #[doc(hidden)] // TODO: decide if this is good API
+    #[track_caller]
     pub fn new_gone(name: Name) -> Handle<T> {
-        Self::new_from_state(
-            name,
-            State::Gone {
-                reason: GoneReason::CreatedGone {},
-            },
-        )
+        match name {
+            Name::Specific(_) | Name::Anonym(_) | Name::Pending => Self::new_from_state(
+                name,
+                State::Gone {
+                    reason: GoneReason::CreatedGone {},
+                },
+            ),
+            Name::Builtin(_) => {
+                panic!("Handle::new_gone() may not be used on builtin names, such as {name}")
+            }
+        }
     }
 
     /// Constructs a [`Handle`] that has an associated entity but not yet a value.
@@ -286,6 +307,8 @@ impl<T: 'static> Handle<T> {
                 ticket_universe_id: Some(expected_universe),
                 ticket_origin: Location::caller(),
             })),
+
+            (_, State::Builtin) => Err(self.create_error(HandleErrorKind::Builtin)),
         }
     }
 
@@ -306,13 +329,18 @@ impl<T: 'static> Handle<T> {
                 ticket_universe_id: None,
                 ticket_origin: Location::caller(),
             })),
+
+            State::Builtin => Err(self.create_error(HandleErrorKind::Builtin)),
         }
     }
 
     /// Returns the unique ID of the universe this handle belongs to.
     ///
-    /// Returns [`None`] if this [`Handle`] is not yet associated with a universe, or if
-    /// it was created by [`Self::new_gone()`].
+    /// Returns [`None`] if this [`Handle`]:
+    ///
+    /// * points to a [`Builtin`],
+    /// * is not yet associated with a universe, or
+    /// * was created by [`Self::new_gone()`].
     ///
     /// The ID cannot be replaced; once [`Some`] is seen, the result will be stable forever.
     pub fn universe_id(&self) -> Option<UniverseId> {
@@ -322,11 +350,11 @@ impl<T: 'static> Handle<T> {
     /// Acquire read access to the referent of this handle.
     ///
     /// The caller must supply a [`ReadTicket`] from the [`Universe`] or [`UniverseTransaction`]
-    /// the handle belongs to.
+    /// the handle belongs to (except in case of [`Builtin`] handles, where the ticket is ignored).
     ///
     /// # Errors
     ///
-    /// Returns an error if the handle is invalid or the ticket does not match.
+    /// Returns an error if the handle is invalid or the ticket does not provide sufficient access.
     #[inline(never)]
     #[expect(clippy::missing_panics_doc, reason = "all panics are bugs")]
     pub fn read<'t>(&self, read_ticket: ReadTicket<'t>) -> Result<T::Read<'t>, HandleError>
@@ -338,12 +366,14 @@ impl<T: 'static> Handle<T> {
         /// but it makes things a little more clearly OK and slightly shortens the duration
         /// the state mutex is locked.
         enum Access {
+            Builtin,
             Pending,
             Entity(ecs::Entity),
         }
 
         // Use the state mutex to figure out how to obtain access.
         let access: Access = match *self.inner.state.lock().expect("Handle::state lock error") {
+            State::Builtin => Access::Builtin,
             State::Pending => Access::Pending,
             #[cfg(feature = "save")]
             State::Deserializing { entity: _ } => {
@@ -378,6 +408,20 @@ impl<T: 'static> Handle<T> {
 
         // Actually obtain access.
         Ok(match access {
+            Access::Builtin => {
+                let name = self.name();
+                let Name::Builtin(builtin_name) = name else {
+                    unreachable!("builtin handle {self:?} does not have a builtin name {name:?}")
+                };
+                let any_data: &universe::AnyPending = builtin_name.get();
+                let boxed_data: Option<&Option<Box<T>>> =
+                    any_data.value_as_any_option_box().downcast_ref();
+                let data: &T = boxed_data
+                    .expect("builtin handles should always have the right type")
+                    .as_ref()
+                    .expect("builtin handles should always have data");
+                T::read_from_standalone(data)
+            }
             Access::Pending => T::read_from_standalone(
                 read_ticket.borrow_pending(self).map_err(|e| e.into_handle_error(self))?,
             ),
@@ -421,8 +465,13 @@ impl<T: 'static> Handle<T> {
         }
     }
 
-    /// Like [`Self::read()`], but allows selecting an arbitrary component.
-    /// In the future, this will need to be the only way, and `read()` will be a facade, or something.
+    /// Like [`Self::read()`], but allows selecting an arbitrary component that is not part of
+    /// [`UniverseMember::Read`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if called on a handle which is not a member of a universe because it is pending
+    /// or builtin.
     pub(crate) fn query<'t, C: ecs::Component>(
         &self,
         read_ticket: ReadTicket<'t>,
@@ -433,9 +482,11 @@ impl<T: 'static> Handle<T> {
         // TODO(ecs): Deduplicate this setup code with read()
         let entity: ecs::Entity = match *self.inner.state.lock().expect("Handle::state lock error")
         {
+            State::Builtin => {
+                unreachable!("cannot use query() on builtin handles")
+            }
             State::Pending => {
-                // TODO(ecs): proper error
-                panic!("cannot use query() on pending handles")
+                unreachable!("cannot use query() on pending handles")
             }
             #[cfg(feature = "save")]
             State::Deserializing { entity: _ } => {
@@ -633,6 +684,7 @@ impl<T: fmt::Debug + 'static> fmt::Debug for Handle<T> {
                     #[cfg(feature = "save")]
                     State::Deserializing { .. } => write!(f, ", not yet deserialized")?,
                     State::Member { .. } => { /* normal condition, no message */ }
+                    State::Builtin => { /* condition explained by the name */ }
                     State::Gone { .. } => write!(f, ", gone")?,
                 }
             }
@@ -732,11 +784,11 @@ mod arbitrary_handle {
     impl<'a, T: arbitrary::Arbitrary<'a> + UniverseMember + 'static> arbitrary::Arbitrary<'a>
         for Handle<T>
     {
-        /// Do not call this! It will panic under most circumstances.
-        /// Because [`Handle`]s belong to a [`Universe`], they must be constructed together.
+        /// Because most [`Handle`]s belong to a [`Universe`], they must be constructed together.
+        /// Use [`ArbitraryWithUniverse`] to obtain useful arbitrary [`Handle`]s.
         fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
             Ok(match u.int_in_range(0..=2)? {
-                0 => Handle::new_gone(Name::arbitrary(u)?),
+                0 => Handle::new_gone(without_builtin_name(Name::arbitrary(u)?)),
                 1 => {
                     let name = Name::arbitrary(u)?;
                     let value = T::arbitrary(u)?;
@@ -745,7 +797,7 @@ mod arbitrary_handle {
                         context.universe.insert(name.clone(), value).unwrap_or_else(|_| {
                             // TODO: insert anonymous if picking an arbitrary name failed;
                             // right now we can't recover ownership of the value!
-                            Handle::new_gone(name)
+                            Handle::new_gone(without_builtin_name(name))
                         })
                     })
                     .unwrap_or_else(no_context)
@@ -800,6 +852,16 @@ mod arbitrary_handle {
             depth: usize,
         ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
             Handle::<T>::try_size_hint(depth)
+        }
+    }
+
+    /// If a name is [`Name::Builtin`], replace it.
+    /// This makes the name compatible with [`Handle::new_gone()`].
+    fn without_builtin_name(name: Name) -> Name {
+        if let Name::Builtin(b) = name {
+            Name::Specific(arcstr::format!("{b}"))
+        } else {
+            name
         }
     }
 
@@ -865,6 +927,9 @@ pub(crate) enum HandleErrorKind {
     /// been called.
     ValueMissing,
 
+    /// This handle is a [`Builtin`] handle; its referent cannot be mutated under any circumstances.
+    Builtin,
+
     /// The given [`ReadTicket`] is for a different universe,
     /// or a mutation function was called on a [`Universe`] which does not contain the given handle.
     //---
@@ -920,9 +985,11 @@ impl HandleError {
             HandleErrorKind::ValueMissing => None,
             HandleErrorKind::NotReady => None,
             HandleErrorKind::WrongUniverse { .. } => None,
+            HandleErrorKind::Builtin => None,
             HandleErrorKind::NotYetInserted { .. } => None,
         }
     }
+
     /// Returns whether the failed access might succeed at a later time,
     /// or with a strictly broader [`ReadTicket`].
     pub fn is_transient(&self) -> bool {
@@ -939,6 +1006,7 @@ impl HandleError {
             // Permanent failures.
             HandleErrorKind::WrongUniverse { .. } => false,
             HandleErrorKind::Gone { .. } => false,
+            HandleErrorKind::Builtin => false,
         }
     }
 
@@ -967,6 +1035,12 @@ impl fmt::Display for HandleError {
             }
             HandleErrorKind::ValueMissing => {
                 write!(f, "handle {handle_name} has no value yet")
+            }
+            HandleErrorKind::Builtin => {
+                write!(
+                    f,
+                    "handle {handle_name} cannot be mutated because it is a builtin"
+                )
             }
             HandleErrorKind::WrongUniverse {
                 ticket_universe_id,
@@ -1010,6 +1084,7 @@ impl core::error::Error for HandleError {
             HandleErrorKind::InUse => None,
             HandleErrorKind::NotReady => None,
             HandleErrorKind::ValueMissing => None,
+            HandleErrorKind::Builtin => None,
             HandleErrorKind::WrongUniverse { .. } => None,
             HandleErrorKind::NotYetInserted { .. } => None,
             HandleErrorKind::InvalidTicket { ref error } => Some(error),
@@ -1425,6 +1500,12 @@ mod tests {
         let r_different: Handle<Space> = Handle::new_gone("bar".into());
         assert_ne!(r1, r2);
         assert_ne!(r1, r_different);
+    }
+
+    #[test]
+    #[should_panic = "Handle::new_gone() may not be used on builtin names, such as builtin 'air'"]
+    fn new_gone_on_builtin() {
+        _ = Handle::<BlockDef>::new_gone(Name::Builtin(Builtin::Air));
     }
 
     #[test]

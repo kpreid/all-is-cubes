@@ -11,6 +11,9 @@ use crate::universe::Universe;
 /// Identifies game entities of a certain game-mechanical kind.
 ///
 /// For example, blocks that can be destroyed with a particular tool.
+//---
+// TODO: Now that we have builtin handles, replace this enum with just `Handle<TagDef>`,
+// unless we want parameterized tags.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]

@@ -9,8 +9,8 @@ use hashbrown::HashMap as HbHashMap;
 
 use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transactional};
 use crate::universe::{
-    AnyPending, ErasedHandle, Handle, HandleError, InsertError, InsertErrorKind, MemberBoilerplate,
-    Name, ReadTicket, Universe, UniverseId, UniverseMember,
+    AnyPending, Builtin, ErasedHandle, Handle, HandleError, InsertError, InsertErrorKind,
+    MemberBoilerplate, Name, ReadTicket, Universe, UniverseId, UniverseMember,
 };
 
 // Reëxports for macro-generated types
@@ -66,6 +66,15 @@ where
     O: UniverseMember + Transactional,
     <O as Transactional>::Transaction: TransactionOnEcs,
 {
+    // Check that the handle is valid to write in this universe. This check:
+    // * Rejects `Builtin` handles.
+    // * Matches the `as_entity()` call we’re going to later do during commit.
+    //   (We could return the entity ID in the check value, but that would be exposing the potential
+    //   for exciting misbehaviors if the wrong check value gets here, so better to do it twice.)
+    let _: ecs::Entity = target
+        .as_entity(universe.universe_id())
+        .map_err(MismatchOrHandleError::Handle)?;
+
     let read_ticket = universe.read_ticket();
     let read = target.read(read_ticket).map_err(MismatchOrHandleError::Handle)?;
     TransactionOnEcs::check(transaction, read, read_ticket).map_err(MismatchOrHandleError::Check)
@@ -85,7 +94,7 @@ where
 {
     let entity: ecs::Entity = target
         .as_entity(universe.universe_id())
-        .expect("transaction target belongs to wrong universe");
+        .expect("as_entity() failed; universe state changed between check and commit");
     let query_state = O::member_mutation_query_state(&mut universe.queries.write_members);
     let target_query_data = query_state
         .get_mut(&mut universe.world, entity)
@@ -523,7 +532,10 @@ impl UniverseTransaction {
     }
 
     /// Given a handle that is newly created, add it to this transaction's set of handles to insert,
-    /// after validating the name.
+    /// after validating the name is not a duplicate within this transaction.
+    ///
+    /// Does not check that the name is valid to insert at all; in particular, it permits
+    /// [`Name::Anonym`] and [`Name::Builtin`]. Those will fail when the transaction is executed.
     ///
     /// Public functions do not allow passing arbitrary handles to this.
     fn insert_named_handle_inner<T: UniverseMember>(
@@ -534,7 +546,8 @@ impl UniverseTransaction {
         let insertion =
             MemberTxn::Insert(MemberBoilerplate::into_any_pending(handle.clone(), None));
         match name {
-            name @ (Name::Specific(_) | Name::Anonym(_)) => {
+            // Note:
+            name @ (Name::Specific(_) | Name::Anonym(_) | Name::Builtin(_)) => {
                 match self.members.entry(name.clone()) {
                     hashbrown::hash_map::Entry::Occupied(_) => {
                         // Equivalent to how transaction merge would fail
@@ -594,8 +607,11 @@ impl UniverseTransaction {
         &self,
         handle: &Handle<T>,
     ) -> Option<&Option<Box<T>>> {
+        // This match must be consistent with [`Self::insert_named_handle_inner`].
         let member_txn: &MemberTxn = match handle.name() {
-            name @ (Name::Specific(_) | Name::Anonym(_)) => self.members.get(&name),
+            name @ (Name::Specific(_) | Name::Anonym(_) | Name::Builtin(_)) => {
+                self.members.get(&name)
+            }
             Name::Pending => {
                 let handle: &dyn ErasedHandle = handle;
                 self.anonymous_insertions.get(handle)
@@ -628,8 +644,11 @@ impl UniverseTransaction {
         &mut self,
         handle: &Handle<T>,
     ) -> Option<&mut Option<Box<T>>> {
+        // This match must be consistent with [`Self::insert_named_handle_inner`].
         let member_txn: &mut MemberTxn = match handle.name() {
-            name @ (Name::Specific(_) | Name::Anonym(_)) => self.members.get_mut(&name),
+            name @ (Name::Specific(_) | Name::Anonym(_) | Name::Builtin(_)) => {
+                self.members.get_mut(&name)
+            }
             Name::Pending => {
                 let handle: &dyn ErasedHandle = handle;
                 self.anonymous_insertions.get_mut(handle)
@@ -878,14 +897,16 @@ impl MemberTxn {
         match (self, name) {
             (MemberTxn::Noop, _) => Ok(MemberCommitCheck(None)),
 
-            (MemberTxn::Modify(_), Name::Pending) => {
-                // This is a weird time to implement this constraint, but the alternative
-                // would be to check it when the `MemberTxn` is created, which would mean
-                // that `bind()` and other functions would need to become fallible.
-                // So, instead, we lean on the idea that transactions have all sorts of
-                // reasons for failing.
-                Err(MemberMismatch::Pending)
+            (MemberTxn::Modify(_) | MemberTxn::Delete, &Name::Builtin(b)) => {
+                Err(MemberMismatch::Builtin(b))
             }
+
+            // This is a weird time to implement these constraints, but the alternative
+            // would be to check them when the `MemberTxn` is created, which would mean
+            // that `bind()` and other functions would need to become fallible.
+            // So, instead, we lean on the idea that transactions have all sorts of
+            // reasons for failing.
+            (MemberTxn::Modify(_), Name::Pending) => Err(MemberMismatch::Pending),
 
             // Kludge: The individual `AnyTransaction`s embed the `Handle<T>` they operate on --
             // so we don't actually pass anything here.
@@ -896,10 +917,12 @@ impl MemberTxn {
             }
 
             // Note: this check is also present in Universe::allocate_name.
-            (MemberTxn::Insert(_), Name::Anonym(_)) => Err(MemberMismatch::Insert(InsertError {
-                name: name.clone(),
-                kind: InsertErrorKind::InvalidName,
-            })),
+            (MemberTxn::Insert(_), Name::Anonym(_) | Name::Builtin(_)) => {
+                Err(MemberMismatch::Insert(InsertError {
+                    name: name.clone(),
+                    kind: InsertErrorKind::InvalidName,
+                }))
+            }
 
             (MemberTxn::Insert(pending), Name::Specific(_) | Name::Pending) => {
                 {
@@ -1081,6 +1104,9 @@ pub enum MemberMismatch {
 
     /// universe transactions may not modify members that have not yet been inserted into the universe
     Pending,
+
+    /// universe transactions may not modify builtins, including builtin '{0}'
+    Builtin(Builtin),
 }
 
 impl core::error::Error for MemberMismatch {
@@ -1091,6 +1117,7 @@ impl core::error::Error for MemberMismatch {
             MemberMismatch::DeleteInvalid(_) => None,
             MemberMismatch::Modify(e) => e.source(),
             MemberMismatch::Pending => None,
+            MemberMismatch::Builtin(_) => None,
         }
     }
 }
@@ -1152,6 +1179,7 @@ mod tests {
     //! (where they are parallel with non-transaction behavior tests).
 
     use super::*;
+    use crate::block;
     use crate::block::AIR;
     use crate::block::BlockDef;
     use crate::content::make_some_blocks;
@@ -1433,6 +1461,38 @@ mod tests {
         assert_eq!(
             error.source().unwrap().to_string(),
             "object 'foo' was deleted"
+        );
+    }
+
+    #[test]
+    fn builtin_mutation_via_universe_transaction_fails() {
+        let mut u = Universe::new();
+        let handle: Handle<BlockDef> = Builtin::Air.handle().clone();
+        let txn = block::BlockDefTransaction::overwrite(AIR).bind(handle);
+
+        let err = txn.execute(&mut u, (), &mut transaction::no_outputs).unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "transaction precondition not met in member builtin 'air'"
+        );
+        assert_eq!(
+            err.source().unwrap().to_string(),
+            "universe transactions may not modify builtins, including builtin 'air'"
+        );
+    }
+
+    #[test]
+    fn builtin_mutation_via_execute_1_fails() {
+        let mut u = Universe::new();
+        let handle: &Handle<BlockDef> = Builtin::Air.handle();
+        let txn = block::BlockDefTransaction::overwrite(AIR);
+
+        let err = u.execute_1(handle, txn).unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "handle builtin 'air' cannot be mutated because it is a builtin"
         );
     }
 

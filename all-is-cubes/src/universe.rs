@@ -37,6 +37,9 @@ pub(crate) use members::*;
 )]
 pub use members::{AnyHandle, Type, UniverseMember};
 
+mod builtin;
+pub use builtin::{Builtin, UnknownBuiltin};
+
 mod ecs_details;
 use ecs_details::NameMap;
 pub use ecs_details::PubliclyMutableComponent;
@@ -239,12 +242,39 @@ impl Universe {
         )
     }
 
+    /// Translates a name for an object of type `T` into a [`Handle`] for it.
+    ///
+    /// Returns [`None`] if no object exists for the name or if its type is not `T`.
+    //---
+    // TODO: consider changing this to return a `Result` — but we need a suitable error type;
+    // `TypeError` can’t handle “missing”.
+    pub fn get<T>(&self, name: &Name) -> Option<Handle<T>>
+    where
+        T: UniverseMember,
+    {
+        self.get_any(name)?.try_into().ok()
+    }
+
     /// Returns a [`Handle`] for the object in this universe with the given name,
     /// regardless of its type, or [`None`] if there is none.
     ///
     /// This is a dynamically-typed version of [`Universe::get()`].
-    pub fn get_any(&self, name: &Name) -> Option<&AnyHandle> {
-        self.world.resource::<NameMap>().map.get(name)
+    pub fn get_any(&self, name: &Name) -> Option<&dyn ErasedHandle> {
+        match *name {
+            // Normal case.
+            Name::Specific(_) | Name::Anonym(_) => self
+                .world
+                .resource::<NameMap>()
+                .map
+                .get(name)
+                .map(|ah: &AnyHandle| -> &dyn ErasedHandle { &**ah }),
+
+            // Builtins are treated as if they exist in every universe.
+            Name::Builtin(builtin) => Some(builtin.erased_handle()),
+
+            // Can never succeed, so don’t bother trying.
+            Name::Pending => None,
+        }
     }
 
     /// Returns the character named `"character"`.
@@ -415,22 +445,6 @@ impl Universe {
             .expect("shouldn't happen: insert_anonymous failed")
     }
 
-    /// Translates a name for an object of type `T` into a [`Handle`] for it.
-    ///
-    /// Returns [`None`] if no object exists for the name or if its type is not `T`.
-    //---
-    // TODO: consider changing this to return a `Result` — but we need a suitable error type;
-    // `TypeError` can’t handle “missing”.
-    pub fn get<T>(&self, name: &Name) -> Option<Handle<T>>
-    where
-        T: UniverseMember,
-    {
-        match self.world.resource::<NameMap>().map.get(name) {
-            Some(handle) => AnyHandle::downcast_ref(handle).ok().cloned(),
-            None => None,
-        }
-    }
-
     /// Inserts a new object with a specific name.
     ///
     /// # Errors
@@ -457,18 +471,18 @@ impl Universe {
         T: UniverseMember,
     {
         match name {
-            Name::Pending => {
-                return Err(DeserializeHandlesError {
-                    name,
-                    kind: DeserializeHandlesErrorKind::InvalidName,
-                });
+            Name::Specific(_) | Name::Anonym(_) => {
+                if let Some(handle) = self.get(&name) {
+                    Ok(handle)
+                } else {
+                    Ok(Handle::new_deserializing(name, self))
+                }
             }
-            Name::Specific(_) | Name::Anonym(_) => {}
-        }
-        if let Some(handle) = self.get(&name) {
-            Ok(handle)
-        } else {
-            Ok(Handle::new_deserializing(name, self))
+            Name::Builtin(builtin) => Ok(builtin.handle().clone()),
+            Name::Pending => Err(DeserializeHandlesError {
+                name,
+                kind: DeserializeHandlesErrorKind::InvalidName,
+            }),
         }
     }
 
@@ -556,7 +570,7 @@ impl Universe {
                 }
                 Ok(proposed_name.clone())
             }
-            Name::Anonym(_) => Err(InsertError {
+            Name::Anonym(_) | Name::Builtin(_) => Err(InsertError {
                 name: proposed_name.clone(),
                 kind: InsertErrorKind::InvalidName,
             }),
@@ -583,7 +597,7 @@ impl Universe {
             return false;
         };
         let entity = handle.as_entity(self.id).unwrap();
-        handle.set_state_to_gone(GoneReason::Deleted {});
+        handle.to_any_handle().set_state_to_gone(GoneReason::Deleted {});
         let success = self.world.despawn(entity);
         assert!(success);
         true

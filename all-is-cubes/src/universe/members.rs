@@ -523,9 +523,11 @@ macro_rules! member_enums_and_impls {
         }
 
         /// Holds a pending handle and its value, to be inserted into a universe.
+        /// Also used by builtins to store their state.
         ///
-        /// There is no validation that the handle is in fact pending.
-        /// This type is used only within [`crate::universe::universe_txn::MemberTxn`].
+        /// There is no validation of the handle’s actual state.
+        /// This type is used within [`crate::universe::universe_txn::MemberTxn`] and
+        /// [`crate::universe::builtin`].
         pub(in crate::universe) enum AnyPending {
             $(
                 $member_type {

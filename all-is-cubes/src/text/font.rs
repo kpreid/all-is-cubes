@@ -17,6 +17,8 @@ use crate::block::Text;
 // -------------------------------------------------------------------------------------------------
 
 /// A font that may be used with [`Text`] blocks.
+//---
+// TODO: Now that we have builtin handles, replace this enum with just `Handle<FontDef>`.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
