@@ -8,21 +8,24 @@ use crate::universe::{Handle, Universe};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Name/key of an object in a [`Universe`].
+/// Name of an object in a [`Universe`].
 ///
 /// Unlike a [`Handle`], a [`Name`] is plain data and the same name could refer to different members
-/// of different universes.
+/// of different universes; or to different members of the same universe if one was deleted, freeing
+/// up the name for reuse.
 #[doc = include_str!("../save/serde-warning.md")]
 #[expect(clippy::exhaustive_enums)]
 #[derive(Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Name {
-    /// An explicitly set name.
+    /// An explicitly set user-defined name.
     Specific(ArcStr),
 
     /// An automatically assigned name.
+    ///
+    /// This numbering is unique within a given [`Universe`].
     Anonym(usize),
 
-    /// Not yet been assigned a name; this may be replaced with `Anonym` but not `Specific`.
+    /// Not yet been assigned a name; this may later be replaced with `Anonym` (but not `Specific`).
     ///
     /// This name is always replaced at the moment of insertion in the [`Universe`].
     Pending,
