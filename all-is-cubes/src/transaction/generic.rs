@@ -2,7 +2,12 @@ use alloc::collections::BTreeMap;
 use core::hash::Hash;
 use core::{fmt, mem};
 
-use crate::transaction::{Merge, NoOutput, Transaction};
+use bevy_ecs::prelude as ecs;
+
+use crate::transaction::{self, Equal, Merge, NoOutput, Transaction};
+use crate::universe;
+
+// -------------------------------------------------------------------------------------------------
 
 /// Transaction precondition error type for transactions on map types such as [`BTreeMap`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -167,6 +172,8 @@ hashmap_merge!(std_map);
 
 use hashbrown::hash_map as hb_map;
 hashmap_merge!(hb_map);
+
+// -------------------------------------------------------------------------------------------------
 
 /// This recursive macro generates implementations of [`Transaction`] and [`Merge`] for
 /// tuples of various non-zero lengths.
@@ -361,4 +368,178 @@ impl Merge for () {
     }
 
     fn commit_merge(&mut self, (): Self, (): Self::MergeCheck) {}
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Transaction which replaces a value entirely or not at all.
+///
+/// This type of transaction is used by [`UniverseMember`][crate::universe::UniverseMember]s that
+/// do not support partial updates or precise change notifications.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ValueTransaction<T> {
+    old: Equal<T>,
+    new: Equal<T>,
+}
+
+impl<T: PartialEq> ValueTransaction<T> {
+    /// Returns a transaction which fails if the current value is not equal to `old`.
+    pub fn expect(old: T) -> Self {
+        Self {
+            old: Equal(Some(old)),
+            new: Equal(None),
+        }
+    }
+
+    /// Returns a transaction which replaces the current value with `new`.
+    pub fn overwrite(new: T) -> Self {
+        Self {
+            old: Equal(None),
+            new: Equal(Some(new)),
+        }
+    }
+
+    /// Returns a transaction which replaces the current value with `new`,
+    /// if it is equal to `old`, and otherwise fails.
+    ///
+    /// This operation is not conservative; that is, it can be merged with another transaction which
+    /// specifies the same `old` value or the same `new` value.
+    /// For example, you cannot use this to reliably increment a counter, because two
+    /// “replace 0 with 1” transactions will be merged into a single “replace 0 with 1”, not
+    /// “replace 0 with 2”.
+    pub fn replace(old: T, new: T) -> Self {
+        Self {
+            old: Equal(Some(old)),
+            new: Equal(Some(new)),
+        }
+    }
+}
+
+impl<T: PartialEq> Transaction for ValueTransaction<T> {
+    type Target = T;
+    type CommitCheck = ();
+    type Context<'a> = ();
+    /// The output indicates that a change was made.
+    type Output = ();
+    type Mismatch = ValueMismatch;
+
+    fn check(&self, target: &T, _context: ()) -> Result<Self::CommitCheck, Self::Mismatch> {
+        self.old.check(target).map_err(|_| ValueMismatch::Unexpected)
+    }
+
+    fn commit(
+        self,
+        target: &mut T,
+        (): Self::CommitCheck,
+        outputs: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), transaction::CommitError> {
+        if let Equal(Some(new)) = self.new {
+            *target = new;
+            outputs(())
+        }
+        Ok(())
+    }
+}
+
+impl<T> universe::TransactionOnEcs for ValueTransaction<T>
+where
+    T: PartialEq
+        + universe::UniverseMember
+        + ecs::Component<Mutability = bevy_ecs::component::Mutable>,
+    for<'a> T: universe::UniverseMember<Read<'a> = &'a T>,
+{
+    type WriteQueryData = &'static mut Self::Target;
+
+    fn check(
+        &self,
+        target: T::Read<'_>,
+        _: universe::ReadTicket<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
+        Transaction::check(self, target, ())
+    }
+
+    fn commit(
+        self,
+        mut target: ecs::Mut<'_, T>,
+        check: Self::CommitCheck,
+    ) -> Result<(), transaction::CommitError> {
+        // TODO: Add a change notification mechanism for these types of members, which we can
+        // invoke here.
+        Transaction::commit(self, &mut *target, check, &mut drop)
+    }
+}
+
+impl<T: PartialEq> Merge for ValueTransaction<T> {
+    type MergeCheck = ();
+    type Conflict = ValueConflict;
+
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
+        let conflict = ValueConflict {
+            old: self.old.check_merge(&other.old).is_err(),
+            new: self.new.check_merge(&other.new).is_err(),
+        };
+
+        if (conflict
+            != ValueConflict {
+                old: false,
+                new: false,
+            })
+        {
+            Err(conflict)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
+        let Self { old, new } = self;
+        old.commit_merge(other.old, ());
+        new.commit_merge(other.new, ());
+    }
+}
+
+/// Transaction precondition error type for a [`ValueTransaction`].
+#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
+#[non_exhaustive]
+pub enum ValueMismatch {
+    /// old definition not as expected
+    Unexpected,
+}
+
+/// Transaction conflict error type for a [`ValueTransaction`].
+// ---
+// TODO: this is identical to `BlockDefConflict` and `CubeConflict` but for the names
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct ValueConflict {
+    /// The transactions have conflicting preconditions (`old` definitions).
+    pub(crate) old: bool,
+    /// The transactions are attempting to provide two different `new` definitions.
+    pub(crate) new: bool,
+}
+
+impl core::error::Error for ValueMismatch {}
+impl core::error::Error for ValueConflict {}
+
+impl fmt::Display for ValueConflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            ValueConflict {
+                old: true,
+                new: false,
+            } => write!(f, "different preconditions"),
+            ValueConflict {
+                old: false,
+                new: true,
+            } => write!(f, "cannot write two different new values"),
+            ValueConflict {
+                old: true,
+                new: true,
+            } => write!(f, "different preconditions (with write)"),
+            ValueConflict {
+                old: false,
+                new: false,
+            } => unreachable!(),
+        }
+    }
 }

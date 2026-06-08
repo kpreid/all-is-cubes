@@ -51,6 +51,7 @@
     * `math::Aab::expand()` now takes `PositiveSign<f64>` instead of `f64` and cannot be used to shrink the box.
       Use `Aab::expand_or_shrink()` instead.
     * `universe::Universe` no longer implements `Default` and `Deserialize`; instead, `Box<Universe>` does.
+    * Universe members `TagDef` and `SoundDef` now use a shared generic transaction type `transaction::ValueTransaction`, replacing `tag::DefTransaction` and `sound::DefTransaction`.
 
     * Renamed `math::Aab::face_coordinate()` to `math::Aab::face_coordinate_outward()`.
     * Renamed `math::Face6` to `Face`.

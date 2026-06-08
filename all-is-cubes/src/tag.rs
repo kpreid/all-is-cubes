@@ -1,9 +1,5 @@
 //! [`Tag`] and related types, defining categories of entities for game rules.
 
-use core::convert::Infallible;
-
-use bevy_ecs::prelude as ecs;
-
 use crate::transaction;
 use crate::universe::{self, Handle};
 
@@ -72,7 +68,7 @@ impl universe::VisitHandles for Is {
 #[doc = include_str!("save/serde-warning.md")]
 #[expect(clippy::exhaustive_structs)]
 #[expect(clippy::module_name_repetitions, reason = "TODO: reconsider")]
-#[derive(Debug, bevy_ecs::component::Component)]
+#[derive(Clone, Debug, Eq, PartialEq, bevy_ecs::component::Component)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct TagDef;
 
@@ -86,71 +82,5 @@ impl universe::VisitHandles for TagDef {
 }
 
 impl transaction::Transactional for TagDef {
-    type Transaction = DefTransaction;
-}
-
-/// Transaction type for [`TagDef`].
-///
-/// Currently, there is nothing for it to do.
-#[non_exhaustive]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DefTransaction {}
-
-impl transaction::Merge for DefTransaction {
-    type MergeCheck = ();
-    type Conflict = Infallible;
-
-    fn check_merge(&self, _: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
-        match *self {}
-    }
-
-    fn commit_merge(&mut self, _: Self, (): Self::MergeCheck) {
-        match *self {}
-    }
-}
-
-impl transaction::Transaction for DefTransaction {
-    type Target = TagDef;
-    // This ReadTicket is not currently used, but at least for now, *all* universe member transactions are to have ReadTicket as their context type.
-    type Context<'a> = universe::ReadTicket<'a>;
-    type CommitCheck = ();
-    type Output = transaction::NoOutput;
-    type Mismatch = Infallible;
-
-    fn check(
-        &self,
-        _: &Self::Target,
-        _: Self::Context<'_>,
-    ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        match *self {}
-    }
-
-    fn commit(
-        self,
-        _: &mut Self::Target,
-        (): Self::CommitCheck,
-        _: &mut dyn FnMut(Self::Output),
-    ) -> Result<(), transaction::CommitError> {
-        match self {}
-    }
-}
-
-impl universe::TransactionOnEcs for DefTransaction {
-    type WriteQueryData = &'static mut Self::Target;
-
-    fn check(
-        &self,
-        target: &TagDef,
-        read_ticket: universe::ReadTicket<'_>,
-    ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        transaction::Transaction::check(self, target, read_ticket)
-    }
-
-    fn commit(
-        self,
-        mut target: ecs::Mut<'_, TagDef>,
-        check: Self::CommitCheck,
-    ) -> Result<(), transaction::CommitError> {
-        transaction::Transaction::commit(self, &mut *target, check, &mut transaction::no_outputs)
-    }
+    type Transaction = transaction::ValueTransaction<TagDef>;
 }

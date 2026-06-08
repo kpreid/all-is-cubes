@@ -8,16 +8,13 @@
 //! Currently, all sounds are synthesized based on a small set of parameters.
 //! In the future, short samples may be allowed.
 
-use core::fmt;
-
-use bevy_ecs::prelude as ecs;
 /// Acts as polyfill for float methods used in synthesis such as `sin()`
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
 use crate::math::{PositiveSign, ZeroOne};
-use crate::transaction::{self, Equal, Transaction};
+use crate::transaction;
 use crate::universe;
 
 // -------------------------------------------------------------------------------------------------
@@ -87,171 +84,6 @@ impl universe::VisitHandles for SoundDef {
     }
 }
 
-// -------------------------------------------------------------------------------------------------
-
-/// A [`Transaction`] which replaces (or checks) a [`SoundDef`].
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct DefTransaction {
-    old: Equal<SoundDef>,
-    new: Equal<SoundDef>,
-}
-
 impl transaction::Transactional for SoundDef {
-    type Transaction = DefTransaction;
-}
-
-impl DefTransaction {
-    /// Returns a transaction which fails if the current value of the [`SoundDef`] is not
-    /// equal to `old`.
-    pub fn expect(old: SoundDef) -> Self {
-        Self {
-            old: Equal(Some(old)),
-            new: Equal(None),
-        }
-    }
-
-    /// Returns a transaction which replaces the current value of the [`SoundDef`] with `new`.
-    pub fn overwrite(new: SoundDef) -> Self {
-        Self {
-            old: Equal(None),
-            new: Equal(Some(new)),
-        }
-    }
-
-    /// Returns a transaction which replaces the value of the [`SoundDef`] with `new`,
-    /// if it is equal to `old`, and otherwise fails.
-    pub fn replace(old: SoundDef, new: SoundDef) -> Self {
-        Self {
-            old: Equal(Some(old)),
-            new: Equal(Some(new)),
-        }
-    }
-}
-
-impl Transaction for DefTransaction {
-    type Target = SoundDef;
-    type CommitCheck = ();
-    // This ReadTicket is not currently used, but at least for now, *all* universe member transactions are to have ReadTicket as their context type.
-    type Context<'a> = universe::ReadTicket<'a>;
-    type Output = transaction::NoOutput;
-    type Mismatch = Mismatch;
-
-    fn check(
-        &self,
-        target: &SoundDef,
-        _read_ticket: universe::ReadTicket<'_>,
-    ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        self.old.check(target).map_err(|_| Mismatch::Unexpected)
-    }
-
-    fn commit(
-        self,
-        target: &mut SoundDef,
-        (): Self::CommitCheck,
-        _outputs: &mut dyn FnMut(Self::Output),
-    ) -> Result<(), transaction::CommitError> {
-        if let Equal(Some(new)) = self.new {
-            *target = new;
-            // Note there is no change notification.
-            // It would be nice if we could arrange such notification to happen via the containing
-            // Handle instead of implementing it anew -- but for now, this should not be too bad
-            // except for editors.
-        }
-        Ok(())
-    }
-}
-
-impl universe::TransactionOnEcs for DefTransaction {
-    type WriteQueryData = &'static mut Self::Target;
-
-    fn check(
-        &self,
-        target: &SoundDef,
-        read_ticket: universe::ReadTicket<'_>,
-    ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        Transaction::check(self, target, read_ticket)
-    }
-
-    fn commit(
-        self,
-        mut target: ecs::Mut<'_, SoundDef>,
-        check: Self::CommitCheck,
-    ) -> Result<(), transaction::CommitError> {
-        Transaction::commit(self, &mut *target, check, &mut transaction::no_outputs)
-    }
-}
-
-impl transaction::Merge for DefTransaction {
-    type MergeCheck = ();
-    type Conflict = Conflict;
-
-    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
-        let conflict = Conflict {
-            old: self.old.check_merge(&other.old).is_err(),
-            new: self.new.check_merge(&other.new).is_err(),
-        };
-
-        if (conflict
-            != Conflict {
-                old: false,
-                new: false,
-            })
-        {
-            Err(conflict)
-        } else {
-            Ok(())
-        }
-    }
-
-    fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
-        let Self { old, new } = self;
-        old.commit_merge(other.old, ());
-        new.commit_merge(other.new, ());
-    }
-}
-
-/// Transaction precondition error type for a [`DefTransaction`].
-#[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
-#[non_exhaustive]
-pub enum Mismatch {
-    /// old definition not as expected
-    Unexpected,
-}
-
-/// Transaction conflict error type for a [`DefTransaction`].
-// ---
-// TODO: this is identical to `BlockDefConflict` and `CubeConflict` but for the names
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[non_exhaustive]
-pub struct Conflict {
-    /// The transactions have conflicting preconditions (`old` definitions).
-    pub(crate) old: bool,
-    /// The transactions are attempting to provide two different `new` definitions.
-    pub(crate) new: bool,
-}
-
-impl core::error::Error for Mismatch {}
-impl core::error::Error for Conflict {}
-
-impl fmt::Display for Conflict {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            Conflict {
-                old: true,
-                new: false,
-            } => write!(f, "different preconditions for SoundDef"),
-            Conflict {
-                old: false,
-                new: true,
-            } => write!(f, "cannot write different new values to the same SoundDef"),
-            Conflict {
-                old: true,
-                new: true,
-            } => write!(f, "different preconditions (with write)"),
-            Conflict {
-                old: false,
-                new: false,
-            } => unreachable!(),
-        }
-    }
+    type Transaction = transaction::ValueTransaction<SoundDef>;
 }
