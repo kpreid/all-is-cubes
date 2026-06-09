@@ -209,13 +209,7 @@ impl Move {
                         )
                     }
                     Some(voxel) => {
-                        // Input block is a solid color; synthesize voxels.
-                        // TODO: Also synthesize if the resolution is merely low
-                        // compared to the velocity.
-                        Evoxels::from_many(
-                            output_resolution,
-                            Vol::from_fn(displaced_bounds, |_| voxel),
-                        )
+                        Evoxels::from_many(output_resolution, Vol::repeat(displaced_bounds, voxel))
                     }
                 };
                 MinEval::new(attributes, displaced_voxels)

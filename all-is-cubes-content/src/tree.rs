@@ -266,7 +266,7 @@ mod graph {
     impl Growph {
         pub fn new(bounds: GridAab) -> Self {
             Self {
-                data: Vol::from_fn(bounds, |_| GrowphCell::new()),
+                data: Vol::repeat(bounds, GrowphCell::new()),
             }
         }
 
@@ -451,7 +451,7 @@ mod graph {
     pub(crate) struct VisitMap(Vol<Box<[bool]>>);
     impl VisitMap {
         fn new(bounds: GridAab) -> VisitMap {
-            Self(Vol::from_fn(bounds, |_| false))
+            Self(Vol::repeat(bounds, false))
         }
     }
     impl petgraph::visit::VisitMap<Cube> for VisitMap {

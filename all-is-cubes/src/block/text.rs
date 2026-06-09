@@ -295,8 +295,7 @@ impl Text {
                 } else {
                     Evoxel::AIR
                 };
-                let mut voxels: Vol<Box<[Evoxel]>> =
-                    Vol::from_fn(bounds_in_this_block, |_| background);
+                let mut voxels: Vol<Box<[Evoxel]>> = Vol::repeat(bounds_in_this_block, background);
 
                 let def = self.data.font.font_def();
                 let font_glyphs = &def.glyphs;

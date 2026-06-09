@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use core::iter;
 
 use rand::{RngExt, SeedableRng as _};
 
@@ -22,9 +23,14 @@ where
     R: rand::distr::uniform::SampleRange<T> + Clone,
 {
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
-    Vol::from_fn(GridAab::for_block(resolution), |_| {
-        postprocess(rng.random_range(range.clone()))
-    })
+    let bounds = GridAab::for_block(resolution);
+    Vol::from_elements(
+        bounds,
+        iter::repeat_with(|| postprocess(rng.random_range(range.clone())))
+            .take(bounds.volume().unwrap())
+            .collect::<Box<[_]>>(),
+    )
+    .unwrap()
 }
 
 /// Extension trait for [`noise_functions::Noise`] which makes it usable with our [`Cube`]s.
