@@ -356,7 +356,7 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
         let instance_data = if should_use_instances(ev, &mesh) {
             // TODO: wasteful data copy to make the SpaceMesh. Consider arranging so that it is
             // merely a sort of borrowing to present a `BlockMesh` as a `RenderDataUpdate`'s mesh.`
-            let space_mesh = SpaceMesh::from(&mesh);
+            let space_mesh = SpaceMesh::from(&mesh); // TODO: oom handling
 
             let mut render_data = M::RenderData::default();
             render_data_updater(super::RenderDataUpdate {

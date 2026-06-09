@@ -56,7 +56,7 @@ pub(crate) fn push_box<M: MeshTypes>(
             & (depth == 0)
             & (lower_bounds == point2(0, 0))
             & (upper_bounds == Point2D::splat(resolution.into()));
-        reserve_vertices(&mut sub_mesh.vertices, 4)?;
+        reserve_vertices_exact(&mut sub_mesh.vertices, 4)?;
 
         // TODO: reduce duplication of code between push_box and push_full_box by factoring out
         // "reserve 6 indices" but in a way that borrow checking likes
@@ -101,7 +101,7 @@ pub(crate) fn push_full_box<M: MeshTypes>(
     let fully_opaque = opacity_category == OpacityCategory::Opaque;
     for (face, sub_mesh) in output.face_vertices.iter_mut() {
         if opacity_category != OpacityCategory::Invisible {
-            reserve_vertices(&mut sub_mesh.vertices, 4)?;
+            reserve_vertices_exact(&mut sub_mesh.vertices, 4)?;
             push_quad(
                 &mut sub_mesh.vertices,
                 if fully_opaque {
@@ -355,7 +355,16 @@ impl QuadTransform {
 
 // -------------------------------------------------------------------------------------------------
 
-fn reserve_vertices<T, U>(
+pub(crate) fn reserve_vertices<T, U>(
+    (v0, v1): &mut (Vec<T>, Vec<U>),
+    n: usize,
+) -> Result<(), crate::OutOfMemory> {
+    v0.try_reserve(n)?;
+    v1.try_reserve(n)?;
+    Ok(())
+}
+
+pub(crate) fn reserve_vertices_exact<T, U>(
     (v0, v1): &mut (Vec<T>, Vec<U>),
     n: usize,
 ) -> Result<(), crate::OutOfMemory> {

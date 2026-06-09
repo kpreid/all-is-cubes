@@ -16,7 +16,7 @@ use crate::texture::Channels;
 use crate::{
     Aabb, Aabbs, BlockMesh, DepthOrdering, IndexSlice, IndexVec, IndexVecDeque, Ixtend as _,
     IxtendFront as _, MeshOptions, MeshRel, MeshTypes, OutOfMemory, Position, Vertex,
-    depth_sorting,
+    depth_sorting, reserve_vertices,
 };
 
 #[cfg(doc)]
@@ -205,12 +205,17 @@ impl<M: MeshTypes> SpaceMesh<M> {
     ) where
         P: GetBlockMesh<'p, M>,
     {
-        self.compute_inner(
+        match self.compute_inner(
             |cube| space.get_block_index(cube),
             bounds,
             options,
             block_meshes,
-        )
+        ) {
+            Ok(()) => (),
+            Err(OutOfMemory { .. }) => {
+                self.meta.flaws |= Flaws::OUT_OF_MEMORY;
+            }
+        }
     }
 
     /// Compute from `Space` data already captured.
@@ -227,12 +232,17 @@ impl<M: MeshTypes> SpaceMesh<M> {
     ) where
         P: GetBlockMesh<'p, M>,
     {
-        self.compute_inner(
+        match self.compute_inner(
             |cube| snapshot.get(cube),
             snapshot.bounds,
             options,
             block_meshes,
-        )
+        ) {
+            Ok(()) => (),
+            Err(OutOfMemory { .. }) => {
+                self.meta.flaws |= Flaws::OUT_OF_MEMORY;
+            }
+        }
     }
 
     fn compute_inner<'p, P>(
@@ -241,7 +251,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
         bounds: GridAab,
         _options: &MeshOptions<M>,
         mut block_meshes: P,
-    ) where
+    ) -> Result<(), OutOfMemory>
+    where
         P: GetBlockMesh<'p, M>,
     {
         // Clear storage so allocations are reused but nothing else is
@@ -267,22 +278,23 @@ impl<M: MeshTypes> SpaceMesh<M> {
         // TODO: Consider reuse
         let mut transparent_indices: FaceMap<IndexVec> = FaceMap::default();
 
-        bounds.interior_iter().for_each(|cube| {
+        bounds.interior_iter().try_for_each(|cube| -> Result<(), OutOfMemory> {
             // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
             // Do we want to make it the caller's responsibility to specify in-bounds?
             let index: BlockIndex = match space_data_source(cube) {
                 Some(index) => index,
-                None => return, // continue in for_each() loop
+                None => return Ok(()), // continue in try_for_each() loop
             };
             let Some(block_mesh) = block_meshes.get_block_mesh(index, cube, true) else {
                 // Skip this cube exactly as if it wasn't in bounds
-                return;
+                return Ok(());
             };
 
-            let already_seen_index = !self.block_indices_used.insert(index).unwrap(); // TODO: handle oom
+            let already_seen_index = !self.block_indices_used.insert(index)?;
 
             if !already_seen_index {
                 // Capture texture handles to ensure that our texture coordinates stay valid.
+                self.meta.textures_used.try_reserve(block_mesh.textures().len())?;
                 self.meta.textures_used.extend(block_mesh.textures().iter().cloned());
                 // Record flaws
                 self.meta.flaws |= block_mesh.flaws();
@@ -306,17 +318,18 @@ impl<M: MeshTypes> SpaceMesh<M> {
                             .is_some_and(|bm| bm.face_vertices[face.opposite()].fully_opaque)
                     {
                         // Don't draw obscured faces, but do record that we depended on them.
-                        self.block_indices_used.insert(adj_block_index).unwrap();
-                        return true;
+                        self.block_indices_used.insert(adj_block_index)?;
+                        return Ok(true);
                     }
-                    false
+                    Ok(false)
                 },
-            )
-            .unwrap(); // TODO: allocation failure handling
-        });
+            )?;
 
-        self.store_indices_and_finish_compute(opaque_indices_deque, transparent_indices)
-            .unwrap(); // TODO: allocation failure handling
+            Ok(())
+        })?;
+
+        self.store_indices_and_finish_compute(opaque_indices_deque, transparent_indices)?;
+        Ok(())
     }
 
     /// Store freshly computed indices into this mesh.
@@ -477,7 +490,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     opaque_indices: &mut IndexVecDeque,
     transparent_indices: &mut FaceMap<IndexVec>,
     meta: &mut MeshMeta<M>,
-    mut neighbor_is_fully_opaque: impl FnMut(Face) -> bool,
+    mut neighbor_is_fully_opaque: impl FnMut(Face) -> Result<bool, OutOfMemory>,
 ) -> Result<(), OutOfMemory> {
     if block_mesh.is_empty() {
         return Ok(());
@@ -493,8 +506,8 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
             // Nothing to do; skip the neighbor check.
             continue;
         }
-        if on_block_face && neighbor_is_fully_opaque(face) {
-            // Skip face fully occluded by a neighbor.
+        if on_block_face && neighbor_is_fully_opaque(face)? {
+            // Skip face fully obscured by a neighbor.
             continue;
         }
 
@@ -514,6 +527,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
 
         // Copy vertices.
         // They will be translated to the block position later.
+        reserve_vertices(vertices, sub_mesh.vertices.0.len())?;
         vertices.0.extend(sub_mesh.vertices.0.iter());
         vertices.1.extend(sub_mesh.vertices.1.iter());
 
@@ -561,6 +575,7 @@ impl<M: MeshTypes> Default for SpaceMesh<M> {
     }
 }
 
+// TODO: Replace this `From` with a `TryFrom` or an explicit method?
 impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
     /// Construct a `SpaceMesh` containing the given `BlockMesh`.
     ///
@@ -568,50 +583,54 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
     /// `GridAab::ORIGIN_CUBE` and placing the block in it,
     /// but more efficient.
     fn from(block_mesh: &BlockMesh<M>) -> Self {
-        let vertex_count = block_mesh.all_sub_meshes().map(|sm| sm.vertices.0.len()).sum();
+        fn inner<M: MeshTypes>(block_mesh: &BlockMesh<M>) -> Result<SpaceMesh<M>, OutOfMemory> {
+            let vertex_count = block_mesh.all_sub_meshes().map(|sm| sm.vertices.0.len()).sum();
 
-        let mut space_mesh = Self {
-            vertices: (
-                Vec::with_capacity(vertex_count),
-                Vec::with_capacity(vertex_count),
-            ),
-            indices: IndexVec::new(), // placeholder
-            meta: MeshMeta {
-                opaque_range: Range::from(0..0),
-                transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
-                textures_used: block_mesh.textures().to_vec(),
-                has_non_rect_transparency: block_mesh
-                    .all_sub_meshes()
-                    .any(|sm| sm.has_non_rect_transparency),
-                bounding_box: block_mesh.bounding_box(),
-                flaws: block_mesh.flaws(),
-            },
-            block_indices_used: BlockIndexSet::from_iter([0]),
-        };
+            let mut space_mesh = SpaceMesh {
+                vertices: (
+                    Vec::with_capacity(vertex_count),
+                    Vec::with_capacity(vertex_count),
+                ),
+                indices: IndexVec::new(), // placeholder
+                meta: MeshMeta {
+                    opaque_range: Range::from(0..0),
+                    transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
+                    textures_used: block_mesh.textures().to_vec(),
+                    has_non_rect_transparency: block_mesh
+                        .all_sub_meshes()
+                        .any(|sm| sm.has_non_rect_transparency),
+                    bounding_box: block_mesh.bounding_box(),
+                    flaws: block_mesh.flaws(),
+                },
+                block_indices_used: BlockIndexSet::from_iter([0]),
+            };
 
-        let mut opaque_indices_deque = IndexVecDeque::from(
-            IndexVec::with_capacity(
+            let mut opaque_indices_deque = IndexVecDeque::from(IndexVec::with_capacity(
                 block_mesh.all_sub_meshes().map(|sm| sm.indices_opaque.len()).sum(),
-            )
-            .unwrap(), // TODO: allocation failure handling
-        );
-        let mut transparent_indices: FaceMap<IndexVec> = FaceMap::default();
+            )?);
+            let mut transparent_indices: FaceMap<IndexVec> = FaceMap::default();
 
-        write_block_mesh_to_space_mesh(
-            block_mesh,
-            Cube::ORIGIN,
-            &mut space_mesh.vertices,
-            &mut opaque_indices_deque,
-            &mut transparent_indices,
-            &mut space_mesh.meta, // partly redundant, but hard to skip
-            |_| false,
-        )
-        .unwrap(); // TODO: allocation failure handling
-        space_mesh
-            .store_indices_and_finish_compute(opaque_indices_deque, transparent_indices)
-            .unwrap(); // TODO: allocation failure handling
+            write_block_mesh_to_space_mesh(
+                block_mesh,
+                Cube::ORIGIN,
+                &mut space_mesh.vertices,
+                &mut opaque_indices_deque,
+                &mut transparent_indices,
+                &mut space_mesh.meta, // partly redundant, but hard to skip
+                |_| Ok(false),
+            )?;
+            space_mesh
+                .store_indices_and_finish_compute(opaque_indices_deque, transparent_indices)
+                .unwrap(); // TODO: allocation failure handling
 
-        space_mesh
+            Ok(space_mesh)
+        }
+
+        inner(block_mesh).unwrap_or_else(|_| {
+            let mut space_mesh = SpaceMesh::default();
+            space_mesh.meta.flaws.insert(Flaws::OUT_OF_MEMORY);
+            space_mesh
+        })
     }
 }
 

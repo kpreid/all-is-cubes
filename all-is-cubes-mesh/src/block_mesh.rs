@@ -24,6 +24,8 @@ mod analyze;
 pub use analyze::{Analysis, AnalysisVertex};
 mod compute;
 mod extend;
+pub(crate) use extend::reserve_vertices;
+
 mod viz;
 #[cfg_attr(feature = "_special_testing", visibility::make(pub))]
 pub(crate) use viz::Viz;

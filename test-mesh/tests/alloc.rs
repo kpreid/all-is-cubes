@@ -151,7 +151,6 @@ fn block_mesh_alloc_failures() {
 }
 
 #[test]
-#[ignore = "SpaceMesh doesn't implement handling allocation failure yet"]
 fn space_mesh_alloc_failures() {
     let options = &mesh::MeshOptions::new(&GraphicsOptions::default());
     let universe = &mut Universe::new();
