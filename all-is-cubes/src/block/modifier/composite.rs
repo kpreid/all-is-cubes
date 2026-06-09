@@ -235,11 +235,11 @@ fn evaluate_composition(
 
     let src_resolution = src_voxels.resolution();
     let dst_resolution = dst_voxels.resolution();
+    // TODO: This "max and then divide" pattern occurs both here and in `Modifier::Move`;
+    // add a function to express it without unwraps.
     let effective_resolution = src_resolution.max(dst_resolution);
-    let src_scale =
-        GridCoordinate::from(effective_resolution) / GridCoordinate::from(src_resolution);
-    let dst_scale =
-        GridCoordinate::from(effective_resolution) / GridCoordinate::from(dst_resolution);
+    let src_scale = (effective_resolution / src_resolution).unwrap();
+    let dst_scale = (effective_resolution / dst_resolution).unwrap();
 
     let src_bounds_scaled = bounds_excluding_air(&src_voxels, src_scale);
     let dst_bounds_scaled = bounds_excluding_air(&dst_voxels, dst_scale);
@@ -351,10 +351,9 @@ fn evaluate_composition(
         Evoxels::from_many(
             effective_resolution,
             Vol::from_fn(output_bounds, |cube| {
-                let p = cube.lower_bounds();
                 operator.blend_evoxel(
-                    src_voxels.get(Cube::from(p / src_scale)).unwrap_or(Evoxel::AIR),
-                    dst_voxels.get(Cube::from(p / dst_scale)).unwrap_or(Evoxel::AIR),
+                    src_voxels.get(cube / src_scale).unwrap_or(Evoxel::AIR),
+                    dst_voxels.get(cube / dst_scale).unwrap_or(Evoxel::AIR),
                 )
             }),
         )
@@ -366,11 +365,11 @@ fn evaluate_composition(
 /// Rescale the bounds of the input to the resolution of the output, but also, if the voxels are
 /// [`Evoxel::AIR`] and thus equivalent to out-of-bounds, substitute empty bounds.
 /// This way, we produce suitably tight bounds when one of the blocks is AIR.
-fn bounds_excluding_air(voxels: &Evoxels, src_scale: i32) -> GridAab {
+fn bounds_excluding_air(voxels: &Evoxels, src_scale: block::Resolution) -> GridAab {
     if voxels.single_voxel() == Some(Evoxel::AIR) {
         GridAab::ORIGIN_EMPTY
     } else {
-        voxels.bounds().multiply(src_scale)
+        voxels.bounds().multiply(GridCoordinate::from(src_scale))
     }
 }
 

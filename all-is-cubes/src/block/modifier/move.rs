@@ -204,7 +204,7 @@ impl Move {
                         Evoxels::from_many(
                             output_resolution,
                             Vol::from_fn(displaced_bounds, |cube| {
-                                voxels[cube - translation_in_res]
+                                voxels[(cube - translation_in_res) / resolution_increase]
                             }),
                         )
                     }
@@ -302,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn move_voxel_block_evaluation() {
+    fn move_voxel_block_evaluation_same_resolution() {
         let mut universe = Universe::new();
         let resolution = R2;
         let color = rgba_const!(1.0, 0.0, 0.0, 1.0);
@@ -352,6 +352,65 @@ mod tests {
                     uniform_collision: None,
                     voxel_opacity_mask: VoxelOpacityMask::new_raw(
                         resolution,
+                        Vol::repeat(expected_bounds, OpacityCategory::Opaque)
+                    ),
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn move_voxel_block_evaluation_different_resolution() {
+        let mut universe = Universe::new();
+        let block_resolution = R2;
+        let move_resolution = R4;
+        let color = rgba_const!(1.0, 0.0, 0.0, 1.0);
+        let original = Block::builder()
+            .voxels_fn(block_resolution, |_| Block::from(color))
+            .unwrap()
+            .build_into(&mut universe);
+
+        let moved = original.clone().with_modifier(Move {
+            direction: Face::PY,
+            resolution: move_resolution,
+            distance: 1,
+            velocity: 0,
+            schedule: time::Schedule::EVERY_TICK,
+        });
+
+        let expected_bounds = GridAab::from_lower_size([0, 1, 0], [4, 3, 4]);
+
+        let ev_original = original.evaluate(universe.read_ticket()).unwrap();
+        assert_eq!(
+            moved.evaluate(universe.read_ticket()).unwrap(),
+            EvaluatedBlock {
+                block: moved,
+                attributes: ev_original.attributes.clone(),
+                cost: block::Cost {
+                    components: ev_original.cost.components + 1,
+                    voxels: 2 * 2 * 2 + 4 * 4 * 3, // original recur + 3/4 block of Move
+                    recursion: 0
+                },
+                voxels: Evoxels::from_many(
+                    move_resolution,
+                    Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
+                ),
+                derived: block::Derived {
+                    color: color.to_rgb().with_alpha(zo32(20. / (6. * 4.))),
+                    face_colors: FaceMap {
+                        nx: color.to_rgb().with_alpha(zo32(0.75)),
+                        ny: color.to_rgb().with_alpha(zo32(1.0)),
+                        nz: color.to_rgb().with_alpha(zo32(0.75)),
+                        px: color.to_rgb().with_alpha(zo32(0.75)),
+                        py: color.to_rgb().with_alpha(zo32(1.0)),
+                        pz: color.to_rgb().with_alpha(zo32(0.75)),
+                    },
+                    light_emission: Rgb::ZERO,
+                    opaque: FaceMap::splat(false).with(Face::PY, true),
+                    visible: true,
+                    uniform_collision: None,
+                    voxel_opacity_mask: VoxelOpacityMask::new_raw(
+                        move_resolution,
                         Vol::repeat(expected_bounds, OpacityCategory::Opaque)
                     ),
                 }

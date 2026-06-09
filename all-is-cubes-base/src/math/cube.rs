@@ -9,6 +9,7 @@ use crate::math::{
     Aab, Face, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint,
     GridVector,
 };
+use crate::resolution::Resolution;
 use crate::util::ConciseDebug;
 
 /// “A cube”, in this documentation, is a unit cube whose corners' coordinates are integers.
@@ -297,6 +298,28 @@ mod arithmetic {
         #[inline]
         fn sub_assign(&mut self, rhs: Face) {
             *self -= rhs.normal_vector()
+        }
+    }
+
+    impl ops::Div<Resolution> for Cube {
+        type Output = Cube;
+
+        /// Produces the cube containing this cube in a grid scaled up by `scale`.
+        ///
+        /// Equivalently: performs what the Rust standard library calls `div_euclid` on the
+        /// `lower_bounds()` coordinates.
+        ///
+        /// ```
+        /// # use all_is_cubes_base::resolution::Resolution;
+        /// # use all_is_cubes_base::math::Cube;
+        ///
+        /// let cube = Cube::new(-17, 3, 33);
+        /// assert_eq!(cube / Resolution::R16, Cube::new(-2, 0, 2));
+        /// ```
+        #[inline]
+        fn div(self, scale: Resolution) -> Self::Output {
+            let shift = scale.log2();
+            self.map(|c| c >> shift)
         }
     }
 
