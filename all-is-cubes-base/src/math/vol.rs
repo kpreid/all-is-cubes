@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::format;
 use alloc::sync::Arc;
 use core::fmt;
+use core::iter;
 use core::ops::{Deref, DerefMut};
 
 #[cfg_attr(
@@ -245,7 +246,9 @@ where
     C: Deref<Target = [V]> + FromIterator<V>,
 {
     /// Constructs a `Vol<C>` by using the provided function to compute a value
-    /// for each point.
+    /// for each cube within the volume.
+    ///
+    /// If the function is a constant function, it is better to use [`Vol::repeat()`] instead.
     ///
     /// # Panics
     ///
@@ -264,12 +267,22 @@ where
     }
 
     /// Constructs a `Vol<C>` by cloning the provided value for each point.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bounds` has a volume exceeding `usize::MAX`.
+    /// (But there will likely be a memory allocation failure well below that point.)
     #[inline]
     pub fn repeat(bounds: GridAab, value: V) -> Self
     where
         V: Clone,
     {
-        Self::from_fn(bounds, |_| value.clone())
+        match bounds.to_vol::<ZMaj>() {
+            Ok(bounds) => {
+                bounds.with_elements(iter::repeat_n(value, bounds.volume()).collect()).unwrap()
+            }
+            Err(length_error) => panic!("{length_error}"),
+        }
     }
 
     /// Constructs a `Vol<C>` with a single value, in bounds `ORIGIN_CUBE`.
@@ -282,7 +295,7 @@ where
         Vol {
             bounds: GridAab::ORIGIN_CUBE,
             ordering: ZMaj,
-            contents: C::from_iter(core::iter::once(value)),
+            contents: C::from_iter(iter::once(value)),
         }
     }
 
