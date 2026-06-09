@@ -4,6 +4,8 @@
 
 use std::cell::Cell;
 
+use all_is_cubes::math::GridAab;
+use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::GraphicsOptions;
@@ -119,9 +121,10 @@ fn run_exhaustive_allocation_failure_test<O>(
 
 // -------------------------------------------------------------------------------------------------
 
+type Mt = mesh::testing::TextureMt;
+
 #[test]
 fn block_mesh_alloc_failures() {
-    type Mt = mesh::testing::TextureMt;
     let options = &mesh::MeshOptions::new(&GraphicsOptions::default());
     let universe = &mut Universe::new();
     let [block] = all_is_cubes_content::make_some_voxel_blocks(universe);
@@ -150,5 +153,25 @@ fn block_mesh_alloc_failures() {
 #[test]
 #[ignore = "SpaceMesh doesn't implement handling allocation failure yet"]
 fn space_mesh_alloc_failures() {
-    todo!()
+    let options = &mesh::MeshOptions::new(&GraphicsOptions::default());
+    let universe = &mut Universe::new();
+    let [block] = all_is_cubes_content::make_some_voxel_blocks(universe);
+    let space = Space::builder(GridAab::ORIGIN_CUBE).filled_with(block).build();
+    let texture_allocator = mesh::testing::Allocator::new();
+    let block_meshes = mesh::block_meshes_for_space(&space.read(), &texture_allocator, options);
+
+    // Mesh built without any memory restrictions
+    let unrestricted_mesh =
+        mesh::SpaceMesh::<Mt>::new(&space.read(), space.bounds(), options, &*block_meshes);
+    assert!(!unrestricted_mesh.flaws().contains(Flaws::OUT_OF_MEMORY));
+
+    // TODO: try meshes that are more complex (to exercise frontier allocation)
+    // and less complex (to exercise the short-circuit cases)
+    let final_restricted_mesh = run_exhaustive_allocation_failure_test(
+        || mesh::SpaceMesh::<Mt>::new(&space.read(), space.bounds(), options, &*block_meshes),
+        |failed| {
+            assert!(failed.flaws().contains(Flaws::OUT_OF_MEMORY));
+        },
+    );
+    assert_eq!(final_restricted_mesh, unrestricted_mesh);
 }
