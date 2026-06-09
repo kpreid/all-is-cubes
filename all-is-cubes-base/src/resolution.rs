@@ -188,6 +188,12 @@ impl From<Resolution> for i32 {
         1 << (r as i32)
     }
 }
+impl From<Resolution> for u8 {
+    #[inline]
+    fn from(r: Resolution) -> u8 {
+        1 << (r as u8)
+    }
+}
 impl From<Resolution> for u16 {
     #[inline]
     fn from(r: Resolution) -> u16 {
