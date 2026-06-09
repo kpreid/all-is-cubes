@@ -1,8 +1,7 @@
 use core::assert_matches;
 
-use crate::block::TickAction;
 use crate::block::{
-    self, AIR, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution::R16,
+    self, AIR, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution, TickAction,
 };
 use crate::math::{Face, GridAab, GridCoordinate, GridRotation, GridVector, Vol};
 use crate::op::Operation;
@@ -27,12 +26,15 @@ pub struct Move {
     /// The direction in which the block is displaced.
     pub direction: Face,
 
-    /// The distance, in 1/256ths, by which it is displaced.
-    pub distance: u16,
+    /// The granularity in which the displacement is expressed.
+    pub resolution: Resolution,
+
+    /// The distance, in units of `self.resolution`, by which it is displaced.
+    pub distance: u8,
 
     /// The amount by which `self.distance` is changing every time
     /// `self.schedule` fires.
-    pub velocity: i16,
+    pub velocity: i8,
 
     /// When to apply the velocity.
     ///
@@ -42,9 +44,10 @@ pub struct Move {
 
 impl Move {
     /// TODO: make a cleaner, less internals-ish constructor
-    pub fn new(direction: Face, distance: u16, velocity: i16) -> Self {
+    pub fn new(direction: Face, resolution: Resolution, distance: u8, velocity: i8) -> Self {
         Self {
             direction,
+            resolution,
             distance,
             velocity,
             schedule: time::Schedule::EVERY_TICK,
@@ -72,7 +75,8 @@ impl Move {
     pub fn complement(&self) -> Self {
         Move {
             direction: self.direction.opposite(),
-            distance: 256 - self.distance,
+            resolution: self.resolution,
+            distance: u8::from(self.resolution) - self.distance,
             velocity: -self.velocity,
             schedule: self.schedule,
         }
@@ -95,6 +99,7 @@ impl Move {
     ) -> Result<MinEval, block::InEvalError> {
         let Move {
             direction,
+            resolution: movement_resolution,
             distance,
             velocity,
             schedule,
@@ -106,25 +111,28 @@ impl Move {
         // but that will involve some sort of predicate and transformation on tick actions.)
         input = block::Quote::default().evaluate(input, filter)?;
 
-        // TODO: short-circuit case when distance is 0
+        // TODO: short-circuit case when distance is 0 (but don't break animation)
 
         let (input_attributes, input_voxels) = input.into_parts();
-        let (original_bounds, effective_resolution) = match input_voxels.single_voxel() {
-            None => (input_voxels.bounds(), input_voxels.resolution()),
-            // Treat atom blocks as having a resolution of 16. TODO: Improve on this hardcoded constant
-            Some(_) => (GridAab::for_block(R16), R16),
-        };
 
-        // For now, our strategy is to work in units of the block's resolution.
-        // TODO: Generalize to being able to increase resolution to a chosen minimum.
-        let distance_in_res =
-            GridCoordinate::from(distance) * GridCoordinate::from(effective_resolution) / 256;
+        // The resolution of the output evaluation must be at least the resolution of the voxels
+        // being moved, and also at least the resolution of the movement.
+        let output_resolution = input_voxels.resolution().max(movement_resolution);
+        let resolution_increase = (output_resolution / input_voxels.resolution()).unwrap();
+
+        // Bounds of the input, expressed in the resolution of the output.
+        let original_bounds_in_res =
+            input_voxels.bounds().multiply(GridCoordinate::from(resolution_increase));
+
+        let distance_in_res = GridCoordinate::from(distance)
+            * GridCoordinate::from(output_resolution)
+            / GridCoordinate::from(movement_resolution);
         let translation_in_res = direction.vector(distance_in_res);
 
         // This will be None if the displacement puts the block entirely out of view.
-        let displaced_bounds: Option<GridAab> = original_bounds
+        let displaced_bounds: Option<GridAab> = original_bounds_in_res
             .translate(translation_in_res)
-            .intersection_cubes(GridAab::for_block(effective_resolution));
+            .intersection_cubes(GridAab::for_block(output_resolution));
 
         let animation_op: Option<Operation> = if displaced_bounds.is_none() && velocity >= 0 {
             // Displaced to invisibility; turn into just plain air.
@@ -194,7 +202,7 @@ impl Move {
                     None => {
                         let voxels = input_voxels.as_vol_ref();
                         Evoxels::from_many(
-                            effective_resolution,
+                            output_resolution,
                             Vol::from_fn(displaced_bounds, |cube| {
                                 voxels[cube - translation_in_res]
                             }),
@@ -205,7 +213,7 @@ impl Move {
                         // TODO: Also synthesize if the resolution is merely low
                         // compared to the velocity.
                         Evoxels::from_many(
-                            effective_resolution,
+                            output_resolution,
                             Vol::from_fn(displaced_bounds, |_| voxel),
                         )
                     }
@@ -227,6 +235,7 @@ impl universe::VisitHandles for Move {
     fn visit_handles(&self, _visitor: &mut dyn universe::HandleVisitor) {
         let Move {
             direction: _,
+            resolution: _,
             distance: _,
             velocity: _,
             schedule: _,
@@ -247,16 +256,18 @@ mod tests {
 
     #[test]
     fn move_atom_block_evaluation() {
+        let resolution = R2;
         let color = rgba_const!(1.0, 0.0, 0.0, 1.0);
         let original = Block::from(color);
         let moved = original.clone().with_modifier(Move {
             direction: Face::PY,
-            distance: 128, // distance 1/2 block × scale factor of 256
+            resolution,
+            distance: 1,
             velocity: 0,
             schedule: time::Schedule::EVERY_TICK,
         });
 
-        let expected_bounds = GridAab::from_lower_size([0, 8, 0], [16, 8, 16]);
+        let expected_bounds = GridAab::from_lower_size([0, 1, 0], [2, 1, 2]);
 
         let ev_original = original.evaluate(ReadTicket::stub()).unwrap();
         assert_eq!(
@@ -265,7 +276,7 @@ mod tests {
                 block: moved,
                 attributes: ev_original.attributes.clone(),
                 voxels: Evoxels::from_many(
-                    R16,
+                    resolution,
                     Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
                 ),
                 cost: block::Cost {
@@ -288,7 +299,7 @@ mod tests {
                     visible: true,
                     uniform_collision: None,
                     voxel_opacity_mask: VoxelOpacityMask::new_raw(
-                        R16,
+                        resolution,
                         Vol::repeat(expected_bounds, OpacityCategory::Opaque)
                     ),
                 }
@@ -308,7 +319,8 @@ mod tests {
 
         let moved = original.clone().with_modifier(Move {
             direction: Face::PY,
-            distance: 128, // distance 1/2 block × scale factor of 256
+            resolution,
+            distance: 1,
             velocity: 0,
             schedule: time::Schedule::EVERY_TICK,
         });
@@ -364,7 +376,8 @@ mod tests {
             .build();
         let moved = original.with_modifier(Move {
             direction: Face::PY,
-            distance: 128,
+            resolution: R2,
+            distance: 1,
             velocity: 0,
             schedule: time::Schedule::EVERY_TICK,
         });
@@ -378,11 +391,11 @@ mod tests {
     /// Set up a `Modifier::Move`, let it run, and then allow assertions to be made about the result.
     fn move_block_test(
         direction: Face,
-        velocity: i16,
+        velocity: i8,
         checker: impl FnOnce(space::Read<'_>, &Block),
     ) {
         let [block] = make_some_blocks();
-        let [move_out, move_in] = Move::new(direction, 0, velocity).into_paired();
+        let [move_out, move_in] = Move::new(direction, R16, 0, velocity).into_paired();
         let space = Space::builder(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]))
             .build_and_mutate(|m| {
                 m.set([0, 0, 0], block.clone().with_modifier(move_out))?;
@@ -421,7 +434,7 @@ mod tests {
 
     #[test]
     fn velocity_whole_cube_in_one_tick() {
-        move_block_test(Face::PX, 256, |space, block| {
+        move_block_test(Face::PX, 16, |space, block| {
             assert_eq!(&space[[0, 0, 0]], &AIR);
             assert_eq!(&space[[1, 0, 0]], block);
         });
@@ -439,6 +452,7 @@ mod tests {
             .clone()
             .with_modifier(Move {
                 direction: Face::PX,
+                resolution: R32,
                 distance: 10,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,
@@ -448,6 +462,7 @@ mod tests {
         let expected_after_tick = base
             .with_modifier(Move {
                 direction: Face::PX,
+                resolution: R32,
                 distance: 20,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,
@@ -471,6 +486,7 @@ mod tests {
             .clone()
             .with_modifier(Move {
                 direction: Face::PX,
+                resolution: R32,
                 distance: 10,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,
@@ -480,6 +496,7 @@ mod tests {
         let expected_after_tick = base
             .with_modifier(Move {
                 direction: Face::PX,
+                resolution: R32,
                 distance: 20,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,
@@ -501,6 +518,7 @@ mod tests {
         let block = extra.clone().with_modifier(Composite::new(
             base.clone().with_modifier(Move {
                 direction: Face::PX,
+                resolution: R32,
                 distance: 10,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,
@@ -511,6 +529,7 @@ mod tests {
         let expected_after_tick = extra.with_modifier(Composite::new(
             base.with_modifier(Move {
                 direction: Face::PX,
+                resolution: R32,
                 distance: 20,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,

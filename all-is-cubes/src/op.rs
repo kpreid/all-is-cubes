@@ -589,7 +589,7 @@ impl core::error::Error for OperationError {
 #[cfg(not(miri))] // slow because of many voxel operations
 mod tests {
     use super::*;
-    use crate::block::AIR;
+    use crate::block::{AIR, Resolution::*};
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::space::Space;
     use crate::universe::Universe;
@@ -600,9 +600,9 @@ mod tests {
 
     #[test]
     fn alt() {
-        let move_x = Operation::StartMove(block::Move::new(Face::PX, 1, 1));
-        let move_y = Operation::StartMove(block::Move::new(Face::PY, 1, 1));
-        let move_z = Operation::StartMove(block::Move::new(Face::PZ, 1, 1));
+        let move_x = Operation::StartMove(block::Move::new(Face::PX, R2, 1, 1));
+        let move_y = Operation::StartMove(block::Move::new(Face::PY, R2, 1, 1));
+        let move_z = Operation::StartMove(block::Move::new(Face::PZ, R2, 1, 1));
         let alt = Operation::Alt([move_x.clone(), move_y.clone(), move_z.clone()].into());
 
         // Control which `StartMove` succeeds by changing the size of the space.
@@ -715,7 +715,7 @@ mod tests {
             .filled_with(block.clone())
             .build();
 
-        let modifier = block::Modifier::Move(block::Move::new(Face::PX, 4, 0));
+        let modifier = block::Modifier::Move(block::Move::new(Face::PX, R16, 4, 0));
         let op = Operation::AddModifiers([modifier.clone()].into());
 
         assert_eq!(
@@ -889,7 +889,7 @@ mod tests {
         transform_consistent_with_rotate(
             universe,
             b1,
-            Operation::Alt([Operation::StartMove(block::Move::new(Face::PX, 4, 0))].into()),
+            Operation::Alt([Operation::StartMove(block::Move::new(Face::PX, R16, 4, 0))].into()),
         );
     }
     #[test]
@@ -899,7 +899,7 @@ mod tests {
         transform_consistent_with_rotate(
             universe,
             b1,
-            Operation::AddModifiers([block::Move::new(Face::PX, 4, 0).into()].into()),
+            Operation::AddModifiers([block::Move::new(Face::PX, R16, 4, 0).into()].into()),
         );
     }
     #[test]
@@ -915,7 +915,7 @@ mod tests {
         transform_consistent_with_rotate(
             universe,
             b1,
-            Operation::StartMove(block::Move::new(Face::PX, 4, 0)),
+            Operation::StartMove(block::Move::new(Face::PX, R16, 4, 0)),
         );
     }
     #[test]
@@ -928,7 +928,7 @@ mod tests {
             Operation::Neighbors(
                 [(
                     Cube::new(1, 0, 0),
-                    Operation::StartMove(block::Move::new(Face::PZ, 4, 0)),
+                    Operation::StartMove(block::Move::new(Face::PZ, R16, 4, 0)),
                 )]
                 .into(),
             ),

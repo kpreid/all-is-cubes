@@ -143,6 +143,7 @@ impl Evoxels {
     /// Panics if `voxels` contains any data outside the block bounds.
     /// Such data would at best be ignored, and at worst would confuse block
     /// processing algorithms, and is therefore rejected.
+    #[track_caller]
     pub fn from_many(resolution: Resolution, voxels: Vol<Arc<[Evoxel]>>) -> Self {
         let bounds = voxels.bounds();
         assert!(

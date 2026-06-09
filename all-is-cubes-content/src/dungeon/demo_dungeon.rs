@@ -283,7 +283,7 @@ impl DemoTheme {
     // TODO: This should be a definition in the universe, but there's no way to do that with `Tool`
     // yet.
     fn make_key_tool(&self) -> Tool {
-        let move_modifier = block::Modifier::Move(block::Move::new(Face::NX, 0, 16));
+        let move_modifier = block::Modifier::Move(block::Move::new(Face::NX, R16, 0, 1));
         let move_gate = op::Operation::AddModifiers([move_modifier.clone()].into());
         let unlock_unrotated = op::Operation::Neighbors(
             [

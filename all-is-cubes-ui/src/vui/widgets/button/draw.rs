@@ -311,7 +311,8 @@ fn draw_button_multiblock_from_image(
 fn shift_label_block(state: &impl ButtonBase, block: Block) -> Block {
     block.with_modifier(block::Move::new(
         Face::PZ,
-        (state.button_label_z() * 256 / theme::RESOLUTION_G) as u16,
+        theme::RESOLUTION,
+        state.button_label_z() as u8,
         0,
     ))
 }

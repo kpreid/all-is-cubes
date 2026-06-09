@@ -222,8 +222,9 @@ pub(crate) enum ModifierSer<'a> {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct MoveSerV1 {
     pub direction: Face,
-    pub distance: u16,
-    pub velocity: i16,
+    pub resolution: block::Resolution,
+    pub distance: u8,
+    pub velocity: i8,
     pub schedule: Schedule,
 }
 

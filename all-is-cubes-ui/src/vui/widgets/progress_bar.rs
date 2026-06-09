@@ -148,12 +148,14 @@ impl ProgressBarController {
                 let mask_substance = block::from_color!(Rgb01::WHITE);
                 let fill_mask = mask_substance.clone().with_modifier(block::Move::new(
                     Face::NX,
-                    u16::try_from((16 - partial_fill) * 16).unwrap(),
+                    block::Resolution::R16,
+                    u8::try_from(16 - partial_fill).unwrap(),
                     0,
                 ));
                 let empty_mask = mask_substance.with_modifier(block::Move::new(
                     Face::PX,
-                    u16::try_from(partial_fill * 16).unwrap(),
+                    block::Resolution::R16,
+                    u8::try_from(partial_fill).unwrap(),
                     0,
                 ));
 

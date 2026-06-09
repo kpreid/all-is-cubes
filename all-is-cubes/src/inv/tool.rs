@@ -209,11 +209,17 @@ impl Tool {
                 // TODO: Tool should have user-controllable modes for push vs. pull when the
                 // choice is free
 
-                let velocity = 8;
+                let resolution = block::Resolution::R16;
+                let velocity = 1;
                 let op = Operation::Alt(
                     [
-                        Operation::StartMove(block::Move::new(direction, 0, velocity)),
-                        Operation::StartMove(block::Move::new(direction.opposite(), 0, velocity)),
+                        Operation::StartMove(block::Move::new(direction, resolution, 0, velocity)),
+                        Operation::StartMove(block::Move::new(
+                            direction.opposite(),
+                            resolution,
+                            0,
+                            velocity,
+                        )),
                     ]
                     .into(),
                 );

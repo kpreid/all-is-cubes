@@ -408,6 +408,7 @@ mod block {
         fn from(value: &Move) -> Self {
             let &Move {
                 direction,
+                resolution,
                 distance,
                 velocity,
                 schedule,
@@ -415,6 +416,7 @@ mod block {
 
             schema::MoveSerV1 {
                 direction,
+                resolution,
                 distance,
                 velocity,
                 schedule,
@@ -426,6 +428,7 @@ mod block {
         fn from(value: schema::MoveSerV1) -> Self {
             let schema::MoveSerV1 {
                 direction,
+                resolution,
                 distance,
                 velocity,
                 schedule,
@@ -433,6 +436,7 @@ mod block {
 
             Move {
                 direction,
+                resolution,
                 distance,
                 velocity,
                 schedule,

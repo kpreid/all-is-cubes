@@ -723,7 +723,7 @@ fn demo_blocks_generator(
                 .tick_action(TickAction {
                     operation: Operation::Alt(
                         [
-                            Operation::StartMove(block::Move::new(Face::PY, 32, 32)),
+                            Operation::StartMove(block::Move::new(Face::PY, R8, 1, 1)),
                             // if we can't move, vanish
                             Operation::Become(AIR),
                         ]

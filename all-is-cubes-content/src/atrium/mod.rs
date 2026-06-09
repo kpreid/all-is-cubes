@@ -307,7 +307,7 @@ fn atrium_non_async(
         }
 
         if MOVING_LIGHT {
-            let mut movement = block::Move::new(Face::PZ, 16, 16);
+            let mut movement = block::Move::new(Face::PZ, block::Resolution::R16, 1, 1);
             movement.schedule = time::Schedule::from_period(NonZero::new(2).unwrap());
             let tick_action = block::TickAction {
                 operation: crate::animation::back_and_forth_movement(movement),

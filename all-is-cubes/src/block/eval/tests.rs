@@ -625,9 +625,17 @@ fn color_evaluation_regression_1() {
     let block = Block::builder()
         .color(Rgba::new(1e28, 1e28, 1e28, 1.0))
         // Modifier matters because it causes the block to become voxels
-        .modifier(Modifier::Move(modifier::Move::new(Face::NX, 0, 0)))
+        .modifier(Modifier::Move(modifier::Move::new(Face::NX, R16, 0, 0)))
         .build();
-    eval_out(&block);
+
+    // This should not panic.
+    let ev = eval_out(&block);
+
+    assert_ne!(
+        ev.resolution(),
+        R1,
+        "this test is not valid if Move no longer produces higher resolution"
+    );
 }
 
 /// Fuzz-discovered test case for a NaN sneaking in to a color.
