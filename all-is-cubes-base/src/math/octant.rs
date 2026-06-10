@@ -152,6 +152,26 @@ impl Octant {
         vec3((i >> 2) & 1, (i >> 1) & 1, i & 1)
     }
 
+    /// Returns the cube which has `origin` as one of its corner points and lies in the direction
+    /// of `self`.
+    ///
+    /// ```
+    /// # use all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes_base::math::{Cube, GridPoint, Octant};
+    ///
+    /// let octant = Octant::Npp;
+    /// let point = GridPoint::new(1, 2, 3);
+    /// let cube = octant.cube_adjacent_to(point);
+    ///
+    /// assert_eq!(cube, Cube::new(0, 2, 3));
+    // TODO: show assert_eq!(cube.corner_point(octant.opposite()), point); (but there is no corner method)
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn cube_adjacent_to(self, origin: GridPoint) -> Cube {
+        Cube::from(origin + self.to_01().map(|c| GridCoordinate::from(c) - 1))
+    }
+
     /// For each component of `vector`, negate it if `self` is on the negative side of that axis.
     ///
     /// This may be used to transform between positive-octant-only data and data mirrored into

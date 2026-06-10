@@ -380,20 +380,15 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                                 //
                                 // It will also pick a vertex color in the case that the
                                 // texture allocation failed.
-                                // TODO: Use block average color instead.
-                                let acceptable_voxel = Cube::from(
-                                    av.position
-                                        + (av.renderable & interior_side_octant_mask)
-                                            .first()
-                                            .unwrap_or_else(|| {
-                                                panic!(
-                                                    "failed to find vertex color for {av:?}\n\
+                                let acceptable_voxel = (av.renderable & interior_side_octant_mask)
+                                    .first()
+                                    .unwrap_or_else(|| {
+                                        panic!(
+                                            "failed to find vertex color for {av:?}\n\
                                             {interior_side_octant_mask:?}\n {face:?}"
-                                                )
-                                            })
-                                            .to_01()
-                                            .map(|c| GridCoordinate::from(c) - 1), // TODO: add an Octant op for balanced cubes
-                                );
+                                        )
+                                    })
+                                    .cube_adjacent_to(av.position);
 
                                 used_any_vertex_colors = true;
 

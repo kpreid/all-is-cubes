@@ -14,6 +14,7 @@
     * `math::Aab::face_coordinate_on_axis()`, a non-negating version of `face_coordinate()`.
     * `math::FaceMap::{as_array, as_array_mut}()`
     * `math::GridAab::clamp_cube()`.
+    * `math::Octant::cube_adjacent_to()`
     * `math::OctantMask::{any, from_face, from_octant}()`
     * `math::PositiveSign::mul()`
     * `math::Rgb::scale()`
