@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::iter;
 
+use hashbrown::HashMap;
 use itertools::Itertools;
 
 use all_is_cubes::block::{self, Evoxel, Resolution};
@@ -214,6 +215,68 @@ impl Analysis {
             } else {
                 Some((i, self.pbox_to_rect(face, pbox)))
             }
+        })
+    }
+
+    /// Compute the geometric edges of this shape.
+    /// The returned numbers are indices into [`Analysis::vertices()`].
+    ///
+    /// Note that these are not the edges of a triangle mesh of the shape, but only the edges of the
+    /// shape itself.
+    /// In particular, the result contains no diagonal lines.
+    ///
+    /// This operation’s overall [time complexity] is O(<var>N</var>), where <var>N</var> is the
+    /// number of vertices; each step of the iterator is amortized O(1).
+    /// It allocates temporary memory which is released when the iterator is dropped.
+    ///
+    /// [time complexity]: https://en.wikipedia.org/wiki/Time_complexity
+    //---
+    // TODO: make index type be u32 just like other mesh functions? or don’t bother?
+    pub fn compute_edges(&self) -> impl Iterator<Item = [usize; 2]> {
+        // Maps a lookup key for the lower vertex of the edge to the index of that vertex.
+        //
+        // Each lookup key is made by forgetting where along its line the edge started.
+        let mut incomplete_edges: HashMap<(Axis, Point2D<GridCoordinate, Cube>), usize> =
+            HashMap::with_capacity(if self.vertices().is_empty() { 0 } else { 3 });
+
+        self.vertices().iter().enumerate().flat_map(move |(vertex_index, vertex)| {
+            Axis::ALL
+                .map(|axis| {
+                    let key = (
+                        axis,
+                        match axis {
+                            Axis::X => vertex.position.yz(),
+                            Axis::Y => vertex.position.xz(),
+                            Axis::Z => vertex.position.xy(),
+                        },
+                    );
+
+                    let has_positive_edge =
+                        has_edge_in_direction(vertex.renderable, axis.positive_face());
+                    let has_negative_edge =
+                        has_edge_in_direction(vertex.renderable, axis.negative_face());
+
+                    match (has_negative_edge, has_positive_edge) {
+                        // At this point, an edge begins and extends in some positive direction.
+                        (false, true) => {
+                            incomplete_edges.insert(key, vertex_index);
+                            None
+                        }
+
+                        // At this point, a previously encountered edge ends.
+                        (true, false) => {
+                            let Some(starting_vertex_index) = incomplete_edges.remove(&key) else {
+                                unreachable!();
+                            };
+                            Some([starting_vertex_index, vertex_index])
+                        }
+
+                        // Either an edge continues or there is no edge; do nothing.
+                        (true, true) | (false, false) => None,
+                    }
+                })
+                .into_iter()
+                .flatten()
         })
     }
 
@@ -513,6 +576,24 @@ fn unflatten(
     }
 }
 
+/// Given the [`mask`] describing the neighborhood around some vertex, returns whether the
+/// wireframe of the shape has an edge extending from that vertex in the given `direction`.
+///
+/// This is a helper for [`Analysis::edges()`].
+fn has_edge_in_direction(mask: OctantMask, direction: Face) -> bool {
+    let axis = direction.axis();
+
+    // Shift away the part which should not be tested.
+    let only_this_side = mask.shift_copy(direction.opposite());
+
+    // There is an edge if and only if there are two faces that meet at a right angle here.
+    // There is a face with a normal on a given axis if the mask is non-uniform on that axis.
+    // Therefore, check uniformity along the two axes perpendicular to `direction`, and if it is
+    // non-uniform on both axes, then there is a right angle, and therefore an edge.
+    !only_this_side.is_uniform_on(axis.decrement())
+        && !only_this_side.is_uniform_on(axis.increment())
+}
+
 // -------------------------------------------------------------------------------------------------
 // Trait implementations, not related to the analysis itself
 
@@ -543,8 +624,11 @@ impl fmt::Debug for AnalysisVertex {
 mod tests {
     use super::*;
     use all_is_cubes::block::{self, Block};
+    use all_is_cubes::content::make_some_blocks;
+    use all_is_cubes::euclid::point3;
     use all_is_cubes::euclid::{point2, size2};
     use all_is_cubes::math::{GridAab, Rgb, Rgba, ZMaj, rgba_const};
+    use all_is_cubes::universe::ReadTicket;
     use all_is_cubes::universe::Universe;
     use alloc::sync::Arc;
     use alloc::{vec, vec::Vec};
@@ -728,5 +812,54 @@ mod tests {
                 Rect::from_origin_and_size(point2(0, 0), size2(4, 4))
             )])
         );
+    }
+
+    #[test]
+    fn edges() {
+        let [block] = make_some_blocks();
+        let ev = block.evaluate(ReadTicket::stub()).unwrap();
+        let analysis = analyze(
+            ev.resolution(),
+            ev.voxels().as_vol_ref(),
+            TransparencyFormat::Surfaces,
+            &mut Viz::disabled(),
+        )
+        .unwrap();
+
+        let edges: Vec<[usize; 2]> = analysis.compute_edges().collect();
+
+        assert_eq!(
+            Vec::from_iter(analysis.vertices().iter().map(|v| v.position)),
+            vec![
+                point3(0, 0, 0),
+                point3(0, 0, 1),
+                point3(0, 1, 0),
+                point3(0, 1, 1),
+                point3(1, 0, 0),
+                point3(1, 0, 1),
+                point3(1, 1, 0),
+                point3(1, 1, 1),
+            ]
+        );
+
+        assert_eq!(
+            edges,
+            vec![
+                // Fun fact: In a cube wireframe/graph with this numbering, every edge is
+                // between two vertices which differ in exactly one bit.
+                [0b000, 0b001],
+                [0b000, 0b010],
+                [0b001, 0b011],
+                [0b010, 0b011],
+                [0b000, 0b100],
+                [0b001, 0b101],
+                [0b100, 0b101],
+                [0b010, 0b110],
+                [0b100, 0b110],
+                [0b011, 0b111],
+                [0b101, 0b111],
+                [0b110, 0b111],
+            ]
+        )
     }
 }

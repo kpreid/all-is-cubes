@@ -27,7 +27,6 @@ dynamic = [
     "dep:flume",
     "dep:futures-channel",
     "dep:futures-util",
-    "dep:hashbrown",
     "dep:log",
 ]
 # Adds support for mesh generation performance logging to Rerun.
@@ -59,7 +58,7 @@ exhaust = { workspace = true }
 flume = { workspace = true, optional = true }
 futures-channel = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
-hashbrown = { workspace = true, optional = true }
+hashbrown = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true, optional = true }
