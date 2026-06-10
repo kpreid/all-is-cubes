@@ -13,6 +13,7 @@ license = "MIT OR Apache-2.0"
 categories = ["games", "rendering"]
 keywords = ["all-is-cubes"]
 exclude = ["*.app", "*.desktop"]
+default-run = "all-is-cubes"
 
 [package.metadata.docs.rs]
 features = []
