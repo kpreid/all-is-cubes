@@ -479,6 +479,16 @@ impl MinEval {
         &self.voxels
     }
 
+    pub fn set_voxels(&mut self, new_voxels: Evoxels) {
+        let Self {
+            attributes: _,
+            voxels,
+            derived,
+        } = self;
+        *derived = None;
+        *voxels = new_voxels;
+    }
+
     pub fn attributes(&self) -> &BlockAttributes {
         &self.attributes
     }
@@ -488,6 +498,7 @@ impl MinEval {
     }
 
     pub(crate) fn set_attributes(&mut self, attributes: BlockAttributes) {
+        // Note that this assumes that no derived property depends on attributes.
         self.attributes = attributes;
     }
 

@@ -684,19 +684,18 @@ pub(in crate::block) fn render_inventory(
             continue;
         };
 
-        let mut icon_evaluated = {
+        let mut icon_evaluated: MinEval = {
             let _recursion_scope = block::Budget::recurse(&filter.budget)?;
-            // this is the wrong cost value but it doesn't matter
-            icon.evaluate_impl(filter)?.finish(icon.clone(), filter.budget.get().to_cost())
+            icon.evaluate_impl(filter)?
         };
 
         // TODO(inventory): Instead of roughly downsampling the icons here, we should be
         // asking evaluation to generate a lower resolution as per `config.icon_resolution`).
-        let resample_scale = GridCoordinate::from(icon_evaluated.voxels.resolution())
+        let resample_scale = GridCoordinate::from(icon_evaluated.voxels().resolution())
             * GridCoordinate::from(config.icon_scale)
             / GridCoordinate::from(config.icon_resolution);
         let resample_point_offset = GridVector::splat(resample_scale / 2);
-        icon_evaluated.voxels = Evoxels::from_many(
+        icon_evaluated.set_voxels(Evoxels::from_many(
             config.icon_resolution,
             Vol::from_fn(placed_icon_bounds, |render_cube| {
                 // Translate to the coordinate system with the icon's lower corner as origin.
@@ -705,14 +704,14 @@ pub(in crate::block) fn render_inventory(
                 let translated_and_scaled: Cube =
                     Cube::from(GridPoint::from(translated) * resample_scale);
                 icon_evaluated
-                    .voxels
+                    .voxels()
                     .get(translated_and_scaled + resample_point_offset)
                     .unwrap_or(Evoxel::AIR)
             }),
-        );
+        ));
 
         input = evaluate_composition(
-            icon_evaluated.into(),
+            icon_evaluated,
             input,
             CompositeOperator::Over,
             filter,
