@@ -15,7 +15,7 @@
     * `math::FaceMap::{as_array, as_array_mut}()`
     * `math::GridAab::clamp_cube()`.
     * `math::Octant::cube_adjacent_to()`
-    * `math::OctantMask::{any, from_face, from_octant}()`
+    * `math::OctantMask::{any, count, from_face, from_octant, is_uniform_on, shift_copy}()`
     * `math::PositiveSign::mul()`
     * `math::Rgb::scale()`
     * `math::Vol::origin_empty()`, infallible construction of empty volume.

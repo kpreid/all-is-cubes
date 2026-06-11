@@ -44,7 +44,7 @@ impl Axis {
 
     /// Returns the [`Face`] value which corresponds to the positive direction on this axis.
     #[inline]
-    pub fn positive_face(self) -> Face {
+    pub const fn positive_face(self) -> Face {
         match self {
             Axis::X => Face::PX,
             Axis::Y => Face::PY,
@@ -54,7 +54,7 @@ impl Axis {
 
     /// Returns the [`Face`] value which corresponds to the negative direction on this axis.
     #[inline]
-    pub fn negative_face(self) -> Face {
+    pub const fn negative_face(self) -> Face {
         match self {
             Axis::X => Face::NX,
             Axis::Y => Face::NY,

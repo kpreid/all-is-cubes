@@ -5,7 +5,7 @@ use core::ops;
 
 use euclid::{Vector3D, vec3};
 
-use crate::math::{Cube, Face, FreeVector, GridCoordinate, GridPoint};
+use crate::math::{Axis, Cube, Face, FreeVector, GridCoordinate, GridPoint};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -287,6 +287,18 @@ impl OctantMask {
         self.flags != 0
     }
 
+    /// Returns the number of bits set in `self`.
+    ///
+    /// ```
+    /// # use all_is_cubes_base::math::OctantMask;
+    /// assert_eq!(OctantMask::NONE.count(), 0);
+    /// assert_eq!(OctantMask::ALL.count(), 8);
+    /// ```
+    #[inline]
+    pub const fn count(self) -> u8 {
+        self.flags.count_ones() as u8
+    }
+
     /// Get the flag for the given octant.
     #[inline]
     pub const fn get(self, octant: Octant) -> bool {
@@ -321,6 +333,37 @@ impl OctantMask {
                 Face::PZ => (flags & 0b01010101) << 1,
             },
         }
+    }
+
+    /// Shift the data in the specified direction, leaving a copy of the shifted bits in their
+    /// original place.
+    ///
+    /// This causes the mask to be uniform on the axis of `direction`.
+    #[inline]
+    #[must_use]
+    pub const fn shift_copy(self, direction: Face) -> Self {
+        let shifted = self.shift(direction);
+        Self {
+            flags: shifted.flags | shifted.shift(direction.opposite()).flags,
+        }
+    }
+
+    /// Returns whether the data does not vary along the given axis.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Axis, Octant, OctantMask};
+    ///
+    /// let uniform_on_x = OctantMask::from_iter([Octant::Nnn, Octant::Pnn]);
+    ///
+    /// assert_eq!(uniform_on_x.is_uniform_on(Axis::X), true);
+    /// assert_eq!(uniform_on_x.is_uniform_on(Axis::Y), false);
+    /// ```
+    #[inline]
+    pub const fn is_uniform_on(self, axis: Axis) -> bool {
+        self.shift_copy(axis.positive_face()).eq(self)
     }
 
     /// Returns the first octant included in the mask.
@@ -381,6 +424,12 @@ impl OctantMask {
             self.flags = (self.flags & 0b01010101) | ((self.flags & 0b10101010) >> 1);
         }
         self
+    }
+
+    /// Placeholder for const `==`
+    #[inline]
+    const fn eq(self, other: Self) -> bool {
+        self.flags == other.flags
     }
 }
 
