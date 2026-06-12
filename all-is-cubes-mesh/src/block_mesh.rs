@@ -21,6 +21,7 @@ use {crate::SpaceMesh, all_is_cubes::space::Space};
 // -------------------------------------------------------------------------------------------------
 
 mod analyze;
+pub use analyze::{Analysis, AnalysisVertex};
 mod compute;
 mod extend;
 mod viz;

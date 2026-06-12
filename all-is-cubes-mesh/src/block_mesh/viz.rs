@@ -409,11 +409,11 @@ impl Inner {
             );
         }
 
-        if self.analysis.vertices != old_analysis.vertices {
+        if self.analysis.vertices() != old_analysis.vertices() {
             let entity_path = &self.analysis_vertices_path;
             self.destination.log(
                 entity_path,
-                &convert_vertices(&self.analysis.vertices, 0.18),
+                &convert_vertices(self.analysis.vertices(), 0.18),
             )
         }
     }

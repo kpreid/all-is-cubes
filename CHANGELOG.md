@@ -24,6 +24,7 @@
     * `time::Tick::{delta_t_f64, delta_t_ps64}()`, convenience for common conversions.
 
 * `all-is-cubes-mesh` library:
+    * `Analysis` and `AnalysisVertex`, now public for special non-triangle-mesh applications.
     * `Channels::union()`.
     * `MeshMeta::textures_used()`.
     * `MeshMeta::texture_channels_used()`.

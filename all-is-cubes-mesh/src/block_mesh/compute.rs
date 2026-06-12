@@ -216,7 +216,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     let mut triangulator = planar::Triangulator::new();
 
     let mut vertex_subset: Vec<AnalysisVertex> = Vec::new();
-    vertex_subset.try_reserve(analysis.vertices.len() / 2)?;
+    vertex_subset.try_reserve(analysis.vertices().len() / 2)?;
 
     // Walk through the planes (layers) of the block, figuring out what geometry to
     // generate for each layer and whether it needs a texture.
@@ -339,7 +339,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             ] {
                 // Iterator over analysis vertices filtered to the current plane.
                 vertex_subset.clear();
-                vertex_subset.extend(analysis.vertices.iter().filter(|&v| {
+                vertex_subset.extend(analysis.vertices().iter().filter(|&v| {
                     // Filter to vertices on this layer,
                     // that have some content on this face and are not purely opposite,
                     // that are either opaque or transparent as requested.

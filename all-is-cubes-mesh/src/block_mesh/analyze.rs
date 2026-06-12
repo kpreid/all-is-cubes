@@ -4,7 +4,7 @@ use core::iter;
 
 use itertools::Itertools;
 
-use all_is_cubes::block::{Evoxel, Resolution};
+use all_is_cubes::block::{self, Evoxel, Resolution};
 use all_is_cubes::euclid::{Box2D, Point2D, point3, vec3};
 use all_is_cubes::math::{
     Axis, Cube, Face, FaceMap, GridAab, GridCoordinate, GridPoint, Octant, OctantMap, OctantMask,
@@ -14,6 +14,9 @@ use all_is_cubes::math::{
 use crate::OutOfMemory;
 use crate::TransparencyFormat;
 use crate::block_mesh::viz::Viz;
+
+#[cfg(doc)]
+use crate::BlockMesh;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -52,8 +55,21 @@ const EMPTY_PLANE_BOX: PlaneBox = PlaneBox(Box2D {
     max: Point2D::new(u8::MIN, u8::MIN),
 });
 
-#[derive(Clone, Debug, PartialEq)] // PartialEq impl is only for debugging
-pub(crate) struct Analysis {
+/// The boundary of a voxel shape.
+///
+/// Analysis consists of iterating over all of the provided voxel data, and identifying positions
+/// that are vertices of the boundary polyhedron(s), as well as some other supporting information.
+/// This allows further work, such as mesh building, to be done at a cost which scales with the
+/// complexity of the boundary rather than the number of voxels.
+///
+/// This data type is used by [`BlockMesh`] as part of its process for building meshes.
+/// However, that is currently limited to an implementation detail; it is not possible to provide
+/// [`Analysis`] to or obtain it from the [`BlockMesh`] computation.
+/// That may be rectified in future versions.
+//
+// TODO: Consider whether this should be renamed to `Shape` or another less abstract name.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Analysis {
     /// For each face normal, which depths will need any triangles generated,
     /// and for those that do, which bounds need to be scanned.
     ///
@@ -76,52 +92,39 @@ pub(crate) struct Analysis {
     /// say, diagonally adjacent voxels. However, this simplifies the job of the mesh builder,
     /// which can always use one mesh vertex per [`AnalysisVertex`] per face, rather than needing
     /// to split vertices by color.
-    pub needs_texture: bool,
+    pub(crate) needs_texture: bool,
 
-    /// Each point that is a vertex; that is, each point which
-    ///
-    /// * is a [vertex] of the block considered as a [polyhedron], and
-    /// * therefore, is necessarily a [`Vertex`] of the mesh.
-    ///
-    /// The vertices are sorted in [`ZMaj`] order.
-    ///
-    /// [vertex]: (https://en.wikipedia.org/wiki/Vertex_\(geometry\))
-    /// [orthogonal polyhedron]: https://en.wikipedia.org/wiki/Orthogonal_polyhedron
-    /// [`Vertex`]: crate::Vertex
-    //
-    // TODO: Currently, this information is not used (except by `Viz`).
-    // It is planned to be used by a new polygon triangulation algorithm.
-    pub vertices: Vec<AnalysisVertex>,
+    vertices: Vec<AnalysisVertex>,
 }
 
-/// An abstract (not textured, not face-specific) vertex of the voxel shape.
+/// An abstract (not textured, not face-specific) vertex of a voxel shape.
 ///
-/// Obtain this from [`Analysis::vertices`].
+/// Obtain this from [`Analysis::vertices()`].
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub(crate) struct AnalysisVertex {
+#[non_exhaustive]
+pub struct AnalysisVertex {
+    /// Position of this vertex.
     pub position: GridPoint,
+
     /// Bitmask of which volumes adjacent to this vertex are occupied by a visible material.
     pub renderable: OctantMask,
+
     /// Bitmask of which volumes adjacent to this vertex are occupied by a fully opaque material.
+    ///
+    /// `opaque` is always a subset of `renderable`.
     pub opaque: OctantMask,
 }
 
-/// Reverses the 2D-ification transformation done to `occupied_planes`.
-fn unflatten(
-    axis: Axis,
-    missing_coordinate: GridCoordinate,
-    point: Point2D<u8, OccupiedInternal>,
-) -> GridPoint {
-    let point = point.to_i32();
-    match axis {
-        Axis::X => point3(missing_coordinate, point.x, point.y),
-        Axis::Y => point3(point.x, missing_coordinate, point.y),
-        Axis::Z => point3(point.x, point.y, missing_coordinate),
-    }
-}
+// -------------------------------------------------------------------------------------------------
 
 impl Analysis {
-    pub const EMPTY: Self = {
+    /// [`Analysis`] value which corresponds to a block with no visible voxels.
+    //---
+    // This is not public because we may want to avoid promising that this is const-constructible.
+    // It is available in non-const public form as `impl Default`.
+    // If we ever decide to allow reuse of `Analysis` for multiple blocks, we should revisit
+    // offering this.
+    pub(crate) const EMPTY: Self = {
         Analysis {
             occupied_planes: FaceMap::splat_copy([EMPTY_PLANE_BOX; MAX_PLANES]),
             transparent_bounding_box: None,
@@ -131,10 +134,76 @@ impl Analysis {
         }
     };
 
+    /// Analyze the given block.
+    ///
+    /// This function’s [time complexity] is O(<var>M</var> + <var>N</var>),
+    /// where <var>M</var> is the number of input voxels and <var>N</var> is the number of vertices
+    /// in the output.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if memory allocation fails during the analysis.
+    /// (That is, this function will never result in the allocation error handler being called,
+    /// and thus will not panic or abort the process for that reason.)
+    ///
+    /// [time complexity]: https://en.wikipedia.org/wiki/Time_complexity
+    //---
+    // Note: This function is only for public use; internally we short-circuit some cases to
+    // avoid building the analysis at all.
+    pub fn analyze(
+        block: &block::EvaluatedBlock,
+        options: &crate::MeshOptions,
+    ) -> Result<Self, OutOfMemory> {
+        analyze(
+            block.resolution(),
+            block.voxels().as_vol_ref(),
+            options.transparency_format(),
+            &mut Viz::Disabled,
+        )
+    }
+
+    /// Returns the resolution of the analyzed block.
+    ///
+    /// This is the inclusive upper bound on the coordinates found in
+    /// [`vertices()`][Self::vertices].
+    pub fn resolution(&self) -> Resolution {
+        self.resolution
+    }
+
+    /// Returns the vertices of the shape.
+    ///
+    /// In the mathematical sense, these are the [vertices] of the shape considered as an
+    /// [orthogonal polyhedron], which occur at every point where two or more edges end
+    /// *or intersect.*
+    /// In the computer graphics sense, these vertices include the positions of every [`Vertex`] of
+    /// a mesh built from this analysis. However, if the mesh vertices have normals (as triangle
+    /// meshes built by this library do), the mesh will necessarily split these vertices into
+    /// vertices with the same position but different normals.
+    ///
+    /// The analysis contains no information about edges; edges must be derived from
+    /// the connectivity information included in these vertices.
+    ///
+    /// The vertices are ordered such that for any edge, its vertices will be encountered in
+    /// increasing order of their coordinates; e.g. `[4, 0, 4]` will always appear before
+    /// `[4, 2, 4]`.
+    ///
+    // Non-public guarantee: More specifically, the vertices are sorted in [`ZMaj`] order.
+    ///
+    /// [vertices]: https://en.wikipedia.org/wiki/Vertex_(geometry)
+    /// [orthogonal polyhedron]: https://en.wikipedia.org/wiki/Orthogonal_polyhedron
+    /// [`Vertex`]: crate::Vertex
+    #[inline]
+    pub fn vertices(&self) -> &[AnalysisVertex] {
+        &self.vertices
+    }
+
     /// For each face normal, which depths will need any triangles generated.
     /// Index 0 is depth 0 (the surface of the block volume), index 1 is one voxel
     /// deeper, and so on.
-    pub fn occupied_planes(&self, face: Face) -> impl Iterator<Item = (GridCoordinate, Rect)> + '_ {
+    pub(crate) fn occupied_planes(
+        &self,
+        face: Face,
+    ) -> impl Iterator<Item = (GridCoordinate, Rect)> + '_ {
         iter::zip(
             0..GridCoordinate::from(self.resolution),
             self.occupied_planes[face],
@@ -149,6 +218,7 @@ impl Analysis {
     }
 
     #[cfg(feature = "rerun")]
+    #[doc(hidden)] // not yet clear whether we want to expose the layer coordinate system
     pub fn occupied_plane_box(&self, face: Face, layer: GridCoordinate) -> Option<GridAab> {
         let pbox = self.occupied_planes[face][usize::try_from(layer).unwrap()];
         if pbox.0.is_empty() {
@@ -205,6 +275,8 @@ impl Analysis {
         self.occupied_planes[face][layer as usize] = EMPTY_PLANE_BOX;
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Analyze a block's voxel array and find characteristics its mesh will have.
 ///
@@ -427,6 +499,29 @@ fn for_each_window<'a>(
     Ok(())
 }
 
+/// Reverses the 2D-ification transformation done to `occupied_planes`.
+fn unflatten(
+    axis: Axis,
+    missing_coordinate: GridCoordinate,
+    point: Point2D<u8, OccupiedInternal>,
+) -> GridPoint {
+    let point = point.to_i32();
+    match axis {
+        Axis::X => point3(missing_coordinate, point.x, point.y),
+        Axis::Y => point3(point.x, missing_coordinate, point.y),
+        Axis::Z => point3(point.x, point.y, missing_coordinate),
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Trait implementations, not related to the analysis itself
+
+impl Default for Analysis {
+    fn default() -> Self {
+        Analysis::EMPTY
+    }
+}
+
 impl fmt::Debug for AnalysisVertex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Always-single-line formatting
@@ -441,6 +536,8 @@ impl fmt::Debug for AnalysisVertex {
         )
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

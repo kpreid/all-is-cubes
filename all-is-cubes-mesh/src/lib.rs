@@ -27,7 +27,11 @@
 //! [`Vertex`] and [`texture::Allocator`] traits, then implement [`MeshTypes`] to bundle them
 //! together.
 //!
-//! You can also do 2D triangulation of shapes not derived from voxels using the [`planar`] module.
+//! Certain subsystems have also been made available for separate use:
+//!
+//! * The [`planar`] module may be used to do 2D triangulation of shapes not derived from voxels.
+//! * [`Analysis`] finds the boundary of a voxel shape and may be useful for building non-triangle
+//!   meshes or other representations.
 //!
 //! ## Package features
 //!
