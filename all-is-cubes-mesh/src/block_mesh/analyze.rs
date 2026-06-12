@@ -5,7 +5,7 @@ use core::iter;
 use itertools::Itertools;
 
 use all_is_cubes::block::{Evoxel, Resolution};
-use all_is_cubes::euclid::{Point2D, point3, vec3};
+use all_is_cubes::euclid::{Box2D, Point2D, point3, vec3};
 use all_is_cubes::math::{
     Axis, Cube, Face, FaceMap, GridAab, GridCoordinate, GridPoint, Octant, OctantMap, OctantMask,
     OpacityCategory, Vol, ZMaj,
@@ -17,29 +17,42 @@ use crate::block_mesh::viz::Viz;
 
 // -------------------------------------------------------------------------------------------------
 
+/// Coordinate system marker type for [`Analysis::occupied_planes`] rectangles as stored, not as
+/// exposed outside.
+///
+/// In this 2D coordinate system, 1 unit = 1 voxel edge, the origin is the lower corner of the
+/// block, and the axes are the 3D axes with the axis perpendicular to the plane deleted.
+/// That is, the `xy` of these coordinates are the `xy`, `xz`, or `yz` of the original voxel
+/// coordinates.
+pub(crate) struct OccupiedInternal;
+
 /// Maximum number of occupied planes/layers in any block.
 ///
 /// The plus one is because we're counting fenceposts (coordinate planes) — wait.
 /// TODO: We should never have anything in the deepest plane. Reduce this and test that's ok.
 const MAX_PLANES: usize = Resolution::MAX.to_grid() as usize + 1;
 
-type Rect = all_is_cubes::euclid::Box2D<GridCoordinate, Cube>;
+type Rect = Box2D<GridCoordinate, Cube>;
 
-/// Flat (one axis zero sized) box whose bounds are a voxel surface that needs triangles
-/// generated for it.
+/// Box which bounds the voxel surface that needs triangles generated for it,
+/// within one particular plane intersecting the block being analyzed.
+/// These boxes are found in [`Analysis::occupied_planes`] and are not exposed outside this module
+/// except for [`Viz`]’s purposes.
 ///
-/// Note: I tried using [`u8`] coordinate storage and it was significantly slower.
-type PlaneBox = all_is_cubes::euclid::Box2D<GridCoordinate, Cube>;
+/// This is a `struct` rather than a `type` so that it can have a higher alignment, to allow
+/// the machine code using it to be more efficient by treating the whole box as an aligned value.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(align(4))]
+pub(crate) struct PlaneBox(pub Box2D<u8, OccupiedInternal>);
 
 /// A maximally inside-out box, used as the `occupied_planes` value containing no voxels.
 /// When it meets any actual voxel it will get replaced implicitly by the min/max operations.
-const EMPTY_PLANE_BOX: PlaneBox = PlaneBox {
-    min: Point2D::new(GridCoordinate::MAX, GridCoordinate::MAX),
-    max: Point2D::new(GridCoordinate::MIN, GridCoordinate::MIN),
-};
+const EMPTY_PLANE_BOX: PlaneBox = PlaneBox(Box2D {
+    min: Point2D::new(u8::MAX, u8::MAX),
+    max: Point2D::new(u8::MIN, u8::MIN),
+});
 
 #[derive(Clone, Debug, PartialEq)] // PartialEq impl is only for debugging
-#[repr(C, align(16))] // For perf, ensure the arrays are aligned to whole `PlaneBox`es, 4 × i32
 pub(crate) struct Analysis {
     /// For each face normal, which depths will need any triangles generated,
     /// and for those that do, which bounds need to be scanned.
@@ -48,8 +61,6 @@ pub(crate) struct Analysis {
     /// deeper, and so on.
     ///
     /// If a given plane contains no voxels, its value will be [`EMPTY_PLANE_BOX`].
-    ///
-    /// The boxes' thickness happens to be equal to the layer position but this is coincidental.
     pub(crate) occupied_planes: FaceMap<[PlaneBox; MAX_PLANES]>,
 
     /// If there are any transparent voxels, and `transparency_format` is
@@ -99,8 +110,9 @@ pub(crate) struct AnalysisVertex {
 fn unflatten(
     axis: Axis,
     missing_coordinate: GridCoordinate,
-    point: Point2D<GridCoordinate, Cube>,
+    point: Point2D<u8, OccupiedInternal>,
 ) -> GridPoint {
+    let point = point.to_i32();
     match axis {
         Axis::X => point3(missing_coordinate, point.x, point.y),
         Axis::Y => point3(point.x, missing_coordinate, point.y),
@@ -128,7 +140,7 @@ impl Analysis {
             self.occupied_planes[face],
         )
         .filter_map(move |(i, pbox)| {
-            if pbox.is_empty() {
+            if pbox.0.is_empty() {
                 None
             } else {
                 Some((i, self.pbox_to_rect(face, pbox)))
@@ -139,7 +151,7 @@ impl Analysis {
     #[cfg(feature = "rerun")]
     pub fn occupied_plane_box(&self, face: Face, layer: GridCoordinate) -> Option<GridAab> {
         let pbox = self.occupied_planes[face][usize::try_from(layer).unwrap()];
-        if pbox.is_empty() {
+        if pbox.0.is_empty() {
             return None;
         }
         let mc = if face.is_negative() {
@@ -148,23 +160,27 @@ impl Analysis {
             GridCoordinate::from(self.resolution) - layer
         };
         Some(GridAab::from_lower_upper(
-            unflatten(face.axis(), mc, pbox.min),
-            unflatten(face.axis(), mc, pbox.max),
+            unflatten(face.axis(), mc, pbox.0.min),
+            unflatten(face.axis(), mc, pbox.0.max),
         ))
     }
 
     pub(crate) fn surface_is_occupied(&self, face: Face) -> bool {
-        !self.occupied_planes[face][0].is_empty()
+        !self.occupied_planes[face][0].0.is_empty()
     }
 
     fn pbox_to_rect(&self, face: Face, pbox: PlaneBox) -> Rect {
         let t = face.face_transform(self.resolution.into()).inverse();
         Rect::from_points([
-            t.transform_point(unflatten(face.axis(), 0, pbox.min)).to_2d(),
-            t.transform_point(unflatten(face.axis(), 0, pbox.max)).to_2d(),
+            t.transform_point(unflatten(face.axis(), 0, pbox.0.min)).to_2d(),
+            t.transform_point(unflatten(face.axis(), 0, pbox.0.max)).to_2d(),
         ])
     }
 
+    /// Expand one of the rectangles in [`Analysis::occupied_planes`] with a new point.
+    ///
+    /// Performance note: making the input coordinates `u8` was slower. This is odd, but it’s why
+    /// we aren't being consistent with `PlaneBox`.
     #[inline(always)] // we want this specialized for each case
     fn expand_rect(
         &mut self,
@@ -176,10 +192,12 @@ impl Analysis {
         // exactly compensated for by the fact that we'll always have a window spilling over
         // the edge, so the range of window-center-points is equal to the range we need to
         // consider meshing.
-        let existing_box = &mut self.occupied_planes[face][layer as usize];
+        let existing_box = &mut self.occupied_planes[face][layer as usize].0;
+
+        let center = center.cast_unit::<OccupiedInternal>().cast::<u8>();
 
         // Can't use union() because that special cases zero-sized boxes in a way we don't want.
-        *existing_box = PlaneBox::new(existing_box.min.min(center), existing_box.max.max(center))
+        *existing_box = Box2D::new(existing_box.min.min(center), existing_box.max.max(center))
     }
 
     #[cfg(feature = "rerun")]
@@ -469,13 +487,13 @@ mod tests {
     /// Check that it doesn't get any bigger without warning.
     #[test]
     fn analysis_size() {
-        let plane_box_size = 16; // 4 × i32
+        let plane_box_size = 4; // 4 × u8
         assert_eq!(size_of::<PlaneBox>(), plane_box_size);
         let planes_per_face = MAX_PLANES;
         let faces = Face::ALL.len();
-        // One GridAab + one Vec + 2 byte-sized fields, aligned to 16
-        let other_fields =
-            (size_of::<GridAab>() + size_of::<Vec<AnalysisVertex>>() + 2).next_multiple_of(16);
+        // One GridAab + one Vec + 2 byte-sized fields
+        let other_fields = (size_of::<GridAab>() + size_of::<Vec<AnalysisVertex>>() + 2)
+            .next_multiple_of(align_of::<Vec<AnalysisVertex>>());
         assert_eq!(
             dbg!(size_of::<Analysis>()),
             plane_box_size * planes_per_face * faces + other_fields
