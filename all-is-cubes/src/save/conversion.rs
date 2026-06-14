@@ -1176,14 +1176,6 @@ mod universe {
     };
     use schema::{HandleSer, MemberDe, NameSer};
 
-    impl From<crate::block::Read<'_>> for schema::MemberSer<'_> {
-        fn from(block_def: crate::block::Read<'_>) -> Self {
-            schema::MemberSer::Block {
-                value: block_def.block().clone(),
-            }
-        }
-    }
-
     impl Serialize for PartialUniverse<'_> {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             let &Self {
@@ -1198,10 +1190,11 @@ mod universe {
                     Ok(match handle {
                         AnyHandle::BlockDef(member_handle) => MemberEntrySer {
                             name,
-                            value: schema::MemberSer::from(read_handle_for_serialization(
-                                read_ticket,
-                                member_handle,
-                            )?),
+                            value: schema::MemberSer::Block {
+                                value: read_handle_for_serialization(read_ticket, member_handle)?
+                                    .block()
+                                    .clone(),
+                            },
                         },
                         AnyHandle::Character(member_handle) => MemberEntrySer {
                             name,
@@ -1212,7 +1205,8 @@ mod universe {
                         AnyHandle::SoundDef(member_handle) => MemberEntrySer {
                             name,
                             value: schema::MemberSer::Sound {
-                                value: schema::SerializeHandle(read_ticket, member_handle.clone()),
+                                value: read_handle_for_serialization(read_ticket, member_handle)?
+                                    .clone(),
                             },
                         },
                         AnyHandle::Space(member_handle) => MemberEntrySer {
@@ -1224,7 +1218,8 @@ mod universe {
                         AnyHandle::TagDef(member_handle) => MemberEntrySer {
                             name,
                             value: schema::MemberSer::Tag {
-                                value: schema::SerializeHandle(read_ticket, member_handle.clone()),
+                                value: read_handle_for_serialization(read_ticket, member_handle)?
+                                    .clone(),
                             },
                         },
                     })
@@ -1270,9 +1265,13 @@ mod universe {
                             MemberDe::Character { value } => {
                                 universe.insert_deserialized(name, value)
                             }
-                            MemberDe::Sound { value } => universe.insert_deserialized(name, value),
+                            MemberDe::Sound { value } => {
+                                universe.insert_deserialized(name, Box::new(value))
+                            }
                             MemberDe::Space { value } => universe.insert_deserialized(name, value),
-                            MemberDe::Tag { value } => universe.insert_deserialized(name, value),
+                            MemberDe::Tag { value } => {
+                                universe.insert_deserialized(name, Box::new(value))
+                            }
                         }
                         .map_err(serde::de::Error::custom)?;
                     }

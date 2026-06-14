@@ -559,25 +559,16 @@ pub(crate) enum ScheduleSer {
 /// case vs. the deserialization case.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum UniverseSchema<C, So, Sp, T> {
+pub(crate) enum UniverseSchema<C, Sp> {
     UniverseV1 {
         /// Note: We are currently targeting JSON output, which cannot use non-string keys.
         /// Therefore, this is not expressed as a map.
-        members: Vec<MemberEntrySer<MemberSchema<C, So, Sp, T>>>,
+        members: Vec<MemberEntrySer<MemberSchema<C, Sp>>>,
     },
 }
-pub(crate) type UniverseSer<'t> = UniverseSchema<
-    SerializeHandle<'t, character::Character>,
-    SerializeHandle<'t, sound::SoundDef>,
-    SerializeHandle<'t, space::Space>,
-    SerializeHandle<'t, tag::TagDef>,
->;
-pub(crate) type UniverseDe = UniverseSchema<
-    Box<character::Character>,
-    Box<sound::SoundDef>,
-    Box<space::Space>,
-    Box<tag::TagDef>,
->;
+pub(crate) type UniverseSer<'t> =
+    UniverseSchema<SerializeHandle<'t, character::Character>, SerializeHandle<'t, space::Space>>;
+pub(crate) type UniverseDe = UniverseSchema<Box<character::Character>, Box<space::Space>>;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct MemberEntrySer<T> {
@@ -588,28 +579,21 @@ pub(crate) struct MemberEntrySer<T> {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "member_type")]
-pub(crate) enum MemberSchema<C, So, Sp, T> {
+pub(crate) enum MemberSchema<C, Sp> {
     // Cheap-to-clone members can have their values directly here;
     // expensive or unclonable ones need to be serialized by handle.
-    // TODO: Should TagDef be really counted as expensive?
     Block { value: Block },
     Character { value: C },
-    Sound { value: So },
+    Sound { value: sound::SoundDef },
     Space { value: Sp },
-    Tag { value: T },
+    Tag { value: tag::TagDef },
 }
-pub(crate) type MemberSer<'t> = MemberSchema<
-    SerializeHandle<'t, character::Character>,
-    SerializeHandle<'t, sound::SoundDef>,
-    SerializeHandle<'t, space::Space>,
-    SerializeHandle<'t, tag::TagDef>,
->;
+pub(crate) type MemberSer<'t> =
+    MemberSchema<SerializeHandle<'t, character::Character>, SerializeHandle<'t, space::Space>>;
 pub(crate) type MemberDe = MemberSchema<
     // the Boxes are not strictly necessary but are expected by other code
     Box<character::Character>,
-    Box<sound::SoundDef>,
     Box<space::Space>,
-    Box<tag::TagDef>,
 >;
 
 #[derive(Debug, Deserialize, Serialize)]
