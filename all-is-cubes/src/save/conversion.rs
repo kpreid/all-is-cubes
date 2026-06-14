@@ -1193,45 +1193,41 @@ mod universe {
 
             let members = handles
                 .iter()
-                .map(|handle: &AnyHandle| match handle {
-                    AnyHandle::BlockDef(member_handle) => {
-                        let name = member_handle.name();
-                        let member_repr = schema::MemberSer::from(
-                            member_handle.read(read_ticket).map_err(|e| {
-                                serde::ser::Error::custom(format!(
-                                    "Failed to read universe member {name}: {e}"
-                                ))
-                            })?,
-                        );
-                        Ok(MemberEntrySer {
-                            name: member_handle.name(),
-                            value: member_repr,
-                        })
-                    }
-                    AnyHandle::Character(member_handle) => Ok(MemberEntrySer {
-                        name: member_handle.name(),
-                        value: schema::MemberSer::Character {
-                            value: schema::SerializeHandle(read_ticket, member_handle.clone()),
+                .map(|handle: &AnyHandle| {
+                    let name = handle.name();
+                    Ok(match handle {
+                        AnyHandle::BlockDef(member_handle) => MemberEntrySer {
+                            name,
+                            value: schema::MemberSer::from(read_handle_for_serialization(
+                                read_ticket,
+                                member_handle,
+                            )?),
                         },
-                    }),
-                    AnyHandle::SoundDef(member_handle) => Ok(MemberEntrySer {
-                        name: member_handle.name(),
-                        value: schema::MemberSer::Sound {
-                            value: schema::SerializeHandle(read_ticket, member_handle.clone()),
+                        AnyHandle::Character(member_handle) => MemberEntrySer {
+                            name,
+                            value: schema::MemberSer::Character {
+                                value: schema::SerializeHandle(read_ticket, member_handle.clone()),
+                            },
                         },
-                    }),
-                    AnyHandle::Space(member_handle) => Ok(MemberEntrySer {
-                        name: member_handle.name(),
-                        value: schema::MemberSer::Space {
-                            value: schema::SerializeHandle(read_ticket, member_handle.clone()),
+                        AnyHandle::SoundDef(member_handle) => MemberEntrySer {
+                            name,
+                            value: schema::MemberSer::Sound {
+                                value: schema::SerializeHandle(read_ticket, member_handle.clone()),
+                            },
                         },
-                    }),
-                    AnyHandle::TagDef(member_handle) => Ok(MemberEntrySer {
-                        name: member_handle.name(),
-                        value: schema::MemberSer::Tag {
-                            value: schema::SerializeHandle(read_ticket, member_handle.clone()),
+                        AnyHandle::Space(member_handle) => MemberEntrySer {
+                            name,
+                            value: schema::MemberSer::Space {
+                                value: schema::SerializeHandle(read_ticket, member_handle.clone()),
+                            },
                         },
-                    }),
+                        AnyHandle::TagDef(member_handle) => MemberEntrySer {
+                            name,
+                            value: schema::MemberSer::Tag {
+                                value: schema::SerializeHandle(read_ticket, member_handle.clone()),
+                            },
+                        },
+                    })
                 })
                 .collect::<Result<Vec<MemberEntrySer<schema::MemberSer<'_>>>, S::Error>>()?;
             schema::UniverseSer::UniverseV1 { members }.serialize(serializer)
@@ -1355,14 +1351,38 @@ mod universe {
             S: Serializer,
         {
             let &schema::SerializeHandle(read_ticket, ref handle) = self;
-            let read = handle.read(read_ticket).map_err(|e| {
-                serde::ser::Error::custom(format!(
-                    "Failed to read universe member {name}: {e}",
-                    name = handle.name()
-                ))
-            })?;
-            read.serialize(serializer)
+            read_handle_for_serialization(read_ticket, handle)?.serialize(serializer)
         }
+    }
+
+    /// Read a handle in order to serialize its contents, converting the error to fit `serde`.
+    ///
+    /// Design note: This does not require `universe::UniverseMember<Read<'ticket>: Serialize>`,
+    /// because the cases it is generic over include ones where `Read` is not itself serializable.
+    fn read_handle_for_serialization<'ticket, T: universe::UniverseMember, E: serde::ser::Error>(
+        read_ticket: universe::ReadTicket<'ticket>,
+        handle: &Handle<T>,
+    ) -> Result<<T as universe::UniverseMember>::Read<'ticket>, E> {
+        match handle.read(read_ticket) {
+            Ok(read) => Ok(read),
+            Err(error) => Err(map_read_handle_error(handle, &error)),
+        }
+    }
+
+    /// Convert the error from a `Handle::read()` to a `serde` error.
+    ///
+    /// Design note: This function is split out so it can be generic over only the error type,
+    /// not the handle type.
+    #[cold]
+    fn map_read_handle_error<E: serde::ser::Error>(
+        handle: &dyn universe::ErasedHandle,
+        error: &universe::HandleError,
+    ) -> E {
+        serde::ser::Error::custom(format!(
+            "failed to read universe member {name}: {error}",
+            name = handle.name(),
+            error = crate::util::ErrorChain(error),
+        ))
     }
 }
 
