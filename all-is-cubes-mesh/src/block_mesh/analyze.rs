@@ -6,7 +6,7 @@ use hashbrown::HashMap;
 use itertools::Itertools;
 
 use all_is_cubes::block::{self, Evoxel, Resolution};
-use all_is_cubes::euclid::{Box2D, Point2D, point3, vec3};
+use all_is_cubes::euclid::{Box2D, Point2D, Point3D, point3, vec3};
 use all_is_cubes::math::{
     Axis, Cube, Face, FaceMap, GridAab, GridCoordinate, GridPoint, Octant, OctantMap, OctantMask,
     OpacityCategory, Vol, ZMaj,
@@ -103,10 +103,10 @@ pub struct Analysis {
 /// Obtain this from [`Analysis::vertices()`].
 #[derive(Clone, Copy, Eq, PartialEq)]
 #[non_exhaustive]
+// repr and field order chosen by benchmarking (on Apple M4 Max CPU) to get +2% for less complex
+// blocks, compared to not increasing the alignment.
+#[repr(C, align(8))]
 pub struct AnalysisVertex {
-    /// Position of this vertex.
-    pub position: GridPoint,
-
     /// Bitmask of which volumes adjacent to this vertex are occupied by a visible material.
     pub renderable: OctantMask,
 
@@ -114,6 +114,9 @@ pub struct AnalysisVertex {
     ///
     /// `opaque` is always a subset of `renderable`.
     pub opaque: OctantMask,
+
+    /// Position of this vertex.
+    pub position: Point3D<u8, Cube>,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -236,7 +239,7 @@ impl Analysis {
         // Maps a lookup key for the lower vertex of the edge to the index of that vertex.
         //
         // Each lookup key is made by forgetting where along its line the edge started.
-        let mut incomplete_edges: HashMap<(Axis, Point2D<GridCoordinate, Cube>), usize> =
+        let mut incomplete_edges: HashMap<(Axis, Point2D<u8, Cube>), usize> =
             HashMap::with_capacity(if self.vertices().is_empty() { 0 } else { 3 });
 
         self.vertices().iter().enumerate().flat_map(move |(vertex_index, vertex)| {
@@ -315,12 +318,7 @@ impl Analysis {
     /// Performance note: making the input coordinates `u8` was slower. This is odd, but it’s why
     /// we aren't being consistent with `PlaneBox`.
     #[inline(always)] // we want this specialized for each case
-    fn expand_rect(
-        &mut self,
-        face: Face,
-        layer: GridCoordinate,
-        center: Point2D<GridCoordinate, Cube>,
-    ) {
+    fn expand_rect(&mut self, face: Face, layer: u8, center: Point2D<u8, Cube>) {
         // We didn't check *exactly* which voxels in the window need pixels, but this is
         // exactly compensated for by the fact that we'll always have a window spilling over
         // the edge, so the range of window-center-points is equal to the range we need to
@@ -377,7 +375,7 @@ pub(crate) fn analyze(
 #[inline]
 fn analyze_one_window(
     analysis: &mut Analysis,
-    center: GridPoint,
+    center: Point3D<u8, Cube>,
     window: OctantMap<&Evoxel>,
     transparency: TransparencyFormat,
 ) -> Result<(), OutOfMemory> {
@@ -392,7 +390,7 @@ fn analyze_one_window(
         }
         TransparencyFormat::BoundingBox => {
             if window[Octant::Ppp].opacity_category() == OpacityCategory::Partial {
-                let cube = Cube::from(center);
+                let cube = Cube::from(center.map(GridCoordinate::from));
                 match &mut analysis.transparent_bounding_box {
                     Some(v) => {
                         *v = {
@@ -419,7 +417,7 @@ fn analyze_one_window(
 
     // First, quickly check if there are any visible surfaces at all here.
     if opaque != NONE && opaque != ALL || semitransparent != NONE && semitransparent != ALL {
-        let resolution_coord = GridCoordinate::from(analysis.resolution);
+        let resolution_coord = u8::from(analysis.resolution);
 
         // Note: this comparison has false positives, in that it will return true for some
         // cases that *could* be meshed without any textures. However, some of these false
@@ -504,7 +502,7 @@ fn uncovered(mask: OctantMask, face: Face) -> bool {
 /// vector, which must be taken into account.
 fn for_each_window<'a>(
     voxels: Vol<&'a [Evoxel], ZMaj>,
-    mut f: impl FnMut((GridPoint, OctantMap<&'a Evoxel>)) -> Result<(), OutOfMemory>,
+    mut f: impl FnMut((Point3D<u8, Cube>, OctantMap<&'a Evoxel>)) -> Result<(), OutOfMemory>,
 ) -> Result<(), OutOfMemory> {
     if voxels.bounds().is_empty() {
         // exit early so the rest of the logic can assume our ranges contain at least 1 element
@@ -554,7 +552,8 @@ fn for_each_window<'a>(
                 oct_voxels[Octant::Pnp] = get_voxel(new_quad_lb.wrapping_add(vec3(1, 0, 0)));
                 oct_voxels[Octant::Ppp] = get_voxel(uppermost_cube);
 
-                f((center, oct_voxels))?;
+                // can't overflow due to the `Resolution` limit on blocks
+                f((center.map(|coord| coord as u8), oct_voxels))?;
             }
         }
     }
@@ -625,8 +624,7 @@ mod tests {
     use super::*;
     use all_is_cubes::block::{self, Block};
     use all_is_cubes::content::make_some_blocks;
-    use all_is_cubes::euclid::point3;
-    use all_is_cubes::euclid::{point2, size2};
+    use all_is_cubes::euclid::{point2, point3, size2};
     use all_is_cubes::math::{GridAab, Rgb, Rgba, ZMaj, rgba_const};
     use all_is_cubes::universe::ReadTicket;
     use all_is_cubes::universe::Universe;
@@ -643,7 +641,7 @@ mod tests {
         // need to change the coordinates if we change the ordering.
         let vol: Vol<Arc<[Evoxel]>, ZMaj> =
             Vol::from_elements(GridAab::ORIGIN_CUBE, vec![Evoxel::from_color(red)]).unwrap();
-        let mut results: Vec<(GridPoint, [Rgba; 8])> = Vec::new();
+        let mut results: Vec<(Point3D<u8, Cube>, [Rgba; 8])> = Vec::new();
         for_each_window(vol.as_ref(), |(point, colors)| {
             results.push((point, colors.into_zmaj_array().map(|voxel| voxel.color)));
             Ok(())
@@ -652,14 +650,14 @@ mod tests {
         assert_eq!(
             results,
             vec![
-                (GridPoint::new(0, 0, 0), [tr, tr, tr, tr, tr, tr, tr, red]),
-                (GridPoint::new(0, 0, 1), [tr, tr, tr, tr, tr, tr, red, tr]),
-                (GridPoint::new(0, 1, 0), [tr, tr, tr, tr, tr, red, tr, tr]),
-                (GridPoint::new(0, 1, 1), [tr, tr, tr, tr, red, tr, tr, tr]),
-                (GridPoint::new(1, 0, 0), [tr, tr, tr, red, tr, tr, tr, tr]),
-                (GridPoint::new(1, 0, 1), [tr, tr, red, tr, tr, tr, tr, tr]),
-                (GridPoint::new(1, 1, 0), [tr, red, tr, tr, tr, tr, tr, tr]),
-                (GridPoint::new(1, 1, 1), [red, tr, tr, tr, tr, tr, tr, tr]),
+                (point3(0, 0, 0), [tr, tr, tr, tr, tr, tr, tr, red]),
+                (point3(0, 0, 1), [tr, tr, tr, tr, tr, tr, red, tr]),
+                (point3(0, 1, 0), [tr, tr, tr, tr, tr, red, tr, tr]),
+                (point3(0, 1, 1), [tr, tr, tr, tr, red, tr, tr, tr]),
+                (point3(1, 0, 0), [tr, tr, tr, red, tr, tr, tr, tr]),
+                (point3(1, 0, 1), [tr, tr, red, tr, tr, tr, tr, tr]),
+                (point3(1, 1, 0), [tr, red, tr, tr, tr, tr, tr, tr]),
+                (point3(1, 1, 1), [red, tr, tr, tr, tr, tr, tr, tr]),
             ]
         )
     }

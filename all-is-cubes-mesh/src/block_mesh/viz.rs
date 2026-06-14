@@ -7,7 +7,8 @@
 use alloc::collections::VecDeque;
 
 use all_is_cubes::block::{Evoxel, Evoxels};
-use all_is_cubes::math::{Face, GridCoordinate, GridPoint, Rgba, Vol};
+use all_is_cubes::euclid::Point3D;
+use all_is_cubes::math::{Cube, Face, GridCoordinate, Rgba, Vol};
 
 use crate::Position;
 use crate::block_mesh::analyze::Analysis;
@@ -18,7 +19,7 @@ use {
     crate::block_mesh::analyze::AnalysisVertex,
     all_is_cubes::block::Resolution,
     all_is_cubes::euclid::Vector3D,
-    all_is_cubes::math::{Cube, GridAab, GridVector, Octant, u32size},
+    all_is_cubes::math::{GridAab, GridVector, Octant, u32size},
     all_is_cubes::rerun_glue as rg,
     alloc::{vec, vec::Vec},
     core::iter,
@@ -190,11 +191,12 @@ impl Viz {
 
     pub(crate) fn window(
         &self,
-        #[allow(unused)] center: GridPoint,
+        #[allow(unused)] center: Point3D<u8, Cube>,
         #[allow(unused)] voxels: Vol<&[Evoxel]>,
     ) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
+            let center = center.map(GridCoordinate::from);
             let window_grid_aab = GridAab::from_lower_upper(
                 center - GridVector::splat(1),
                 center + GridVector::splat(1),

@@ -349,7 +349,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                         v.opaque & !v.opaque.shift(-face)
                     } & interior_side_octant_mask)
                         .any()
-                        && voxel_transform_inverse.transform_point(v.position).z == layer
+                        && voxel_transform_inverse.transform_point(v.position.to_i32()).z == layer
                 }));
 
                 let index_offset = vertices.0.len().try_into().expect("vertex index overflow");
@@ -388,7 +388,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                                             {interior_side_octant_mask:?}\n {face:?}"
                                         )
                                     })
-                                    .cube_adjacent_to(av.position);
+                                    .cube_adjacent_to(av.position.map(GridCoordinate::from));
 
                                 used_any_vertex_colors = true;
 
@@ -552,7 +552,7 @@ fn analysis_vertex_to_planar_vertex(
     }
 
     planar::Vertex {
-        position: vertex.position,
+        position: vertex.position.map(GridCoordinate::from),
         connectivity,
         index,
     }
