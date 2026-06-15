@@ -24,6 +24,7 @@
     * `math::Rgb::scale()`
     * `math::Vol::origin_empty()`, infallible construction of empty volume.
     * `physics::Contact::aab()`
+    * `text::Measurement`
     * `time::Clock::phase()`, returns the clock’s phase, which was previously only obtainable through `Tick`.
     * `time::Tick::{delta_t_f64, delta_t_ps64}()`, convenience for common conversions.
     * `universe::Type`, for working with the closed set of types universe members can have.

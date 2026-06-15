@@ -2,6 +2,7 @@
 
 use core::fmt;
 
+use all_is_cubes_base::resolution::Resolution;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -10,6 +11,9 @@ use euclid::{Box2D, Point2D, SideOffsets2D, Vector3D, point2, vec3};
 use crate::math::{Cube, GridAab, GridCoordinate, GridPoint};
 use crate::text;
 
+#[cfg(doc)]
+use crate::block::{Primitive, Text};
+
 // -------------------------------------------------------------------------------------------------
 
 /// The result of text layout: a list of glyphs to draw in specific positions.
@@ -17,7 +21,7 @@ use crate::text;
 /// Must be used with the [`text::Font`] it was created with.
 //---
 // Using `slice_dst` lets the `Layout` be a single wide pointer, storing the metadata and
-// the glyphs in a single slice.
+// the glyphs in a single allocation.
 #[derive(Clone)]
 pub(crate) struct Layout(
     erasable::Thin<Arc<slice_dst::SliceWithHeader<LayoutHeader, PositionedGlyph>>>,
@@ -31,7 +35,7 @@ pub(crate) struct LayoutHeader {
     /// whole line heights without considering the presence or absence of ascenders, descenders, or
     /// accents.
     ///
-    /// This is not necessarily contained by the [`block::Text::layout_bounds`], in case the text
+    /// This is not necessarily contained by the [`Text::layout_bounds`], in case the text
     /// is larger than fits in those bounds.
     ///
     /// TODO: Currently, leading and trailing newlines are not counted, but they should be.
@@ -39,7 +43,7 @@ pub(crate) struct LayoutHeader {
 
     /// Bounding box of all glyphs to be drawn according to this layout.
     ///
-    /// This is not necessarily contained by the [`block::Text::layout_bounds`].
+    /// This is not necessarily contained by the [`Text::layout_bounds`].
     /// It is also not necessarily equal to the logical size of the text;
     /// for example, if the text starts or ends with blank lines,
     /// this box will not contain the height of those blank lines.
@@ -408,6 +412,74 @@ fn char_to_glyph_index(c: char) -> usize {
         '\u{20}'..='\u{7F}' => (c as usize) - 0x20,
         '\u{80}'..='\u{FF}' => (c as usize) - 0x40,
         _ => 0x1f, // unavailable glyphs become question marks -- TODO: dedicate a glyph
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Information about the space a [`Text`] takes up.
+#[derive(Debug)]
+pub struct Measurement<'a> {
+    pub(crate) resolution: Resolution,
+    pub(crate) layout_bounds: GridAab,
+    pub(crate) layout: &'a Layout,
+}
+
+impl Measurement<'_> {
+    /// Returns the voxel resolution which text blocks made from this [`Text`] will have.
+    /// This is the scale factor between the sizes the `*_blocks` and `*_voxels` methods report.
+    pub fn resolution(&self) -> Resolution {
+        self.resolution
+    }
+
+    /// Returns the bounding box relative to which the text was laid out.
+    ///
+    /// This does not reflect the actual size of the text, but the configuration with which the
+    /// [`Text`] value was constructed.
+    /// The text may overflow this bounding box depending on its length and the
+    /// [`positioning()`](Text::positioning).
+    pub fn layout_bounds(&self) -> GridAab {
+        self.layout_bounds
+    }
+
+    /// Returns the bounding box that the text logically occupies,
+    /// in voxels at the [`resolution()`](Self::resolution).
+    ///
+    /// This box may be significantly larger than the actual visual space taken up; it measures
+    /// whole line heights without considering the presence or absence of ascenders, descenders, or
+    /// accents.
+    /// It is most appropriate for arranging pieces of text next to other pieces of text,
+    /// such as in UI layouts.
+    ///
+    /// This box is in the same units as [`Self::layout_bounds()`] but reflects the actual text
+    /// layout rather than the configuration.
+    pub fn logical_bounding_voxels(&self) -> GridAab {
+        self.layout.header().logical_bounding_box
+    }
+
+    /// Returns the bounding box that the text as drawn actually covers,
+    /// in voxels at the [`resolution()`](Self::resolution).
+    ///
+    /// This box is in the same units as [`Self::layout_bounds()`] but reflects the actual text
+    /// layout rather than the configuration.
+    pub fn rendering_bounding_voxels(&self) -> GridAab {
+        self.layout.header().rendering_bounding_box
+    }
+
+    /// Returns the bounding box that the text logically occupies,
+    /// in whole blocks — the set of [`Primitive::Text`] offsets that will fit all of it.
+    ///
+    /// This is identical to [`Self::logical_bounding_voxels()`] scaled down by [`Self::resolution()`].
+    pub fn logical_bounding_blocks(&self) -> GridAab {
+        self.logical_bounding_voxels().divide(self.resolution.into())
+    }
+
+    /// Returns the bounding box that the text as drawn actually covers,
+    /// in whole blocks — the set of [`Primitive::Text`] offsets that will fit all of it.
+    ///
+    /// This is identical to [`Self::rendering_bounding_voxels()`] scaled down by [`Self::resolution()`].
+    pub fn rendering_bounding_blocks(&self) -> GridAab {
+        self.rendering_bounding_voxels().divide(self.resolution.into())
     }
 }
 

@@ -107,7 +107,7 @@ fn TEXT(_: Context<'_>) {
 
     let bounds_for_text = texts
         .iter()
-        .map(|ex| ex.text.rendering_bounding_blocks().translate(ex.offset))
+        .map(|ex| ex.text.measure().rendering_bounding_blocks().translate(ex.offset))
         .reduce(|a, b| a.union_box(b))
         .unwrap();
 

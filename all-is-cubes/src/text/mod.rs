@@ -8,6 +8,7 @@ mod font;
 pub use font::{Font, FontDef, Metrics, Value};
 
 mod layout;
+pub use layout::Measurement;
 pub(crate) use layout::{InGlyph, Layout, LayoutHeader, compute_layout, glyph_bounding_box_to_3d};
 
 mod positioning;

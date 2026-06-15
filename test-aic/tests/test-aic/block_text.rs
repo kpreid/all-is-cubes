@@ -97,7 +97,10 @@ fn single_line_text_smoke_test() {
         ev.voxels().bounds(),
         GridAab::from_lower_size([0, 3, 0], [13, 10, 1])
     );
-    assert_eq!(ev.voxels().bounds(), text.rendering_bounding_voxels());
+    assert_eq!(
+        ev.voxels().bounds(),
+        text.measure().rendering_bounding_voxels()
+    );
 
     assert_eq!(
         plane_to_text(ev.voxels()),
@@ -185,7 +188,7 @@ fn bounding_voxels_of_positioning_high() {
     // The part we care about precisely is that the upper corner.
     // The lower corner might change when we change the system font metrics.
     assert_eq!(
-        text.logical_bounding_voxels(),
+        text.measure().logical_bounding_voxels(),
         GridAab::from_lower_upper([11, 16, 31], [32, 32, 32])
     );
 }
@@ -239,7 +242,7 @@ fn positioning_x(
         .build();
 
     assert_eq!(
-        text.logical_bounding_voxels().x_range(),
+        text.measure().logical_bounding_voxels().x_range(),
         core::range::Range::from(expected)
     );
 }

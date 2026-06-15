@@ -135,7 +135,7 @@ impl Text {
 
     /// Returns the bounding box, within the blocks at the specified resolution, of the text.
     ///
-    /// This does not reflect the actual size of the text but the configuration with which this
+    /// This does not reflect the actual size of the text, but the configuration with which this
     /// [`Text`] value was constructed.
     /// The text may overflow this bounding box depending on its length and the
     /// [`positioning()`](Self::positioning).
@@ -153,50 +153,19 @@ impl Text {
         self.data.debug
     }
 
-    /// Returns the bounding box that the text logically occupies,
-    /// in voxels at the [`resolution()`](Self::resolution).
-    ///
-    /// This box may be significantly larger than the actual visual space taken up; it measures
-    /// whole line heights without considering the presence or absence of ascenders, descenders, or
-    /// accents.
-    /// It is most appropriate for arranging pieces of text next to other pieces of text,
-    /// such as in UI layouts.
-    ///
-    /// This box is in the same units as [`Self::layout_bounds()`] but reflects the actual text
-    /// layout rather than the configuration.
-    pub fn logical_bounding_voxels(&self) -> GridAab {
-        self.get_or_init_layout().header().logical_bounding_box
-    }
-
-    /// Returns the bounding box that the text as drawn actually covers,
-    /// in voxels at the [`resolution()`](Self::resolution).
-    ///
-    /// This box is in the same units as [`Self::layout_bounds()`] but reflects the actual text
-    /// layout rather than the configuration.
-    pub fn rendering_bounding_voxels(&self) -> GridAab {
-        self.get_or_init_layout().header().rendering_bounding_box
-    }
-
-    /// Returns the bounding box that the text logically occupies,
-    /// in whole blocks — the set of [`Primitive::Text`] offsets that will fit all of it.
-    ///
-    /// This is identical to [`Self::logical_bounding_voxels()`] scaled down by [`Self::resolution()`].
-    pub fn logical_bounding_blocks(&self) -> GridAab {
-        self.logical_bounding_voxels().divide(self.resolution().into())
-    }
-
-    /// Returns the bounding box that the text as drawn actually covers,
-    /// in whole blocks — the set of [`Primitive::Text`] offsets that will fit all of it.
-    ///
-    /// This is identical to [`Self::rendering_bounding_voxels()`] scaled down by [`Self::resolution()`].
-    pub fn rendering_bounding_blocks(&self) -> GridAab {
-        self.rendering_bounding_voxels().divide(self.resolution().into())
+    /// Computes and returns the dimensions of the rendered text.
+    pub fn measure(&self) -> text::Measurement<'_> {
+        text::Measurement {
+            resolution: self.resolution(),
+            layout_bounds: self.layout_bounds(),
+            layout: self.get_or_init_layout(),
+        }
     }
 
     /// Returns a transaction which places [`Primitive::Text`] blocks containing this text.
     ///
-    /// The text lies within the volume [`Self::rendering_bounding_blocks()`] transformed by
-    /// `transform`.
+    /// The text lies within the volume [`self.measure().rendering_bounding_blocks()`]
+    /// transformed by `transform`.
     ///
     /// Each individual block is given to `block_fn` to allow alterations.
     ///
@@ -205,15 +174,18 @@ impl Text {
     /// # Panics
     ///
     /// Panics if `transform` causes coordinate overflow.
+    ///
+    /// [`self.measure().rendering_bounding_blocks()`]: text::Measurement::rendering_bounding_blocks
     pub fn installation(
         &self,
         transform: Gridgid,
         block_fn: impl Fn(Block) -> Block,
     ) -> SpaceTransaction {
+        let measurement = self.measure();
         let dst_to_src_transform = transform.inverse();
         let block_rotation = transform.rotation;
         SpaceTransaction::filling(
-            self.rendering_bounding_blocks().transform(transform).unwrap(),
+            measurement.rendering_bounding_blocks().transform(transform).unwrap(),
             |cube| {
                 space::CubeTransaction::replacing(
                     None,
