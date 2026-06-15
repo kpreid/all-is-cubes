@@ -62,7 +62,10 @@ impl SurfaceRenderer {
             device.clone(),
             &queue,
             cameras,
-            choose_surface_format(&surface.get_capabilities(&adapter)),
+            choose_surface_format(
+                adapter.get_info().backend,
+                &surface.get_capabilities(&adapter),
+            ),
             &adapter,
         );
 
@@ -221,12 +224,15 @@ impl SurfaceRenderer {
 // -------------------------------------------------------------------------------------------------
 
 /// Choose the surface format we would prefer from among the supported formats.
-fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::TextureFormat {
+fn choose_surface_format(
+    backend: wgpu::Backend,
+    capabilities: &wgpu::SurfaceCapabilities,
+) -> wgpu::TextureFormat {
     /// A structure whose maximum [`Ord`] value corresponds to the texture format we'd rather use.
     #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
     struct Rank {
         /// If we can have a float format that gives us (potential) HDR output, do that.
-        is_float: bool,
+        is_float_hdr: bool,
         /// Known SRGB outputs are good
         is_srgb: bool,
         /// All else being equal, prefer the original preference order
@@ -241,13 +247,19 @@ fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::Text
         .enumerate()
         .max_by_key(|&(index, format)| {
             use wgpu::TextureFormat::*;
+
+            // Web HDR bugs:
+            // * WebGL2: incorrect color space <https://github.com/kpreid/all-is-cubes/issues/310>.
+            //   TODO: repro and report to wgpu, supposing that it is a wgpu bug.
+            // * WebGPU, Chrome: incorrect color space (possibly in the same way).
+            // * WebGPU, Firefox: `configure()` panics (unhandled JS exception) if `Rgba16Float` is used.
+            let known_hdr_bugs = backend == wgpu::Backend::BrowserWebGpu
+                || backend == wgpu::Backend::Gl && cfg!(target_family = "wasm");
+
             Rank {
                 is_srgb: format.is_srgb(),
-                // Float output is somehow broken on wasm, so don't prefer it.
-                // <https://github.com/kpreid/all-is-cubes/issues/310>
-                // TODO: repro and report to wgpu, supposing that it is a wgpu bug
-                is_float: matches!(format, Rgba16Float | Rgba32Float | Rgb9e5Ufloat)
-                    && !cfg!(target_family = "wasm"),
+                is_float_hdr: matches!(format, Rgba16Float | Rgba32Float | Rgb9e5Ufloat)
+                    && !known_hdr_bugs,
                 #[expect(clippy::cast_possible_wrap)]
                 negated_original_order: -(index as isize),
             }
