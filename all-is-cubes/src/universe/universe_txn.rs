@@ -9,12 +9,9 @@ use hashbrown::HashMap as HbHashMap;
 
 use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transactional};
 use crate::universe::{
-    AnyPending, ErasedHandle, Handle, InsertError, InsertErrorKind, MemberBoilerplate, Name,
-    ReadTicket, Universe, UniverseId, UniverseMember,
+    AnyPending, ErasedHandle, Handle, HandleError, InsertError, InsertErrorKind, MemberBoilerplate,
+    Name, ReadTicket, Universe, UniverseId, UniverseMember,
 };
-
-#[cfg(doc)]
-use crate::universe::HandleError;
 
 // Reëxports for macro-generated types
 #[doc(inline)]
@@ -64,20 +61,14 @@ pub(in crate::universe) fn check_transaction_in_universe<O>(
     universe: &Universe,
     target: &Handle<O>,
     transaction: &<O as Transactional>::Transaction,
-) -> Result<<O::Transaction as Transaction>::CommitCheck, <O::Transaction as Transaction>::Mismatch>
+) -> Result<<O::Transaction as Transaction>::CommitCheck, MismatchOrHandleError<O::Transaction>>
 where
     O: UniverseMember + Transactional,
     <O as Transactional>::Transaction: TransactionOnEcs,
 {
     let read_ticket = universe.read_ticket();
-    let check = TransactionOnEcs::check(
-        transaction,
-        target
-            .read(read_ticket)
-            .expect("Attempted to execute transaction with target already borrowed"),
-        read_ticket,
-    )?;
-    Ok(check)
+    let read = target.read(read_ticket).map_err(MismatchOrHandleError::Handle)?;
+    TransactionOnEcs::check(transaction, read, read_ticket).map_err(MismatchOrHandleError::Check)
 }
 
 /// Commit a transaction to a [`Handle`].
@@ -101,6 +92,48 @@ where
         .expect("target query failed; universe state changed between check and commit");
 
     TransactionOnEcs::commit(transaction, target_query_data, check)
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Error resulting from running a transaction check on a universe member, including the
+/// handle being invalid.
+///
+/// This error is passed through intermediate logic but not public; it should always be destructured
+/// and replaced with, e.g., [`ExecuteError`].
+pub(in crate::universe) enum MismatchOrHandleError<T: Transaction> {
+    Handle(HandleError),
+    Check(<T as Transaction>::Mismatch),
+}
+
+impl<T: Transaction> fmt::Debug for MismatchOrHandleError<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MismatchOrHandleError::Handle(e) => f.debug_tuple("HandleError").field(e).finish(),
+            MismatchOrHandleError::Check(m) => f.debug_tuple("Mismatch").field(m).finish(),
+        }
+    }
+}
+
+impl<T: Transaction> fmt::Display for MismatchOrHandleError<T> {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unimplemented!("MismatchOrHandleError should not become a public error")
+    }
+}
+
+impl<T: Transaction> core::error::Error for MismatchOrHandleError<T> {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        unimplemented!("MismatchOrHandleError should not become a public error")
+    }
+}
+
+impl<T: Transaction> From<MismatchOrHandleError<T>> for transaction::ExecuteError<T> {
+    fn from(error: MismatchOrHandleError<T>) -> Self {
+        match error {
+            MismatchOrHandleError::Handle(e) => Self::Handle(e),
+            MismatchOrHandleError::Check(m) => Self::Check(m),
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -140,7 +173,7 @@ where
     type Context<'a> = ();
     type CommitCheck = <O::Transaction as Transaction>::CommitCheck;
     type Output = transaction::NoOutput;
-    type Mismatch = <O::Transaction as Transaction>::Mismatch;
+    type Mismatch = MismatchOrHandleError<O::Transaction>;
 
     fn check(
         &self,
@@ -1128,6 +1161,8 @@ mod tests {
     use crate::space::SpaceTransaction;
     use crate::space::SpaceTransactionConflict;
     use crate::transaction::{ExecuteError, MapConflict};
+    use crate::universe::HandleErrorKind;
+    use core::error::Error;
     use indoc::indoc;
     use std::{assert_matches, println};
 
@@ -1351,6 +1386,25 @@ mod tests {
     }
 
     #[test]
+    fn wrong_universe_execute_1() {
+        let [block] = make_some_blocks();
+        let mut u1 = Universe::new();
+        let mut u2 = Universe::new();
+        let s1 = u1.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block));
+
+        let error = u2.execute_1(&s1, t1).unwrap_err();
+
+        assert_matches!(
+            error,
+            ExecuteError::Handle(HandleError {
+                kind: HandleErrorKind::WrongUniverse { .. },
+                ..
+            })
+        );
+    }
+
+    #[test]
     fn wrong_universe_merge() {
         let [block] = make_some_blocks();
         let mut u1 = Universe::new();
@@ -1364,17 +1418,24 @@ mod tests {
         t1.merge(t2).unwrap_err();
     }
 
-    // TODO(ecs): Write tests for all the variants of `InsertError` that aren’t now impossible.
-    // Remove the cases that are now impossible.
-
-    // This panic is not specifically desirable, but more work will be needed to avoid it.
     #[test]
-    #[should_panic = "Attempted to execute transaction with target already borrowed: HandleError { name: Specific(\"foo\"), handle_universe_id: None, kind: Gone { reason: CreatedGone } }"]
     fn handle_error_from_universe_txn() {
         let mut u = Universe::new();
         let txn: UniverseTransaction =
             SpaceTransaction::default().bind(Handle::<Space>::new_gone("foo".into()));
 
-        _ = txn.execute(&mut u, (), &mut transaction::no_outputs);
+        let error = txn.execute(&mut u, (), &mut transaction::no_outputs).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "transaction precondition not met in member 'foo'"
+        );
+        assert_eq!(
+            error.source().unwrap().to_string(),
+            "object 'foo' was deleted"
+        );
     }
+
+    // TODO(ecs): Write tests for all the variants of `InsertError` that aren’t now impossible.
+    // Remove the cases that are now impossible.
 }

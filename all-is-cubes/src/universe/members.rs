@@ -401,8 +401,15 @@ macro_rules! member_enums_and_impls {
                 Ok::<Self::CommitCheck, Self::Mismatch>(match self {
                     Self::Noop => Box::new(()),
                     $(
-                        Self::$member_type(t) => Box::new(t.check(universe, ())
-                            .map_err(AnyTransactionMismatch::$member_type)?),
+                        Self::$member_type(t) => match t.check(universe, ()) {
+                            Ok(check) => Box::new(check), // type erasure
+                            Err(universe::MismatchOrHandleError::Check(error)) => {
+                                return Err(AnyTransactionMismatch::$member_type(error))
+                            }
+                            Err(universe::MismatchOrHandleError::Handle(error)) => {
+                                return Err(AnyTransactionMismatch::Handle(error))
+                            }
+                        },
                     )*
                 })
             }
@@ -454,6 +461,7 @@ macro_rules! member_enums_and_impls {
         #[derive(Clone, Debug, Eq, PartialEq)]
         #[non_exhaustive]
         pub(in crate::universe) enum AnyTransactionMismatch {
+            Handle(universe::HandleError),
             $(
                 $member_type(
                     <
@@ -479,26 +487,28 @@ macro_rules! member_enums_and_impls {
             )*
         }
 
-            impl core::error::Error for AnyTransactionMismatch {
-                fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-                    match self {
-                        $( Self::$member_type(e) => Some(e), )*
-                    }
+        impl core::error::Error for AnyTransactionMismatch {
+            fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+                match self {
+                    Self::Handle(e) => e.source(),
+                    $( Self::$member_type(e) => e.source(), )*
                 }
             }
+        }
 
-            impl core::error::Error for AnyTransactionConflict {
-                fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-                    match self {
-                        Self::TypeMismatch => None,
-                        $( Self::$member_type(e) => Some(e), )*
-                    }
+        impl core::error::Error for AnyTransactionConflict {
+            fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+                match self {
+                    Self::TypeMismatch => None,
+                    $( Self::$member_type(e) => Some(e), )*
                 }
             }
+        }
 
         impl fmt::Display for AnyTransactionMismatch {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 match self {
+                    Self::Handle(e) => e.fmt(f),
                     $( Self::$member_type(e) => e.fmt(f), )*
                 }
             }

@@ -278,9 +278,7 @@ impl Universe {
     /// Returns an error if
     /// * the transaction's preconditions are not met,
     /// * the transaction encountered an internal error,
-    /// * the referent was already being read or written (which is expressed as an
-    ///   [`ExecuteError::Commit`], because it is a shouldn’t-happen kind of error),
-    /// * or the handle does not belong to this universe.
+    /// * the handle is deleted, not yet inserted, or belongs to the wrong universe.
     #[inline(never)]
     #[expect(private_bounds, reason = "TransactionOnEcs is internal")]
     pub fn execute_1<T>(
@@ -292,8 +290,7 @@ impl Universe {
         T::Transaction: TransactionOnEcs,
         T: UniverseMember + Transactional,
     {
-        let check = check_transaction_in_universe(self, handle, &transaction)
-            .map_err(ExecuteError::Check)?;
+        let check = check_transaction_in_universe(self, handle, &transaction)?;
         commit_transaction_in_universe(self, handle, transaction, check)
             .map_err(ExecuteError::Commit)
     }
