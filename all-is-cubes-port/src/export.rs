@@ -209,7 +209,7 @@ impl ExportSet {
             Err(ExportError::MemberTypeNotRepresentable {
                 format,
                 name: handle.name(),
-                member_type_name: handle.member_type_name(),
+                member_type: handle.handle_type(),
             })
         } else {
             Ok(())
@@ -294,17 +294,16 @@ pub enum ExportError {
     /// The requested [`ExportSet`] contained members of a type that cannot be represented in the
     /// requested [`Format`], regardless of their specific value.
     #[error(
-        "cannot export {member_type_name} such as {name} to {format}",
+        "cannot export {member_type} such as {name} to {format}",
         format = .format.descriptive_name())
     ]
     MemberTypeNotRepresentable {
         /// Format that cannot represent it.
         format: Format,
-        /// Name of the universe member being exported.
+        /// Name of the universe member of the unsupported type.
         name: universe::Name,
-        /// The [`std::any::type_name()`] (TODO: have something better) of the
-        /// member that cannot be exported.
-        member_type_name: &'static str,
+        /// The unsupported type.
+        member_type: universe::Type,
     },
 }
 

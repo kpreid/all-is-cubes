@@ -8,7 +8,7 @@ use core::ops;
 use bevy_ecs::prelude as ecs;
 
 use crate::time;
-use crate::universe::{AnyHandle, Handle, Name, UniverseMember};
+use crate::universe::{AnyHandle, ErasedHandle, Handle, MemberBoilerplate, Name, UniverseMember};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -65,8 +65,8 @@ impl Membership {
             Err(_) => panic!(
                 "type mismatch: Membership::handle() called on member with type {actual} \
                     while expecting type {expected}",
-                expected = core::any::type_name::<T>(),
-                actual = self.handle.member_type_name()
+                expected = <T as MemberBoilerplate>::TYPE,
+                actual = <AnyHandle as ErasedHandle>::handle_type(&self.handle)
             ),
         }
     }

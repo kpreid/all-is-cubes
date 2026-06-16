@@ -87,6 +87,9 @@ pub trait UniverseMember: Sized + 'static + fmt::Debug + SealedMember + MemberBo
 /// Trait for operations on [`Handle`]s and queries that must be implemented for each member type.
 /// This trait is implemented by macro and not customized for each member type.
 pub(in crate::universe) trait MemberBoilerplate: Sized {
+    /// Run-time type ID for this member type.
+    const TYPE: Type;
+
     /// Generic constructor for [`AnyHandle`].
     fn into_any_handle(handle: Handle<Self>) -> AnyHandle;
 
@@ -184,6 +187,8 @@ pub(crate) use impl_universe_member_for_single_component_type;
 macro_rules! impl_universe_for_member {
     ($member_type:ident, $table:ident) => {
         impl MemberBoilerplate for $member_type {
+            const TYPE: Type = Type::$member_type;
+
             fn into_any_handle(handle: Handle<Self>) -> AnyHandle {
                 AnyHandle::$member_type(handle)
             }
@@ -251,6 +256,46 @@ macro_rules! member_enums_and_impls {
             }
         }
 
+        $( impl_universe_for_member!($member_type, $table_name); )*
+
+        /// The types that a [`Universe`] member can have.
+        ///
+        /// This enum has one variant for each implementation of [`UniverseMember`].
+        /// Thus, it is also a fieldless version of [`AnyHandle`].
+        /// It can be obtained from any handle using [`ErasedHandle::handle_type()`].
+        ///
+        /// The [`fmt::Debug`] format is always a Rust type name (and a Rust identifier).
+        /// The [`fmt::Display`] format is currently a Rust type name, but may in the future be
+        /// replaced by a “plain English” type name (e.g. “character” instead of “`Character`”).
+        #[derive(Clone, Copy, Eq, Hash, PartialEq)]
+        #[non_exhaustive]
+        pub enum Type {
+            $(
+                #[allow(missing_docs)]
+                $member_type,
+            )*
+        }
+
+        impl From<Type> for core::any::TypeId {
+            fn from(value: Type) -> Self {
+                match value {
+                    $(
+                        Type::$member_type => core::any::TypeId::of::<$member_type>(),
+                    )*
+                }
+            }
+        }
+
+        impl fmt::Display for Type {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.pad(match self {
+                    $(
+                        Self::$member_type => stringify!($member_type),
+                    )*
+                })
+            }
+        }
+
         /// Holds any one of the concrete [`Handle<T>`](Handle) types that can be in a [`Universe`].
         ///
         /// See also [`ErasedHandle`], which is implemented by `Handle`s rather than owning one.
@@ -264,16 +309,6 @@ macro_rules! member_enums_and_impls {
         }
 
         impl AnyHandle {
-            /// For debugging — not guaranteed to be stable.
-            #[doc(hidden)] // TODO: not great API, but used by all-is-cubes-port
-            pub fn member_type_name(&self) -> &'static str {
-                 match self {
-                    $( AnyHandle::$member_type(_) => {
-                        core::any::type_name::<$member_type>()
-                    } )*
-                }
-            }
-
             /// Used as part of checking whether a deserialized Universe contains bad handles.
             #[cfg(feature = "save")]
             pub(crate) fn not_still_deserializing(
@@ -321,8 +356,6 @@ macro_rules! member_enums_and_impls {
                 }
             }
         }
-
-        $( impl_universe_for_member!($member_type, $table_name); )*
 
         /// Polymorphic container for [`TransactionInUniverse`] which is
         /// used to store transactions in a [`UniverseTransaction`].
@@ -714,6 +747,10 @@ member_enums_and_impls!(
 
 impl AnyHandle {
     /// Downcast to a specific `Handle<T>` type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the handle points to some other type than `T`.
     pub fn downcast_ref<T: 'static>(&self) -> Option<&Handle<T>> {
         let handle: &dyn ErasedHandle = self.as_ref();
         let handle: &dyn Any = handle;
@@ -724,7 +761,7 @@ impl AnyHandle {
     ///
     /// # Errors
     ///
-    /// Returns `Err(self)` if the handle is of a different type than `T`.
+    /// Returns an error if the handle points to some other type than `T`.
     pub fn downcast<T: 'static>(self) -> Result<Handle<T>, AnyHandle> {
         // TODO: implement this more efficiently, without the clone
         // (note that `Box`ing to use `Box<dyn Any>` downcasting is *not* more efficient)
@@ -757,6 +794,11 @@ impl ErasedHandle for AnyHandle {
     fn name(&self) -> Name {
         let r: &dyn ErasedHandle = &**self;
         r.name()
+    }
+
+    fn handle_type(&self) -> Type {
+        let r: &dyn ErasedHandle = &**self;
+        r.handle_type()
     }
 
     fn universe_id(&self) -> Option<super::UniverseId> {
@@ -832,5 +874,13 @@ impl bevy_ecs::system::ExclusiveSystemParam for &mut MemberReadQueryStates {
         _: &bevy_ecs::system::SystemMeta,
     ) -> Self::Item<'s> {
         state
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+impl fmt::Debug for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <Type as fmt::Display>::fmt(self, f)
     }
 }

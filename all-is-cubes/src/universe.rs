@@ -35,7 +35,7 @@ pub(crate) use members::*;
     clippy::module_name_repetitions,
     reason = "TODO: rename UniverseMember to Member or something"
 )]
-pub use members::{AnyHandle, UniverseMember};
+pub use members::{AnyHandle, Type, UniverseMember};
 
 mod ecs_details;
 use ecs_details::NameMap;
@@ -786,17 +786,14 @@ impl fmt::Debug for Universe {
         }
 
         // Print members, sorted by name.
-        let members: BTreeMap<&Name, &'static str> = self
+        let members: BTreeMap<&Name, Type> = self
             .queries
             .all_members_query
             .iter_manual(&self.world)
-            .map(|(_entity, membership)| (&membership.name, membership.handle.member_type_name()))
+            .map(|(_entity, membership)| (&membership.name, membership.handle.handle_type()))
             .collect();
         for (member_name, type_name) in members {
-            ds.field(
-                &format!("{member_name}"),
-                &type_name.refmt(&manyfmt::formats::Unquote),
-            );
+            ds.field(&format!("{member_name}"), &type_name);
         }
 
         ds.finish_non_exhaustive()

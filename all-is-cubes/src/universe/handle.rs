@@ -19,7 +19,7 @@ use bevy_platform::sync::{Mutex, MutexGuard, OnceLock};
 
 use crate::universe::{
     self, AnyHandle, InsertError, InsertErrorKind, MemberBoilerplate, Membership, Name, ReadTicket,
-    ReadTicketError, SealedMember, Universe, UniverseId, UniverseMember, VisitHandles,
+    ReadTicketError, SealedMember, Type, Universe, UniverseId, UniverseMember, VisitHandles,
     id::OnceUniverseId,
 };
 
@@ -1156,6 +1156,8 @@ impl<T: UniverseMember> Clone for StrongHandle<T> {
 ///
 /// All [`PartialEq`] and [`hash::Hash`] implementations which wish to agree with [`Handle`] or
 /// [`ErasedHandle`] should delegate to (or effectively delegate to) this value.
+///
+/// This pointer is not valid to dereference and no assumptions should be made about its pointee.
 pub(in crate::universe) trait HandlePtr {
     fn as_erased_shared_pointer(&self) -> *const ();
 }
@@ -1168,9 +1170,12 @@ pub(in crate::universe) trait HandlePtr {
     private_bounds,
     reason = "trait not meant for implementation outside the crate"
 )]
-pub trait ErasedHandle: HandlePtr + Any + fmt::Debug {
+pub trait ErasedHandle: HandlePtr + Any + fmt::Debug + Send + Sync {
     /// Same as [`Handle::name()`].
     fn name(&self) -> Name;
+
+    /// Returns the [`Type`] of what this handle points to.
+    fn handle_type(&self) -> Type;
 
     /// Same as [`Handle::universe_id()`].
     fn universe_id(&self) -> Option<UniverseId>;
@@ -1191,6 +1196,10 @@ impl<T> HandlePtr for Handle<T> {
 impl<T: UniverseMember> ErasedHandle for Handle<T> {
     fn name(&self) -> Name {
         Handle::name(self)
+    }
+
+    fn handle_type(&self) -> Type {
+        T::TYPE
     }
 
     fn universe_id(&self) -> Option<UniverseId> {

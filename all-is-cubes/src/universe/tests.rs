@@ -64,8 +64,8 @@ fn universe_debug_elements() {
             clock: Clock(0/60 of 1s), \
             session_step_time: 0, \
             spaces_with_work: 0, \
-            'foo': all_is_cubes::space::Space, \
-            [anonymous #0]: all_is_cubes::block::block_def::BlockDef, \
+            'foo': Space, \
+            [anonymous #0]: BlockDef, \
             .. \
         }"
     );
@@ -76,8 +76,8 @@ fn universe_debug_elements() {
                 clock: Clock(0/60 of 1s),
                 session_step_time: 0,
                 spaces_with_work: 0,
-                'foo': all_is_cubes::space::Space,
-                [anonymous #0]: all_is_cubes::block::block_def::BlockDef,
+                'foo': Space,
+                [anonymous #0]: BlockDef,
                 ..
             }\
         "}
