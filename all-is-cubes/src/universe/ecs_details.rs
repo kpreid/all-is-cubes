@@ -66,7 +66,7 @@ impl Membership {
                 "type mismatch: Membership::handle() called on member with type {actual} \
                     while expecting type {expected}",
                 expected = <T as MemberBoilerplate>::TYPE,
-                actual = <AnyHandle as ErasedHandle>::handle_type(&self.handle)
+                actual = ErasedHandle::handle_type(&*self.handle)
             ),
         }
     }

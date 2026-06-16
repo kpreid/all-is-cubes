@@ -1162,15 +1162,19 @@ pub(in crate::universe) trait HandlePtr {
     fn as_erased_shared_pointer(&self) -> *const ();
 }
 
-/// `dyn` compatible trait implemented for [`Handle`], to allow code to operate on `Handle<T>`
-/// regardless of `T`.
+/// Type-erased form of [`Handle`].
 ///
-/// Do not implement this trait.
+/// This `dyn`-compatible trait is implemented for all [`Handle`]s,
+/// to allow code to operate on `Handle<T>` without needing to be implemented for every `T`.
+//---
+// Note: In order for the `Any` supertrait to behave as expected, this trait must not be implemented
+// for any types other than `Handle<T>`. If we find a need for more implementations, the `Any`
+// supertrait must be replaced with an explicit conversion method to `&dyn Any`.
 #[allow(
     private_bounds,
     reason = "trait not meant for implementation outside the crate"
 )]
-pub trait ErasedHandle: HandlePtr + Any + fmt::Debug + Send + Sync {
+pub trait ErasedHandle: HandlePtr + Any + fmt::Debug + Send + Sync + 'static {
     /// Same as [`Handle::name()`].
     fn name(&self) -> Name;
 

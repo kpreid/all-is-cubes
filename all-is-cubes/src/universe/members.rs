@@ -20,7 +20,7 @@ use crate::tag::TagDef;
 use crate::time;
 use crate::transaction;
 use crate::universe::{
-    self, ErasedHandle, Handle, InsertError, Name, Universe, handle::HandlePtr, universe_txn as ut,
+    self, ErasedHandle, Handle, InsertError, Universe, handle::HandlePtr, universe_txn as ut,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -787,35 +787,6 @@ impl HandlePtr for AnyHandle {
     fn as_erased_shared_pointer(&self) -> *const () {
         let r: &dyn ErasedHandle = &**self;
         r.as_erased_shared_pointer()
-    }
-}
-
-impl ErasedHandle for AnyHandle {
-    fn name(&self) -> Name {
-        let r: &dyn ErasedHandle = &**self;
-        r.name()
-    }
-
-    fn handle_type(&self) -> Type {
-        let r: &dyn ErasedHandle = &**self;
-        r.handle_type()
-    }
-
-    fn universe_id(&self) -> Option<super::UniverseId> {
-        let r: &dyn ErasedHandle = &**self;
-        r.universe_id()
-    }
-
-    fn as_entity(
-        &self,
-        expected_universe: super::UniverseId,
-    ) -> Result<ecs::Entity, universe::handle::HandleError> {
-        let r: &dyn ErasedHandle = &**self;
-        r.as_entity(expected_universe)
-    }
-
-    fn to_any_handle(&self) -> AnyHandle {
-        self.clone()
     }
 }
 
