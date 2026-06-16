@@ -20,7 +20,8 @@ use crate::tag::TagDef;
 use crate::time;
 use crate::transaction;
 use crate::universe::{
-    self, ErasedHandle, Handle, InsertError, Universe, handle::HandlePtr, universe_txn as ut,
+    self, ErasedHandle, Handle, InsertError, TypeError, Universe, handle::HandlePtr,
+    universe_txn as ut,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -751,10 +752,13 @@ impl AnyHandle {
     /// # Errors
     ///
     /// Returns an error if the handle points to some other type than `T`.
-    pub fn downcast_ref<T: 'static>(&self) -> Option<&Handle<T>> {
+    pub fn downcast_ref<T: UniverseMember>(&self) -> Result<&Handle<T>, TypeError> {
         let handle: &dyn ErasedHandle = self.as_ref();
-        let handle: &dyn Any = handle;
-        handle.downcast_ref()
+        <dyn Any>::downcast_ref(handle).ok_or_else(|| TypeError {
+            name: self.name(),
+            actual_type: self.handle_type(),
+            expected_type: T::TYPE,
+        })
     }
 
     /// Downcast to a specific `Handle<T>` type.
@@ -762,12 +766,12 @@ impl AnyHandle {
     /// # Errors
     ///
     /// Returns an error if the handle points to some other type than `T`.
-    pub fn downcast<T: 'static>(self) -> Result<Handle<T>, AnyHandle> {
+    pub fn downcast<T: UniverseMember>(self) -> Result<Handle<T>, AnyHandle> {
         // TODO: implement this more efficiently, without the clone
         // (note that `Box`ing to use `Box<dyn Any>` downcasting is *not* more efficient)
         match self.downcast_ref() {
-            Some(handle) => Ok(handle.clone()),
-            None => Err(self),
+            Ok(handle) => Ok(handle.clone()),
+            Err(_) => Err(self),
         }
     }
 }

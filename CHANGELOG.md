@@ -23,6 +23,7 @@
     * `time::Clock::phase()`, returns the clock’s phase, which was previously only obtainable through `Tick`.
     * `time::Tick::{delta_t_f64, delta_t_ps64}()`, convenience for common conversions.
     * `universe::Type`, for working with the closed set of types universe members can have.
+    * `universe::TypeError`
 
 * `all-is-cubes-mesh` library:
     * `Analysis` and `AnalysisVertex`, now public for special non-triangle-mesh applications.

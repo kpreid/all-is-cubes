@@ -1251,6 +1251,34 @@ impl<T> PartialEq<dyn ErasedHandle> for Handle<T> {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Error returned when attempting to obtain a typed [`Handle`] from an untyped source,
+/// and the type does not match.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub struct TypeError {
+    pub(crate) name: Name,
+    pub(crate) actual_type: Type,
+    pub(crate) expected_type: Type,
+}
+
+impl fmt::Display for TypeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            name,
+            actual_type,
+            expected_type,
+        } = self;
+        write!(
+            f,
+            "expected {expected_type}, but found {actual_type} {name}"
+        )
+    }
+}
+
+impl core::error::Error for TypeError {}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;

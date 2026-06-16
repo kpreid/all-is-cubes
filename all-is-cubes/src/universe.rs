@@ -421,16 +421,17 @@ impl Universe {
     /// Translates a name for an object of type `T` into a [`Handle`] for it.
     ///
     /// Returns [`None`] if no object exists for the name or if its type is not `T`.
+    //---
+    // TODO: consider changing this to return a `Result` — but we need a suitable error type;
+    // `TypeError` can’t handle “missing”.
     pub fn get<T>(&self, name: &Name) -> Option<Handle<T>>
     where
         T: UniverseMember,
     {
-        self.world
-            .resource::<NameMap>()
-            .map
-            .get(name)
-            .and_then(AnyHandle::downcast_ref)
-            .cloned()
+        match self.world.resource::<NameMap>().map.get(name) {
+            Some(handle) => AnyHandle::downcast_ref(handle).ok().cloned(),
+            None => None,
+        }
     }
 
     /// Inserts a new object with a specific name.
@@ -523,11 +524,12 @@ impl Universe {
     where
         T: UniverseMember,
     {
+        // TODO(ecs): it would be more efficient to have a query per type instead of filtering.
         self.queries.all_members_query.iter_manual(&self.world).filter_map(
             |(_entity, membership)| {
                 Some((
                     membership.name.clone(),
-                    membership.handle.downcast_ref::<T>()?.clone(),
+                    membership.handle.downcast_ref::<T>().ok()?.clone(),
                 ))
             },
         )

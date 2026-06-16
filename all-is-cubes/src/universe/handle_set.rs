@@ -39,7 +39,7 @@ impl HandleSet {
     /// Removes every `Handle<T>` from this set and returns them.
     pub fn extract_type<T: universe::UniverseMember>(&mut self) -> Vec<Handle<T>> {
         self.handles
-            .extract_if(.., |_, handle| handle.downcast_ref::<T>().is_some())
+            .extract_if(.., |_, handle| handle.downcast_ref::<T>().is_ok())
             .map(|(_, handle)| handle.downcast::<T>().unwrap_or_else(|_| unreachable!()))
             .collect()
     }

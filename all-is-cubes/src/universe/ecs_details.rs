@@ -8,7 +8,7 @@ use core::ops;
 use bevy_ecs::prelude as ecs;
 
 use crate::time;
-use crate::universe::{AnyHandle, ErasedHandle, Handle, MemberBoilerplate, Name, UniverseMember};
+use crate::universe::{AnyHandle, Handle, Name, UniverseMember};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -56,18 +56,14 @@ fn remove_membership_hook(
 impl Membership {
     /// Returns this member’s handle.
     ///
+    /// # Panics
+    ///
     /// Panics if `T` is not the correct handle type.
     #[track_caller]
     pub fn handle<T: UniverseMember>(&self) -> Handle<T> {
-        #[expect(clippy::match_wild_err_arm)]
-        match self.handle.clone().downcast() {
-            Ok(handle) => handle,
-            Err(_) => panic!(
-                "type mismatch: Membership::handle() called on member with type {actual} \
-                    while expecting type {expected}",
-                expected = <T as MemberBoilerplate>::TYPE,
-                actual = ErasedHandle::handle_type(&*self.handle)
-            ),
+        match self.handle.downcast_ref() {
+            Ok(handle) => handle.clone(),
+            Err(error) => panic!("type mismatch in Membership::handle(): {error}"),
         }
     }
 }
