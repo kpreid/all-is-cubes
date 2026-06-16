@@ -1250,6 +1250,80 @@ impl<T> PartialEq<dyn ErasedHandle> for Handle<T> {
 }
 
 // -------------------------------------------------------------------------------------------------
+// Conversions between erased handle types and non-erased handle types.
+
+impl<'a, T: UniverseMember> TryFrom<&'a dyn ErasedHandle> for &'a Handle<T> {
+    type Error = TypeError;
+
+    /// Downcast the handle reference to a concrete type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the handle points to some other type than `T`.
+    fn try_from(handle: &'a dyn ErasedHandle) -> Result<Self, Self::Error> {
+        <dyn Any>::downcast_ref(handle).ok_or_else(|| TypeError {
+            name: handle.name(),
+            actual_type: handle.handle_type(),
+            expected_type: T::TYPE,
+        })
+    }
+}
+
+impl<'a, T: UniverseMember> TryFrom<&'a dyn ErasedHandle> for Handle<T> {
+    type Error = TypeError;
+
+    /// Downcast the handle to a concrete type, cloning it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the handle points to some other type than `T`.
+    fn try_from(handle: &'a dyn ErasedHandle) -> Result<Self, Self::Error> {
+        <&'a Handle<T>>::try_from(handle).cloned()
+    }
+}
+
+impl<'a, T: UniverseMember> TryFrom<&'a AnyHandle> for &'a Handle<T> {
+    type Error = TypeError;
+
+    /// Downcast the handle to a concrete type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the handle points to some other type than `T`.
+    fn try_from(handle: &'a AnyHandle) -> Result<Self, Self::Error> {
+        let handle: &dyn ErasedHandle = handle.as_ref();
+        handle.try_into()
+    }
+}
+
+impl<T: UniverseMember> TryFrom<AnyHandle> for Handle<T> {
+    type Error = TypeError;
+
+    /// Downcast the handle to a concrete type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the handle points to some other type than `T`.
+    fn try_from(handle: AnyHandle) -> Result<Self, Self::Error> {
+        // TODO: implement this more efficiently, without the clone
+        let handle: &dyn ErasedHandle = handle.as_ref();
+        handle.try_into()
+    }
+}
+
+impl<'a, T: ?Sized + ErasedHandle> From<&'a T> for AnyHandle {
+    fn from(handle: &'a T) -> Self {
+        ErasedHandle::to_any_handle(handle)
+    }
+}
+
+impl<T: UniverseMember> From<Handle<T>> for AnyHandle {
+    fn from(handle: Handle<T>) -> Self {
+        MemberBoilerplate::into_any_handle(handle)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Error returned when attempting to obtain a typed [`Handle`] from an untyped source,
 /// and the type does not match.
@@ -1395,7 +1469,7 @@ mod tests {
             UniverseTransaction::insert("space".into(), Space::empty_positive(1, 1, 1));
         let handle_a_2 = handle_a_1.clone();
         let handle_a_dyn: &dyn ErasedHandle = &handle_a_1;
-        let handle_a_any: AnyHandle = MemberBoilerplate::into_any_handle(handle_a_1.clone());
+        let handle_a_any: AnyHandle = handle_a_1.clone().into();
         let handle_a_strong = StrongHandle::new(handle_a_1.clone());
         let (handle_b_1, _insert_b) =
             UniverseTransaction::insert("space".into(), Space::empty_positive(1, 1, 1));

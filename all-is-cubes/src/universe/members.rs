@@ -749,30 +749,24 @@ member_enums_and_impls!(
 impl AnyHandle {
     /// Downcast to a specific `Handle<T>` type.
     ///
+    /// This operation is also available as a [`TryFrom`] implementation.
+    ///
     /// # Errors
     ///
     /// Returns an error if the handle points to some other type than `T`.
     pub fn downcast_ref<T: UniverseMember>(&self) -> Result<&Handle<T>, TypeError> {
-        let handle: &dyn ErasedHandle = self.as_ref();
-        <dyn Any>::downcast_ref(handle).ok_or_else(|| TypeError {
-            name: self.name(),
-            actual_type: self.handle_type(),
-            expected_type: T::TYPE,
-        })
+        self.try_into()
     }
 
     /// Downcast to a specific `Handle<T>` type.
     ///
+    /// This operation is also available as a [`TryFrom`] implementation.
+    ///
     /// # Errors
     ///
     /// Returns an error if the handle points to some other type than `T`.
-    pub fn downcast<T: UniverseMember>(self) -> Result<Handle<T>, AnyHandle> {
-        // TODO: implement this more efficiently, without the clone
-        // (note that `Box`ing to use `Box<dyn Any>` downcasting is *not* more efficient)
-        match self.downcast_ref() {
-            Ok(handle) => Ok(handle.clone()),
-            Err(_) => Err(self),
-        }
+    pub fn downcast<T: UniverseMember>(self) -> Result<Handle<T>, TypeError> {
+        self.try_into()
     }
 }
 
