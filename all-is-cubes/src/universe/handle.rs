@@ -847,9 +847,10 @@ pub(crate) enum HandleErrorKind {
 
     /// Referent is being mutated and is not possible to access.
     ///
-    /// This can only happen inside of transactions or when working with a handle which is not
-    /// yet inserted into a universe. Outside of those cases, borrow checking of the universe
-    /// as a whole prevents it.
+    /// This can only happen if effects during universe stepping, such as a block tick action,
+    /// attempt to read data from the same object that is being stepped.
+    // [Internal: Specifically, when `ReadTicket::everything_but()` is being used.
+    /// It cannot happen as a result of external access.
     InUse,
 
     /// Referent does not have its data yet, which means that a serialized universe had

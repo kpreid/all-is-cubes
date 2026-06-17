@@ -741,9 +741,9 @@ pub(crate) struct BlockDefStepInfo {
     attempted: time::TimeStats,
     /// Evaluation cache updates that succeeded.
     updated: usize,
-    /// Evaluation cache updates that failed because of a [`HandleError::InUse`] conflict.
+    /// Evaluation cache updates that failed because of a [`HandleError`].
     /// TODO(ecs): Isn’t this impossible now?
-    was_in_use: usize,
+    transient_errors: usize,
 }
 
 impl manyfmt::Fmt<crate::util::StatusText> for BlockDefStepInfo {
@@ -751,11 +751,11 @@ impl manyfmt::Fmt<crate::util::StatusText> for BlockDefStepInfo {
         let Self {
             attempted,
             updated,
-            was_in_use,
+            transient_errors,
         } = self;
         write!(
             fmt,
-            "{attempted}, {updated} successful, {was_in_use} were in use"
+            "{attempted}, {updated} successful, {transient_errors} transient"
         )
     }
 }

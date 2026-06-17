@@ -155,7 +155,7 @@ impl CachedBlock {
 
         if let Some(attempted) = attempted {
             if matches!(self.cache, Err(ref e) if e.is_transient()) {
-                info.was_in_use += 1;
+                info.transient_errors += 1;
             }
 
             info.attempted = time::TimeStats::one(attempted.elapsed());
