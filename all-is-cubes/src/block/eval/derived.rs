@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use core::{fmt, ops};
 
 use euclid::Vector3D;
-use itertools::{Itertools as _, iproduct};
+use itertools::{AllEqualValueError, Itertools as _, iproduct};
 
 use crate::block::{
     self,
@@ -314,8 +314,8 @@ impl VoxelOpacityMask {
             .all_equal_value()
         {
             Ok(cat) => Some(cat),
-            Err(None) => Some(OpacityCategory::Invisible),
-            Err(Some(_)) => None,
+            Err(AllEqualValueError(None)) => Some(OpacityCategory::Invisible),
+            Err(AllEqualValueError(Some(_))) => None,
         };
 
         if let Some(uniform_opacity) = uniform_opacity {
@@ -352,8 +352,8 @@ impl VoxelOpacityMask {
         let uniform_opacity: Option<OpacityCategory> =
             match voxels.as_linear().iter().all_equal_value() {
                 Ok(&cat) => Some(cat),
-                Err(None) => Some(OpacityCategory::Invisible),
-                Err(Some(_)) => None,
+                Err(AllEqualValueError(None)) => Some(OpacityCategory::Invisible),
+                Err(AllEqualValueError(Some(_))) => None,
             };
 
         if let Some(uniform_opacity) = uniform_opacity {

@@ -115,7 +115,7 @@ hashbrown = { version = "0.17.0", default-features = false, features = ["default
 image = { version = "0.25.10", default-features = false }
 imgref = { version = "1.10.1", default-features = false }
 indoc = { version = "2.0.1", default-features = false }
-itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
+itertools = { version = "0.15.0", default-features = false, features = ["use_alloc"] }
 libm = { version = "0.2.8", default-features = false }
 log = { version = "0.4.29", default-features = false }
 macro_rules_attribute = { version = "0.2.0", default-features = false }

@@ -57,7 +57,7 @@ dependencies = [
  "futures-util",
  "hashbrown 0.17.0",
  "indoc",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "libm",
  "log",
  "macro_rules_attribute",
@@ -98,7 +98,7 @@ dependencies = [
  "exhaust",
  "futures-core",
  "indoc",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "libm",
  "log",
  "manyfmt",
@@ -127,7 +127,7 @@ dependencies = [
  "exhaust",
  "futures-core",
  "hashbrown 0.17.0",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "log",
  "macro_rules_attribute",
  "noise-functions",
@@ -170,7 +170,7 @@ dependencies = [
  "gltf",
  "hashbrown 0.17.0",
  "indicatif",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "kira",
  "log",
  "mint",
@@ -213,7 +213,7 @@ dependencies = [
  "hashbrown 0.17.0",
  "image",
  "indoc",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "log",
  "macro_rules_attribute",
  "num-traits",
@@ -251,7 +251,7 @@ dependencies = [
  "futures-util",
  "hashbrown 0.17.0",
  "indoc",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "log",
  "mutants 0.0.4",
  "num-traits",
@@ -279,7 +279,7 @@ dependencies = [
  "futures-core",
  "gltf-json",
  "image",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "log",
  "macro_rules_attribute",
  "pollster",
@@ -310,7 +310,7 @@ dependencies = [
  "hashbrown 0.17.0",
  "imgref",
  "indoc",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "manyfmt",
  "mutants 0.0.4",
  "num-traits",
@@ -354,7 +354,7 @@ dependencies = [
  "futures-util",
  "hashbrown 0.17.0",
  "indoc",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "log",
  "macro_rules_attribute",
  "mutants 0.0.4",
@@ -3180,6 +3180,15 @@ name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
@@ -6421,7 +6430,7 @@ dependencies = [
  "async_fn_traits",
  "clap",
  "futures-util",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "log",
  "serde",
  "serde_json",
@@ -6442,7 +6451,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "imgref",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "log",
  "oxipng",
  "png-decoder",
@@ -7985,7 +7994,7 @@ dependencies = [
  "anyhow",
  "cargo_metadata",
  "clap",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "serde_json",
  "strum 0.28.0",
  "toml_edit 0.25.11+spec-1.1.0",
