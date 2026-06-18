@@ -9,7 +9,7 @@ use all_is_cubes::block::{self, Evoxel, Resolution};
 use all_is_cubes::euclid::{Box2D, Point2D, Point3D, point3, vec3};
 use all_is_cubes::math::{
     Axis, Cube, Face, FaceMap, GridAab, GridCoordinate, GridPoint, Octant, OctantMap, OctantMask,
-    OpacityCategory, Vol, ZMaj,
+    OpacityCategory,
 };
 
 use crate::OutOfMemory;
@@ -161,8 +161,7 @@ impl Analysis {
         options: &crate::MeshOptions<M>,
     ) -> Result<Self, OutOfMemory> {
         analyze(
-            block.resolution(),
-            block.voxels().as_vol_ref(),
+            block.voxels().read(),
             options.transparency_format,
             &mut Viz::Disabled,
         )
@@ -347,13 +346,12 @@ impl Analysis {
 ///
 /// TODO: consider taking an `&mut Analysis` value to reuse allocation and reduce stack size.
 pub(crate) fn analyze(
-    resolution: Resolution,
-    voxels: Vol<&[Evoxel]>,
+    voxels: block::EvoxelsRef<'_>,
     transparency: TransparencyFormat,
     viz: &mut Viz,
 ) -> Result<Analysis, OutOfMemory> {
     let mut analysis = Analysis::EMPTY;
-    analysis.resolution = resolution;
+    analysis.resolution = voxels.resolution();
     viz.analysis_in_progress(&analysis);
 
     // TODO: Have EvaluatedBlock tell us when a block is fully cubical and opaque,
@@ -503,7 +501,7 @@ fn uncovered(mask: OctantMask, face: Face) -> bool {
 /// Note: Changing the iteration order will change the ordering of the [`Analysis::vertices`]
 /// vector, which must be taken into account.
 fn for_each_window<'a>(
-    voxels: Vol<&'a [Evoxel], ZMaj>,
+    voxels: block::EvoxelsRef<'a>,
     mut f: impl FnMut((Point3D<u8, Cube>, OctantMap<&'a Evoxel>)) -> Result<(), OutOfMemory>,
 ) -> Result<(), OutOfMemory> {
     if voxels.bounds().is_empty() {
@@ -523,7 +521,6 @@ fn for_each_window<'a>(
 
     // TODO: try using explicitly computed linear indices instead of passing a Cube every time
     // (might not be a win given needing to handle the out-of-bounds cases).
-    let get_voxel = |cube: Cube| voxels.get_ref(cube).unwrap_or(const { &Evoxel::AIR });
 
     for x in window_lb_bounds.x_range() {
         for y in window_lb_bounds.y_range() {
@@ -549,10 +546,12 @@ fn for_each_window<'a>(
                 // Fetch voxels newly within the window
                 let uppermost_cube = new_quad_lb.wrapping_add(vec3(1, 1, 0));
                 let center = uppermost_cube.lower_bounds();
-                oct_voxels[Octant::Nnp] = get_voxel(new_quad_lb);
-                oct_voxels[Octant::Npp] = get_voxel(new_quad_lb.wrapping_add(vec3(0, 1, 0)));
-                oct_voxels[Octant::Pnp] = get_voxel(new_quad_lb.wrapping_add(vec3(1, 0, 0)));
-                oct_voxels[Octant::Ppp] = get_voxel(uppermost_cube);
+                oct_voxels[Octant::Nnp] = voxels.get_evoxel(new_quad_lb);
+                oct_voxels[Octant::Npp] =
+                    voxels.get_evoxel(new_quad_lb.wrapping_add(vec3(0, 1, 0)));
+                oct_voxels[Octant::Pnp] =
+                    voxels.get_evoxel(new_quad_lb.wrapping_add(vec3(1, 0, 0)));
+                oct_voxels[Octant::Ppp] = voxels.get_evoxel(uppermost_cube);
 
                 // can't overflow due to the `Resolution` limit on blocks
                 f((center.map(|coord| coord as u8), oct_voxels))?;
@@ -627,7 +626,7 @@ mod tests {
     use all_is_cubes::block::{self, Block};
     use all_is_cubes::content::make_some_blocks;
     use all_is_cubes::euclid::{point2, point3, size2};
-    use all_is_cubes::math::{GridAab, Rgb, Rgba, ZMaj, rgba_const};
+    use all_is_cubes::math::{GridAab, Rgb, Rgba, Vol, ZMaj, rgba_const};
     use all_is_cubes::universe::ReadTicket;
     use all_is_cubes::universe::Universe;
     use alloc::sync::Arc;
@@ -641,13 +640,17 @@ mod tests {
         let red = rgba_const!(1.0, 0.0, 0.0, 1.0);
         // This test is ordering-sensitive but doesn't truly care what ordering; just, we'll
         // need to change the coordinates if we change the ordering.
-        let vol: Vol<Arc<[Evoxel]>, ZMaj> =
-            Vol::from_elements(GridAab::ORIGIN_CUBE, vec![Evoxel::from_color(red)]).unwrap();
+        let vol: Vol<Arc<[block::VoxelIndex]>, ZMaj> =
+            Vol::from_elements(GridAab::ORIGIN_CUBE, [0]).unwrap();
         let mut results: Vec<(Point3D<u8, Cube>, [Rgba; 8])> = Vec::new();
-        for_each_window(vol.as_ref(), |(point, colors)| {
-            results.push((point, colors.into_zmaj_array().map(|voxel| voxel.color)));
-            Ok(())
-        })
+        for_each_window(
+            block::Evoxels::from_paletted(Resolution::R2, Arc::new([Evoxel::from_color(red)]), vol)
+                .read(), // resolution doesn't matter
+            |(point, colors)| {
+                results.push((point, colors.into_zmaj_array().map(|voxel| voxel.color)));
+                Ok(())
+            },
+        )
         .unwrap();
         assert_eq!(
             results,
@@ -689,8 +692,7 @@ mod tests {
         let slab = all_is_cubes::content::make_slab(&mut u, thickness, Resolution::R4);
         let ev = slab.evaluate(u.read_ticket()).unwrap();
         let analysis = analyze(
-            ev.resolution(),
-            ev.voxels().as_vol_ref(),
+            ev.voxels().read(),
             TransparencyFormat::Surfaces,
             &mut Viz::disabled(),
         )
@@ -745,8 +747,7 @@ mod tests {
         voxel.emission = Rgb::ONE;
 
         let analysis = analyze(
-            Resolution::R1,
-            Vol::from_elements(GridAab::for_block(Resolution::R1), [voxel].as_slice()).unwrap(),
+            block::Evoxels::from_one(voxel).read(),
             TransparencyFormat::Surfaces,
             &mut Viz::disabled(),
         )
@@ -768,8 +769,7 @@ mod tests {
             .build_into(&mut u);
         let ev = block.evaluate(u.read_ticket()).unwrap();
         let analysis = analyze(
-            ev.resolution(),
-            ev.voxels().as_vol_ref(),
+            ev.voxels().read(),
             TransparencyFormat::BoundingBox,
             &mut Viz::disabled(),
         )
@@ -795,8 +795,7 @@ mod tests {
             .build_into(&mut u);
         let ev = block.evaluate(u.read_ticket()).unwrap();
         let analysis = analyze(
-            ev.resolution(),
-            ev.voxels().as_vol_ref(),
+            ev.voxels().read(),
             TransparencyFormat::Surfaces,
             &mut Viz::disabled(),
         )
@@ -819,8 +818,7 @@ mod tests {
         let [block] = make_some_blocks();
         let ev = block.evaluate(ReadTicket::stub()).unwrap();
         let analysis = analyze(
-            ev.resolution(),
-            ev.voxels().as_vol_ref(),
+            ev.voxels().read(),
             TransparencyFormat::Surfaces,
             &mut Viz::disabled(),
         )

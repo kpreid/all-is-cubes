@@ -10,12 +10,14 @@ use alloc::sync::Arc;
 use alloc::{vec, vec::Vec};
 use core::fmt;
 
+use hashbrown::HashMap;
+
 use crate::inv;
 use crate::listen::{self, Listen as _, Listener};
 use crate::math::{
     GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgb01, Rgba, Vol,
 };
-use crate::space::{SetCubeError, Space, SpaceChange};
+use crate::space::{BlockIndex, SetCubeError, Space, SpaceChange};
 use crate::universe::{Handle, HandleVisitor, ReadTicket, VisitHandles};
 
 // -------------------------------------------------------------------------------------------------
@@ -690,36 +692,28 @@ impl Block {
                     ));
                 }
 
-                // Intersect that region with the actual bounds of `space`.
-                let mut voxels_animation_hint = AnimationHint::UNCHANGING;
-                let voxels: Vol<Arc<[Evoxel]>> = match full_resolution_bounds
+                // Intersect the nominal region with the actual bounds of `space`
+                // (and also use this as our chance to `skip_eval`).
+                let occupied_bounds: Option<GridAab> = full_resolution_bounds
                     .intersection_cubes(block_space.bounds())
-                    .filter(|_| !filter.skip_eval)
-                {
-                    Some(occupied_bounds) => {
-                        Budget::decrement_voxels(
-                            &filter.budget,
-                            occupied_bounds.volume().unwrap(),
-                        )?;
+                    .filter(|_| !filter.skip_eval);
 
-                        block_space
-                            .extract(
-                                occupied_bounds,
-                                #[inline(always)]
-                                |extract| {
-                                    let ev = extract.block_data().evaluated();
-                                    voxels_animation_hint |= ev.attributes().animation_hint;
-                                    Evoxel::from_block(ev)
-                                },
-                            )
-                            .translate(-offset.to_vector())
-                    }
-                    None => {
-                        // If there is no intersection, then return an empty voxel array,
-                        // with an arbitrary position.
-                        // Also applies when skip_eval is true
-                        Vol::origin_empty()
-                    }
+                Budget::decrement_voxels(
+                    &filter.budget,
+                    occupied_bounds.as_ref().and_then(GridAab::volume).unwrap_or(0),
+                )?;
+
+                let (palette, indices, voxels_animation_hint): (
+                    Arc<[Evoxel]>,
+                    Vol<Arc<[VoxelIndex]>>,
+                    AnimationHint,
+                ) = if let Some(occupied_bounds) = occupied_bounds {
+                    copy_space_to_voxels(-offset.to_vector(), block_space, occupied_bounds)
+                } else {
+                    // If there is no intersection, then return an empty voxel array,
+                    // with an arbitrary position.
+                    // Also applies when skip_eval is true
+                    (Arc::new([]), Vol::origin_empty(), AnimationHint::UNCHANGING)
                 };
 
                 MinEval::new(
@@ -733,7 +727,7 @@ impl Block {
                         },
                         ..BlockAttributes::default()
                     },
-                    Evoxels::from_many(resolution, voxels),
+                    Evoxels::from_paletted(resolution, palette, indices),
                 )
             }
 
@@ -779,6 +773,77 @@ impl Block {
                 panic!("Block::color not defined for non-atom blocks")
             }
         }
+    }
+}
+
+/// Copy [`Space`] contents to the ingredients of [`Evoxels`].
+///
+/// `bounds_to_copy` is the region of the [`Space`] to copy.
+/// `translation` is the translation to apply to the result.
+///
+/// Part of evaluating [`Primitive::Recur`].
+fn copy_space_to_voxels(
+    translation: GridVector,
+    block_space: crate::space::Read<'_>,
+    bounds_to_copy: GridAab,
+) -> (Arc<[Evoxel]>, Vol<Arc<[VoxelIndex]>>, AnimationHint) {
+    let mut voxels_animation_hint = AnimationHint::UNCHANGING;
+
+    // TODO: Do we ever want to bother with the remapping version of this?
+    if true {
+        // Copy the space’s palette and indices exactly identically.
+        // This does not require building a lookup table, but may produce unused palette entries,
+        // and even duplicate entries due to blocks that are identical when converted to `Evoxel`.
+
+        let block_palette: Arc<[Evoxel]> = block_space
+            .block_data()
+            .iter()
+            .map(|block_data| {
+                let ev = block_data.evaluated();
+                // This is imprecise: we might take a hint from a block that doesn’t appear
+                // in what we’re copying. We will assume that is not a big deal.
+                voxels_animation_hint |= ev.attributes().animation_hint;
+                Evoxel::from_block(ev)
+            })
+            .collect();
+
+        // TODO: If copying the whole space, skip extract() and do a pure slice copy.
+        let indices = block_space
+            .extract(
+                bounds_to_copy,
+                #[inline(always)]
+                |extract| extract.block_index(),
+            )
+            .translate(translation);
+
+        (block_palette, indices, voxels_animation_hint)
+    } else {
+        // Remap indices to produce a more condensed palette.
+
+        let mut block_palette = Vec::new();
+        let mut index_remap: HashMap<BlockIndex, VoxelIndex> = HashMap::new();
+
+        let indices: Vol<Arc<[VoxelIndex]>> = block_space
+            .extract(
+                bounds_to_copy,
+                #[inline(always)]
+                |extract| {
+                    *index_remap.entry(extract.block_index()).or_insert_with(|| {
+                        let ev = extract.block_data().evaluated();
+                        let evoxel = Evoxel::from_block(ev);
+
+                        voxels_animation_hint |= ev.attributes().animation_hint;
+
+                        // Cannot overflow because `Space`s have u16 indices too.
+                        let new_index = block_palette.len() as VoxelIndex;
+                        block_palette.push(evoxel);
+                        new_index
+                    })
+                },
+            )
+            .translate(translation);
+
+        (block_palette.into(), indices, voxels_animation_hint)
     }
 }
 

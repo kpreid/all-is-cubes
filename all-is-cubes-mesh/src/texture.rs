@@ -4,10 +4,9 @@
 
 use core::fmt;
 
-use all_is_cubes::block::{Evoxel, Evoxels};
-use all_is_cubes::content::palette;
+use all_is_cubes::block;
 use all_is_cubes::euclid::Point3D;
-use all_is_cubes::math::{Axis, Cube, GridAab, GridSizeCoord, Rgb, Vol};
+use all_is_cubes::math::{Axis, Cube, GridAab, GridSizeCoord, Rgb};
 use all_is_cubes::util::{ConciseDebug, Fmt};
 
 // -------------------------------------------------------------------------------------------------
@@ -58,7 +57,8 @@ pub trait Allocator {
     ///   texture coordinate transformation convenient for the caller.
     ///   It must not be empty (zero volume).
     /// * `channels` specifies what types of data the texture should capture from the
-    ///   [`Evoxel`]s that will be provided later to [`Tile::write()`].
+    ///   [`Evoxel`][all_is_cubes::block::Evoxel]s that will be provided later to
+    ///   [`Tile::write()`].
     ///   The allocator may choose to ignore some channels if this suits the
     ///   limitations of the intended rendering; an allocation should not fail due to
     ///   unsupported channels.
@@ -120,9 +120,10 @@ pub trait Tile: Clone + PartialEq {
     /// this [`Tile`] (or a clone of it) has not been dropped.
     fn grid_to_texcoord_3d(&self, in_tile_grid: TilePoint) -> Self::Point;
 
-    /// Copy the given voxels' color into this texture volume.
+    /// Copy the given voxels' visual properties into this texture volume.
     ///
-    /// [`data.bounds()`](Vol::bounds) must be equal to [`self.bounds()`](Self::bounds).
+    /// [`data.bounds()`][block::EvoxelsRef::bounds] must be equal to
+    /// [`self.bounds()`][Self::bounds].
     ///
     /// If `Self::REUSABLE` is false, this may not be called more than once; the implementation
     /// may panic, overwrite, or ignore additional calls.
@@ -130,7 +131,7 @@ pub trait Tile: Clone + PartialEq {
     // TODO: Make the input be ordered in X-major order so a bulk copy is feasible in typical
     // texturing systems.
     // TODO: `REUSABLE` is a lousy API because it isn't statically checked
-    fn write(&mut self, data: Vol<&[Evoxel]>);
+    fn write(&mut self, data: block::EvoxelsRef<'_>);
 }
 
 /// 2D texture slice to use for texturing the surface of a voxel mesh.
@@ -253,21 +254,24 @@ pub fn validate_slice(tile_bounds: GridAab, slice_bounds: GridAab) -> Axis {
 /// `voxels` must not be empty (zero volume).
 pub(super) fn copy_voxels_to_new_texture<A: Allocator>(
     texture_allocator: &A,
-    voxels: &Evoxels,
+    voxels: block::EvoxelsRef<'_>,
 ) -> Option<A::Tile> {
     texture_allocator
         .allocate(voxels.bounds(), needed_channels(voxels))
         .map(|mut texture| {
-            texture.write(voxels.as_vol_ref());
+            texture.write(voxels);
             texture
         })
 }
 
 /// Determine which [`Channels`] are necessary to store all relevant characteristics of the block.
-pub(super) fn needed_channels(voxels: &Evoxels) -> Channels {
-    // This has false positives because it includes obscured voxels, but that is probably not
-    // worth fixing with a more complex algorithm.
-    if voxels.as_vol_ref().as_linear().iter().any(|voxel| voxel.emission != Rgb::ZERO) {
+pub(super) fn needed_channels(voxels: block::EvoxelsRef<'_>) -> Channels {
+    // This has false positives because:
+    // * It includes obscured voxels that do not appear in the mesh.
+    // * The voxel palette may contain unused entries.
+    // These issues are probably not worth fixing with a more complex algorithm
+    // (unless we have a use case for carefully building absolute-minimal-data-size meshes).
+    if voxels.palette().iter().any(|voxel| voxel.emission != Rgb::ZERO) {
         Channels::ReflectanceEmission
     } else {
         Channels::Reflectance
@@ -283,14 +287,16 @@ pub(super) fn needed_channels(voxels: &Evoxels) -> Channels {
 )]
 #[expect(clippy::module_name_repetitions)]
 pub fn copy_voxels_into_xmaj_texture(
-    voxels: Vol<&[Evoxel]>,
+    voxels: block::EvoxelsRef<'_>,
     reflectance_texture: &mut [[u8; 4]],
     emission_texture: Option<&mut [[u8; 4]]>,
 ) {
     let bounds = voxels.bounds();
-    assert_eq!(voxels.volume(), reflectance_texture.len());
+    let volume: usize = voxels.indices().volume();
+
+    assert_eq!(volume, reflectance_texture.len());
     if let Some(&mut ref mut t) = emission_texture {
-        assert_eq!(voxels.volume(), t.len());
+        assert_eq!(volume, t.len());
     }
 
     // TODO: Consider changing `Evoxels`'s ordering so that this can be a straight copy instead
@@ -299,10 +305,7 @@ pub fn copy_voxels_into_xmaj_texture(
     for z in bounds.z_range() {
         for y in bounds.y_range() {
             for x in bounds.x_range() {
-                let voxel = voxels
-                    .get(Cube { x, y, z })
-                    .copied()
-                    .unwrap_or(Evoxel::from_color(palette::MISSING_VOXEL_ERROR));
+                let voxel = voxels.get_evoxel(Cube { x, y, z });
                 reflectance_texture[i] = voxel.color.to_srgb8();
 
                 if let Some(&mut ref mut t) = emission_texture {
@@ -364,7 +367,7 @@ impl Tile for NoTexture {
         match *self {}
     }
 
-    fn write(&mut self, _data: Vol<&[Evoxel]>) {
+    fn write(&mut self, _data: block::EvoxelsRef<'_>) {
         match *self {}
     }
 

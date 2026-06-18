@@ -5,7 +5,7 @@ use rand_distr::Distribution;
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use all_is_cubes::block::{Evoxel, Resolution};
+use all_is_cubes::block::{self, Evoxel, Resolution};
 use all_is_cubes::math::{Cube, Face7, FreeCoordinate, FreePoint, FreeVector, Rgb, Rgba, Vol};
 use all_is_cubes::raycast::Ray;
 
@@ -337,19 +337,15 @@ where
             }
             None => {
                 let resolution = tb.voxels.resolution();
-                let array = tb.voxels.as_vol_ref();
                 let block_cube = rc_step.cube_ahead();
                 let (sub_raycaster, sub_ray) =
-                    R::recursive_raycast(rc_step, self.ray, resolution, array.bounds());
-                let antiscale = resolution.recip_f64();
+                    R::recursive_raycast(rc_step, self.ray, resolution, tb.voxels.bounds());
 
                 self.current_block = Some(VoxelSurfaceIter {
                     voxel_ray: sub_ray,
                     voxel_raycaster: sub_raycaster,
                     block_data: &tb.block_data,
-                    resolution,
-                    antiscale,
-                    array,
+                    array: tb.voxels.read(),
                     block_cube,
                 });
 
@@ -373,10 +369,7 @@ where
     voxel_ray: R::Ray,
     voxel_raycaster: R,
     block_data: &'a D,
-    resolution: Resolution,
-    /// Reciprocal of resolution, for scaling back to outer world
-    antiscale: FreeCoordinate,
-    array: Vol<&'a [Evoxel]>,
+    array: block::EvoxelsRef<'a>,
 
     /// Cube these voxels are located in, for lighting lookups.
     block_cube: Cube,
@@ -393,9 +386,10 @@ where
 
         // Note: The proper scaling here depends on the direction vector scale, that
         // recursive_raycast() _doesn't_ change.
-        let t_distance = rc_step.t_distance() * self.antiscale;
+        let antiscale = self.array.resolution().recip_f64();
+        let t_distance = rc_step.t_distance() * antiscale;
 
-        let Some(voxel) = self.array.get(rc_step.cube_ahead()) else {
+        let Some(voxel) = self.array.get_opt_evoxel(rc_step.cube_ahead()) else {
             // On exit from the voxel bounds, report the distance.
             // If we returned None, we might count a transparent volume
             // as too deep.
@@ -411,9 +405,9 @@ where
             diffuse_color: voxel.color,
             emission: voxel.emission,
             cube: self.block_cube,
-            voxel: (self.resolution, rc_step.cube_ahead()),
+            voxel: (self.array.resolution(), rc_step.cube_ahead()),
             t_distance,
-            intersection_point: rc_step.intersection_point(self.voxel_ray.into()) * self.antiscale
+            intersection_point: rc_step.intersection_point(self.voxel_ray.into()) * antiscale
                 + self.block_cube.lower_bounds().map(FreeCoordinate::from).to_vector(),
             normal: rc_step.face(),
         }))

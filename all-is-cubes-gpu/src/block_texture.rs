@@ -14,10 +14,10 @@ use std::sync::{Mutex, MutexGuard};
 #[cfg(feature = "rerun")]
 use itertools::iproduct;
 
-use all_is_cubes::block::Evoxel;
+use all_is_cubes::block;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{Box3D, Translation3D};
-use all_is_cubes::math::{self, Cube, GridAab, GridCoordinate, VectorOps as _, Vol};
+use all_is_cubes::math::{self, Cube, GridAab, GridCoordinate, VectorOps as _};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;
@@ -341,7 +341,7 @@ impl texture::Tile for AtlasTile {
         }
     }
 
-    fn write(&mut self, data: Vol<&[Evoxel]>) {
+    fn write(&mut self, data: block::EvoxelsRef<'_>) {
         // Note: acquiring the two locks separately to avoid possible deadlock
         // with another thread trying to flush() (which acquires allocator and
         // then tile locks). I believe that in all possible interleavings, the

@@ -281,6 +281,28 @@ where
         }
     }
 
+    /// Constructs a `Vol<C>` by using the provided function (which may fail) to compute a value
+    /// for each cube within the volume.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bounds` has a volume exceeding `usize::MAX`.
+    /// (But there will likely be a memory allocation failure well below that point.)
+    #[inline]
+    #[track_caller]
+    #[expect(clippy::missing_errors_doc)]
+    pub fn try_from_fn<E, F>(bounds: GridAab, f: F) -> Result<Self, E>
+    where
+        F: FnMut(Cube) -> Result<V, E>,
+    {
+        match bounds.to_vol::<ZMaj>() {
+            Ok(bounds) => Ok(bounds
+                .with_elements(bounds.iter_cubes().map(f).collect::<Result<C, E>>()?)
+                .unwrap()),
+            Err(length_error) => panic!("{length_error}"),
+        }
+    }
+
     /// Constructs a `Vol<C>` by cloning the provided value for each point.
     ///
     /// # Panics
@@ -603,7 +625,23 @@ impl<V> Vol<&mut [V], ZMaj> {
     }
 }
 
-impl<V: Clone, O> Vol<Arc<[V]>, O> {
+impl<V: Clone, O: Copy> Vol<Arc<[V]>, O> {
+    /// Borrows `self` as a `Vol<&mut [V]>`, cloning if necessary, as if by [`Arc::make_mut()`].
+    ///
+    /// This is equivalent to [`Vol::as_mut()`] for non-`Arc` containers.
+    #[doc(hidden)] // TODO: good public API?
+    #[allow(clippy::missing_inline_in_public_items)]
+    pub fn make_mut(&mut self) -> Vol<&mut [V], O> {
+        let slice: &mut [V] = Arc::make_mut(&mut self.contents);
+        debug_assert_eq!(slice.len(), self.bounds.volume().unwrap());
+
+        Vol {
+            bounds: self.bounds,
+            ordering: self.ordering,
+            contents: slice,
+        }
+    }
+
     /// Returns the linear contents viewed as a mutable slice, as if by [`Arc::make_mut()`].
     #[doc(hidden)] // TODO: good public API?
     #[allow(clippy::missing_inline_in_public_items)]

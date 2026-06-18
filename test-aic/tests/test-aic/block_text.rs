@@ -3,14 +3,15 @@ use pretty_assertions::assert_eq;
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::block::{self, Block, Primitive, Resolution, Text};
 use all_is_cubes::euclid::size2;
-use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector, Vol};
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector};
 use all_is_cubes::space::Space;
 use all_is_cubes::text::{Font, Positioning, PositioningX, PositioningY, PositioningZ};
 use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_render::raytracer::print_space;
 
 /// Convert voxels with z range = 1 to a string for readable comparisons.
-fn plane_to_text(voxels: Vol<&[block::Evoxel]>) -> Vec<String> {
+fn plane_to_text(voxels: &block::Evoxels) -> Vec<String> {
+    let voxels = voxels.read();
     fn convert_voxel(v: &block::Evoxel) -> char {
         if v.color.fully_transparent() {
             '.'
@@ -31,7 +32,7 @@ fn plane_to_text(voxels: Vol<&[block::Evoxel]>) -> Vec<String> {
                 .bounds()
                 .x_range()
                 .into_iter()
-                .map(|x| convert_voxel(&voxels[Cube::new(x, y, z)]))
+                .map(|x| convert_voxel(voxels.get_evoxel(Cube::new(x, y, z))))
                 .collect::<String>()
         })
         .collect()
@@ -99,7 +100,7 @@ fn single_line_text_smoke_test() {
     assert_eq!(ev.voxels().bounds(), text.rendering_bounding_voxels());
 
     assert_eq!(
-        plane_to_text(ev.voxels().as_vol_ref()),
+        plane_to_text(ev.voxels()),
         vec![
             ".......##....",
             ".......##....",
@@ -131,7 +132,7 @@ fn multiple_line() {
     );
 
     assert_eq!(
-        plane_to_text(block.evaluate(universe.read_ticket()).unwrap().voxels().as_vol_ref()),
+        plane_to_text(block.evaluate(universe.read_ticket()).unwrap().voxels()),
         vec![
             ".......##................##",
             ".......##................##",

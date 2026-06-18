@@ -4,11 +4,11 @@ use alloc::vec::Vec;
 
 use itertools::Itertools as _;
 
-use all_is_cubes::block::{self, AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
+use all_is_cubes::block::{self, AnimationChange, EvaluatedBlock, Evoxel, Resolution};
 use all_is_cubes::euclid::Scale;
 use all_is_cubes::math::{
     Cube, Face, GridAab, GridCoordinate, GridSizeCoord, OctantMask, OpacityCategory, Rgb, Rgba,
-    Vol, ZeroOne,
+    ZeroOne,
 };
 use all_is_cubes_render::Flaws;
 
@@ -101,7 +101,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
         // If we want to use a texture, try to allocate it.
         output.texture_used = if prefer_textures {
             // TODO: this doesn't use the result of `limit_alpha()` but should.
-            texture::copy_voxels_to_new_texture(texture_allocator, voxels)
+            texture::copy_voxels_to_new_texture(texture_allocator, voxels.read())
         } else {
             None
         };
@@ -118,28 +118,19 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
 
         push_full_box(output, voxel.opacity_category(), coloring, &mut viz)?;
     } else {
+        let voxels = voxels.read();
         viz.voxels(voxels);
         viz.completed_step();
-        let voxels_array = voxels.as_vol_ref();
 
         // Exit when the voxel data is not at all in the right volume, or is empty.
         // This dodges some integer overflow cases on bad input,
         // and avoids asking the texture allocator for an empty allocation.
         // TODO: Add a test for this case
-        if voxels_array
-            .bounds()
-            .intersection_cubes(GridAab::for_block(resolution))
-            .is_none()
-        {
+        if voxels.bounds().intersection_cubes(GridAab::for_block(resolution)).is_none() {
             return Ok(());
         }
 
-        let analysis = analyze(
-            resolution,
-            voxels_array,
-            options.transparency_format,
-            &mut viz,
-        )?;
+        let analysis = analyze(voxels, options.transparency_format, &mut viz)?;
 
         compute_block_mesh_from_analysis(
             output,
@@ -179,7 +170,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
 /// Returns an error if memory allocation fails.
 fn compute_block_mesh_from_analysis<M: MeshTypes>(
     output: &mut BlockMesh<M>,
-    voxels: &Evoxels,
+    voxels: block::EvoxelsRef<'_>,
     analysis: &Analysis,
     prefer_textures: bool,
     texture_allocator: &M::Alloc,
@@ -193,7 +184,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     let resolution = voxels.resolution();
     let resolution_g = GridCoordinate::from(resolution);
     let scale_to_block: Scale<f32, Cube, crate::MeshRel> = Scale::new(resolution.recip_f32());
-    let voxels_array = voxels.as_vol_ref();
 
     for sub_mesh in output.face_vertices.values_mut() {
         // Start assuming opacity; if we find any transparent pixels we'll set
@@ -279,7 +269,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     for (t, s) in occupied_rect.y_range().cartesian_product(occupied_rect.x_range())
                     {
                         let cube: Cube = voxel_transform.transform_cube(Cube::new(s, t, layer));
-                        let evoxel = get_voxel_with_limit(voxels_array, cube, options);
+                        let evoxel = get_voxel_with_limit(voxels, cube, options);
 
                         if !evoxel.color.fully_opaque() {
                             // If the first layer is transparent in any cube at all, then the face is
@@ -396,7 +386,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                                 used_any_vertex_colors = true;
 
                                 // Fetch color from voxel data
-                                vertex::Coloring::Solid(voxels_array[acceptable_voxel].color)
+                                vertex::Coloring::Solid(voxels.get_evoxel(acceptable_voxel).color)
                             };
                         let v =
                             <M::Vertex as vertex::Vertex>::from_block_vertex(vertex::BlockVertex {
@@ -452,12 +442,13 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
 
 // -------------------------------------------------------------------------------------------------
 
+#[inline] // single use
 fn get_voxel_with_limit(
-    voxels: Vol<&[Evoxel]>,
+    voxels: block::EvoxelsRef<'_>,
     cube: Cube,
     options: &MeshOptions<impl MeshTypes>,
 ) -> Evoxel {
-    let mut evoxel = *voxels.get(cube).unwrap_or(&Evoxel::AIR);
+    let mut evoxel = *voxels.get_evoxel(cube);
     // TODO: this is clunky and might get out of sync with other places that read voxels
     evoxel.color = match options.transparency_format {
         TransparencyFormat::Surfaces => options.transparency.limit_alpha(evoxel.color),

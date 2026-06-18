@@ -51,7 +51,7 @@ pub fn cursor_raycast(
                 face_selected = Some(step.face());
             }
             None => {
-                let voxels = evaluated.voxels().as_vol_ref();
+                let voxels = evaluated.voxels().read();
                 let recursive_hit: Option<(Cube, &Evoxel)> = step
                     .recursive_raycast(ray, evaluated.resolution(), voxels.bounds())
                     .0
@@ -64,7 +64,9 @@ pub fn cursor_raycast(
                             // evaluation to make the bounding box guaranteed tight.
                             face_selected = Some(voxel_step.face());
                         }
-                        voxels.get(voxel_step.cube_ahead()).map(|v| (voxel_step.cube_ahead(), v))
+                        voxels
+                            .get_opt_evoxel(voxel_step.cube_ahead())
+                            .map(|v| (voxel_step.cube_ahead(), v))
                     })
                     .find(|(_, v)| v.selectable);
                 if recursive_hit.is_none() {

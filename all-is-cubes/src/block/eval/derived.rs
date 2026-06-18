@@ -7,7 +7,7 @@ use euclid::Vector3D;
 use itertools::{AllEqualValueError, Itertools as _, iproduct};
 
 use crate::block::{
-    self,
+    self, Evoxels,
     Resolution::{self, R1},
 };
 use crate::math::{
@@ -75,7 +75,7 @@ pub(in crate::block) struct Derived {
 /// from the information in a [`block::MinEval`] or similar,
 /// to enable constructing a [`block::EvaluatedBlock`].
 #[inline(never)] // neither cheap nor going to benefit from per-call optimizations
-pub(in crate::block::eval) fn compute_derived(voxels: &block::Evoxels) -> Derived {
+pub(in crate::block::eval) fn compute_derived(voxels: &Evoxels) -> Derived {
     let resolution = voxels.resolution();
 
     // Optimization for single voxels:
@@ -100,6 +100,10 @@ pub(in crate::block::eval) fn compute_derived(voxels: &block::Evoxels) -> Derive
             voxel_opacity_mask: VoxelOpacityMask::new_r1(voxel),
         };
     }
+
+    // TODO: everything here should be using voxels_r, not voxels, to be maybe more efficient.
+    let voxels_r: block::EvoxelsRef<'_> = voxels.read();
+    let palette: &[block::Evoxel] = voxels.palette();
 
     let full_block_bounds = GridAab::for_block(resolution);
     let data_bounds = voxels.bounds();
@@ -132,7 +136,7 @@ pub(in crate::block::eval) fn compute_derived(voxels: &block::Evoxels) -> Derive
                         );
                         cube
                     })
-                    .map(|cube| trace_for_eval(voxels, cube, face.opposite(), resolution))
+                    .map(|cube| trace_for_eval(voxels_r, cube, face.opposite(), resolution))
                     .fold(VoxSum::default(), |mut sum, trace| {
                         sum += trace;
                         sum
@@ -150,19 +154,41 @@ pub(in crate::block::eval) fn compute_derived(voxels: &block::Evoxels) -> Derive
     };
 
     // Compute if the collision is uniform in all voxels.
-    let uniform_collision = iter::chain(
-        if less_than_full {
+    let uniform_collision = {
+        let outside_collision = if less_than_full {
             // Some of the block’s volume is occupied by implicit air voxels.
             Some(block::BlockCollision::None)
         } else {
             None
-        },
-        voxels.as_vol_ref().as_linear().iter().map(|voxel| voxel.collision),
-    )
-    .all_equal_value()
-    .ok();
+        };
 
-    let voxel_opacity_mask = VoxelOpacityMask::new(resolution, voxels.as_vol_ref());
+        // First, see if the palette has uniform collision. If it does, then we don’t need to check
+        // the volume data. If it doesn’t, then it might be because the palette contains unused
+        // entries, so we need to check the volume data to find only used entries.
+        //
+        // TODO: We should have a flag for whether the palette is known to contain only used entries
+        // and we can skip the second part.
+        iter::chain(
+            outside_collision,
+            palette.iter().map(|voxel| voxel.collision),
+        )
+        .all_equal_value()
+        .ok()
+        .or_else(|| {
+            iter::chain(
+                outside_collision,
+                voxels_r
+                    .indices()
+                    .as_linear()
+                    .iter()
+                    .map(|&index| palette[usize::from(index)].collision),
+            )
+            .all_equal_value()
+            .ok()
+        })
+    };
+
+    let voxel_opacity_mask = VoxelOpacityMask::new(voxels_r);
 
     Derived {
         color,
@@ -176,7 +202,7 @@ pub(in crate::block::eval) fn compute_derived(voxels: &block::Evoxels) -> Derive
             if surface_volume.intersection_cubes(voxels.bounds()) == Some(surface_volume) {
                 surface_volume.interior_iter().all(
                     #[inline(always)]
-                    |p| voxels[p].color.fully_opaque(),
+                    |p| voxels_r.get_evoxel(p).color.fully_opaque(),
                 )
             } else {
                 false
@@ -292,13 +318,15 @@ impl VoxelOpacityMask {
         ))
     }
 
-    pub(crate) fn new(resolution: Resolution, voxels: Vol<&[block::Evoxel]>) -> Self {
+    pub(crate) fn new(voxels: block::EvoxelsRef<'_>) -> Self {
+        let resolution = voxels.resolution();
+
+        // TODO: iterate the palette only, *if* we can get a guarantee of no unused entries
         let uniform_opacity: Option<OpacityCategory> = match voxels
-            .as_linear()
-            .iter()
+            .iter_with_palette()
             .map(
                 #[inline(always)]
-                |voxel| voxel.opacity_category(),
+                |(_cube, _index, voxel)| voxel.opacity_category(),
             )
             .all_equal_value()
         {
@@ -327,8 +355,9 @@ impl VoxelOpacityMask {
 
             VoxelOpacityMask(MaskInner::Irregular(
                 resolution,
-                voxels.map_container(|voxels| {
-                    voxels.iter().map(|voxel| voxel.opacity_category()).collect()
+                // TODO: make this expressible without indexing
+                Vol::from_fn(voxels.bounds(), |cube| {
+                    voxels.get_evoxel(cube).opacity_category()
                 }),
             ))
         }
@@ -483,7 +512,7 @@ mod tests {
     fn opacity_mask_constructor_consistency() {
         assert_eq!(
             VoxelOpacityMask::R1_INVISIBLE,
-            VoxelOpacityMask::new(R1, Vol::from_element_ref(&Evoxel::AIR))
+            VoxelOpacityMask::new(Evoxels::from_one(Evoxel::AIR).read())
         );
         assert_eq!(
             VoxelOpacityMask::R1_INVISIBLE,
@@ -499,10 +528,7 @@ mod tests {
             ..Evoxel::from_color(Rgba::TRANSPARENT)
         };
         assert_eq!(
-            VoxelOpacityMask::new(
-                R2,
-                Vol::from_elements(bounds, [voxel; 8].as_slice()).unwrap()
-            ),
+            VoxelOpacityMask::new(Evoxels::repeat(R2, bounds, voxel).read()),
             VoxelOpacityMask::new_raw(R2, Vol::repeat(bounds, OpacityCategory::Partial))
         );
 

@@ -1354,7 +1354,7 @@ mod tests {
         let [block] = all_is_cubes::content::make_some_voxel_blocks(universe);
         assert_eq!(
             crate::texture::needed_channels(
-                block.evaluate(universe.read_ticket()).unwrap().voxels()
+                block.evaluate(universe.read_ticket()).unwrap().voxels().read()
             ),
             Channels::ReflectanceEmission,
             "sanity check that the input data has emission"

@@ -213,6 +213,8 @@ impl Context<'_> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::sync::Arc;
+
     use all_is_cubes::block::{self, Resolution::R2};
     use all_is_cubes::linking::InGenError;
     use all_is_cubes::math::{GridAab, GridRotation, Rgb, Rgba, Vol};
@@ -277,24 +279,20 @@ mod tests {
         };
         let evaluated = loaded_block.evaluate(txn.read_ticket()).unwrap();
         assert_eq!(
-            evaluated.voxels().as_vol_ref(),
-            Vol::from_elements(
-                GridAab::for_block(R2),
-                [
-                    invisible_voxel,
+            block::EvoxelsEq::from(evaluated.voxels()),
+            block::EvoxelsEq::from(block::Evoxels::from_paletted(
+                R2,
+                Arc::new([
                     invisible_voxel,
                     // Note that by using `from_color()` here, we test the documented claim that
                     // `Vox::DEFAULT` is equivalent to `from_color()`.
                     block::Evoxel::from_color(Rgba::new(0., 1., 0., 1.)),
-                    block::Evoxel::from_color(Rgba::new(0., 1., 0., 1.)),
-                    block::Evoxel::from_color(Rgba::new(1., 0., 0., 1.)),
                     block::Evoxel::from_color(Rgba::new(1., 0., 0., 1.)),
                     block::Evoxel::from_color(Rgba::new(0., 0., 1., 1.)),
-                    block::Evoxel::from_color(Rgba::new(0., 0., 1., 1.)),
-                ]
-                .as_slice()
-            )
-            .unwrap()
+                ]),
+                Vol::from_elements(GridAab::for_block(R2), [0, 0, 1, 1, 2, 2, 3, 3].as_slice())
+                    .unwrap()
+            ))
         );
     }
 

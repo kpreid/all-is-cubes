@@ -11,7 +11,7 @@ use num_traits::float::FloatCore as _;
 
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
-    Aab, Cube, CubeFace, Face, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, Octant, Vol,
+    Aab, Cube, CubeFace, Face, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, Octant,
 };
 use crate::physics::{Contact, ContactSet, POSITION_EPSILON};
 use crate::raycast::{Ray, Raycaster};
@@ -314,7 +314,7 @@ impl CollisionSpace for space::Read<'_> {
         let voxel_aab = space_aab.scale(scale);
         let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
         let result = collide_along_ray(
-            &evaluated.voxels().as_vol_ref(),
+            &evaluated.voxels().read(),
             voxel_ray,
             voxel_aab,
             drop,
@@ -324,16 +324,16 @@ impl CollisionSpace for space::Read<'_> {
     }
 }
 
-impl CollisionSpace for Vol<&[Evoxel]> {
+impl CollisionSpace for crate::block::EvoxelsRef<'_> {
     type Cell = Evoxel;
 
     fn bounds(&self) -> GridAab {
-        Vol::bounds(self)
+        crate::block::EvoxelsRef::bounds(self)
     }
 
     #[inline]
     fn get_cell(&self, cube: Cube) -> &Self::Cell {
-        self.get(cube).unwrap_or(&Evoxel::AIR)
+        self.get_evoxel(cube)
     }
 
     #[inline]

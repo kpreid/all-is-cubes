@@ -6,9 +6,9 @@
 
 use alloc::collections::VecDeque;
 
-use all_is_cubes::block::{Evoxel, Evoxels};
+use all_is_cubes::block;
 use all_is_cubes::euclid::Point3D;
-use all_is_cubes::math::{Cube, Face, GridCoordinate, Rgba, Vol};
+use all_is_cubes::math::{Cube, Face, GridCoordinate, Rgba};
 
 use crate::Position;
 use crate::block_mesh::analyze::Analysis;
@@ -17,7 +17,7 @@ use crate::block_mesh::planar::Vertex;
 #[cfg(feature = "rerun")]
 use {
     crate::block_mesh::analyze::AnalysisVertex,
-    all_is_cubes::block::Resolution,
+    all_is_cubes::block::{Evoxel, Resolution},
     all_is_cubes::euclid::Vector3D,
     all_is_cubes::math::{GridAab, GridVector, Octant, u32size},
     all_is_cubes::rerun_glue as rg,
@@ -158,7 +158,7 @@ impl Viz {
         }
     }
 
-    pub(crate) fn voxels(&mut self, #[allow(unused)] voxels: &Evoxels) {
+    pub(crate) fn voxels(&mut self, #[allow(unused)] voxels: block::EvoxelsRef<'_>) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
             state.resolution = Some(voxels.resolution());
@@ -179,10 +179,9 @@ impl Viz {
                     .with_fill_mode(rg::components::FillMode::MajorWireframe),
             );
 
-            let voxel_vol = voxels.as_vol_ref();
-            let voxel_iter = voxel_vol
-                .iter()
-                .map(|(cube, &voxel)| (cube, voxel))
+            let voxel_iter = voxels
+                .iter_with_palette()
+                .map(|(cube, _index, voxel)| (cube, voxel))
                 .filter(|&(_, voxel)| !voxel.color.fully_transparent());
 
             state.log_voxels(&rg::entity_path!("voxels"), voxel_iter, VOXEL_RADIUS);
@@ -192,7 +191,7 @@ impl Viz {
     pub(crate) fn window(
         &self,
         #[allow(unused)] center: Point3D<u8, Cube>,
-        #[allow(unused)] voxels: Vol<&[Evoxel]>,
+        #[allow(unused)] voxels: block::EvoxelsRef<'_>,
     ) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
@@ -203,9 +202,8 @@ impl Viz {
             );
 
             // Log the voxels the window is looking at, with bigger radius to highlight them.
-            let voxel_iter = window_grid_aab
-                .interior_iter()
-                .map(|cube| (cube, voxels.get(cube).copied().unwrap_or(Evoxel::AIR)));
+            let voxel_iter =
+                window_grid_aab.interior_iter().map(|cube| (cube, voxels.get_evoxel(cube)));
             state.log_voxels(&state.window_voxels_path, voxel_iter, 0.5);
         }
     }
@@ -437,10 +435,10 @@ impl Inner {
         );
     }
 
-    fn log_voxels(
+    fn log_voxels<'v>(
         &self,
         path: &rg::EntityPath,
-        voxel_iter: impl Iterator<Item = (Cube, Evoxel)> + Clone,
+        voxel_iter: impl Iterator<Item = (Cube, &'v Evoxel)> + Clone,
         radius: f32,
     ) {
         self.destination.log(

@@ -68,8 +68,8 @@ palette! {
     /// Used as a placeholder appearance when a block definition fails to evaluate.
     BLOCK_EVAL_ERROR: Rgba = srgb[0xFF 0xBB 0x00 0xFF];
 
-    /// Used when a recursive block definition should have provided a voxel color but did not.
-    MISSING_VOXEL_ERROR: Rgba = srgb[0xBB 0x00 0xFF 0xFF];
+    // This error condition can no longer occur. TODO: Use this color for something else.
+    // MISSING_VOXEL_ERROR: Rgba = srgb[0xBB 0x00 0xFF 0xFF];
 
     /// Fill color to draw when a renderer does not have any [`Space`](crate::space::Space)
     /// to define a sky color.

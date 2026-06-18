@@ -930,9 +930,8 @@ mod tests {
         #[values(false, true)] transparent: bool,
         #[values(false, true)] force_non_rect: bool,
     ) {
-        let options = &crate::MeshOptions::new(
-            &all_is_cubes_render::camera::GraphicsOptions::default(),
-        );
+        let options =
+            &crate::MeshOptions::new(&all_is_cubes_render::camera::GraphicsOptions::default());
         let tex = crate::testing::Allocator::new();
         let opaque_block = &block::from_color!(1.0, 0.0, 0.0, 1.0);
         let maybe_transparent_block = if transparent {

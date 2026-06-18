@@ -261,14 +261,15 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
             return false;
         }
 
+        let voxels = block.voxels().read();
         match (&self.voxel_opacity_mask, &mut self.texture_used) {
             (Some(old_mask), Some(existing_texture))
                 if old_mask == block.voxel_opacity_mask()
                     && existing_texture
                         .channels()
-                        .is_superset_of(texture::needed_channels(block.voxels())) =>
+                        .is_superset_of(texture::needed_channels(voxels)) =>
             {
-                existing_texture.write(block.voxels().as_vol_ref());
+                existing_texture.write(voxels);
                 true
             }
             _ => false,

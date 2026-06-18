@@ -1,13 +1,16 @@
 //! Support for [`Primitive::Text`] and other text rendering.
 
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use core::fmt;
 
 use arcstr::ArcStr;
 use bevy_platform::sync::OnceLock;
 use euclid::vec3;
 
-use crate::block::{self, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Resolution};
+use crate::block::{
+    self, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Resolution, VoxelIndex,
+};
 use crate::content::palette;
 use crate::math::{
     Cube, GridAab, GridCoordinate, GridPoint, GridVector, Gridgid, Rgb, Vol, rgba_const,
@@ -273,29 +276,53 @@ impl Text {
             .intersection_cubes(GridAab::for_block(self.data.resolution))
         {
             Some(bounds_in_this_block) => {
-                // Evaluate blocks making up the brush.
-                let (brush, outlined): (Brush<Evoxel>, bool) = {
-                    let _recursion_scope = block::Budget::recurse(&filter.budget)?;
-                    let evaluated_foreground =
-                        self.data.foreground.evaluate_to_evoxel_internal(filter)?;
-                    match self.data.outline {
-                        Some(ref block) => (
-                            Brush::Outline {
-                                foreground: evaluated_foreground,
-                                outline: block.evaluate_to_evoxel_internal(filter)?,
-                            },
-                            true,
-                        ),
-                        None => (Brush::Plain(evaluated_foreground), false),
-                    }
-                };
-
-                let background = if self.data.debug {
+                let background_evoxel = if self.data.debug {
                     DEBUG_TEXT_RENDERING_BOUNDS_VOXEL
                 } else {
                     Evoxel::AIR
                 };
-                let mut voxels: Vol<Box<[Evoxel]>> = Vol::repeat(bounds_in_this_block, background);
+
+                // Evaluate blocks making up the brush, and choose the palette.
+                let background_index = 0;
+                let (mut palette, brush, outlined): (Arc<[Evoxel]>, Brush<VoxelIndex>, bool) = {
+                    let _recursion_scope = block::Budget::recurse(&filter.budget)?;
+                    let evaluated_foreground =
+                        self.data.foreground.evaluate_to_evoxel_internal(filter)?;
+                    match self.data.outline {
+                        Some(ref outline_block) => (
+                            Arc::new([
+                                background_evoxel,
+                                evaluated_foreground,
+                                outline_block.evaluate_to_evoxel_internal(filter)?,
+                            ]),
+                            Brush::Outline {
+                                foreground: 1,
+                                outline: 2,
+                            },
+                            true,
+                        ),
+                        None => (
+                            Arc::new([background_evoxel, evaluated_foreground]),
+                            Brush::Plain(1),
+                            false,
+                        ),
+                    }
+                };
+
+                // Add debug voxels to the palette if needed.
+                let debug_glyph_bounds_index = if self.data.debug {
+                    let index = palette.len() as VoxelIndex;
+                    // This is less efficient than allocating right from the start, but
+                    // we will not worry about that when debugging.
+                    palette =
+                        palette.iter().copied().chain([DEBUG_TEXT_GLYPH_BOUNDS_VOXEL]).collect();
+                    Some(index)
+                } else {
+                    None
+                };
+
+                let mut voxels: Vol<Box<[VoxelIndex]>> =
+                    Vol::repeat(bounds_in_this_block, background_index);
 
                 let def = self.data.font.font_def();
                 let font_glyphs = &def.glyphs;
@@ -307,14 +334,14 @@ impl Text {
                     font_glyphs.get(glyph.glyph_index).for_each(|(position_in_glyph, value)| {
                         let position_in_block_of_voxel =
                             glyph_position_3d + vec3(position_in_glyph.x, -position_in_glyph.y, 0);
-                        for (offset, evoxel) in brush.iter(value) {
+                        for (offset, index) in brush.iter(value) {
                             if let Some(vox) = voxels.get_mut(position_in_block_of_voxel + offset) {
-                                *vox = evoxel;
+                                *vox = index;
                             }
                         }
                     });
 
-                    if self.data.debug
+                    if let Some(debug_glyph_bounds_index) = debug_glyph_bounds_index
                         && let Some(glyph_bounds_intersecting_block) =
                             text::glyph_bounding_box_to_3d(
                                 font_glyphs.rendering_bounding_box(glyph.glyph_index, outlined),
@@ -329,14 +356,18 @@ impl Text {
                             let voxel = &mut voxels[cube];
                             // conditional to not overwrite previously drawn glyphs which might
                             // overlap
-                            if *voxel == DEBUG_TEXT_RENDERING_BOUNDS_VOXEL {
-                                *voxel = DEBUG_TEXT_GLYPH_BOUNDS_VOXEL
+                            if *voxel == background_index {
+                                *voxel = debug_glyph_bounds_index;
                             }
                         }
                     }
                 }
 
-                Evoxels::from_many(self.data.resolution, voxels.map_container(Into::into))
+                Evoxels::from_paletted(
+                    self.data.resolution,
+                    palette,
+                    voxels.map_container(Into::into),
+                )
             }
 
             None => Evoxels::from_one(if self.data.debug {
@@ -773,7 +804,7 @@ const DEBUG_TEXT_GLYPH_BOUNDS_VOXEL: Evoxel = Evoxel {
 
 /// Specifies how a text glyph is painted into 3D space.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum Brush<V> {
+enum Brush<V> {
     Plain(V),
     Outline { foreground: V, outline: V },
 }

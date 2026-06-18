@@ -8,9 +8,9 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use gltf_json::validation::Checked::Valid;
 
-use all_is_cubes::block::Evoxel;
+use all_is_cubes::block;
 use all_is_cubes::euclid::{Point2D, Point3D, Scale, Vector2D, point2};
-use all_is_cubes::math::{self, Axis, Cube, GridAab, GridRotation, Gridgid, Vol};
+use all_is_cubes::math::{self, Axis, Cube, GridAab, GridRotation, Gridgid};
 use all_is_cubes_mesh::texture::{self, TilePoint};
 
 use crate::gltf::GltfDataDestination;
@@ -200,7 +200,7 @@ impl texture::Tile for GltfTile {
     const REUSABLE: bool = false;
     const SUPPORTS_3D: bool = false;
 
-    fn write(&mut self, data: Vol<&[Evoxel]>) {
+    fn write(&mut self, data: block::EvoxelsRef<'_>) {
         assert_eq!(data.bounds(), self.bounds());
 
         let mut reflectance_buffer = self.allocate_texels();
@@ -736,8 +736,8 @@ mod tests {
             .allocate(GridAab::ORIGIN_CUBE, Channels::Reflectance)
             .expect("allocation");
         tile.write(
-            block::Evoxels::from_one(Evoxel::from_color(Rgba::from_srgb8([1, 2, 3, 4])))
-                .as_vol_ref(),
+            block::Evoxels::from_one(block::Evoxel::from_color(Rgba::from_srgb8([1, 2, 3, 4])))
+                .read(),
         );
         drop(tile);
 

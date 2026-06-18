@@ -11,7 +11,7 @@ use euclid::Vector3D;
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::block::{Evoxels, Resolution};
+use crate::block::{self, Resolution};
 use crate::math::{Cube, Face, Intensity, OpacityCategory, Rgb, Rgba, ZeroOne, rgb_const, zo32};
 
 // -------------------------------------------------------------------------------------------------
@@ -172,7 +172,7 @@ impl From<Rgba> for ColorBuf {
 ///
 /// `origin` should be the first cube to trace through *within* the grid.
 pub(crate) fn trace_for_eval(
-    voxels: &Evoxels,
+    voxels: block::EvoxelsRef<'_>,
     origin: Cube,
     direction: Face,
     resolution: Resolution,
@@ -184,7 +184,7 @@ pub(crate) fn trace_for_eval(
     let mut color_buf = ColorBuf::default();
     let mut emission = Vector3D::zero();
 
-    while let Some(voxel) = voxels.get(cube) {
+    while let Some(voxel) = voxels.get_opt_evoxel(cube) {
         let (adjusted_color, emission_coeff) = apply_transmittance(voxel.color, thickness);
         emission += Vector3D::from(voxel.emission * emission_coeff) * color_buf.transmittance;
         color_buf.add_color_internal(adjusted_color.into());

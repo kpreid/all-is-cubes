@@ -2,15 +2,18 @@
 //! and errors.
 
 use alloc::format;
+use alloc::sync::Arc;
 use core::cell::Cell;
 use core::fmt;
+
+use bevy_platform::sync::LazyLock;
 
 use crate::block::{
     self, Block, BlockAttributes, BlockChange, EvaluatedBlock, Evoxel, Evoxels, Resolution,
 };
 use crate::content::palette;
 use crate::listen;
-use crate::math::{GridAab, Rgba};
+use crate::math::{GridAab, Rgba, Vol};
 use crate::universe::{HandleError, ReadTicket};
 
 #[cfg(doc)]
@@ -257,6 +260,9 @@ pub struct EvalBlockError {
 #[non_exhaustive]
 // TODO: should this be public? It may have been private by accident.
 pub(crate) enum ErrorKind {
+    /// The block contains more than 2<sup>16</sup> distinct voxels.
+    PaletteFull,
+
     /// The evaluation budget was exceeded.
     BudgetExceeded,
 
@@ -288,12 +294,13 @@ pub(crate) enum ErrorKind {
 /// This could be
 #[derive(Debug)]
 pub(in crate::block) struct InEvalError {
-    kind: ErrorKind,
+    pub(in crate::block) kind: ErrorKind,
 }
 
 impl fmt::Display for EvalBlockError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
+            ErrorKind::PaletteFull => write!(f, "block definition exceeded 2¹⁶ distinct voxels"),
             ErrorKind::BudgetExceeded => {
                 let Self { budget, used, .. } = self;
                 write!(
@@ -316,6 +323,7 @@ impl fmt::Display for EvalBlockError {
 impl core::error::Error for EvalBlockError {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match &self.kind {
+            ErrorKind::PaletteFull => None,
             ErrorKind::BudgetExceeded => None,
             ErrorKind::PriorBudgetExceeded { .. } => None,
             ErrorKind::Handle(e) => Some(e),
@@ -369,7 +377,8 @@ impl EvalBlockError {
         InEvalError {
             kind: match kind {
                 ErrorKind::BudgetExceeded => ErrorKind::PriorBudgetExceeded { budget, used },
-                ErrorKind::PriorBudgetExceeded { .. }
+                ErrorKind::PaletteFull
+                | ErrorKind::PriorBudgetExceeded { .. }
                 | ErrorKind::Handle { .. }
                 | ErrorKind::DefunctRaw => kind,
             },
@@ -390,6 +399,7 @@ impl EvalBlockError {
     /// If `true`, then reevaluating later or with a more proper [`ReadTicket`] may succeed.
     pub(crate) fn is_transient(&self) -> bool {
         match self.kind {
+            ErrorKind::PaletteFull => false,
             ErrorKind::Handle(ref h) => h.is_transient(),
             ErrorKind::BudgetExceeded => false,
             ErrorKind::PriorBudgetExceeded { .. } => false,
@@ -401,11 +411,16 @@ impl EvalBlockError {
     /// occurred.
     ///
     /// This block is fully opaque and as inert to game mechanics as currently possible.
-    // TODO: test this
+    //---
+    // TODO: test the properties of this evaluation.
+    // TODO: indicate type of error, possibly by some kind of icon, rather than just a
+    // fixed color pattern.
     pub fn to_placeholder(&self) -> EvaluatedBlock {
+        static ERROR_PLACEHOLDER_PALETTE: LazyLock<Arc<[Evoxel]>> = LazyLock::new(|| {
+            Arc::new([palette::BLOCK_EVAL_ERROR, Rgba::BLACK].map(Evoxel::from_color))
+        });
+
         let resolution = Resolution::R8;
-        // TODO: indicate type of error or at least have some kind of icon,
-        let pattern = [palette::BLOCK_EVAL_ERROR, Rgba::BLACK].map(Evoxel::from_color);
 
         EvaluatedBlock::from_voxels(
             block::AIR, // TODO: wrong value. should get block through self
@@ -414,9 +429,13 @@ impl EvalBlockError {
                 selectable: false, // TODO: make this selectable but immutable
                 ..Default::default()
             },
-            Evoxels::from_fn(resolution, GridAab::for_block(resolution), |cube| {
-                pattern[((cube.x + cube.y + cube.z).rem_euclid(2)) as usize]
-            }),
+            Evoxels::from_paletted(
+                resolution,
+                ERROR_PLACEHOLDER_PALETTE.clone(),
+                Vol::from_fn(GridAab::for_block(resolution), |cube| {
+                    ((cube.x + cube.y + cube.z).rem_euclid(2)) as u16
+                }),
+            ),
             self.used,
         )
     }

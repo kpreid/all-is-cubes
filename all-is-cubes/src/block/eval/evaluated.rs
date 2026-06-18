@@ -1,6 +1,5 @@
 //! [`EvaluatedBlock`] and [`Evoxel`].
 
-use all_is_cubes_base::util::NoAlternateDebug;
 use alloc::boxed::Box;
 use core::{fmt, ptr};
 
@@ -9,15 +8,15 @@ use core::{fmt, ptr};
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
-use crate::block::eval::derived::Derived;
-use crate::block::eval::voxel_storage::EvoxelsEq;
 use crate::block::{
-    self, BlRotate as _, Block, BlockAttributes, BlockCollision, Cost, Evoxel, Evoxels,
+    self, BlRotate as _, Block, BlockAttributes, BlockCollision, Cost, Derived, Evoxel, Evoxels,
+    EvoxelsEq,
     Resolution::{self, R1},
     VoxelOpacityMask,
 };
 use crate::inv;
 use crate::math::{Face, Face7, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
+use crate::util::NoAlternateDebug;
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
@@ -97,15 +96,20 @@ impl fmt::Debug for EvaluatedBlock {
             None => {
                 ds.field("voxels.bounds", &NoAlternateDebug(voxels.bounds()));
                 ds.field(
-                    "voxels",
+                    "voxels.palette",
+                    &super::voxel_storage::FmtPalette(voxels.palette()),
+                );
+                ds.field(
+                    "voxels.indices",
                     &fmt::from_fn(|f| {
                         let mut dl = f.debug_list();
-                        let voxels = voxels.as_vol_ref();
+                        let indices = voxels.indices();
                         const LIMIT: usize = 8;
-                        for voxel in voxels.as_linear().iter().take(LIMIT) {
-                            dl.entry(&NoAlternateDebug(voxel));
+                        // TODO: consider matrix-like formatting
+                        for index in indices.as_linear().iter().take(LIMIT) {
+                            dl.entry(&index);
                         }
-                        if voxels.volume() > LIMIT {
+                        if indices.volume() > LIMIT {
                             dl.finish_non_exhaustive()
                         } else {
                             dl.finish()
@@ -493,6 +497,7 @@ impl MinEval {
             voxels,
             derived,
         } = self;
+
         match derived {
             Some(derived) => EvaluatedBlock {
                 block,
@@ -802,9 +807,10 @@ impl fmt::Debug for EvaluatedBlockEq {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::Cube;
+    use crate::math::{Cube, Vol};
     use crate::universe::{ReadTicket, Universe};
     use alloc::format;
+    use alloc::sync::Arc;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
 
@@ -895,15 +901,19 @@ mod tests {
                     uniform_collision: None,
                     resolution: 2,
                     voxels.bounds: GridAab(0..2, 0..2, 0..2),
-                    voxels: [
-                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
-                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
-                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
-                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
-                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
-                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
-                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
+                    voxels.palette: [
                         Evoxel { color: Rgba(0.0, 0.0, 0.0, 0.0), selectable: false, collision: None },
+                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
+                    ],
+                    voxels.indices: [
+                        1,
+                        1,
+                        1,
+                        1,
+                        1,
+                        1,
+                        1,
+                        0,
                     ],
                     voxel_opacity_mask: VoxelOpacityMask {
                         resolution: 2,
@@ -925,7 +935,11 @@ mod tests {
         let attributes = BlockAttributes::default();
         let resolution = Resolution::R4;
         let bounds = GridAab::from_lower_size([1, 2, 3], [0, 0, 0]);
-        let voxels = Evoxels::from_fn(resolution, bounds, |_| unreachable!());
+        let voxels = Evoxels::from_paletted(
+            resolution,
+            Arc::new([]),
+            Vol::from_fn(bounds, |_| unreachable!()),
+        );
         assert_eq!(
             EvaluatedBlock::from_voxels(
                 block::AIR, // caution: incorrect placeholder value
@@ -944,7 +958,7 @@ mod tests {
                     opaque: FaceMap::splat(false),
                     visible: false,
                     uniform_collision: Some(BlockCollision::None),
-                    voxel_opacity_mask: VoxelOpacityMask::new(resolution, voxels.as_vol_ref()),
+                    voxel_opacity_mask: VoxelOpacityMask::new(voxels.read()),
                 }),
                 voxels: EvoxelsEq::from(voxels),
             }

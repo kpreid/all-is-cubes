@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 
 use crate::block::{self, BlRotate as _, Block, Evoxels, MinEval};
 use crate::inv;
-use crate::math::GridRotation;
+use crate::math::{GridRotation, Vol};
 use crate::tag;
 use crate::universe::{HandleVisitor, VisitHandles};
 
@@ -298,7 +298,7 @@ fn evaluate_rotate(
             value
         } else {
             let (attributes, voxels) = value.into_parts();
-            block::Budget::decrement_voxels(&filter.budget, voxels.count())?;
+            block::Budget::decrement_voxels(&filter.budget, voxels.data_volume())?;
 
             // It'd be nice if this rotation operation were in-place, but I've read that
             // it's actually quite difficult to implement a 3D array rotation in-place.
@@ -310,13 +310,19 @@ fn evaluate_rotate(
             let resolution = voxels.resolution();
             let inner_to_outer = rotation.to_positive_octant_transform(resolution.into());
             let outer_to_inner = rotation.inverse().to_positive_octant_transform(resolution.into());
+            let indices = voxels.indices();
 
             MinEval::new(
                 attributes.rotate(rotation),
-                Evoxels::from_fn(
+                Evoxels::from_paletted(
                     resolution,
-                    voxels.bounds().transform(inner_to_outer).unwrap(),
-                    |cube| voxels.get(outer_to_inner.transform_cube(cube)).unwrap(),
+                    // palette is always unchanged
+                    voxels.palette_arc(),
+                    // indices are rotated
+                    Vol::from_fn(
+                        indices.bounds().transform(inner_to_outer).unwrap(),
+                        |cube| indices[outer_to_inner.transform_cube(cube)],
+                    ),
                 ),
             )
         },

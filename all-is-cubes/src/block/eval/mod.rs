@@ -6,15 +6,12 @@
 //! ([`crate::block::Primitive`] and [`crate::block::Modifier`])
 
 mod control;
-#[cfg(test)]
-pub(crate) use control::ErrorKind;
-pub(crate) use control::{Budget, EvalFilter};
+pub(crate) use control::{Budget, ErrorKind, EvalFilter};
 pub use control::{Cost, EvalBlockError};
 pub(in crate::block) use control::{InEvalError, finish_evaluation};
 
 mod derived;
-#[cfg(test)]
-pub(super) use derived::Derived;
+pub(in crate::block) use derived::Derived;
 pub use derived::VoxelOpacityMask;
 use derived::compute_derived;
 
@@ -26,7 +23,7 @@ pub use evaluated::{AIR_EVALUATED, EvKey, EvaluatedBlock};
 pub(in crate::block) use evaluated::{AIR_EVALUATED_MIN, MinEval};
 
 mod voxel_storage;
-pub use voxel_storage::{Evoxel, Evoxels, EvoxelsEq};
+pub use voxel_storage::{Evoxel, Evoxels, EvoxelsEq, EvoxelsRef, VoxelIndex};
 
 #[cfg(test)]
 mod tests;

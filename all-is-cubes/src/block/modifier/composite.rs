@@ -1,9 +1,17 @@
+use alloc::sync::Arc;
 use alloc::vec;
+use alloc::vec::Vec;
 use core::mem;
+use hashbrown::hash_map::Entry;
 
-use crate::block::{self, AIR, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier};
+use hashbrown::HashMap;
+
+use crate::block::{
+    self, AIR, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, VoxelIndex,
+};
 use crate::math::{
-    Cube, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, PositiveSign, Rgb, ZeroOne,
+    Cube, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, PositiveSign, Rgb, Vol,
+    ZeroOne,
 };
 use crate::op::Operation;
 use crate::universe;
@@ -300,6 +308,14 @@ fn evaluate_composition(
         animation_hint: src_att.animation_hint | dst_att.animation_hint, // TODO: some operators should ignore some hints (e.g. `In` should ignore destination color changes)
     };
 
+    let mut pb = PaletteBuffer {
+        palette: Vec::new(),
+        blended_index_map: HashMap::new(),
+        operator,
+        src_palette: src_voxels.palette_arc(),
+        dst_palette: dst_voxels.palette_arc(),
+    };
+
     // Evaluate the voxel compositions, choosing an evaluation strategy based on the
     // situation to minimize the number of voxels we need to process individually and
     // memory we need to allocate.
@@ -312,7 +328,7 @@ fn evaluate_composition(
         block::Budget::decrement_voxels(&filter.budget, 1)?;
         // TODO: Do we need the `output_bounds == ORIGIN_CUBE` test?
         // It skips this branch to keep the bounds empty, but is that good?
-        Evoxels::from_one(operator.blend_evoxel(src_voxel, dst_voxel))
+        Evoxels::from_one(operator.blend_evoxel(&src_voxel, &dst_voxel))
     } else if operator.air_src_leaves_dst_unchanged()
         && output_bounds == dst_voxels.bounds()
         && dst_scale == src_scale
@@ -320,12 +336,19 @@ fn evaluate_composition(
         // Perform composition in-place in dst_voxels.
         // This may skip a memory allocation (depending on the reference count),
         // and in any case avoids performing blending on voxels that are out of bounds of src.
-        block::Budget::decrement_voxels(&filter.budget, src_voxels.count())?;
-        let mut dst_voxels_mut = dst_voxels.as_vol_mut();
-        intersection_for_blend.interior_iter().for_each(|cube| {
-            let dst_voxel = &mut dst_voxels_mut[cube];
-            *dst_voxel = operator.blend_evoxel(src_voxels[cube], *dst_voxel);
-        });
+
+        block::Budget::decrement_voxels(&filter.budget, src_voxels.data_volume())?;
+        pb.absorb_dst_palette(); // makes the existing indices valid
+
+        let src_voxels = src_voxels.read();
+        let (dst_palette_mut, mut dst_indices_mut) = dst_voxels.make_mut();
+
+        intersection_for_blend.interior_iter().try_for_each(|cube| {
+            let dst_index = &mut dst_indices_mut[cube];
+            *dst_index = pb.get([src_voxels.get_palette_index(cube), Some(*dst_index)])?;
+            Ok::<(), block::InEvalError>(())
+        })?;
+        *dst_palette_mut = pb.into_palette();
         dst_voxels
     } else if operator.air_dst_leaves_src_unchanged()
         && output_bounds == src_voxels.bounds()
@@ -334,25 +357,103 @@ fn evaluate_composition(
         // Perform composition in-place in src_voxels.
         // This is the reverse of the previous case.
         // TODO: deduplicate code?
-        block::Budget::decrement_voxels(&filter.budget, dst_voxels.count())?;
-        let mut src_voxels_mut = src_voxels.as_vol_mut();
-        intersection_for_blend.interior_iter().for_each(|cube| {
-            let src_voxel = &mut src_voxels_mut[cube];
-            *src_voxel = operator.blend_evoxel(*src_voxel, dst_voxels[cube]);
-        });
+
+        block::Budget::decrement_voxels(&filter.budget, dst_voxels.data_volume())?;
+        pb.absorb_src_palette(); // makes the existing indices valid
+
+        let (src_palette_mut, mut src_indices_mut) = src_voxels.make_mut();
+        let dst_voxels = dst_voxels.read();
+
+        intersection_for_blend.interior_iter().try_for_each(|cube| {
+            let src_index = &mut src_indices_mut[cube];
+            *src_index = pb.get([Some(*src_index), dst_voxels.get_palette_index(cube)])?;
+            Ok::<(), block::InEvalError>(())
+        })?;
+        *src_palette_mut = pb.into_palette();
         src_voxels
     } else {
         // Allocate new output array that encloses the full output bounds.
+
         block::Budget::decrement_voxels(&filter.budget, output_bounds.volume().unwrap())?;
-        Evoxels::from_fn(effective_resolution, output_bounds, |cube| {
-            operator.blend_evoxel(
-                src_voxels.get(cube / src_scale).unwrap_or(Evoxel::AIR),
-                dst_voxels.get(cube / dst_scale).unwrap_or(Evoxel::AIR),
-            )
-        })
+        let src_voxels = src_voxels.read();
+        let dst_voxels = dst_voxels.read();
+
+        let new_indices: Vol<Arc<[VoxelIndex]>> = Vol::try_from_fn(output_bounds, |cube| {
+            let src_index = src_voxels.get_palette_index(cube / src_scale);
+            let dst_index = dst_voxels.get_palette_index(cube / dst_scale);
+            pb.get([src_index, dst_index])
+        })?;
+
+        Evoxels::from_paletted(effective_resolution, pb.into_palette(), new_indices)
     };
 
     Ok(MinEval::new(attributes, voxels))
+}
+
+/// Intermediate storage for a composited block’s palette and mapping from input indices.
+struct PaletteBuffer {
+    /// Output palette.
+    palette: Vec<Evoxel>,
+
+    /// Lookup table from `[src, dst]` pairs of input indices to output indices.
+    blended_index_map: HashMap<[Option<VoxelIndex>; 2], VoxelIndex>,
+
+    operator: CompositeOperator,
+
+    src_palette: Arc<[Evoxel]>,
+    dst_palette: Arc<[Evoxel]>,
+}
+impl PaletteBuffer {
+    /// Allocate entries for `src` blended with `AIR` with the same indices as `src`.
+    fn absorb_src_palette(&mut self) {
+        assert!(self.palette.is_empty());
+
+        self.palette.extend(self.src_palette.iter().copied());
+        self.blended_index_map
+            .extend((0..(self.src_palette.len() as VoxelIndex)).map(|i| ([Some(i), None], i)));
+    }
+
+    /// Allocate entries for `dst` blended with `AIR` with the same indices as `dst`.
+    fn absorb_dst_palette(&mut self) {
+        assert!(self.palette.is_empty());
+
+        self.palette.extend(self.dst_palette.iter().copied());
+        self.blended_index_map
+            .extend((0..(self.dst_palette.len() as VoxelIndex)).map(|i| ([None, Some(i)], i)));
+    }
+
+    #[inline]
+    fn get(
+        &mut self,
+        input_indices @ [src_index, dst_index]: [Option<VoxelIndex>; 2],
+    ) -> Result<VoxelIndex, block::InEvalError> {
+        fn get_opt_palette_entry(palette: &[Evoxel], index: Option<VoxelIndex>) -> &Evoxel {
+            match index {
+                Some(i) => &palette[usize::from(i)],
+                None => &Evoxel::AIR,
+            }
+        }
+
+        Ok(match self.blended_index_map.entry(input_indices) {
+            Entry::Occupied(oe) => *oe.get(),
+            Entry::Vacant(ve) => {
+                let src_ev = get_opt_palette_entry(&self.src_palette, src_index);
+                let dst_ev = get_opt_palette_entry(&self.dst_palette, dst_index);
+
+                let index =
+                    VoxelIndex::try_from(self.palette.len()).map_err(|_| block::InEvalError {
+                        kind: block::ErrorKind::PaletteFull,
+                    })?;
+                self.palette.push(self.operator.blend_evoxel(src_ev, dst_ev));
+                ve.insert(index);
+                index
+            }
+        })
+    }
+
+    fn into_palette(self) -> Arc<[Evoxel]> {
+        self.palette.into()
+    }
 }
 
 /// Rescale the bounds of the input to the resolution of the output, but also, if the voxels are
@@ -426,7 +527,7 @@ pub enum CompositeOperator {
 
 impl CompositeOperator {
     /// Entry point by which [`evaluate_composition()`] uses [`Self`].
-    fn blend_evoxel(self, src_ev: Evoxel, dst_ev: Evoxel) -> Evoxel {
+    fn blend_evoxel(self, src_ev: &Evoxel, dst_ev: &Evoxel) -> Evoxel {
         use BlockCollision as Coll;
         Evoxel {
             color: {
@@ -695,27 +796,28 @@ pub(in crate::block) fn render_inventory(
             continue;
         };
 
-        // Compute the scale and offset to use for sampling the icon’s voxels.
-        let resample_scale =
-            GridCoordinate::from(icon_evaluated.voxels().resolution()) / icon_size_in_resolution;
-        let resample_point_offset = GridVector::splat(resample_scale / 2);
+        icon_evaluated.set_voxels({
+            // TODO(inventory): Instead of roughly downsampling the icons here, we should be
+            // asking evaluation to generate a lower resolution as per `config.render_resolution()`).
+            let resample_scale = GridCoordinate::from(icon_evaluated.voxels().resolution())
+                / icon_size_in_resolution;
+            let resample_point_offset = GridVector::splat(resample_scale / 2);
+            let read = icon_evaluated.voxels().read();
 
-        // TODO(inventory): Instead of roughly downsampling the icons here, we should be
-        // asking evaluation to generate a lower resolution as per `config.render_resolution()`).
-        icon_evaluated.set_voxels(Evoxels::from_fn(
-            config.render_resolution(),
-            placed_icon_data_bounds,
-            |render_cube| {
-                // Translate to the coordinate system with the icon's lower corner as origin.
-                let translated: Cube =
-                    render_cube - placed_icon_logical_bounds.lower_bounds().to_vector();
-                // Scale to the icon's voxels' resolution.
-                let translated_and_scaled: Cube =
-                    Cube::from(GridPoint::from(translated) * resample_scale);
-                let sample_point = translated_and_scaled + resample_point_offset;
-                icon_evaluated.voxels()[sample_point]
-            },
-        ));
+            Evoxels::from_paletted(
+                config.render_resolution(),
+                icon_evaluated.voxels().palette_arc(),
+                Vol::from_fn(placed_icon_data_bounds, |render_cube| -> VoxelIndex {
+                    // Translate to the coordinate system with the icon's lower corner as origin.
+                    let translated: Cube =
+                        render_cube - placed_icon_logical_bounds.lower_bounds().to_vector();
+                    // Scale to the icon's voxels' resolution.
+                    let translated_and_scaled: Cube =
+                        Cube::from(GridPoint::from(translated) * resample_scale);
+                    read.get_palette_index(translated_and_scaled + resample_point_offset).unwrap()
+                }),
+            )
+        });
 
         input = evaluate_composition(
             icon_evaluated,
@@ -764,7 +866,7 @@ mod tests {
         // TODO: Replace this direct call with going through the full block evaluation.
 
         assert_eq!(
-            operator.blend_evoxel(src, dst),
+            operator.blend_evoxel(&src, &dst),
             outcome,
             "\nexpecting {operator:?}.blend(\n  {src:?},\n  {dst:?}\n) == {outcome:?}"
         );
@@ -884,8 +986,8 @@ mod tests {
             // We just want to see this does not panic on math errors.
             // TODO: this test should eventually become obsolete by using constrained numeric types.
             Over.blend_evoxel(
-                evcolor(Rgba::new(2e25, 2e25, 2e25, 1.0)),
-                evcolor(Rgba::new(2e25, 2e25, 2e25, 1.0)),
+                &evcolor(Rgba::new(2e25, 2e25, 2e25, 1.0)),
+                &evcolor(Rgba::new(2e25, 2e25, 2e25, 1.0)),
             );
         }
 

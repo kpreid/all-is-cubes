@@ -4,7 +4,7 @@ use crate::block::{
     self, Evoxel, Evoxels, MinEval, Modifier,
     Resolution::{self, R1},
 };
-use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, GridRotation};
+use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, GridRotation, Vol};
 use crate::universe;
 
 /// Data for [`Modifier::Zoom`], describing a portion of the original block that is scaled
@@ -89,7 +89,6 @@ impl Zoom {
             }
             None => {
                 let (attributes, voxels) = input.into_parts();
-                let voxels = voxels.as_vol_ref();
                 let voxel_offset = offset_in_zoomed_blocks.map(GridCoordinate::from).to_vector()
                     * GridCoordinate::from(zoom_resolution);
                 match GridAab::for_block(zoom_resolution)
@@ -103,11 +102,14 @@ impl Zoom {
                             &filter.budget,
                             intersected_bounds.volume().unwrap(),
                         )?;
+                        let indices = voxels.indices();
                         MinEval::new(
                             attributes,
-                            Evoxels::from_fn(zoom_resolution, intersected_bounds, |cube| {
-                                voxels[cube + voxel_offset]
-                            }),
+                            Evoxels::from_paletted(
+                                zoom_resolution,
+                                voxels.palette_arc(),
+                                Vol::from_fn(intersected_bounds, |p| indices[p + voxel_offset]),
+                            ),
                         )
                     }
                 }
@@ -210,7 +212,7 @@ mod tests {
         assert_eq!(ev_original.resolution(), Resolution::R16);
         let scale = R2; // scale up by two = divide resolution by two
         let zoom_resolution = ev_original.resolution().halve().unwrap();
-        let original_voxels = ev_original.voxels();
+        let original_voxels = ev_original.voxels().read();
 
         // Try zoom at multiple offset steps.
         for x in 0i32..2 {
@@ -239,11 +241,13 @@ mod tests {
                             zoom_resolution,
                             GridAab::for_block(zoom_resolution),
                             |p| {
-                                original_voxels[p + GridVector::new(
-                                    GridCoordinate::from(zoom_resolution) * x,
-                                    0,
-                                    0,
-                                )]
+                                *original_voxels.get_evoxel(
+                                    p + GridVector::new(
+                                        GridCoordinate::from(zoom_resolution) * x,
+                                        0,
+                                        0,
+                                    ),
+                                )
                             },
                         )
                         .into(),

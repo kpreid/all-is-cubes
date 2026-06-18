@@ -2,8 +2,9 @@ use core::assert_matches;
 
 use crate::block::{
     self, AIR, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution, TickAction,
+    VoxelIndex,
 };
-use crate::math::{Face, GridAab, GridCoordinate, GridRotation, GridVector};
+use crate::math::{Face, GridAab, GridCoordinate, GridRotation, GridVector, Vol};
 use crate::op::Operation;
 use crate::time;
 use crate::universe;
@@ -160,7 +161,7 @@ impl Move {
                 {
                     *distance = i32::from(*distance)
                             .saturating_add(i32::from(*velocity))
-                            .clamp(0, i32::from(u16::MAX))
+                            .clamp(0, i32::from(VoxelIndex::MAX))
                             .try_into()
                             .unwrap(/* clamped to range */);
                 }
@@ -200,10 +201,14 @@ impl Move {
 
                 let displaced_voxels = match input_voxels.single_voxel() {
                     None => {
-                        let voxels = input_voxels.as_vol_ref();
-                        Evoxels::from_fn(output_resolution, displaced_bounds, |cube| {
-                            voxels[(cube - translation_in_res) / resolution_increase]
-                        })
+                        let indices = input_voxels.indices();
+                        Evoxels::from_paletted(
+                            output_resolution,
+                            input_voxels.palette_arc(),
+                            Vol::from_fn(displaced_bounds, |cube| {
+                                indices[(cube - translation_in_res) / resolution_increase]
+                            }),
+                        )
                     }
                     Some(voxel) => Evoxels::repeat(output_resolution, displaced_bounds, voxel),
                 };

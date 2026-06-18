@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use all_is_cubes::block::{Block, EvaluatedBlock, Evoxel};
+use all_is_cubes::block::{Block, EvaluatedBlock};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::euclid::{Point3D, vec3};
@@ -136,20 +136,23 @@ pub(crate) fn from_block(
     let bounds = GridAab::for_block(block.resolution());
     let transform = aic_to_mv_coordinate_transform(bounds).map_err(|e| e.to_export_error(name))?;
 
-    let mut evoxel_to_palette_index: HashMap<Evoxel, Option<u8>> = HashMap::new();
+    let evoxel_palette = block.voxels().palette();
+    let mut evoxel_palette_index_to_mv_palette_index: HashMap<u16, Option<u8>> = HashMap::new();
     let mut voxels: Vec<dot_vox::Voxel> = Vec::new();
-    for (cube, evoxel) in block.voxels().as_vol_ref().iter() {
+    for (cube, &evoxel_index) in block.voxels().indices().iter() {
         // TODO: warn-or-error on voxels that have properties we can't represent
 
-        let i = *evoxel_to_palette_index.entry(*evoxel).or_insert_with(|| {
-            if evoxel.opacity_category() == OpacityCategory::Invisible {
-                None
-            } else {
-                // TODO: if get_or_insert() returns None then we are failing to represent some
-                // voxels, and should report that incompleteness, rather than treating it as air.
-                palette.get_or_insert(mv::palette::MaterialKey::from_evoxel(evoxel)?)
-            }
-        });
+        let i =
+            *evoxel_palette_index_to_mv_palette_index.entry(evoxel_index).or_insert_with(|| {
+                let evoxel = &evoxel_palette[usize::from(evoxel_index)];
+                if evoxel.opacity_category() == OpacityCategory::Invisible {
+                    None
+                } else {
+                    // TODO: if get_or_insert() returns None then we are failing to represent some
+                    // voxels, and should report that incompleteness, rather than treating it as air.
+                    palette.get_or_insert(mv::palette::MaterialKey::from_evoxel(evoxel)?)
+                }
+            });
 
         if let Some(i) = i {
             voxels.push(voxel_out(transform, cube, i));

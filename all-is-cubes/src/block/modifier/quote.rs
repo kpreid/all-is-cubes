@@ -49,8 +49,9 @@ impl Quote {
 
             // If `suppress_ambient`, then avoid the block having any light or sound emission.
             if suppress_ambient {
-                block::Budget::decrement_voxels(&filter.budget, voxels.count())?;
-                for voxel in voxels.as_vol_mut().as_linear_mut().iter_mut() {
+                // TODO: in palette world, this is no longer the cost
+                block::Budget::decrement_voxels(&filter.budget, voxels.data_volume())?;
+                for voxel in voxels.make_palette_mut() {
                     voxel.emission = Rgb::ZERO;
                 }
 
