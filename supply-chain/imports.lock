@@ -211,8 +211,8 @@ user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_build_info]]
-version = "0.30.0"
-when = "2026-02-25"
+version = "0.31.0-alpha.1"
+when = "2026-03-10"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
@@ -232,8 +232,8 @@ user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_case]]
-version = "0.30.0"
-when = "2026-02-25"
+version = "0.31.0-alpha.1"
+when = "2026-03-10"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
@@ -316,8 +316,8 @@ user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_string_interner]]
-version = "0.30.0"
-when = "2026-02-25"
+version = "0.31.0-alpha.1"
+when = "2026-03-10"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
@@ -507,22 +507,50 @@ when = "2026-01-06"
 trusted-publisher = "github:bytecodealliance/wasm-tools"
 
 [[publisher.wgpu]]
-version = "28.0.0"
-when = "2025-12-18"
+version = "29.0.3"
+when = "2026-05-02"
 user-id = 53780
 user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
 
 [[publisher.wgpu-core]]
-version = "28.0.0"
-when = "2025-12-18"
+version = "29.0.3"
+when = "2026-05-02"
+user-id = 53780
+user-login = "cwfitzgerald"
+user-name = "Connor Fitzgerald"
+
+[[publisher.wgpu-core-deps-emscripten]]
+version = "29.0.0"
+when = "2026-03-19"
 user-id = 53780
 user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
 
 [[publisher.wgpu-hal]]
-version = "28.0.0"
-when = "2025-12-18"
+version = "29.0.3"
+when = "2026-05-02"
+user-id = 53780
+user-login = "cwfitzgerald"
+user-name = "Connor Fitzgerald"
+
+[[publisher.wgpu-naga-bridge]]
+version = "29.0.3"
+when = "2026-05-02"
+user-id = 53780
+user-login = "cwfitzgerald"
+user-name = "Connor Fitzgerald"
+
+[[publisher.wgpu-types]]
+version = "27.0.1"
+when = "2025-10-02"
+user-id = 53780
+user-login = "cwfitzgerald"
+user-name = "Connor Fitzgerald"
+
+[[publisher.wgpu-types]]
+version = "29.0.3"
+when = "2026-05-02"
 user-id = 53780
 user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
@@ -4278,6 +4306,17 @@ criteria = "safe-to-deploy"
 delta = "27.0.0 -> 28.0.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
+[[audits.mozilla.audits.naga]]
+who = [
+    "Jim Blandy <jimb@red-bean.com>",
+    "Andy Leiserson <aleiserson@mozilla.com>",
+    "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
+    "Erich Gubler <erichdongubler@gmail.com>",
+]
+criteria = "safe-to-deploy"
+delta = "28.0.0 -> 29.0.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
 [[audits.mozilla.audits.nix]]
 who = "Gabriele Svelto <gsvelto@mozilla.com>"
 criteria = "safe-to-deploy"
@@ -4946,112 +4985,17 @@ criteria = "safe-to-deploy"
 delta = "28.0.0 -> 29.0.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
-[[audits.mozilla.audits.wgpu-types]]
-who = "Dzmitry Malyshau <kvark@fastmail.com>"
+[[audits.mozilla.audits.windows-link]]
+who = "Mark Hammond <mhammond@skippinet.com.au>"
 criteria = "safe-to-deploy"
-version = "0.12.0"
-notes = """
-This crate, up through the indicated version, was written or reviewed
-by Dzmitry Malyshau while he was a Mozilla employee. Dzmitry left
-Mozilla at the beginning of February 2022. This audit statement was
-collected by Jim Blandy, a Mozilla employee, over email in July 2022:
-Dzmitry was shown, and agreed to, the 'safe-to-deploy' text.
-"""
+version = "0.1.1"
+notes = "A microsoft crate allowing unsafe calls to windows apis."
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
-[[audits.mozilla.audits.wgpu-types]]
-who = "Jim Blandy <jimb@mozilla.com>"
-criteria = "safe-to-deploy"
-delta = "0.12.0 -> 0.13.0"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
-who = "Jim Blandy <jimb@red-bean.com>"
-criteria = "safe-to-deploy"
-delta = "0.13.0 -> 0.14.0"
-notes = "Audit by Erich Gubler, Jim Blandy, Nicolas Silva, and Teodor Tanasoaia."
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
-who = "Nicolas Silva <nical@fastmail.com>"
-criteria = "safe-to-deploy"
-delta = "0.14.0 -> 0.15.0"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
-who = "Nicolas Silva <nical@fastmail.com>"
-criteria = "safe-to-deploy"
-delta = "0.15.0 -> 0.16.0"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
-who = "Nicolas Silva <nical@fastmail.com>"
-criteria = "safe-to-deploy"
-delta = "0.16.0 -> 0.17.0"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
-who = "Nicolas Silva <nical@fastmail.com>"
-criteria = "safe-to-deploy"
-delta = "0.17.0 -> 0.18.0"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
+[[audits.mozilla.audits.windows-link]]
 who = "Erich Gubler <erichdongubler@gmail.com>"
 criteria = "safe-to-deploy"
-delta = "0.18.0 -> 0.19.2"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
-who = [
-    "Jim Blandy <jimb@red-bean.com>",
-    "Nicolas Silva <nical@fastmail.com>",
-    "Erich Gubler <erichdongubler@gmail.com>",
-    "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
-]
-criteria = "safe-to-deploy"
-delta = "0.19.2 -> 0.20.0"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
-who = "Jim Blandy <jimb@red-bean.com>"
-criteria = "safe-to-deploy"
-delta = "0.20.0 -> 22.0.0"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
-who = "Erich Gubler <erichdongubler@gmail.com>"
-criteria = "safe-to-deploy"
-delta = "22.0.0 -> 23.0.0"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
-who = "Erich Gubler <erichdongubler@gmail.com>"
-criteria = "safe-to-deploy"
-delta = "23.0.0 -> 24.0.0"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
-who = "Erich Gubler <erichdongubler@gmail.com>"
-criteria = "safe-to-deploy"
-delta = "24.0.0 -> 25.0.0"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
-who = "Erich Gubler <erichdongubler@gmail.com>"
-criteria = "safe-to-deploy"
-delta = "25.0.0 -> 26.0.0"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.wgpu-types]]
-who = [
-    "Andy Leiserson <aleiserson@mozilla.com>",
-    "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
-    "Jim Blandy <jimb@red-bean.com>",
-    "Erich Gubler <erichdongubler@gmail.com>",
-]
-criteria = "safe-to-deploy"
-delta = "26.0.0 -> 27.0.0"
+delta = "0.1.1 -> 0.2.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.writeable]]

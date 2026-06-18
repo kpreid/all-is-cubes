@@ -61,6 +61,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.5.0 -> 0.6.0"
 
+[[audits.crunchy]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.2.4"
+
 [[audits.displaydoc]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
@@ -75,6 +80,11 @@ version = "0.2.5"
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "5.1.1 -> 5.2.0"
+
+[[audits.embed-doc-image]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.1.4"
 
 [[audits.euclid]]
 who = "Kevin Reid <kpreid@switchb.org>"
@@ -95,6 +105,16 @@ delta = "0.11.0 -> 0.12.0"
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.1.5 -> 0.2.0"
+
+[[audits.futures-io]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.3.31 -> 0.3.32"
+
+[[audits.futures-macro]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.3.31 -> 0.3.32"
 
 [[audits.gloo-timers]]
 who = "Kevin Reid <kpreid@switchb.org>"
@@ -160,6 +180,11 @@ version = "0.0.3"
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.0.3 -> 0.0.4"
+
+[[audits.naga]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "29.0.0 -> 29.0.1"
 
 [[audits.noise-functions]]
 who = "Kevin Reid <kpreid@switchb.org>"
@@ -237,6 +262,21 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "0.1.0"
 
+[[audits.re_build_info]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.31.0-alpha.1 -> 0.33.0"
+
+[[audits.re_case]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.31.0-alpha.1 -> 0.33.0"
+
+[[audits.re_string_interner]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.31.0-alpha.1 -> 0.33.0"
+
 [[audits.rectangle-pack]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
@@ -251,6 +291,11 @@ delta = "0.5.0 -> 0.6.0"
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "0.6.0"
+
+[[audits.resource_list_proc_macro]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.6.0 -> 0.6.1"
 
 [[audits.rstest]]
 who = "Kevin Reid <kpreid@switchb.org>"
@@ -346,6 +391,26 @@ version = "0.2.3"
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.2.3 -> 1.0.0"
+
+[[audits.wgpu-core-deps-apple]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "29.0.0 -> 29.0.3"
+
+[[audits.wgpu-naga-bridge]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "29.0.2 -> 29.0.1"
+
+[[audits.wgpu-types]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "29.0.2 -> 29.0.1"
+
+[[audits.windows-link]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.2.0 -> 0.2.1"
 
 [[trusted.anstream]]
 criteria = "safe-to-deploy"
@@ -879,19 +944,37 @@ end = "2026-04-26"
 criteria = "safe-to-deploy"
 user-id = 53780 # Connor Fitzgerald (cwfitzgerald)
 start = "2022-07-01"
-end = "2026-03-08"
+end = "2027-06-18"
 
 [[trusted.wgpu-core]]
 criteria = "safe-to-deploy"
 user-id = 53780 # Connor Fitzgerald (cwfitzgerald)
 start = "2022-07-01"
-end = "2026-03-12"
+end = "2027-06-18"
+
+[[trusted.wgpu-core-deps-emscripten]]
+criteria = "safe-to-deploy"
+user-id = 53780 # Connor Fitzgerald (cwfitzgerald)
+start = "2025-04-10"
+end = "2027-06-18"
 
 [[trusted.wgpu-hal]]
 criteria = "safe-to-deploy"
 user-id = 53780 # Connor Fitzgerald (cwfitzgerald)
 start = "2022-07-01"
-end = "2026-03-12"
+end = "2027-06-18"
+
+[[trusted.wgpu-naga-bridge]]
+criteria = "safe-to-deploy"
+user-id = 53780 # Connor Fitzgerald (cwfitzgerald)
+start = "2026-03-19"
+end = "2027-06-18"
+
+[[trusted.wgpu-types]]
+criteria = "safe-to-deploy"
+user-id = 53780 # Connor Fitzgerald (cwfitzgerald)
+start = "2022-07-01"
+end = "2027-06-18"
 
 [[trusted.winnow]]
 criteria = "safe-to-deploy"

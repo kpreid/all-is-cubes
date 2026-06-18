@@ -424,10 +424,6 @@ criteria = "safe-to-deploy"
 version = "0.1.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.embed-doc-image]]
-version = "0.1.4"
-criteria = "safe-to-run"
-
 [[exemptions.encode_unicode]]
 version = "1.0.0"
 criteria = "safe-to-deploy"
@@ -1462,10 +1458,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.windows-interface]]
 version = "0.59.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.windows-link]]
-version = "0.1.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.windows-result]]
