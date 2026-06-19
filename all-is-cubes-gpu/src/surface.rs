@@ -225,15 +225,24 @@ impl SurfaceRenderer {
 fn choose_surface_format_and_color_space(
     capabilities: &wgpu::SurfaceCapabilities,
 ) -> (wgpu::TextureFormat, wgpu::SurfaceColorSpace) {
+    const PREFERRED_HDR_COLOR_SPACES: [wgpu::SurfaceColorSpace; 2] = [
+        // Ordered from most preferred to least preferred.
+        wgpu::SurfaceColorSpace::ExtendedSrgbLinear,
+        wgpu::SurfaceColorSpace::ExtendedDisplayP3,
+    ];
+    const PREFERRED_HDR_COLOR_SPACES_FLAGS: wgpu::SurfaceColorSpaces = {
+        let [s1, s2] = PREFERRED_HDR_COLOR_SPACES;
+        s1.to_color_spaces().unwrap().union(s2.to_color_spaces().unwrap())
+    };
+
     /// A structure whose maximum value in [`Ord`] corresponds to the texture format we'd rather use.
     #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
     struct Rank {
-        /// Above all else, the format must be able to accept the linear sRGB output of our shader.
-        /// (TODO: Add support for non-sRGB color spaces.)
-        accepts_linear_srgb: bool,
+        /// If we can have a format that gives us (potential) HDR output, do that.
+        hdr_color_space_ok: bool,
 
-        /// If we can have a float format that gives us (potential) HDR output, do that.
-        is_float_hdr: bool,
+        /// The format is not necessarily HDR but can accept linear (not encoded) sRGB values.
+        accepts_linear_srgb: bool,
 
         /// All else being equal, prefer the original preference order
         /// (earlier elements are better)
@@ -246,8 +255,6 @@ fn choose_surface_format_and_color_space(
         .copied()
         .enumerate()
         .max_by_key(|&(index, format)| {
-            use wgpu::TextureFormat::*;
-
             let color_space_caps = capabilities.color_spaces(format);
 
             // Does this format support automatic sRGB encoding through texture views?
@@ -259,15 +266,16 @@ fn choose_surface_format_and_color_space(
             let has_srgb_encoder =
                 format.add_srgb_suffix() != format || format.remove_srgb_suffix() != format;
 
-            // Will this format accept linear-sRGB colors, either directly or via an encoding view?
+            let hdr_color_space_ok =
+                capabilities.color_spaces(format).intersects(PREFERRED_HDR_COLOR_SPACES_FLAGS);
+
             let accepts_linear_srgb = color_space_caps
                 .contains(wgpu::SurfaceColorSpaces::EXTENDED_SRGB_LINEAR)
                 || has_srgb_encoder && color_space_caps.contains(wgpu::SurfaceColorSpaces::SRGB);
 
             let rank = Rank {
+                hdr_color_space_ok,
                 accepts_linear_srgb,
-                is_float_hdr: matches!(format, Rgba16Float | Rgba32Float | Rgb9e5Ufloat)
-                    && accepts_linear_srgb,
                 original_order: Reverse(index),
             };
 
@@ -277,21 +285,24 @@ fn choose_surface_format_and_color_space(
         })
         .expect("wgpu::Surface::get_supported_formats() was empty");
 
-    let color_space = if capabilities
-        .color_spaces(best_format)
-        .contains(wgpu::SurfaceColorSpaces::EXTENDED_SRGB_LINEAR)
+    let surface_color_spaces = capabilities.color_spaces(best_format);
+
+    let chosen_color_space: wgpu::SurfaceColorSpace = if let Some(hdr_color_space) =
+        PREFERRED_HDR_COLOR_SPACES
+            .into_iter()
+            .find(|space| surface_color_spaces.contains(space.to_color_spaces().unwrap()))
     {
-        wgpu::SurfaceColorSpace::ExtendedSrgbLinear
+        hdr_color_space
     } else {
         wgpu::SurfaceColorSpace::Srgb
     };
 
     log::debug!(
-        "Chose surface format {best_format:?} with color space {color_space:?}, \
+        "Chose surface format {best_format:?} with color space {chosen_color_space:?}, \
         #{index} out of {formats:?}",
         index = index + 1,
         formats = capabilities.formats,
     );
 
-    (best_format, color_space)
+    (best_format, chosen_color_space)
 }

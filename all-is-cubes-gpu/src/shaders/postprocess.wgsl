@@ -4,12 +4,15 @@
 struct PostprocessUniforms {
     info_text_coordinate_scale: vec2f,
     info_text_origin: vec2f,
+    // --- 16-byte aligned point ---
     font_cell_size: vec2u,
     font_cell_margin: u32,
     tone_mapping_id: i32,
+    // --- 16-byte aligned point ---
+    color_space_id: i32,
     maximum_intensity: f32,
     bloom_intensity: f32,
-    _padding: vec2u,
+    _padding: i32,
 }
 
 // Group 0 is named postprocess_bind_group_layout on the Rust side.
@@ -54,6 +57,32 @@ fn postprocess_vertex(
     return VertexOutput(position, scene_tc, info_text_tc);
 }
 
+// --- Color conversion functions ----------------------------------------------
+
+// Convert linear sRGB to linear Display P3.
+// Both color spaces use the S64 white point.
+fn linear_srgb_to_linear_display_p3(srgb_color: vec3f) -> vec3f {
+    // TODO: Prove that the values in this matrix are correct.
+    return mat3x3<f32>(
+        vec3f(0.8224621, 0.0331941, 0.0170827),
+        vec3f(0.1775380, 0.9668058, 0.0723974),
+        vec3f(0.0000000, 0.0000000, 0.9105199)
+    ) * srgb_color;
+}
+
+// Apply the sRGB encoding curve.
+//
+// The input and output are bgoth in the 0-1 range (or the HDR extended version thereof),
+// not 0-255.
+fn encode_srgb(linear: vec3f) -> vec3f {
+    // TODO: write test for this encoding function comparing it to the CPU-side encoder
+    return mix(
+        linear * (323.0 / 25.0),
+        pow(linear, vec3f(5.0 / 12.0)) * 1.055 - 0.055,
+        vec3f(linear > vec3f(0.0031308))
+    );
+}
+
 // --- Fragment shader; doing the actual postprocessing work -------------------
 
 fn luminance(linear_rgb: vec3<f32>) -> f32 {
@@ -70,6 +99,30 @@ fn tone_map(linear_rgb: vec3<f32>) -> vec3<f32> {
             // Reinhard
             // TODO: Explain exactly which Reinhard, citation, etc
             return linear_rgb / (1.0 + luminance(linear_rgb) / camera.maximum_intensity);
+        }
+    }
+}
+
+// Perform color space conversion.
+//
+// No clamping is done on the input or the output.
+fn convert_to_output_color_space(linear_srgb: vec3<f32>) -> vec3<f32> {
+    switch camera.color_space_id {
+        default: { // or case 0
+            // Linear sRGB, possibly extended to HDR (scRGB).
+            // When this is used, it may or may not be sRGB encoded by the GPU after it leaves this
+            // shader’s control.
+            return linear_srgb;
+        }
+        case 1 {
+            // Encoded sRGB, created explicitly.
+            return encode_srgb(linear_srgb);
+        }
+        case 2 {
+            // Display P3, possibly extended to HDR.
+            // Display P3 has a wider gamut than sRGB via using different primaries, but uses
+            // the same encoding function.
+            return encode_srgb(linear_srgb_to_linear_display_p3(linear_srgb));
         }
     }
 }
@@ -184,11 +237,21 @@ fn render_character_cell(cell: vec2i, position_in_cell: vec2f) -> vec4f {
     return textureLoad(font_texture, font_atlas_tc, 0);
 }
 
+// Blend the scene texture and text, and apply tonemapping.
+// The result is always linear sRGB with premultiplied alpha; it may or may not be HDR, depending
+// on tone mapping configuration and other factors.
 @fragment
 fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
+    // Scene without text overlay, in linear HDR sRGB color.
     let scene_color = scene_pixel(in.scene_tc);
 
-    // apply tone mapping, respecting premultiplied alpha
+    // Apply tone mapping, respecting premultiplied alpha.
+    //
+    // This is a nonlinear transformation, but the answer to “what color space is this in?” for
+    // display purposes is “linear maybe-HDR sRGB”.
+    //
+    // TODO: Actually, we should perform color space conversion before tone mapping, since
+    // tone mapping should be aware of the limits of the color space.
     let tone_mapped_scene = vec4<f32>(
         tone_map(scene_color.rgb * scene_color.a) / scene_color.a,
         scene_color.a,
@@ -196,6 +259,10 @@ fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let text: vec4f = render_text(in);
 
-    // Premultiplied alpha blend.
-    return tone_mapped_scene * (1.0 - text.a) + text;
+    // Add text overlay, using premultiplied alpha blend.
+    // Text is not affected by tone mapping.
+    // Color space: linear maybe-HDR sRGB.
+    let linear_srgb_image = tone_mapped_scene * (1.0 - text.a) + text;
+
+    return vec4f(convert_to_output_color_space(linear_srgb_image.rgb), linear_srgb_image.a);
 }

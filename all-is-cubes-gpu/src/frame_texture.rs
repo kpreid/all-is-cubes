@@ -428,6 +428,8 @@ pub(crate) struct FbtConfig {
     /// adapter supports the necessary features (blending and multisample).
     pub(crate) linear_scene_texture_format: wgpu::TextureFormat,
 
+    pub(crate) output_color_space: wgpu::SurfaceColorSpace,
+
     /// Sample count of `linear_scene_tex`.
     /// Currently always 1 or 4.
     pub(crate) sample_count: u32,
@@ -482,6 +484,7 @@ impl FbtConfig {
                     size,
                     maximum_intensity,
                     linear_scene_texture_format: wgpu::TextureFormat::Rgba16Float,
+                    output_color_space: surface_config.color_space,
                     sample_count: sample_count_if_ok,
                     enable_copy_out,
                     flaws: Flaws::empty(),
@@ -493,6 +496,7 @@ impl FbtConfig {
                     size,
                     maximum_intensity,
                     linear_scene_texture_format: wgpu::TextureFormat::Rgba16Float,
+                    output_color_space: surface_config.color_space,
                     sample_count: 1,
                     enable_copy_out,
                     flaws: if sample_count_if_ok != 1 {
@@ -510,6 +514,7 @@ impl FbtConfig {
                 size,
                 maximum_intensity,
                 linear_scene_texture_format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                output_color_space: surface_config.color_space,
                 sample_count: if features.rgba8_can_multisample {
                     sample_count_if_ok
                 } else {

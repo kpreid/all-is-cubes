@@ -320,20 +320,23 @@ pub(crate) struct PostprocessUniforms {
     /// in 0.0..1.0 coordinates.
     info_text_origin: [f32; 2],
 
+    // --- 16-byte aligned point ---
     /// Size of a single character cell in `font_texture`.
     font_cell_size: [u32; 2],
 
-    // --- 16-byte aligned point ---
     font_cell_margin: u32,
 
     tone_mapping_id: i32,
+
+    // --- 16-byte aligned point ---
+    color_space_id: i32,
 
     maximum_intensity: f32,
 
     bloom_intensity: f32,
 
     // Adjust this as needed to make a multiple of 16 bytes
-    _padding: [u32; 2],
+    _padding: [u32; 1],
 }
 
 impl PostprocessUniforms {
@@ -341,6 +344,7 @@ impl PostprocessUniforms {
         options: &GraphicsOptions,
         viewport: Viewport,
         surface_maximum_intensity: PositiveSign<f32>,
+        output_color_space: wgpu::SurfaceColorSpace,
         info_text_coordinate_scale: Vector2D<f32, ()>,
         info_text_font_metrics: &GpuFontMetrics,
     ) -> Self {
@@ -367,6 +371,18 @@ impl PostprocessUniforms {
                 // so reset the operator to `Clamp` so the other operators don’t have to deal
                 // with infinity.
                 0
+            },
+            // TODO: use an enum of our own for clarity
+            color_space_id: match output_color_space {
+                wgpu::SurfaceColorSpace::ExtendedSrgbLinear => 0,
+                wgpu::SurfaceColorSpace::Srgb => 0,
+                wgpu::SurfaceColorSpace::ExtendedSrgb => 1,
+                wgpu::SurfaceColorSpace::DisplayP3 => 2,
+                wgpu::SurfaceColorSpace::ExtendedDisplayP3 => 2,
+
+                wgpu::SurfaceColorSpace::Auto => unreachable!(),
+                wgpu::SurfaceColorSpace::Bt2100Pq => unimplemented!(),
+                wgpu::SurfaceColorSpace::Bt2100Hlg => unimplemented!(),
             },
 
             maximum_intensity: {
