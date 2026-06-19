@@ -208,9 +208,7 @@ impl Move {
                             }),
                         )
                     }
-                    Some(voxel) => {
-                        Evoxels::from_many(output_resolution, Vol::repeat(displaced_bounds, voxel))
-                    }
+                    Some(voxel) => Evoxels::repeat(output_resolution, displaced_bounds, voxel),
                 };
                 MinEval::new(attributes, displaced_voxels)
             }
@@ -269,9 +267,10 @@ mod tests {
             EvaluatedBlock {
                 block: moved,
                 attributes: ev_original.attributes.clone(),
-                voxels: Evoxels::from_many(
+                voxels: Evoxels::repeat(
                     resolution,
-                    Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
+                    expected_bounds,
+                    Evoxel::from_block(&ev_original)
                 ),
                 cost: block::Cost {
                     components: ev_original.cost.components + 1,
@@ -332,9 +331,10 @@ mod tests {
                     voxels: 2u32.pow(3) * 3 / 2, // original recur + 1/2 block of Move
                     recursion: 0
                 },
-                voxels: Evoxels::from_many(
+                voxels: Evoxels::repeat(
                     resolution,
-                    Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
+                    expected_bounds,
+                    Evoxel::from_block(&ev_original)
                 ),
                 derived: block::Derived {
                     color: color.to_rgb().with_alpha(zo32(2. / 3.)),
@@ -391,9 +391,10 @@ mod tests {
                     voxels: 2 * 2 * 2 + 4 * 4 * 3, // original recur + 3/4 block of Move
                     recursion: 0
                 },
-                voxels: Evoxels::from_many(
+                voxels: Evoxels::repeat(
                     move_resolution,
-                    Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
+                    expected_bounds,
+                    Evoxel::from_block(&ev_original)
                 ),
                 derived: block::Derived {
                     color: color.to_rgb().with_alpha(zo32(20. / (6. * 4.))),

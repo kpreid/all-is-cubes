@@ -156,6 +156,25 @@ impl Evoxels {
         Evoxels(EvoxelsInner::Many(resolution, voxels))
     }
 
+    /// Constructs an [`Evoxels`] which is made up of copies of a single voxel in a given volume.
+    ///
+    /// Because this creates only uniform boxes, it is mainly useful for testing.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bounds` exceed `GridAab::for_block(resolution)`.
+    pub fn repeat(resolution: Resolution, bounds: GridAab, voxel: Evoxel) -> Self {
+        assert!(
+            GridAab::for_block(resolution).contains_box(bounds),
+            "Evoxels::repeat() bounds {bounds:?} exceeds specified resolution {resolution}"
+        );
+        if resolution == R1 && bounds == GridAab::ORIGIN_CUBE {
+            Self::from_one(voxel)
+        } else {
+            Self::from_many(resolution, Vol::repeat(bounds, voxel))
+        }
+    }
+
     /// Returns the resolution (scale factor) of this set of voxels.
     /// See [`Resolution`] for more information.
     #[inline]

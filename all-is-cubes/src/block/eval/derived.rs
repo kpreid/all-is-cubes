@@ -424,10 +424,7 @@ mod tests {
     ) {
         let voxel = Evoxel::from_color(color);
         let ev_one = compute_derived(&Evoxels::from_one(voxel));
-        let ev_many = compute_derived(&Evoxels::from_many(
-            R2,
-            Vol::repeat(GridAab::for_block(R2), voxel),
-        ));
+        let ev_many = compute_derived(&Evoxels::repeat(R2, GridAab::for_block(R2), voxel));
 
         // Check that the derived attributes are all identical (except for the opacity mask),
         assert_eq!(

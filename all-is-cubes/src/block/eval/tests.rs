@@ -590,15 +590,13 @@ fn raw_primitive() {
         display_name: arcstr::literal!("foo"),
         ..Default::default()
     });
-    let voxels = Evoxels::from_many(
+    let voxels = Evoxels::repeat(
         R4,
-        Vol::repeat(
-            GridAab::for_block(R4),
-            Evoxel {
-                color: Rgba::WHITE,
-                ..Evoxel::AIR
-            },
-        ),
+        GridAab::for_block(R4),
+        Evoxel {
+            color: Rgba::WHITE,
+            ..Evoxel::AIR
+        },
     );
     let block = Block::from_primitive(Primitive::Raw {
         attributes: attributes.clone(),
