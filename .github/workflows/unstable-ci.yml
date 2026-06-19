@@ -73,7 +73,7 @@ jobs:
     runs-on: ${{ matrix.os }}-latest
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: unstable-rust
 
@@ -162,7 +162,7 @@ jobs:
       RUSTFLAGS: "-Dwarnings"
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - uses: Swatinem/rust-cache@v2.9.1
       with:
@@ -214,7 +214,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: Swatinem/rust-cache@v2.9.1
     - run: rustup toolchain install nightly --component miri
     - uses: taiki-e/install-action@v2

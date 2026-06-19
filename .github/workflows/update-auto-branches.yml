@@ -27,7 +27,7 @@ jobs:
     outputs:
       nextnamesjson: ${{ steps.list.outputs.nextnamesjson }} 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0 # supposedly will fetch all branches. TODO: we really only need to list them, and this might be better as a GitHub API call?
     - id: list
@@ -45,7 +45,7 @@ jobs:
       matrix:
         nextname: ${{ fromJson(needs.find-branches.outputs.nextnamesjson) }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: "next/${{ matrix.nextname }}"
         fetch-depth: 0 # need branches to perform rebase

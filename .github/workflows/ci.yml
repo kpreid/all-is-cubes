@@ -111,7 +111,7 @@ jobs:
 
     - run: df -h .
 
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - run: df -h .
 
@@ -215,7 +215,7 @@ jobs:
 
     steps:
 
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - uses: Swatinem/rust-cache@v2.9.1
       with:
@@ -290,7 +290,7 @@ jobs:
       RUSTFLAGS: "-Dwarnings"
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - uses: Swatinem/rust-cache@v2.9.1
       with:
@@ -362,7 +362,7 @@ jobs:
         large-packages: false # slow
         swap-storage: false
 
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     # Load cache before doing any Rust builds
     - uses: Swatinem/rust-cache@v2.9.1
@@ -424,7 +424,7 @@ jobs:
         large-packages: false # slow
         swap-storage: false
 
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     # Load cache before doing any Rust builds
     - uses: Swatinem/rust-cache@v2.9.1
@@ -484,7 +484,7 @@ jobs:
     if: ${{ !startsWith(github.ref, 'refs/heads/next/') }}
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     # Run once on each workspace (hence each lock file) of interest.
     # Our only other workspace is fuzz/, which we aren't interested in checking.
@@ -504,7 +504,7 @@ jobs:
     # Running on push would require more work to determine the base revision
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # Needed to ensure `main` branch is needed
           fetch-depth: 0
@@ -547,7 +547,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: Swatinem/rust-cache@v2.9.1
     - run: rustup toolchain install nightly --component miri
     - uses: taiki-e/install-action@v2
@@ -566,7 +566,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     # The build is faster *without* this cache.
     # - uses: Swatinem/rust-cache@v2.7.8
@@ -594,7 +594,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     # Cache both the main workspace (for xtask builds) and the fuzzing workspace
     - uses: Swatinem/rust-cache@v2.9.1
