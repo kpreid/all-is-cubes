@@ -17,7 +17,7 @@ dependencies = [
  "arrayvec",
  "base64",
  "bevy_ecs",
- "bevy_platform",
+ "bevy_platform 0.19.0",
  "bitflags",
  "bytemuck",
  "derive_more",
@@ -52,7 +52,7 @@ dependencies = [
 name = "all-is-cubes-base"
 version = "0.10.0"
 dependencies = [
- "bevy_platform",
+ "bevy_platform 0.19.0",
  "bytemuck",
  "displaydoc",
  "euclid",
@@ -198,7 +198,7 @@ dependencies = [
  "all-is-cubes",
  "all-is-cubes-render",
  "async_fn_traits",
- "bevy_platform",
+ "bevy_platform 0.19.0",
  "bitflags",
  "displaydoc",
  "exhaust",
@@ -230,7 +230,7 @@ dependencies = [
  "all-is-cubes-port",
  "all-is-cubes-render",
  "all-is-cubes-ui",
- "bevy_platform",
+ "bevy_platform 0.19.0",
  "console_error_panic_hook",
  "console_log",
  "flume",
@@ -337,7 +337,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9cf7a3ee41342dd7b5a5d82e200d0e8efb933169247fce853b4ad633d51e87d"
 dependencies = [
  "bevy_ecs_macros",
- "bevy_platform",
+ "bevy_platform 0.18.1",
  "bevy_ptr",
  "bevy_tasks",
  "bevy_utils",
@@ -385,6 +385,21 @@ version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec6b36504169b644acd26a5469fd8d371aa6f1d73ee5c01b1b1181ae1cefbf9b"
 dependencies = [
+ "foldhash 0.2.0",
+ "futures-channel",
+ "hashbrown 0.16.1",
+ "portable-atomic",
+ "portable-atomic-util",
+ "serde",
+ "spin 0.10.0",
+]
+
+[[package]]
+name = "bevy_platform"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3120670bb2308980f723477c9d82476fcda31f08be9b256c3f0acdee82a65094"
+dependencies = [
  "critical-section",
  "foldhash 0.2.0",
  "futures-channel",
@@ -397,6 +412,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-time",
+ "windows-sys",
 ]
 
 [[package]]
@@ -414,7 +430,7 @@ dependencies = [
  "async-channel",
  "async-task",
  "atomic-waker",
- "bevy_platform",
+ "bevy_platform 0.18.1",
  "crossbeam-queue",
  "derive_more",
  "futures-lite",
@@ -428,7 +444,7 @@ version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2111910cd7a4b1e6ce07eaaeb6f68a2c0ea0ca609ed0d0d506e3eb161101435b"
 dependencies = [
- "bevy_platform",
+ "bevy_platform 0.18.1",
  "disqualified",
 ]
 
