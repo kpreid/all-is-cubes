@@ -29,7 +29,7 @@ dependencies = [
  "flate2",
  "futures-core",
  "hashbrown 0.17.0",
- "itertools 0.15.0",
+ "itertools",
  "libm",
  "log",
  "macro_rules_attribute",
@@ -101,7 +101,7 @@ dependencies = [
  "gloo-timers",
  "half",
  "hashbrown 0.17.0",
- "itertools 0.15.0",
+ "itertools",
  "log",
  "num-traits",
  "pollster",
@@ -134,7 +134,7 @@ dependencies = [
  "futures-util",
  "hashbrown 0.17.0",
  "indoc",
- "itertools 0.15.0",
+ "itertools",
  "log",
  "mutants 0.0.4",
  "num-traits",
@@ -157,7 +157,7 @@ dependencies = [
  "futures-core",
  "gltf-json",
  "image",
- "itertools 0.15.0",
+ "itertools",
  "log",
  "pollster",
  "rectangle-pack",
@@ -180,7 +180,7 @@ dependencies = [
  "hashbrown 0.17.0",
  "imgref",
  "indoc",
- "itertools 0.15.0",
+ "itertools",
  "manyfmt",
  "mutants 0.0.4",
  "num-traits",
@@ -621,21 +621,20 @@ dependencies = [
 
 [[package]]
 name = "exhaust"
-version = "0.2.5"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55753e2354c477cf7cb0089316c526e72be8610c330358c93d6f12f8d1fad756"
+checksum = "e8502ca11bf13d10e518a180e12787b3630dcd75b3648251fdbe5e748cba28fa"
 dependencies = [
  "exhaust-macros",
- "mutants 0.0.4",
+ "mutants 0.0.3",
 ]
 
 [[package]]
 name = "exhaust-macros"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de248793548b04e7d29117107315b9cb6410c0b37dbb85038452eccfb489cda3"
+checksum = "5b18ebe804a66e3843203555d81fe7def7ed845620f49913636f71d899b5b652"
 dependencies = [
- "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn",
@@ -907,15 +906,6 @@ name = "inflections"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a257582fdcde896fd96463bf2d40eefea0580021c0712a0e2b028b60b47a837a"
-
-[[package]]
-name = "itertools"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
 
 [[package]]
 name = "itertools"

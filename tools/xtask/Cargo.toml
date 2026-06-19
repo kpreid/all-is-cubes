@@ -17,7 +17,7 @@ itertools = { workspace = true }
 # used for generating .vscode/tasks.json
 serde_json = { workspace = true, features = ["preserve_order"] }
 strum = { workspace = true }
-toml_edit = { version = "0.25.0" }
+toml_edit = { version = "0.25.1" }
 walkdir = "2.5.0"
 xshell = "0.2.7"
 
