@@ -83,6 +83,10 @@ jobs:
         # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
         prefix-key: "v1-rust-unstablefeatures-${{ matrix.os }}-${{ matrix.depversions }}"
         shared-key: "build"
+        # Don’t save caches specific to PR branches.
+        # This will greatly reduce cache usage without significantly reducing the benefits, because
+        # the default branch’s cache will be still be loaded.
+        save-if: ${{ github.event_name != 'pull_request' }}
         workspaces: |
           ./
           all-is-cubes-wasm/
@@ -170,6 +174,10 @@ jobs:
         # would invalidate all cached artifacts anyway.
         prefix-key: "v1-rust-unstablefeatures-${{ matrix.toolchain }}"
         shared-key: "lint"
+        # Don’t save caches specific to PR branches.
+        # This will greatly reduce cache usage without significantly reducing the benefits, because
+        # the default branch’s cache will be still be loaded.
+        save-if: ${{ github.event_name != 'pull_request' }}
         # Job's likely to fail and yet have useful cache material.
         cache-on-failure: true
         workspaces: |
@@ -216,6 +224,11 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - uses: Swatinem/rust-cache@v2.9.1
+      with:
+        # Don’t save caches specific to PR branches.
+        # This will greatly reduce cache usage without significantly reducing the benefits, because
+        # the default branch’s cache will be still be loaded.
+        save-if: ${{ github.event_name != 'pull_request' }}
     - run: rustup toolchain install nightly --component miri
     - uses: taiki-e/install-action@v2
       with:
