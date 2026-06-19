@@ -597,13 +597,9 @@ async fn follow_options_change(mut context: RenderTestContext) {
         .await;
 }
 
-/// A “white furnace test shows that a renderer’s rendering of a 100% reflective surface is
-/// accurate, neither absorbing nor emitting additional light energy. When properly implemented,
-/// the white object should be invisible.
-///
-/// In our case, rendering has a tiny fudge factor intended to make corners more distinct even
-/// under uniform lighting conditions, so the output image is expected not to be perfectly constant.
-/// But it’s still a test case worth looking at. (And perhaps we should remove that fudge factor.)
+/// A “white furnace” test demonstrates the accuracy of a renderer’s rendering of a scene containing
+/// only objects which reflect (or transmit) 100% of incoming light, neither absorbing nor emitting
+/// additional light energy. When properly implemented, the white objects should be invisible.
 async fn furnace(mut context: RenderTestContext) {
     let white_block = block::from_color!(Rgba::WHITE);
     let bounds = GridAab::from_lower_size([-1, -1, -1], [3, 3, 3]);
