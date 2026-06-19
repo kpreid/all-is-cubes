@@ -6418,6 +6418,7 @@ dependencies = [
  "all-is-cubes-ui",
  "exhaust",
  "rendiff",
+ "serde",
  "test-renderers-types",
 ]
 

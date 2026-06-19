@@ -20,3 +20,4 @@ all-is-cubes-render = { workspace = true, features = ["raytracer", "serde", "std
 all-is-cubes-ui = { workspace = true, features = ["session"] }
 exhaust = { workspace = true }
 rendiff = { workspace = true }
+serde = { workspace = true }

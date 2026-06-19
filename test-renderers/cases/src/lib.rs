@@ -98,7 +98,12 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     );
     c.insert("follow_character_change", None, follow_character_change);
     c.insert("follow_options_change", None, follow_options_change);
-    c.insert("furnace", None, furnace);
+    c.insert_variants(
+        "furnace",
+        &None,
+        furnace,
+        <(FurnaceFog, FurnaceTransparency)>::exhaust(),
+    );
     c.insert("icons", None, icons);
     c.insert("layers_all", None, layers_all);
     c.insert("layers_hidden_ui", None, layers_hidden_ui);
@@ -597,11 +602,30 @@ async fn follow_options_change(mut context: RenderTestContext) {
         .await;
 }
 
+// Custom enums to make the test case names clearer.
+#[derive(Clone, Copy, exhaust::Exhaust, serde::Serialize)]
+enum FurnaceFog {
+    Clear,
+    Foggy,
+}
+#[derive(Clone, Copy, serde::Serialize, exhaust::Exhaust)]
+enum FurnaceTransparency {
+    Opaque,
+    Transparent,
+}
+
 /// A “white furnace” test demonstrates the accuracy of a renderer’s rendering of a scene containing
 /// only objects which reflect (or transmit) 100% of incoming light, neither absorbing nor emitting
 /// additional light energy. When properly implemented, the white objects should be invisible.
-async fn furnace(mut context: RenderTestContext) {
-    let white_block = block::from_color!(Rgba::WHITE);
+async fn furnace(
+    mut context: RenderTestContext,
+    (fog, transparency): (FurnaceFog, FurnaceTransparency),
+) {
+    let white_block = match transparency {
+        FurnaceTransparency::Opaque => block::from_color!(1.0, 1.0, 1.0, 1.0),
+        FurnaceTransparency::Transparent => block::from_color!(1.0, 1.0, 1.0, 0.5),
+    };
+
     let bounds = GridAab::from_lower_size([-1, -1, -1], [3, 3, 3]);
     let space = Space::builder(bounds)
         .sky(space::Sky::Uniform(Rgb::ONE * 0.75))
@@ -629,6 +653,11 @@ async fn furnace(mut context: RenderTestContext) {
     let mut options = GraphicsOptions::default();
     options.fov_y = ps64(45.0);
     options.bloom_intensity = zo32(0.0);
+    options.view_distance = ps64(10.0);
+    options.fog = match fog {
+        FurnaceFog::Clear => FogOption::None,
+        FurnaceFog::Foggy => FogOption::Physical,
+    };
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
 
