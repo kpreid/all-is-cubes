@@ -711,6 +711,7 @@ impl EverythingRenderer {
             self.cameras.graphics_options(),
             self.cameras.viewport(),
             self.fb.config().maximum_intensity,
+            self.fb.config().output_color_space,
             self.info_text_coordinate_scale,
             &self.pipelines.info_text_font_metrics,
         )));
