@@ -652,7 +652,7 @@ jobs:
     # Failed runs are useful to cache since they expand the corpus, so we use separate save and
     # restore steps per <https://github.com/actions/cache/tree/main/save#always-save-cache>
     - name: Save fuzzer corpus
-      if: ${{ always() }}
+      if: ${{ always() && github.event_name != 'pull_request' }}
       uses: actions/cache/save@v5
       with:
         key: fuzz-corpus
