@@ -619,17 +619,19 @@ fn antialias_texel_coordinates(texel_coordinates: vec3<f32>) -> vec3<f32> {
     return which_texel + clamp((texel_coordinates - which_texel) / scale, vec3f(-0.5), vec3f(0.5));
 }
 
-// Apply the effects of distance fog and camera exposure.
-// These effects are independent of alpha and therefore the input and output is RGB.
+// Apply the effects of distance fog and camera exposure to `lit_color`.
+//
+// `lit_color` is an input RGB color which will be `mix()`ed with the fog.
+// `fog_alpha` scales the fog color, which may be used for premultiplied-alpha output.
 fn apply_fog_and_exposure(
     lit_color: vec3<f32>,
     fog_mix: f32,
+    fog_alpha: f32,
     view_direction: vec3<f32>,
 ) -> vec3<f32> {
-
     // Fog
     let fog_color = textureSample(skybox_texture, skybox_sampler, view_direction).rgb;
-    let fogged_color = mix(lit_color, fog_color, fog_mix);
+    let fogged_color = mix(lit_color, fog_color * fog_alpha, fog_mix);
 
     // Exposure/eye adaptation
     let exposed_color = fogged_color.rgb * camera.exposure;
@@ -820,10 +822,14 @@ fn finalize(light: vec3f, alpha: f32, in: BlockFragmentInput) -> vec4f {
     let debug_text_fragment: vec4f = render_debug_text(in);
 
     // Note: this is not a blend, but a branchless test. debug_text_fragment.a is always 0 or 1.
-    return mix(vec4<f32>(
-        apply_fog_and_exposure(light, in.fog_mix, in.camera_ray_direction),
-        alpha,
-    ), debug_text_fragment, debug_text_fragment.a);
+    return mix(
+        vec4<f32>(
+            apply_fog_and_exposure(light, in.fog_mix, alpha, in.camera_ray_direction),
+            alpha,
+        ),
+        debug_text_fragment,
+        debug_text_fragment.a
+    );
 }
 
 // --- Entry points for block fragment shading -----------------------------------------------------
@@ -943,7 +949,7 @@ fn skybox_vertex(
 
 @fragment
 fn skybox_fragment(in: SkyboxFragmentInput) -> @location(0) vec4<f32> {
-    return vec4<f32>(apply_fog_and_exposure(vec3(0.0), 1.0, in.camera_ray_direction), 1.0);
+    return vec4<f32>(apply_fog_and_exposure(vec3(0.0), 1.0, 1.0, in.camera_ray_direction), 1.0);
 }
 
 // --- Debug text rendering -----------------------------------------------------------
