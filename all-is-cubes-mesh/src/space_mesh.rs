@@ -539,8 +539,19 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         meta.bounding_box.union_mut(sub_mesh.bounding_box.translate(bb_translation));
     }
 
-    for vertex in &mut vertices.0[first_new_vertex..] {
-        vertex.instantiate_vertex(inst);
+    // “Instantiate” the vertices: translate them to their position in the space.
+    // When doing this, they are chunked into fixed-size batches to encourage optimizations
+    // (autovectorization and unrolling).
+    {
+        let (v_chunks, v_remainder) = vertices.0[first_new_vertex..].as_chunks_mut::<8>();
+        for chunk in v_chunks {
+            for vertex in chunk {
+                vertex.instantiate_vertex(inst);
+            }
+        }
+        for vertex in v_remainder {
+            vertex.instantiate_vertex(inst);
+        }
     }
 }
 
