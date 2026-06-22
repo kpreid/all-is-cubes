@@ -4,7 +4,10 @@ use criterion::{BatchSize, Criterion, criterion_main};
 use rand::RngExt as _;
 use rand::SeedableRng as _;
 
-use all_is_cubes::block::{self, AIR, Block, Resolution::R16};
+use all_is_cubes::block::{
+    self, AIR, Block,
+    Resolution::{R4, R16},
+};
 use all_is_cubes::euclid::point3;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::math::{Face, GridAab, GridCoordinate, GridPoint, Rgba, u32size};
@@ -103,7 +106,7 @@ fn block_mesh_benches(c: &mut Criterion) {
     g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("tetrahedron", |b| {
         let universe = &mut Universe::new();
-        let block = tetrahedron_block(universe);
+        let block = tetrahedron_block(universe, R16);
         iter_reused_block_mesh(b, universe, options, &block);
     });
 
@@ -165,27 +168,39 @@ fn iter_new_block_mesh(
 }
 
 fn space_mesh_benches(c: &mut Criterion) {
+    // OK to share this because none of the universe mutations are inside a benchmark.
+    let mut universe = Universe::new();
+
     let mut g = c.benchmark_group("space");
     let options = MeshOptions::new(&GraphicsOptions::default());
     // The Space and block meshes are not mutated, so we can construct them once.
     // This also ensures we're not timing dropping them.
-    let checker_ing = checkerboard_space_bench_setup(options.clone(), false);
+    let checker_r1_ing = checkerboard_space_bench_setup(
+        options.clone(),
+        block::from_color!(Rgba::WHITE),
+        universe.read_ticket(),
+    );
+    let checker_tet_ing = checkerboard_space_bench_setup(
+        options.clone(),
+        tetrahedron_block(&mut universe, R4),
+        universe.read_ticket(),
+    );
 
+    // Half-full space (i.e. most blocks don't add any surfaces)
+    let half_ing = SpaceMeshIngredients::new(options, half_space(&block::from_color!(Rgba::WHITE)));
     g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
-    g.bench_function("checker-fresh", |b| {
+    g.bench_function("half-fresh", |b| {
         // This benchmark actually has no use for iter_batched_ref -- it could be
         // iter_with_large_drop -- but I want to make sure any quirks of the measurement
-        // are shared between all cases.
-        b.iter_batched_ref(|| (), |()| checker_ing.do_new(), BatchSize::SmallInput);
+        // are shared between all cases. The same logic applies to the other -fresh benches
+        // in this group.
+        b.iter_batched_ref(|| (), |()| half_ing.do_new(), BatchSize::SmallInput);
     });
-
-    g.bench_function("checker-reused", |b| {
+    g.bench_function("half-reused", |b| {
         b.iter_batched_ref(
             || {
                 let mut buffer = SpaceMesh::default();
-                checker_ing.do_compute(&mut buffer);
-                // Sanity check that we're actually rendering as much as we expect.
-                assert_eq!(buffer.vertices().0.len(), 6 * 4 * (16 * 16 * 16) / 2);
+                half_ing.do_compute(&mut buffer);
                 buffer
             },
             |buffer: &mut SpaceMesh<Mt>| {
@@ -194,26 +209,45 @@ fn space_mesh_benches(c: &mut Criterion) {
                 // able to reuse some work (or at least send only part of the buffer to the GPU),
                 // and so this will become a meaningful benchmark of how much CPU time we're
                 // spending or saving on that.
-                checker_ing.do_compute(buffer)
+                half_ing.do_compute(buffer)
             },
             BatchSize::SmallInput,
         );
     });
 
-    let half_ing = SpaceMeshIngredients::new(options, half_space(&block::from_color!(Rgba::WHITE)));
+    // Checkerboard of resolution-1 blocks
     g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
-    g.bench_function("half-fresh", |b| {
-        b.iter_batched_ref(|| (), |()| half_ing.do_new(), BatchSize::SmallInput);
+    g.bench_function("checker-r1-fresh", |b| {
+        b.iter_batched_ref(|| (), |()| checker_r1_ing.do_new(), BatchSize::SmallInput);
     });
-
-    g.bench_function("half-reused", |b| {
+    g.bench_function("checker-r1-reused", |b| {
         b.iter_batched_ref(
             || {
                 let mut buffer = SpaceMesh::default();
-                half_ing.do_compute(&mut buffer);
+                checker_r1_ing.do_compute(&mut buffer);
+                // Sanity check that we're actually rendering as much as we expect.
+                assert_eq!(buffer.vertices().0.len(), 6 * 4 * (16 * 16 * 16) / 2);
                 buffer
             },
-            |buffer: &mut SpaceMesh<Mt>| half_ing.do_compute(buffer),
+            |buffer: &mut SpaceMesh<Mt>| checker_r1_ing.do_compute(buffer),
+            BatchSize::SmallInput,
+        );
+    });
+
+    // Checkerboard of tetrahedron blocks.
+    // This exercises the case of many vertices per block mesh copied to the space.
+    g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
+    g.bench_function("checker-tet-fresh", |b| {
+        b.iter_batched_ref(|| (), |()| checker_tet_ing.do_new(), BatchSize::SmallInput);
+    });
+    g.bench_function("checker-tet-reused", |b| {
+        b.iter_batched_ref(
+            || {
+                let mut buffer = SpaceMesh::default();
+                checker_tet_ing.do_compute(&mut buffer);
+                buffer
+            },
+            |buffer: &mut SpaceMesh<Mt>| checker_tet_ing.do_compute(buffer),
             BatchSize::SmallInput,
         );
     });
@@ -226,7 +260,11 @@ fn slow_mesh_benches(c: &mut Criterion) {
 
     g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("transparent", |b| {
-        let ing = checkerboard_space_bench_setup(options.clone(), true);
+        let ing = checkerboard_space_bench_setup(
+            options.clone(),
+            block::from_color!(0.5, 0.5, 0.5, 0.5),
+            universe::ReadTicket::stub(),
+        );
         b.iter_batched_ref(|| (), |()| ing.do_new(), BatchSize::SmallInput);
     });
 }
@@ -504,29 +542,27 @@ fn planar_benches(c: &mut Criterion) {
 // -------------------------------------------------------------------------------------------------
 // Helpers, not benches
 
-fn checkerboard_space_bench_setup(options: MeshOptions, transparent: bool) -> SpaceMeshIngredients {
-    SpaceMeshIngredients::new(
-        options,
-        checkerboard_space(&[
-            AIR,
-            if transparent {
-                block::from_color!(0.5, 0.5, 0.5, 0.5)
-            } else {
-                block::from_color!(Rgba::WHITE)
-            },
-        ]),
-    )
+fn checkerboard_space_bench_setup(
+    options: MeshOptions,
+    block: Block,
+    read_ticket: universe::ReadTicket<'_>,
+) -> SpaceMeshIngredients {
+    SpaceMeshIngredients::new(options, checkerboard_space(&[AIR, block], read_ticket))
 }
 
 fn checkerboard_block(universe: &mut Universe, voxels: &[Block; 2]) -> Block {
     Block::builder()
-        .voxels_handle(R16, universe.insert_anonymous(checkerboard_space(voxels)))
+        .voxels_handle(
+            R16,
+            universe.insert_anonymous(checkerboard_space(voxels, universe.read_ticket())),
+        )
         .build()
 }
 
-fn checkerboard_space(blocks: &[Block; 2]) -> Space {
+fn checkerboard_space(blocks: &[Block; 2], read_ticket: universe::ReadTicket<'_>) -> Space {
     let bounds = GridAab::from_lower_size([0, 0, 0], [16, 16, 16]);
     Space::builder(bounds)
+        .read_ticket(read_ticket)
         .build_and_mutate(|m| {
             m.fill(bounds, |p| {
                 Some(&blocks[((p.x + p.y + p.z) as usize).rem_euclid(blocks.len())])
@@ -546,8 +582,7 @@ fn half_space(block: &Block) -> Space {
 }
 
 /// A block occupied by a tetrahedron extending from the low corner.
-fn tetrahedron_block(universe: &mut Universe) -> Block {
-    let resolution = R16;
+fn tetrahedron_block(universe: &mut Universe, resolution: block::Resolution) -> Block {
     let solid = block::from_color!(Rgba::WHITE);
     Block::builder()
         .voxels_fn(resolution, |p| {
