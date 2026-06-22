@@ -507,27 +507,25 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         return;
     }
 
+    let first_new_vertex = vertices.0.len();
+
     let inst = M::Vertex::instantiate_block(translation);
     let bb_translation = translation.lower_bounds().to_f32().to_vector().cast_unit::<MeshRel>();
 
     for (face, on_block_face, sub_mesh) in block_mesh.all_sub_meshes_keyed() {
         if sub_mesh.is_empty() {
-            // Nothing to do; skip opacity lookup.
+            // Nothing to do; skip the neighbor check.
             continue;
         }
         if on_block_face && neighbor_is_fully_opaque(face) {
-            // Skip face fully obscured by a neighbor.
+            // Skip face fully occluded by a neighbor.
             continue;
         }
 
         // Copy vertices, offset to the block position
-        let index_offset_usize = vertices.0.len();
-        let index_offset: u32 = index_offset_usize.try_into().expect("vertex index overflow");
+        let index_offset: u32 = vertices.0.len().try_into().expect("vertex index overflow");
         vertices.0.extend(sub_mesh.vertices.0.iter());
         vertices.1.extend(sub_mesh.vertices.1.iter());
-        for vertex in &mut vertices.0[index_offset_usize..] {
-            vertex.instantiate_vertex(inst);
-        }
         opaque_indices.extend_with_offset(
             sub_mesh.indices_opaque.as_slice(..),
             index_offset,
@@ -539,6 +537,10 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         meta.has_non_rect_transparency |= sub_mesh.has_non_rect_transparency;
 
         meta.bounding_box.union_mut(sub_mesh.bounding_box.translate(bb_translation));
+    }
+
+    for vertex in &mut vertices.0[first_new_vertex..] {
+        vertex.instantiate_vertex(inst);
     }
 }
 
