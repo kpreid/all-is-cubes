@@ -10,7 +10,8 @@ use all_is_cubes::math::{
 
 use crate::texture::{self, Plane as _, TexelUnit, TextureCoordinate, TilePoint};
 use crate::{
-    Aabb, BlockMesh, BlockVertex, Coloring, IndexVec, MeshRel, MeshTypes, PosCoord, Position, Viz,
+    Aabb, BlockMesh, BlockVertex, Coloring, IndexVec, Ixtend as _, MeshRel, MeshTypes, PosCoord,
+    Position, Viz,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -167,7 +168,7 @@ where
         position_iter
             .clone()
             .map(|p| transform.transform_position(p) * PosCoord::from(transform.resolution)),
-        QUAD_INDICES.iter().copied(),
+        QUAD_INDICES.iter().copied().map(u32::from),
         || match coloring {
             QuadColoring::Solid(color) => color,
             QuadColoring::Texture(_) => rgba_const!(0.5, 0.5, 0.5, 1.0),
@@ -237,8 +238,9 @@ where
         }
     }
 
+    // TODO: replace this try_reserve with making Ixtend itself fallible.
     indices.try_reserve(QUAD_INDICES.len())?;
-    indices.extend(QUAD_INDICES.iter().map(|&i| index_origin + i));
+    indices.ixtend_with_offset(QUAD_INDICES.as_slice(), index_origin);
 
     Ok(())
 }
@@ -258,7 +260,7 @@ const QUAD_VERTICES: &[Vector2D<PosCoord, TexelUnit>; 4] = &[
     Vector2D::new(1.0, 1.0),
 ];
 
-const QUAD_INDICES: &[u32; 6] = &[0, 1, 2, 2, 1, 3];
+const QUAD_INDICES: &[u16; 6] = &[0, 1, 2, 2, 1, 3];
 
 /// Helper for [`push_quad`] which offers the alternatives of solid color or texturing.
 /// Compared to [`Coloring`], it describes texturing for an entire quad rather than a vertex.

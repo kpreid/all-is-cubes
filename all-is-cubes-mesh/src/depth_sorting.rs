@@ -14,7 +14,7 @@ use all_is_cubes::math::lines::Wireframe as _;
 use all_is_cubes::math::{Axis, Face, FaceMap, GridRotation, lines, range_len};
 
 use crate::{
-    Aabb, IndexInt, IndexSliceMut, IndexVec, MeshRel, MeshTypes, PosCoord, Position,
+    Aabb, IndexInt, IndexSliceMut, IndexVec, Ixtend, MeshRel, MeshTypes, PosCoord, Position,
     TransparentMeta, Vertex,
 };
 #[cfg(doc)]
@@ -388,9 +388,9 @@ impl<Ix: IndexInt> Primitive for [Ix; 3] {
 pub(crate) fn store_transparent_indices<M: MeshTypes, I: IndexInt>(
     indices: &mut IndexVec,
     transparent_meta: &mut [TransparentMeta; DepthOrdering::COUNT],
-    transparent_indices: FaceMap<Vec<I>>,
+    transparent_indices: &FaceMap<Vec<I>>,
 ) where
-    IndexVec: Extend<I>,
+    for<'a> IndexVec: Ixtend<&'a [I]>,
 {
     #![allow(clippy::single_range_in_vec_init)]
 
@@ -402,7 +402,7 @@ pub(crate) fn store_transparent_indices<M: MeshTypes, I: IndexInt>(
         // TODO: There is inadequate testing for this case (only the glTF export test catches if
         // these indices are missing or extra).
         let index_range =
-            extend_giving_range(indices, transparent_indices.into_values_iter().flatten());
+            ixtend_giving_range(indices, transparent_indices.values().map(Vec::as_slice));
         transparent_meta.fill(TransparentMeta {
             index_range,
             depth_sort_validity: Aabb::EVERYWHERE,
@@ -421,7 +421,7 @@ pub(crate) fn store_transparent_indices<M: MeshTypes, I: IndexInt>(
             // of the bounding box, which can never be visible from within.
 
             let index_range =
-                extend_giving_range(indices, transparent_indices.values().flatten().copied());
+                ixtend_giving_range(indices, transparent_indices.values().map(Vec::as_slice));
             debug_assert!(!index_range.is_empty());
             *meta = TransparentMeta {
                 // Always dynamically sort everything.
@@ -432,12 +432,12 @@ pub(crate) fn store_transparent_indices<M: MeshTypes, I: IndexInt>(
             };
         } else {
             // Cull and copy indices into the main array.
-            let index_range = extend_giving_range(
+            let index_range = ixtend_giving_range(
                 indices,
                 transparent_indices
                     .iter()
                     .filter(|&(face, _)| ordering.face_visible_from_here(face))
-                    .flat_map(|(_, index_vec)| index_vec.iter().copied()),
+                    .map(|(_, index_vec)| index_vec.as_slice()),
             );
             *meta = TransparentMeta {
                 depth_sort_validity: if index_range.is_empty() {
@@ -782,16 +782,21 @@ fn midpoint<V: Vertex, P: Primitive>(vertices: &[V], indices: P) -> Position {
     (p0.max(p1).max(p2) + p0.min(p1).min(p2).to_vector()) * 0.5
 }
 
-/// `storage.extend(items)` plus reporting the added range of items
-fn extend_giving_range<T>(
+/// Repeated `storage.ixtend_without_offset(items)` plus reporting the added range of items.
+///
+/// This is a helper for [`store_transparent_indices()`], which needs to do this several times.
+fn ixtend_giving_range<T>(
     storage: &mut IndexVec,
-    items: impl IntoIterator<Item = T>,
+    chunks: impl IntoIterator<Item = T>,
 ) -> Range<usize>
 where
-    IndexVec: Extend<T>,
+    T: Copy,
+    IndexVec: Ixtend<T>,
 {
     let start = storage.len();
-    storage.extend(items);
+    for chunk in chunks {
+        storage.ixtend_without_offset(chunk);
+    }
     let end = storage.len();
     Range { start, end }
 }

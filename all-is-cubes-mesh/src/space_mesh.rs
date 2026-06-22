@@ -14,8 +14,8 @@ use all_is_cubes_render::Flaws;
 use crate::heap::HeapUsage;
 use crate::texture::Channels;
 use crate::{
-    Aabb, Aabbs, BlockMesh, DepthOrdering, IndexSlice, IndexVec, IndexVecDeque, MeshOptions,
-    MeshRel, MeshTypes, Position, Vertex, depth_sorting,
+    Aabb, Aabbs, BlockMesh, DepthOrdering, IndexSlice, IndexVec, IndexVecDeque, Ixtend as _,
+    IxtendFront as _, MeshOptions, MeshRel, MeshTypes, Position, Vertex, depth_sorting,
 };
 
 #[cfg(doc)]
@@ -357,7 +357,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 depth_sorting::store_transparent_indices::<M, u16>(
                     &mut self.indices,
                     &mut self.meta.transparent,
-                    FaceMap { nx, ny, nz, px, py, pz },
+                    &FaceMap { nx, ny, nz, px, py, pz },
                 );
             }
             FaceMap {
@@ -371,7 +371,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 depth_sorting::store_transparent_indices::<M, u32>(
                     &mut self.indices,
                     &mut self.meta.transparent,
-                    FaceMap { nx, ny, nz, px, py, pz },
+                    &FaceMap { nx, ny, nz, px, py, pz },
                 );
             }
             _ => {
@@ -381,7 +381,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 depth_sorting::store_transparent_indices::<M, u32>(
                     &mut self.indices,
                     &mut self.meta.transparent,
-                    transparent_indices.map(|_, index_vec| index_vec.into_u32s()),
+                    &transparent_indices.map(|_, index_vec| index_vec.into_u32s()),
                 );
             }
         };
@@ -526,13 +526,13 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         let index_offset: u32 = vertices.0.len().try_into().expect("vertex index overflow");
         vertices.0.extend(sub_mesh.vertices.0.iter());
         vertices.1.extend(sub_mesh.vertices.1.iter());
-        opaque_indices.extend_with_offset(
+        opaque_indices.ixtend_with_offset_and_direction(
             sub_mesh.indices_opaque.as_slice(..),
             index_offset,
             face.is_positive(),
         );
         transparent_indices[face]
-            .extend_with_offset(sub_mesh.indices_transparent.as_slice(..), index_offset);
+            .ixtend_with_offset(sub_mesh.indices_transparent.as_slice(..), index_offset);
 
         meta.has_non_rect_transparency |= sub_mesh.has_non_rect_transparency;
 

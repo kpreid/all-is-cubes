@@ -152,44 +152,11 @@ impl IndexVec {
         }
     }
 
-    /// Appends `source` to `self`, with `offset` added to each element.
-    #[inline(always)]
-    pub(crate) fn extend_with_offset(&mut self, source: IndexSlice<'_>, offset: u32) {
-        // TODO: see if we can improve this by specializing to individual. u16/u32 cases.
-        // If we track the maximum value in self and source, then we can also predict whether
-        // a change to u32 will be necessary or not.
-        self.extend(source.iter_u32().map(|i| i + offset));
-    }
-
     /// Convert to `Vec<u32>`, reallocating if needed.
     pub(crate) fn into_u32s(self) -> Vec<u32> {
         match self {
             IndexVec::U32(vec) => vec,
             IndexVec::U16(vec) => vec.into_iter().map(u32::from).collect(),
-        }
-    }
-}
-
-impl IndexVecDeque {
-    /// Appends `source` to `self`, with `offset` added to each element.
-    ///
-    /// If `on_front` is true, then the indices are inserted in the “front” of `self`,
-    /// and hence will be drawn before existing indices.
-    /// The internal order of the indices in [`source`] is not reversed.
-    #[inline(always)]
-    pub(crate) fn extend_with_offset(
-        &mut self,
-        source: IndexSlice<'_>,
-        offset: u32,
-        on_front: bool,
-    ) {
-        // TODO: see if we can improve this by specializing to individual. u16/u32 cases.
-        // If we track the maximum value in self and source, then we can also predict whether
-        // a change to u32 will be necessary or not.
-        if on_front {
-            self.extend_front(source.iter_u32().map(|i| i + offset));
-        } else {
-            self.extend(source.iter_u32().map(|i| i + offset));
         }
     }
 }
@@ -271,16 +238,6 @@ impl Default for IndexVec {
     }
 }
 
-impl Extend<u16> for IndexVec {
-    #[inline]
-    fn extend<T: IntoIterator<Item = u16>>(&mut self, iter: T) {
-        match self {
-            IndexVec::U16(vec) => vec.extend(iter),
-            IndexVec::U32(vec) => vec.extend(iter.into_iter().map(u32::from)),
-        }
-    }
-}
-
 impl heap::HeapUsage for IndexVec {
     #[inline]
     fn heap_bytes_owned(&self) -> usize {
@@ -292,17 +249,77 @@ impl heap::HeapUsage for IndexVec {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Implementations of extending `IndexVec` and `IndexVecDeque`.
+// Implementations of appending/prepending data to `IndexVec` and `IndexVecDeque`.
 
-impl Extend<u32> for IndexVec {
-    // This inline attribute validated by somewhat dubious benchmark.
+/// Append data to an [`IndexVec`] or [`IndexVecDeque`].
+///
+/// Unlike [`Extend`] which accepts arbitrary iterators, this trait demands concretely typed input,
+/// which is expected to be some kind of slice reference (including [`IndexSlice`]).
+pub(crate) trait Ixtend<S> {
+    /// Appends `source`’s elements to `self`, with `offset` added to each one.
+    fn ixtend_with_offset(&mut self, source: S, offset: u32);
+
+    /// Appends `source`’s elements to `self`.
+    #[inline(always)] // trivial dispatch
+    fn ixtend_without_offset(&mut self, source: S) {
+        self.ixtend_with_offset(source, 0);
+    }
+}
+
+/// Append data to the front of an [`IndexVecDeque`].
+pub(crate) trait IxtendFront<S> {
+    /// Appends `source`’s elements to the front of `self`, with `offset` added to each one.
+    ///
+    /// The internal order of the indices in [`source`] is not reversed.
+    fn ixtend_front_with_offset(&mut self, source: S, offset: u32);
+
+    /// Appends `source` to `self`, with `offset` added to each element.
+    ///
+    /// If `on_front` is true, then the indices are inserted in the “front” of `self`,
+    /// and hence will be drawn before existing indices.
+    /// The internal order of the indices in [`source`] is not reversed.
+    #[inline(always)] // trivial dispatch
+    fn ixtend_with_offset_and_direction(&mut self, source: S, offset: u32, on_front: bool)
+    where
+        Self: Ixtend<S>, // in addition to IxtendFront<S>
+    {
+        if on_front {
+            self.ixtend_front_with_offset(source, offset);
+        } else {
+            self.ixtend_with_offset(source, offset);
+        }
+    }
+}
+
+impl Ixtend<IndexSlice<'_>> for IndexVec {
+    #[inline(always)] // trivial dispatch
+    fn ixtend_with_offset(&mut self, source: IndexSlice<'_>, offset: u32) {
+        // Dispatch to the implementation for the dynamic type of the source.
+        match source {
+            IndexSlice::U16(source) => self.ixtend_with_offset(source, offset),
+            IndexSlice::U32(source) => self.ixtend_with_offset(source, offset),
+        }
+    }
+
+    #[inline(always)] // trivial dispatch
+    fn ixtend_without_offset(&mut self, source: IndexSlice<'_>) {
+        // Dispatch to the implementation for the dynamic type of the source.
+        match source {
+            IndexSlice::U16(source) => self.ixtend_without_offset(source),
+            IndexSlice::U32(source) => self.ixtend_without_offset(source),
+        }
+    }
+}
+
+impl Ixtend<&[u16]> for IndexVec {
     #[inline(always)]
-    fn extend<T: IntoIterator<Item = u32>>(&mut self, iter: T) {
+    fn ixtend_with_offset(&mut self, source: &[u16], offset: u32) {
         match self {
+            IndexVec::U32(u32_vec) => u32_vec.extend(source.iter().map(|&i| u32::from(i) + offset)),
+
+            // With an offset, we cannot rely on the input being in-range.
             IndexVec::U16(u16_vec) => {
-                // In this case, we have u32s which we want to fit into a vector of u16s,
-                // if possible.
-                let mut iter = iter.into_iter();
+                let mut iter = source.iter().map(|&i| u32::from(i) + offset);
 
                 let non_fitting_element: u32;
                 'try_to_use_u16: {
@@ -320,42 +337,98 @@ impl Extend<u32> for IndexVec {
                     return; // succeeded at fitting all u32s in u16s
                 }
 
-                *self = upgrade_to_u32(u16_vec, non_fitting_element, iter);
-
-                #[cold]
-                #[inline(never)]
-                fn upgrade_to_u32(
-                    u16_vec: &mut Vec<u16>,
-                    non_fitting_element: u32,
-                    iter: impl Iterator<Item = u32>,
-                ) -> IndexVec {
-                    // Construct new u32 vector using
-                    // * the existing items
-                    // * the new item triggering the conversion
-                    // * the remaining new items
-                    IndexVec::U32(Vec::from_iter(
-                        mem::take(u16_vec)
-                            .into_iter()
-                            .map(u32::from)
-                            .chain([non_fitting_element])
-                            .chain(iter),
-                    ))
-                }
+                *self = upgrade_vec_to_u32(u16_vec, non_fitting_element, iter);
             }
-            IndexVec::U32(vec) => vec.extend(iter),
+        }
+    }
+
+    #[inline(always)] // trivial dispatch
+    fn ixtend_without_offset(&mut self, source: &[u16]) {
+        match self {
+            IndexVec::U16(vec) => vec.extend(source),
+            IndexVec::U32(vec) => vec.extend(source.iter().copied().map(u32::from)),
         }
     }
 }
 
-impl Extend<u32> for IndexVecDeque {
-    // This inline attribute validated by somewhat dubious benchmark.
-    #[inline(always)]
-    fn extend<T: IntoIterator<Item = u32>>(&mut self, iter: T) {
+impl Ixtend<&[u32]> for IndexVec {
+    #[inline]
+    fn ixtend_with_offset(&mut self, source: &[u32], offset: u32) {
         match self {
-            IndexVecDeque::U16(u16_vec) => {
+            IndexVec::U32(u32_vec) => u32_vec.extend(source.iter().map(|&i| i + offset)),
+            IndexVec::U16(u16_vec) => {
                 // In this case, we have u32s which we want to fit into a vector of u16s,
                 // if possible.
-                let mut iter = iter.into_iter();
+
+                // TODO: If we track the maximum value in self and source, then we can predict whether
+                // a change to u32 will be necessary or not.
+
+                let mut iter = source.iter().map(|&i| i + offset);
+
+                let non_fitting_element: u32;
+                'try_to_use_u16: {
+                    for big_index in iter.by_ref() {
+                        match u16::try_from(big_index) {
+                            Ok(small_index) => u16_vec.push(small_index),
+                            Err(_) => {
+                                // Save the element that failed to fit,
+                                // so that we can put it in the u32 vector.
+                                non_fitting_element = big_index;
+                                break 'try_to_use_u16;
+                            }
+                        }
+                    }
+                    return; // succeeded at fitting all u32s in u16s
+                }
+
+                *self = upgrade_vec_to_u32(u16_vec, non_fitting_element, iter);
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn ixtend_without_offset(&mut self, source: &[u32]) {
+        match self {
+            IndexVec::U32(u32_vec) => u32_vec.extend(source),
+            IndexVec::U16(u16_vec) => {
+                // In this case, we have u32s which we want to fit into a vector of u16s,
+                // if possible.
+
+                // TODO: If we track the maximum value in self and source, then we can predict whether
+                // a change to u32 will be necessary or not.
+
+                let mut iter = source.iter().copied();
+
+                let non_fitting_element: u32;
+                'try_to_use_u16: {
+                    for big_index in iter.by_ref() {
+                        match u16::try_from(big_index) {
+                            Ok(small_index) => u16_vec.push(small_index),
+                            Err(_) => {
+                                // Save the element that failed to fit,
+                                // so that we can put it in the u32 vector.
+                                non_fitting_element = big_index;
+                                break 'try_to_use_u16;
+                            }
+                        }
+                    }
+                    return; // succeeded at fitting all u32s in u16s
+                }
+
+                *self = upgrade_vec_to_u32(u16_vec, non_fitting_element, iter);
+            }
+        }
+    }
+}
+
+impl<'a> Ixtend<IndexSlice<'a>> for IndexVecDeque {
+    #[inline(always)]
+    fn ixtend_with_offset(&mut self, source: IndexSlice<'a>, offset: u32) {
+        match self {
+            IndexVecDeque::U32(vecdeque) => vecdeque.extend(source.iter_u32().map(|i| i + offset)),
+
+            IndexVecDeque::U16(u16_vec) => {
+                let mut iter = source.iter_u32().map(|i| i + offset);
 
                 let non_fitting_element: u32;
                 'try_to_use_u16: {
@@ -373,39 +446,18 @@ impl Extend<u32> for IndexVecDeque {
                     return; // succeeded at fitting all u32s in u16s
                 }
 
-                *self = upgrade_to_u32(u16_vec, non_fitting_element, iter);
-
-                #[cold]
-                #[inline(never)]
-                fn upgrade_to_u32(
-                    u16_vec: &mut VecDeque<u16>,
-                    non_fitting_element: u32,
-                    iter: impl Iterator<Item = u32>,
-                ) -> IndexVecDeque {
-                    // Construct new u32 vector using
-                    // * the existing items
-                    // * the new item triggering the conversion
-                    // * the remaining new items
-                    IndexVecDeque::U32(VecDeque::from_iter(
-                        mem::take(u16_vec)
-                            .into_iter()
-                            .map(u32::from)
-                            .chain([non_fitting_element])
-                            .chain(iter),
-                    ))
-                }
+                *self = upgrade_vecdeque_to_u32(u16_vec, non_fitting_element, iter);
             }
-            IndexVecDeque::U32(vecdeque) => vecdeque.extend(iter),
         }
     }
+
+    // no ixtend_without_offset() because it isn't used.
 }
 
-impl IndexVecDeque {
-    /// Identical to [`Extend::extend()`] except that the new indices are positioned before the
-    /// existing indices instead of after.
+impl<'a> IxtendFront<IndexSlice<'a>> for IndexVecDeque {
     #[inline(always)]
-    fn extend_front<T: DoubleEndedIterator<Item = u32>>(&mut self, iter: T) {
-        let mut iter_rev = iter.into_iter().rev();
+    fn ixtend_front_with_offset(&mut self, source: IndexSlice<'a>, offset: u32) {
+        let mut iter_rev = source.iter_u32().rev().map(|i| i + offset);
         match self {
             IndexVecDeque::U16(u16_vec) => {
                 let non_fitting_element: u32;
@@ -424,26 +476,7 @@ impl IndexVecDeque {
                     return; // succeeded at fitting all u32s in u16s
                 }
 
-                #[cold]
-                #[inline(never)]
-                fn upgrade_to_u32(
-                    u16_vec: &mut VecDeque<u16>,
-                    non_fitting_element: u32,
-                    iter_rev: impl DoubleEndedIterator<Item = u32>,
-                ) -> IndexVecDeque {
-                    // Construct new VecDeque<u32> using
-                    // * the remaining new items
-                    // * the new item triggering the conversion
-                    // * the existing items
-                    IndexVecDeque::U32(VecDeque::from_iter(
-                        iter_rev
-                            .rev()
-                            .chain([non_fitting_element])
-                            .chain(mem::take(u16_vec).into_iter().map(u32::from)),
-                    ))
-                }
-
-                *self = upgrade_to_u32(u16_vec, non_fitting_element, iter_rev);
+                *self = upgrade_vecdeque_to_u32(u16_vec, non_fitting_element, iter_rev);
             }
             IndexVecDeque::U32(vec) => {
                 // TODO: reserve?
@@ -453,6 +486,45 @@ impl IndexVecDeque {
             }
         }
     }
+}
+
+#[cold]
+#[inline(never)]
+fn upgrade_vec_to_u32(
+    u16_vec: &mut Vec<u16>,
+    non_fitting_element: u32,
+    iter: impl Iterator<Item = u32>,
+) -> IndexVec {
+    // Construct new Vec<u32> using
+    // * the existing items
+    // * the new item triggering the conversion
+    // * the remaining new items
+    IndexVec::U32(Vec::from_iter(
+        mem::take(u16_vec)
+            .into_iter()
+            .map(u32::from)
+            .chain([non_fitting_element])
+            .chain(iter),
+    ))
+}
+
+#[cold]
+#[inline(never)]
+fn upgrade_vecdeque_to_u32(
+    u16_vec: &mut VecDeque<u16>,
+    non_fitting_element: u32,
+    iter_rev: impl DoubleEndedIterator<Item = u32>,
+) -> IndexVecDeque {
+    // Construct new VecDeque<u32> using
+    // * the remaining new items
+    // * the new item triggering the conversion
+    // * the existing items
+    IndexVecDeque::U32(VecDeque::from_iter(
+        iter_rev
+            .rev()
+            .chain([non_fitting_element])
+            .chain(mem::take(u16_vec).into_iter().map(u32::from)),
+    ))
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -591,11 +663,17 @@ mod tests {
     #[test]
     fn extend_u32_upgrades_only_when_necessary() {
         let mut v = IndexVec::new();
-        v.extend([1, 2, 3_u32]);
+        v.ixtend_without_offset(IndexSlice::U32(&[1, 2, 3_u32]));
         // Still u16 even though the inputs were u32
         assert_eq!(v, IndexVec::U16(vec![1, 2, 3]));
 
-        v.extend([4, 5, 1_000_001, 1_000_002, 1_000_003_u32]);
+        v.ixtend_without_offset(IndexSlice::U32(&[
+            4,
+            5,
+            1_000_001,
+            1_000_002,
+            1_000_003_u32,
+        ]));
         // Now u32 is necessary.
         assert_eq!(
             v,

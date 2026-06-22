@@ -18,7 +18,9 @@ use crate::block_mesh::extend::{
 };
 use crate::block_mesh::planar;
 use crate::texture::{self, Plane as _, Tile as _};
-use crate::{BlockMesh, IndexSlice, MeshOptions, MeshTypes, OutOfMemory, SubMesh, Viz, vertex};
+use crate::{
+    BlockMesh, IndexSlice, Ixtend as _, MeshOptions, MeshTypes, OutOfMemory, SubMesh, Viz, vertex,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -422,7 +424,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     |triangle_indices| {
                         pass_indices.try_reserve(triangle_indices.len())?;
                         pass_indices
-                            .extend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);
+                            .ixtend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);
                         Ok(())
                     },
                 )?;
