@@ -153,8 +153,17 @@ where
     V: crate::Vertex<TexPoint = Tex::Point>,
     Tex: texture::Tile,
 {
-    let index_origin: u32 = vertices.0.len().try_into().expect("vertex index overflow");
     let face = transform.face;
+
+    // Note: If things are working correctly, it is impossible for this `usize` to `u32` conversion
+    // to overflow, and impossible for the index offset arithmetic that is done with it to overflow,
+    // because the maximum number of vertices in a single block’s mesh is less than the number of
+    // voxel face vertices in a 128³ volume, which is
+    //
+    //   128³ voxels · 6 faces · 4 vertices = 50,331,648
+    //
+    // which is much less than u32::MAX = 4,294,967,295.
+    let index_origin: u32 = vertices.0.len() as u32;
 
     // This iterator computes the coordinates but not the vertex --
     // it is shared between the colored and textured cases.
