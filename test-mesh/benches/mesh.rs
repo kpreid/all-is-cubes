@@ -27,7 +27,6 @@ fn benches() {
     let mut c = Criterion::default().configure_from_args();
     block_mesh_benches(&mut c);
     space_mesh_benches(&mut c);
-    slow_mesh_benches(&mut c);
     #[cfg(feature = "dynamic")]
     dynamic_benches(&mut c);
     planar_benches(&mut c);
@@ -185,9 +184,14 @@ fn space_mesh_benches(c: &mut Criterion) {
         tetrahedron_block(&mut universe, R4),
         universe.read_ticket(),
     );
+    let checker_transparent_ing = checkerboard_space_bench_setup(
+        options.clone(),
+        block::from_color!(0.5, 0.5, 0.5, 0.5),
+        universe::ReadTicket::stub(),
+    );
+    let half_ing = SpaceMeshIngredients::new(options, half_space(&block::from_color!(Rgba::WHITE)));
 
     // Half-full space (i.e. most blocks don't add any surfaces)
-    let half_ing = SpaceMeshIngredients::new(options, half_space(&block::from_color!(Rgba::WHITE)));
     g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("half-fresh", |b| {
         // This benchmark actually has no use for iter_batched_ref -- it could be
@@ -251,21 +255,14 @@ fn space_mesh_benches(c: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
-}
-
-fn slow_mesh_benches(c: &mut Criterion) {
-    let mut g = c.benchmark_group("slow");
-    g.sample_size(10);
-    let options = MeshOptions::new(&GraphicsOptions::default());
 
     g.throughput(criterion::Throughput::Elements(16u64.pow(3)));
     g.bench_function("transparent", |b| {
-        let ing = checkerboard_space_bench_setup(
-            options.clone(),
-            block::from_color!(0.5, 0.5, 0.5, 0.5),
-            universe::ReadTicket::stub(),
+        b.iter_batched_ref(
+            || (),
+            |()| checker_transparent_ing.do_new(),
+            BatchSize::SmallInput,
         );
-        b.iter_batched_ref(|| (), |()| ing.do_new(), BatchSize::SmallInput);
     });
 }
 
