@@ -630,7 +630,7 @@ jobs:
 
     - name: Load fuzzer corpus
       id: fuzz-corpus-restore
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@v6
       with:
         key: fuzz-corpus
         path: |
@@ -653,7 +653,7 @@ jobs:
     # restore steps per <https://github.com/actions/cache/tree/main/save#always-save-cache>
     - name: Save fuzzer corpus
       if: ${{ always() && github.event_name != 'pull_request' }}
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@v6
       with:
         key: fuzz-corpus
         path: |
