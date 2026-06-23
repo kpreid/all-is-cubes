@@ -143,7 +143,6 @@ libm = { workspace = true }
 log = { workspace = true, public = true }
 macro_rules_attribute = { workspace = true }
 manyfmt = { workspace = true, public = true }
-mutants = { workspace = true }
 nosy = { workspace = true, public = true, features = ["async", "spin-sync"] }
 num-traits = { workspace = true, public = true }
 ordered-float = { workspace = true, public = true }

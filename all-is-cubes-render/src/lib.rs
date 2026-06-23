@@ -17,11 +17,13 @@
 //!   * [`raytracer::print_space()`] is not available.
 
 #![no_std]
+#![register_tool(mutants)]
 #![feature(const_default)]
 #![feature(const_trait_impl)]
 #![feature(doc_cfg)]
 #![feature(never_type)]
 #![feature(new_range)]
+#![feature(register_tool)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(dead_code_pub_in_binary))]

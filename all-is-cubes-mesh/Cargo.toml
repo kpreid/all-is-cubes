@@ -62,7 +62,6 @@ hashbrown = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true, optional = true }
-mutants = { workspace = true }
 num-traits = { workspace = true }
 ordered-float = { workspace = true }
 rayon = { workspace = true, optional = true }

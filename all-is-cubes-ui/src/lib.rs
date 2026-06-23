@@ -6,6 +6,7 @@
 #![feature(macro_attr)]
 #![feature(never_type)]
 #![feature(new_range)]
+#![feature(register_tool)]
 
 //! User interface framework and screens for [`all_is_cubes`].
 //!
@@ -36,6 +37,7 @@
 //!   Not compatible with `no_std` platforms.
 
 #![no_std]
+#![register_tool(mutants)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 #![cfg_attr(not(feature = "session"), allow(clippy::arc_with_non_send_sync))]

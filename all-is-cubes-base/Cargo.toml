@@ -46,7 +46,6 @@ futures-core = { workspace = true }
 libm = { workspace = true }
 log = { workspace = true, public = true }
 manyfmt = { workspace = true, public = true }
-mutants = { workspace = true }
 num-traits = { workspace = true, public = true }
 ordered-float = { workspace = true, public = true }
 rand = { workspace = true, public = true }

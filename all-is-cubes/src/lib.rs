@@ -12,6 +12,7 @@
 #![feature(negative_impls)]
 #![feature(never_type)]
 #![feature(new_range)]
+#![feature(register_tool)]
 #![feature(try_blocks)]
 
 //! All is Cubes is a game/engine for worlds made of cubical blocks, where the blocks
@@ -156,6 +157,7 @@
     doc = "[`rayon`]: https://docs.rs/rayon/"
 )]
 #![no_std]
+#![register_tool(mutants)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 // * This crate contains some unsafe code and therefore does not `forbid(unsafe_code)`.
 //   All of it pertains to ECS extensions.
