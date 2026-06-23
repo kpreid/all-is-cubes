@@ -449,7 +449,8 @@ impl<'a> Ixtend<IndexSlice<'a>> for IndexVecDeque {
                     return; // succeeded at fitting all u32s in u16s
                 }
 
-                *self = upgrade_vecdeque_to_u32(u16_vec, non_fitting_element, iter_with_offset);
+                *self =
+                    upgrade_vecdeque_to_u32_back(u16_vec, non_fitting_element, iter_with_offset);
             }
         }
     }
@@ -479,7 +480,7 @@ impl<'a> IxtendFront<IndexSlice<'a>> for IndexVecDeque {
                     return; // succeeded at fitting all u32s in u16s
                 }
 
-                *self = upgrade_vecdeque_to_u32(u16_vec, non_fitting_element, iter_rev);
+                *self = upgrade_vecdeque_to_u32_front(u16_vec, non_fitting_element, iter_rev);
             }
             IndexVecDeque::U32(vec) => {
                 // TODO: reserve?
@@ -523,7 +524,27 @@ fn upgrade_vec_to_u32(
 
 #[cold]
 #[inline(never)]
-fn upgrade_vecdeque_to_u32(
+fn upgrade_vecdeque_to_u32_back(
+    u16_vec: &mut VecDeque<u16>,
+    non_fitting_element: u32,
+    iter: impl Iterator<Item = u32>,
+) -> IndexVecDeque {
+    // Construct new u32 vector using
+    // * the existing items
+    // * the new item triggering the conversion
+    // * the remaining new items
+    IndexVecDeque::U32(VecDeque::from_iter(
+        mem::take(u16_vec)
+            .into_iter()
+            .map(u32::from)
+            .chain([non_fitting_element])
+            .chain(iter),
+    ))
+}
+
+#[cold]
+#[inline(never)]
+fn upgrade_vecdeque_to_u32_front(
     u16_vec: &mut VecDeque<u16>,
     non_fitting_element: u32,
     iter_rev: impl DoubleEndedIterator<Item = u32>,
@@ -691,6 +712,28 @@ mod tests {
         assert_eq!(
             v,
             IndexVec::U32(vec![1, 2, 3, 4, 5, 1_000_001, 1_000_002, 1_000_003])
+        );
+    }
+
+    /// Correct ordering of elements in `IndexVecDeque`s upgraded while extending the back.
+    #[test]
+    fn extend_deque_upgrade_back() {
+        let mut v = IndexVecDeque::U16(VecDeque::from_iter([1]));
+        v.ixtend_with_offset(IndexSlice::U32(&[2, 3]), 1_000_000);
+        assert_eq!(
+            v,
+            IndexVecDeque::U32(VecDeque::from_iter([1, 1_000_002, 1_000_003]))
+        );
+    }
+
+    /// Correct ordering of elements in `IndexVecDeque`s upgraded while extending the front.
+    #[test]
+    fn extend_deque_upgrade_front() {
+        let mut v = IndexVecDeque::U16(VecDeque::from_iter([1]));
+        v.ixtend_front_with_offset(IndexSlice::U32(&[2, 3]), 1_000_000);
+        assert_eq!(
+            v,
+            IndexVecDeque::U32(VecDeque::from_iter([1_000_002, 1_000_003, 1]))
         );
     }
 
