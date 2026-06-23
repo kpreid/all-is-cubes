@@ -63,10 +63,10 @@ pub(crate) fn push_box<M: MeshTypes>(
         push_quad(
             &mut sub_mesh.vertices,
             if fully_opaque {
-                sub_mesh.indices_opaque.reserve_exact(6);
+                sub_mesh.indices_opaque.try_reserve_exact(6)?;
                 &mut sub_mesh.indices_opaque
             } else {
-                sub_mesh.indices_transparent.reserve_exact(6);
+                sub_mesh.indices_transparent.try_reserve_exact(6)?;
                 &mut sub_mesh.indices_transparent
             },
             &QuadTransform::new(face, resolution),
@@ -105,10 +105,10 @@ pub(crate) fn push_full_box<M: MeshTypes>(
             push_quad(
                 &mut sub_mesh.vertices,
                 if fully_opaque {
-                    sub_mesh.indices_opaque.reserve_exact(6);
+                    sub_mesh.indices_opaque.try_reserve_exact(6)?;
                     &mut sub_mesh.indices_opaque
                 } else {
-                    sub_mesh.indices_transparent.reserve_exact(6);
+                    sub_mesh.indices_transparent.try_reserve_exact(6)?;
                     &mut sub_mesh.indices_transparent
                 },
                 &QuadTransform::new(face, Resolution::R1),
@@ -247,9 +247,9 @@ where
         }
     }
 
-    // TODO: replace this try_reserve with making Ixtend itself fallible.
-    indices.try_reserve(QUAD_INDICES.len())?;
-    indices.ixtend_with_offset(QUAD_INDICES.as_slice(), index_origin);
+    // TODO: instead of using an array constant, teach Ixtend about adding quad indices natively
+    // and see if that improves throughput.
+    indices.ixtend_with_offset(QUAD_INDICES.as_slice(), index_origin)?;
 
     Ok(())
 }

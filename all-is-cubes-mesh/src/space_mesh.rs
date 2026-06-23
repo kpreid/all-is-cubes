@@ -315,7 +315,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
             .unwrap(); // TODO: allocation failure handling
         });
 
-        self.store_indices_and_finish_compute(opaque_indices_deque, transparent_indices);
+        self.store_indices_and_finish_compute(opaque_indices_deque, transparent_indices)
+            .unwrap(); // TODO: allocation failure handling
     }
 
     /// Store freshly computed indices into this mesh.
@@ -338,7 +339,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
         &mut self,
         opaque_indices_deque: IndexVecDeque,
         transparent_indices: FaceMap<IndexVec>,
-    ) {
+    ) -> Result<(), OutOfMemory> {
         self.indices = IndexVec::from(opaque_indices_deque);
 
         // Set the opaque range to all indices which have already been stored
@@ -349,10 +350,12 @@ impl<M: MeshTypes> SpaceMesh<M> {
             &mut self.indices,
             &mut self.meta.transparent,
             transparent_indices,
-        );
+        )?;
 
         #[cfg(debug_assertions)]
         self.consistency_check();
+
+        Ok(())
     }
 
     /// Sort the existing indices of
@@ -462,8 +465,11 @@ impl<M: MeshTypes> Clone for SpaceMesh<M> {
 ///
 /// # Errors
 ///
-/// Returns [`OutOfMemory`] if the mesh would contain more than [`u32::MAX`] vertices.
-/// (This is not strictly a memory allocation error, but it needs to be handled similarly.)
+/// Returns [`OutOfMemory`] if:
+///
+/// * an allocation fails, or
+/// * the mesh would contain more than [`u32::MAX`] vertices.
+///   (This is not strictly a memory allocation error, but it needs to be handled similarly.)
 fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     block_mesh: &BlockMesh<M>,
     translation: Cube,
@@ -515,9 +521,9 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
             sub_mesh.indices_opaque.as_slice(..),
             index_offset,
             face.is_positive(),
-        );
+        )?;
         transparent_indices[face]
-            .ixtend_with_offset(sub_mesh.indices_transparent.as_slice(..), index_offset);
+            .ixtend_with_offset(sub_mesh.indices_transparent.as_slice(..), index_offset)?;
 
         meta.has_non_rect_transparency |= sub_mesh.has_non_rect_transparency;
 
@@ -583,9 +589,12 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             block_indices_used: BlockIndexSet::from_iter([0]),
         };
 
-        let mut opaque_indices_deque = IndexVecDeque::from(IndexVec::with_capacity(
-            block_mesh.all_sub_meshes().map(|sm| sm.indices_opaque.len()).sum(),
-        ));
+        let mut opaque_indices_deque = IndexVecDeque::from(
+            IndexVec::with_capacity(
+                block_mesh.all_sub_meshes().map(|sm| sm.indices_opaque.len()).sum(),
+            )
+            .unwrap(), // TODO: allocation failure handling
+        );
         let mut transparent_indices: FaceMap<IndexVec> = FaceMap::default();
 
         write_block_mesh_to_space_mesh(
@@ -598,7 +607,9 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             |_| false,
         )
         .unwrap(); // TODO: allocation failure handling
-        space_mesh.store_indices_and_finish_compute(opaque_indices_deque, transparent_indices);
+        space_mesh
+            .store_indices_and_finish_compute(opaque_indices_deque, transparent_indices)
+            .unwrap(); // TODO: allocation failure handling
 
         space_mesh
     }

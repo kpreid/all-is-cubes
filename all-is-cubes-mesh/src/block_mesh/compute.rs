@@ -422,9 +422,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                         )
                     }),
                     |triangle_indices| {
-                        pass_indices.try_reserve(triangle_indices.len())?;
                         pass_indices
-                            .ixtend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);
+                            .ixtend_with_offset(IndexSlice::U32(&triangle_indices), index_offset)?;
                         Ok(())
                     },
                 )?;

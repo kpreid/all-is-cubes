@@ -14,8 +14,8 @@ use all_is_cubes::math::lines::Wireframe as _;
 use all_is_cubes::math::{Axis, Face, FaceMap, GridRotation, lines, range_len};
 
 use crate::{
-    Aabb, IndexInt, IndexSliceMut, IndexVec, Ixtend, MeshRel, MeshTypes, PosCoord, Position,
-    TransparentMeta, Vertex,
+    Aabb, IndexInt, IndexSliceMut, IndexVec, Ixtend, MeshRel, MeshTypes, OutOfMemory, PosCoord,
+    Position, TransparentMeta, Vertex,
 };
 #[cfg(doc)]
 use crate::{MeshMeta, SpaceMesh};
@@ -387,7 +387,7 @@ pub(crate) fn store_transparent_indices<M: MeshTypes>(
     indices_out: &mut IndexVec,
     transparent_meta_out: &mut [TransparentMeta; DepthOrdering::COUNT],
     transparent_indices_in: FaceMap<IndexVec>,
-) {
+) -> Result<(), OutOfMemory> {
     if !M::Vertex::WANTS_DEPTH_SORTING || transparent_indices_in.values().all(|v| v.is_empty()) {
         // Either there is nothing to sort (and all ranges will be length 0),
         // or the destination doesn't want sorting anyway. In either case, write the
@@ -395,13 +395,13 @@ pub(crate) fn store_transparent_indices<M: MeshTypes>(
         //
         // TODO: There is inadequate testing for this case (only the glTF export test catches if
         // these indices are missing or extra).
-        let index_range = ixtend_giving_range(indices_out, transparent_indices_in.values());
+        let index_range = ixtend_giving_range(indices_out, transparent_indices_in.values())?;
         transparent_meta_out.fill(TransparentMeta {
             index_range,
             depth_sort_validity: Aabb::EVERYWHERE,
             dynamic_sub_ranges: SmallVec::new(),
         });
-        return;
+        return Ok(());
     }
 
     // Prepare un-sorted, but culled, indices for each direction.
@@ -413,7 +413,7 @@ pub(crate) fn store_transparent_indices<M: MeshTypes>(
             // TODO: We can improve slightly by culling faces that are on the outside surface
             // of the bounding box, which can never be visible from within.
 
-            let index_range = ixtend_giving_range(indices_out, transparent_indices_in.values());
+            let index_range = ixtend_giving_range(indices_out, transparent_indices_in.values())?;
             debug_assert!(!index_range.is_empty());
             *meta = TransparentMeta {
                 // Always dynamically sort everything.
@@ -430,7 +430,7 @@ pub(crate) fn store_transparent_indices<M: MeshTypes>(
                     .iter()
                     .filter(|&(face, _)| ordering.face_visible_from_here(face))
                     .map(|(_, index_vec)| index_vec),
-            );
+            )?;
             *meta = TransparentMeta {
                 depth_sort_validity: if index_range.is_empty() {
                     // Everything was culled, so no sorting needed.
@@ -445,6 +445,7 @@ pub(crate) fn store_transparent_indices<M: MeshTypes>(
             };
         }
     }
+    Ok(())
 }
 
 /// Sort `indices` according to `ordering`, and determine which portions, if any,
@@ -780,13 +781,13 @@ fn midpoint<V: Vertex, P: Primitive>(vertices: &[V], indices: P) -> Position {
 fn ixtend_giving_range<'a>(
     storage: &mut IndexVec,
     chunks: impl IntoIterator<Item = &'a IndexVec>,
-) -> Range<usize> {
+) -> Result<Range<usize>, OutOfMemory> {
     let start = storage.len();
     for chunk in chunks {
-        storage.ixtend_without_offset(chunk.as_slice(..));
+        storage.ixtend_without_offset(chunk.as_slice(..))?;
     }
     let end = storage.len();
-    Range { start, end }
+    Ok(Range { start, end })
 }
 
 #[inline]
