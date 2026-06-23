@@ -52,7 +52,6 @@ indoc = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 macro_rules_attribute = { workspace = true }
-mutants = { workspace = true }
 num-traits = { workspace = true }
 paste = { workspace = true }
 scopeguard = { workspace = true, optional = true }
