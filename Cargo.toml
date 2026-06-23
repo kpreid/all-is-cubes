@@ -209,6 +209,7 @@ collapsible_if = "allow"
 match_ref_pats = "allow"
 needless_update = "allow"
 single_match = "allow"
+single_range_in_vec_init = "allow" # false positives <https://github.com/rust-lang/rust-clippy/issues/11086>
 too_many_arguments = "allow" # not usefully actionable for the internal functions it fires on
 
 # clippy::pedantic lints that are set to allow
