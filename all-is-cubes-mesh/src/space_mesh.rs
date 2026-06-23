@@ -345,48 +345,11 @@ impl<M: MeshTypes> SpaceMesh<M> {
         // (which will be the opaque ones only).
         self.meta.opaque_range = Range::from(0..self.indices.len());
 
-        // Dispatch to the depth sorting algorithm in its u16 or u32 version.
-        #[rustfmt::skip]
-        match transparent_indices {
-            FaceMap {
-                nx: IndexVec::U16(nx),
-                ny: IndexVec::U16(ny),
-                nz: IndexVec::U16(nz),
-                px: IndexVec::U16(px),
-                py: IndexVec::U16(py),
-                pz: IndexVec::U16(pz),
-            } => {
-                depth_sorting::store_transparent_indices::<M, u16>(
-                    &mut self.indices,
-                    &mut self.meta.transparent,
-                    &FaceMap { nx, ny, nz, px, py, pz },
-                );
-            }
-            FaceMap {
-                nx: IndexVec::U32(nx),
-                ny: IndexVec::U32(ny),
-                nz: IndexVec::U32(nz),
-                px: IndexVec::U32(px),
-                py: IndexVec::U32(py),
-                pz: IndexVec::U32(pz),
-            } => {
-                depth_sorting::store_transparent_indices::<M, u32>(
-                    &mut self.indices,
-                    &mut self.meta.transparent,
-                    &FaceMap { nx, ny, nz, px, py, pz },
-                );
-            }
-            _ => {
-                // Mixed type index vectors.
-                // This should only come up in very rare cases where the mesh is just big enough
-                // to have switched to u32 indices while writing the very last transparent block.
-                depth_sorting::store_transparent_indices::<M, u32>(
-                    &mut self.indices,
-                    &mut self.meta.transparent,
-                    &transparent_indices.map(|_, index_vec| index_vec.into_u32s()),
-                );
-            }
-        };
+        depth_sorting::store_transparent_indices::<M>(
+            &mut self.indices,
+            &mut self.meta.transparent,
+            transparent_indices,
+        );
 
         #[cfg(debug_assertions)]
         self.consistency_check();
