@@ -146,7 +146,6 @@ empty_enums = "allow"
 enum_glob_use = "allow"
 explicit_iter_loop = "allow" # I prefer the opposite style
 float_cmp = "allow"
-from_iter_instead_of_collect = "allow" # <https://github.com/rust-lang/rust-clippy/issues/7213>
 if_not_else = "allow"
 inline_always = "allow"
 items_after_statements = "allow" # we use this sparingly
