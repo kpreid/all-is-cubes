@@ -63,10 +63,17 @@ pub(crate) fn capacity_bytes<T>(v: &alloc::vec::Vec<T>) -> usize {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Error type returned from certain functions when memory allocation fails.
+/// Error type returned from certain functions when memory allocation fails, or when a mesh
+/// would reach hard numeric limits.
 #[derive(Debug)]
 pub struct OutOfMemory {
     _private: (),
+}
+
+impl OutOfMemory {
+    pub(crate) fn new() -> Self {
+        Self { _private: () }
+    }
 }
 
 impl core::error::Error for OutOfMemory {}
@@ -79,6 +86,6 @@ impl fmt::Display for OutOfMemory {
 
 impl From<alloc::collections::TryReserveError> for OutOfMemory {
     fn from(_: alloc::collections::TryReserveError) -> Self {
-        Self { _private: () }
+        Self::new()
     }
 }

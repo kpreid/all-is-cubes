@@ -15,7 +15,8 @@ use crate::heap::HeapUsage;
 use crate::texture::Channels;
 use crate::{
     Aabb, Aabbs, BlockMesh, DepthOrdering, IndexSlice, IndexVec, IndexVecDeque, Ixtend as _,
-    IxtendFront as _, MeshOptions, MeshRel, MeshTypes, Position, Vertex, depth_sorting,
+    IxtendFront as _, MeshOptions, MeshRel, MeshTypes, OutOfMemory, Position, Vertex,
+    depth_sorting,
 };
 
 #[cfg(doc)]
@@ -310,7 +311,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
                     }
                     false
                 },
-            );
+            )
+            .unwrap(); // TODO: allocation failure handling
         });
 
         self.store_indices_and_finish_compute(opaque_indices_deque, transparent_indices);
@@ -494,6 +496,11 @@ impl<M: MeshTypes> Clone for SpaceMesh<M> {
 /// * `neighbor_is_fully_opaque` is called to determine whether this block's faces are
 ///   obscured. It is a function so that lookups can be skipped if their answer would
 ///   make no difference.
+///
+/// # Errors
+///
+/// Returns [`OutOfMemory`] if the mesh would contain more than [`u32::MAX`] vertices.
+/// (This is not strictly a memory allocation error, but it needs to be handled similarly.)
 fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     block_mesh: &BlockMesh<M>,
     translation: Cube,
@@ -502,9 +509,9 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     transparent_indices: &mut FaceMap<IndexVec>,
     meta: &mut MeshMeta<M>,
     mut neighbor_is_fully_opaque: impl FnMut(Face) -> bool,
-) {
+) -> Result<(), OutOfMemory> {
     if block_mesh.is_empty() {
-        return;
+        return Ok(());
     }
 
     let first_new_vertex = vertices.0.len();
@@ -522,10 +529,25 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
             continue;
         }
 
-        // Copy vertices, offset to the block position
-        let index_offset: u32 = vertices.0.len().try_into().expect("vertex index overflow");
+        // unreachable because all appending to the mesh will have checked this condition already
+        let index_offset: u32 = vertices.0.len().try_into().expect("unreachable index overflow");
+
+        if index_offset.checked_add(sub_mesh.vertices.0.len() as u32).is_none() {
+            // The mesh has sufficient indices that it is impossible to refer to them all with
+            // a single 32-bit index buffer. Also, something has probably gone horribly wrong.
+            // Stop before we overflow the index arithmetic.
+            //
+            // Strictly speaking, this check is too strong, because we could have a mesh with
+            // exactly 2³² vertices, such that the index of the last vertex is 2³² − 1, but that
+            // is not a case worth bothering to support.
+            return Err(OutOfMemory::new());
+        }
+
+        // Copy vertices.
+        // They will be translated to the block position later.
         vertices.0.extend(sub_mesh.vertices.0.iter());
         vertices.1.extend(sub_mesh.vertices.1.iter());
+
         opaque_indices.ixtend_with_offset_and_direction(
             sub_mesh.indices_opaque.as_slice(..),
             index_offset,
@@ -553,6 +575,8 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
             vertex.instantiate_vertex(inst);
         }
     }
+
+    Ok(())
 }
 
 impl<M: MeshTypes> Default for SpaceMesh<M> {
@@ -609,7 +633,8 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             &mut transparent_indices,
             &mut space_mesh.meta, // partly redundant, but hard to skip
             |_| false,
-        );
+        )
+        .unwrap(); // TODO: allocation failure handling
         space_mesh.store_indices_and_finish_compute(opaque_indices_deque, transparent_indices);
 
         space_mesh
