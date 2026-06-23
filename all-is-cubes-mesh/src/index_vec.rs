@@ -257,6 +257,9 @@ impl heap::HeapUsage for IndexVec {
 /// which is expected to be some kind of slice reference (including [`IndexSlice`]).
 pub(crate) trait Ixtend<S> {
     /// Appends `source`’s elements to `self`, with `offset` added to each one.
+    ///
+    /// The addition of `offset` is calculated modulo 2<sup>32</sup>.
+    /// Callers are expected to check for overflow when building their vertex vector.
     fn ixtend_with_offset(&mut self, source: S, offset: u32);
 
     /// Appends `source`’s elements to `self`.
@@ -271,6 +274,9 @@ pub(crate) trait IxtendFront<S> {
     /// Appends `source`’s elements to the front of `self`, with `offset` added to each one.
     ///
     /// The internal order of the indices in [`source`] is not reversed.
+    ///
+    /// The addition of `offset` is calculated modulo 2<sup>32</sup>.
+    /// Callers are expected to check for overflow when building their vertex vector.
     fn ixtend_front_with_offset(&mut self, source: S, offset: u32);
 
     /// Appends `source` to `self`, with `offset` added to each element.
@@ -314,16 +320,15 @@ impl Ixtend<IndexSlice<'_>> for IndexVec {
 impl Ixtend<&[u16]> for IndexVec {
     #[inline(always)]
     fn ixtend_with_offset(&mut self, source: &[u16], offset: u32) {
+        let mut iter_with_offset = source.iter().copied().map(map_offset(offset));
         match self {
-            IndexVec::U32(u32_vec) => u32_vec.extend(source.iter().map(|&i| u32::from(i) + offset)),
+            IndexVec::U32(u32_vec) => u32_vec.extend(iter_with_offset),
 
             // With an offset, we cannot rely on the input being in-range.
             IndexVec::U16(u16_vec) => {
-                let mut iter = source.iter().map(|&i| u32::from(i) + offset);
-
                 let non_fitting_element: u32;
                 'try_to_use_u16: {
-                    for big_index in iter.by_ref() {
+                    for big_index in iter_with_offset.by_ref() {
                         match u16::try_from(big_index) {
                             Ok(small_index) => u16_vec.push(small_index),
                             Err(_) => {
@@ -337,7 +342,7 @@ impl Ixtend<&[u16]> for IndexVec {
                     return; // succeeded at fitting all u32s in u16s
                 }
 
-                *self = upgrade_vec_to_u32(u16_vec, non_fitting_element, iter);
+                *self = upgrade_vec_to_u32(u16_vec, non_fitting_element, iter_with_offset);
             }
         }
     }
@@ -354,8 +359,9 @@ impl Ixtend<&[u16]> for IndexVec {
 impl Ixtend<&[u32]> for IndexVec {
     #[inline]
     fn ixtend_with_offset(&mut self, source: &[u32], offset: u32) {
+        let mut iter_with_offset = source.iter().copied().map(map_offset(offset));
         match self {
-            IndexVec::U32(u32_vec) => u32_vec.extend(source.iter().map(|&i| i + offset)),
+            IndexVec::U32(u32_vec) => u32_vec.extend(iter_with_offset),
             IndexVec::U16(u16_vec) => {
                 // In this case, we have u32s which we want to fit into a vector of u16s,
                 // if possible.
@@ -363,11 +369,9 @@ impl Ixtend<&[u32]> for IndexVec {
                 // TODO: If we track the maximum value in self and source, then we can predict whether
                 // a change to u32 will be necessary or not.
 
-                let mut iter = source.iter().map(|&i| i + offset);
-
                 let non_fitting_element: u32;
                 'try_to_use_u16: {
-                    for big_index in iter.by_ref() {
+                    for big_index in iter_with_offset.by_ref() {
                         match u16::try_from(big_index) {
                             Ok(small_index) => u16_vec.push(small_index),
                             Err(_) => {
@@ -381,7 +385,7 @@ impl Ixtend<&[u32]> for IndexVec {
                     return; // succeeded at fitting all u32s in u16s
                 }
 
-                *self = upgrade_vec_to_u32(u16_vec, non_fitting_element, iter);
+                *self = upgrade_vec_to_u32(u16_vec, non_fitting_element, iter_with_offset);
             }
         }
     }
@@ -424,15 +428,14 @@ impl Ixtend<&[u32]> for IndexVec {
 impl<'a> Ixtend<IndexSlice<'a>> for IndexVecDeque {
     #[inline(always)]
     fn ixtend_with_offset(&mut self, source: IndexSlice<'a>, offset: u32) {
+        let mut iter_with_offset = source.iter_u32().map(map_offset(offset));
         match self {
-            IndexVecDeque::U32(vecdeque) => vecdeque.extend(source.iter_u32().map(|i| i + offset)),
+            IndexVecDeque::U32(vecdeque) => vecdeque.extend(iter_with_offset),
 
             IndexVecDeque::U16(u16_vec) => {
-                let mut iter = source.iter_u32().map(|i| i + offset);
-
                 let non_fitting_element: u32;
                 'try_to_use_u16: {
-                    for big_index in iter.by_ref() {
+                    for big_index in iter_with_offset.by_ref() {
                         match u16::try_from(big_index) {
                             Ok(small_index) => u16_vec.push_back(small_index),
                             Err(_) => {
@@ -446,7 +449,7 @@ impl<'a> Ixtend<IndexSlice<'a>> for IndexVecDeque {
                     return; // succeeded at fitting all u32s in u16s
                 }
 
-                *self = upgrade_vecdeque_to_u32(u16_vec, non_fitting_element, iter);
+                *self = upgrade_vecdeque_to_u32(u16_vec, non_fitting_element, iter_with_offset);
             }
         }
     }
@@ -457,7 +460,7 @@ impl<'a> Ixtend<IndexSlice<'a>> for IndexVecDeque {
 impl<'a> IxtendFront<IndexSlice<'a>> for IndexVecDeque {
     #[inline(always)]
     fn ixtend_front_with_offset(&mut self, source: IndexSlice<'a>, offset: u32) {
-        let mut iter_rev = source.iter_u32().rev().map(|i| i + offset);
+        let mut iter_rev = source.iter_u32().rev().map(map_offset(offset));
         match self {
             IndexVecDeque::U16(u16_vec) => {
                 let non_fitting_element: u32;
@@ -486,6 +489,16 @@ impl<'a> IxtendFront<IndexSlice<'a>> for IndexVecDeque {
             }
         }
     }
+}
+
+#[inline(always)]
+fn apply_offset<T: Into<u32>>(index: T, offset: u32) -> u32 {
+    index.into().wrapping_add(offset)
+}
+#[inline(always)]
+fn map_offset<T: Into<u32>>(offset: u32) -> impl Fn(T) -> u32 {
+    #[inline(always)]
+    move |index| apply_offset::<T>(index, offset)
 }
 
 #[cold]
