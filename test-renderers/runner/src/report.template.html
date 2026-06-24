@@ -9,15 +9,15 @@
   <table class="results-table">
     <thead>
       <tr>
-        <th>Test Case</th>
+        <th colspan="2">Test Case</th>
         {{ for renderer in renderers }}
-        <th><code>{renderer.id}</code></th>
+        <th colspan="2"><code>{renderer.id}</code></th>
         {{ endfor }}
       </tr>
       <tr>
         <td></td>
         {{ for renderer in renderers }}
-        <td><pre>{renderer.info}</pre></td>
+        <td colspan="2"><pre>{renderer.info}</pre></td>
         {{ endfor }}
       </tr>
     </thead>
@@ -27,17 +27,24 @@
           <code>{test_case.id}</code>
         </td>
         {{ for cell in test_case.renderers }}
-        <td class="test-outcome-cell">
-          <div class="test-outcome">{cell.test_outcome}</div>
+        <td class="test-overall-outcome-cell">
+          <div class="test-outcome">{cell.test_outcome_symbol}</div>
+        </td>
+        <td class="test-comparisons-cell">
+          <div class="test-outcome">{cell.test_outcome_message}</div>
           {{ for comp_record in cell.comparisons }}
             <div class="comparison-record
             {{ if comp_record.show_expected_for_comparison }}comparison-record-with-diff{{ endif }}
             ">
+              <details class="render-info">
+                <summary>Info</summary>
+                <pre>{comp_record.render_info}</pre>
+              </details>
               <details class="expected-and-diff-details">
                 <summary
                   {{ if comp_record.show_expected_for_comparison }} open {{ endif }}               
-                >🔍</summary>
-                <figure>
+                >Diff</summary>
+                <figure class="expected">
                   <img
                     src="expected/{comp_record.expected.file_name}"
                     width="{comp_record.expected.width}"
@@ -46,7 +53,7 @@
                   >
                   <figcaption>Expected</figcaption>
                 </figure><!--
-                -->{{ for diff in comp_record.diff }}<figure>
+                -->{{ for diff in comp_record.diff }}<figure class="diff">
                   <img
                     src="diff/{diff.file_name}"
                     width="{diff.width}"
@@ -56,7 +63,7 @@
                   <figcaption>Diff</figcaption>
                 </figure>{{ endfor }}
               </details><!--
-              --><figure>
+              --><figure class="actual">
                   <img
                     src="actual/{comp_record.actual.file_name}"
                     width="{comp_record.actual.width}"
@@ -69,10 +76,6 @@
                   <div class="flawedness">{comp_record.flawedness}</div>
                 </figcaption>
               </figure>
-              <details class="render-info">
-                <summary>Render</summary>
-                <pre>{comp_record.render_info}</pre>
-              </details>
             </div>
           {{ endfor }}
         </td>

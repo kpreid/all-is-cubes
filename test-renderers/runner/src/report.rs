@@ -88,10 +88,14 @@ pub(crate) fn write_report_file(suite_id: SuiteId) -> PathBuf {
                         }) => {
                             let flawed = comparisons.iter().any(|c| c.outcome.is_flawed());
                             tmpl::StatusCell {
-                                test_outcome: match outcome {
+                                test_outcome_symbol: match outcome {
                                     Ok(()) if flawed => "⚠️".to_owned(),
                                     Ok(()) => "✅".to_owned(),
-                                    Err(e) => format!("❌ {e}"),
+                                    Err(_) => "❌".to_owned(),
+                                },
+                                test_outcome_message: match outcome {
+                                    Ok(()) => "".to_owned(),
+                                    Err(e) => e.to_owned(),
                                 },
                                 comparisons: comparisons
                                     .iter()
@@ -100,7 +104,8 @@ pub(crate) fn write_report_file(suite_id: SuiteId) -> PathBuf {
                             }
                         }
                         None => tmpl::StatusCell {
-                            test_outcome: "Not run".into(),
+                            test_outcome_symbol: "".to_owned(),
+                            test_outcome_message: "Not run".to_owned(),
                             comparisons: vec![],
                         },
                     })
@@ -154,7 +159,8 @@ mod tmpl {
 
     #[derive(serde::Serialize)]
     pub struct StatusCell {
-        pub test_outcome: String,
+        pub test_outcome_symbol: String,
+        pub test_outcome_message: String,
         pub comparisons: Vec<TmplComparison>,
     }
 

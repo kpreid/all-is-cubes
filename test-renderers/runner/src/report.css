@@ -1,7 +1,6 @@
 body {
-    /* #BCBCBC = sRGB encoding of 50% gray */
-    background: #BCBCBC;
-    color: black;
+    background: #222;
+    color: white;
 }
 
 /* Test case matrix results table */
@@ -9,12 +8,11 @@ body {
 table.results-table {
     /* Overall centering */
     margin: auto;
-
     border-collapse: collapse;
 }
 
 .results-table tr {
-    border-bottom: 1px solid white;
+    border-bottom: 2px solid black;
 }
 
 td.test-case-name-cell {
@@ -22,13 +20,13 @@ td.test-case-name-cell {
 }
 
 .results-table th,
-.results-table td {
+.results-table td:not(.test-comparisons-cell) {
     /* Baseline align the test names and outcomes. */
     vertical-align: baseline;
+    padding: .3em;
 }
-
-.test-outcome {
-    float: left;
+.results-table td.test-comparisons-cell {
+    vertical-align: top;
 }
 
 /* Image comparisons */
@@ -37,9 +35,15 @@ td.test-case-name-cell {
     /** allowed but not required to go on the same line */
     display: inline-block;
 
-    border: 1px solid transparent;
-    padding: 1px;
+    margin: 2px;
+    border: 1px solid;
+    border-radius: 10px;
+    padding: 1px 6px; /* top and bottom of image are padded by their text */
     white-space: nowrap;
+    
+    /* Surround images with pure black except for their individual borders. */
+    border-color: #444;
+    background: black;
 }
 
 .comparison-record > * {
@@ -51,12 +55,16 @@ td.test-case-name-cell {
     border-color: red;
 }
 
-details.expected-and-diff-details {
-    display: inline;
+.comparison-record details:not([open]) {
+    /* allow <summary>s to appear on one line if they are closed */
+    display: inline-block;
 }
-.expected-and-diff-details > summary {
-    display: inline;
+summary {
     cursor: pointer;
+}
+.comparison-record summary:hover {
+    background: #444;
+    color: white;
 }
 
 .diffcount {
@@ -69,13 +77,24 @@ figure {
     margin: 0;
     padding: 0;
 }
+figure.actual {
+    /* don't let it appear on the info+diff line */
+    display: block;
+}
 
-figcaption {
+figcaption, summary {
     font-size: 80%;
 }
 
 figure img {
-    border: 1px dotted white;
+    border: 1px dashed transparent;
     display: block;
     image-rendering: pixelated;
+}
+figure img:hover {
+    border-color: #888;
+}
+figure.diff img {
+    /* Diff images are always 1 pixel smaller all around. */
+    padding: 1px;
 }
