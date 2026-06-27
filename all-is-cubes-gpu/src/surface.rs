@@ -62,10 +62,7 @@ impl SurfaceRenderer {
             device.clone(),
             &queue,
             cameras,
-            choose_surface_format(
-                adapter.get_info().backend,
-                &surface.get_capabilities(&adapter),
-            ),
+            choose_surface_format(&surface.get_capabilities(&adapter)),
             &adapter,
         );
 
@@ -224,17 +221,17 @@ impl SurfaceRenderer {
 // -------------------------------------------------------------------------------------------------
 
 /// Choose the surface format we would prefer from among the supported formats.
-fn choose_surface_format(
-    backend: wgpu::Backend,
-    capabilities: &wgpu::SurfaceCapabilities,
-) -> wgpu::TextureFormat {
+fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::TextureFormat {
     /// A structure whose maximum [`Ord`] value corresponds to the texture format we'd rather use.
     #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
     struct Rank {
+        /// Above all else, the format must be able to accept the linear sRGB output of our shader.
+        /// (TODO: Add support for non-sRGB color spaces.)
+        accepts_linear_srgb: bool,
+
         /// If we can have a float format that gives us (potential) HDR output, do that.
         is_float_hdr: bool,
-        /// Known SRGB outputs are good
-        is_srgb: bool,
+
         /// All else being equal, prefer the original preference order
         /// (earlier elements are better)
         negated_original_order: isize,
@@ -248,18 +245,21 @@ fn choose_surface_format(
         .max_by_key(|&(index, format)| {
             use wgpu::TextureFormat::*;
 
-            // Web HDR bugs:
-            // * WebGL2: incorrect color space <https://github.com/kpreid/all-is-cubes/issues/310>.
-            //   TODO: repro and report to wgpu, supposing that it is a wgpu bug.
-            // * WebGPU, Chrome: incorrect color space (possibly in the same way).
-            // * WebGPU, Firefox: `configure()` panics (unhandled JS exception) if `Rgba16Float` is used.
-            let known_hdr_bugs = backend == wgpu::Backend::BrowserWebGpu
-                || backend == wgpu::Backend::Gl && cfg!(target_family = "wasm");
+            let color_space_caps = capabilities.color_spaces(format);
+            log::debug!("color spaces for {format:?}: {color_space_caps:?}");
+
+            // Does this format support automatic sRGB encoding through texture views?
+            let has_srgb_encoder = format.add_srgb_suffix() != format;
+
+            // Will this format accept linear-sRGB colors, either directly or via an encoding view?
+            let accepts_linear_srgb = color_space_caps
+                .contains(wgpu::SurfaceColorSpaces::EXTENDED_SRGB_LINEAR)
+                || has_srgb_encoder && color_space_caps.contains(wgpu::SurfaceColorSpaces::SRGB);
 
             Rank {
-                is_srgb: format.is_srgb(),
+                accepts_linear_srgb,
                 is_float_hdr: matches!(format, Rgba16Float | Rgba32Float | Rgb9e5Ufloat)
-                    && !known_hdr_bugs,
+                    && accepts_linear_srgb,
                 #[expect(clippy::cast_possible_wrap)]
                 negated_original_order: -(index as isize),
             }
