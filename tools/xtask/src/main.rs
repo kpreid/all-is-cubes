@@ -169,9 +169,10 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             print_revision(config, false);
             do_for_all_packages(
                 config,
-                // no Clippy for better throughput; pragmatically we care about "does it build"
+                // No Clippy for better throughput; pragmatically we care about "does it build"
                 // much more than the more pedantic lints, and this will still give us dead code
-                // and unused imports warnings
+                // and unused imports warnings.
+                // Note that this does not fail on warnings.
                 TestOrCheck::Check,
                 Features::Powerset,
             )?;
@@ -785,8 +786,8 @@ fn build_documentation(config: &Config<'_>) -> Result<(), ActionError> {
     let _t = config.capture_time("doc");
     config
         .cargo()
-        .env("RUSTDOCFLAGS", "-Dwarnings")
         .arg("doc")
+        .arg("--config=build.warnings='deny'")
         .args(config.cargo_build_args())
         .run()?;
     Ok(())
