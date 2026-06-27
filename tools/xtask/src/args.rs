@@ -53,6 +53,8 @@ pub(crate) enum XtaskCommand {
     },
 
     /// Run all tests (and some builds without tests) with default features.
+    ///
+    /// Does not fail on warnings.
     Test {
         /// Build test executables, but don't run them.
         #[arg(long)]
@@ -67,17 +69,20 @@ pub(crate) enum XtaskCommand {
 
     /// Check for lint and generate documentation (to lint the doc markdown), but do not test.
     ///
-    /// Caution: If there are rustc or clippy warnings only, the exit code is still zero.
-    /// <https://github.com/rust-lang/rust-clippy/issues/1209>
+    /// Fails on warnings.
     Lint,
 
     /// Check every feature combination builds (but do not test them).
+    ///
+    /// Does not fail on warnings.
     CheckFeatures,
 
     /// Build documentation.
     ///
     /// This is approximately the same as `cargo doc` but uses the same options as `xtask lint`
     /// does in order to avoid spurious rebuilds.
+    ///
+    /// Fails on warnings.
     Doc,
 
     /// Format code (as `cargo fmt` but covering all packages)
