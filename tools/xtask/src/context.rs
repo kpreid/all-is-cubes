@@ -85,12 +85,13 @@ impl Config<'_> {
 pub(crate) enum TestOrCheck {
     /// `cargo test`
     Test,
-    /// `cargo test --no-run`
+    /// `cargo test --no-run`.
+    /// Builds everything that [`Self::Test`] would run, as much as possible.
     BuildTests,
-    /// `cargo clippy`
+    /// `cargo clippy --config=build.warnings='deny'`
     Lint,
     /// Really `cargo check`, not `cargo clippy`, for efficiency when all we care about is
-    /// "does it build?"
+    /// "does it build?". Also, does not deny warnings.
     Check,
 }
 
@@ -101,7 +102,7 @@ impl TestOrCheck {
             .args(match self {
                 Self::Test => vec!["test"],
                 Self::BuildTests => vec!["test", "--no-run"],
-                Self::Lint => vec!["clippy"],
+                Self::Lint => vec!["clippy", "--config=build.warnings='deny'"],
                 Self::Check => vec!["check"],
             })
             .args(config.cargo_build_args())
