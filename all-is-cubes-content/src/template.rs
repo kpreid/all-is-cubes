@@ -525,7 +525,10 @@ mod tests {
     use all_is_cubes::util::yield_progress_for_testing;
     use futures_core::future::BoxFuture;
 
-    #[expect(clippy::let_underscore_future)]
+    #[allow(
+        clippy::let_underscore_future,
+        reason = "remove after Rust 1.98; <https://github.com/rust-lang/rust-clippy/pull/17001>"
+    )]
     fn _test_build_future_is_send() {
         let _: BoxFuture<'_, _> = Box::pin(
             UniverseTemplate::Atrium
