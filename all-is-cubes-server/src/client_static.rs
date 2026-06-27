@@ -21,7 +21,9 @@ impl AicClientSource {
     pub(crate) fn client_router(&self) -> Router {
         let static_service = match self {
             #[cfg(feature = "embed")]
-            AicClientSource::Embedded => axum::routing::get(embedded::client),
+            AicClientSource::Embedded => axum::routing::get_service(
+                tower_http::services::ServeDir::with_backend("", embedded::EmbeddedClient),
+            ),
             AicClientSource::Workspace => axum::routing::get_service(
                 tower_http::services::ServeDir::new(concat!(env!("AIC_CLIENT_BUILD_DIR"), "/")),
             ),
@@ -35,43 +37,113 @@ impl AicClientSource {
 
 #[cfg(feature = "embed")]
 mod embedded {
-    use axum::body;
-    use axum::extract::Path;
-    use axum::http::StatusCode;
-    use axum::response::{IntoResponse, Response};
+    use std::future::{Ready, ready};
+    use std::io;
+    use std::path::{Path, PathBuf};
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+
+    use include_dir::DirEntry;
+    use tokio::io::{AsyncRead, AsyncSeek};
+    use tower_http::services::fs;
 
     // TODO: need to support optionally embedding the release build rather than the dev build
-    static CLIENT_STATIC: include_dir::Dir<'static> =
-        include_dir::include_dir!("$AIC_CLIENT_BUILD_DIR");
+    static CLIENT_STATIC: DirEntry<'static> =
+        DirEntry::Dir(include_dir::include_dir!("$AIC_CLIENT_BUILD_DIR"));
 
-    /// Handler for client static files
-    pub(crate) async fn client(path: Option<Path<String>>) -> impl IntoResponse {
-        // based on example code https://bloerg.net/posts/serve-static-content-with-axum/
-        let path = match &path {
-            None => "index.html",
-            Some(Path(path_string)) => {
-                // TODO: validate that this is url-escaping-correct (i.e. over-escaped characters should still match)
-                path_string.as_str()
-            }
-        };
-        match CLIENT_STATIC.get_file(path) {
-            None => Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(body::Body::from(String::from("Not found")))
-                .unwrap(),
-            Some(file) => {
-                // Note that we're matching the *file's statically known path*, not the provided URL,
-                // to ensure that this is not controlled by the request.
-                // TODO: I'd rather have a hardcoded list for our purposes than mime_guess, but
-                // I want to match the non-embedded option and `tower_http::services::ServeDir`
-                // doesn't offer an option that isn't mime_guess.
-                let content_type = mime_guess::from_path(file.path()).first_or_octet_stream();
-                Response::builder()
-                    .status(StatusCode::OK)
-                    .header("Content-Type", content_type.as_ref())
-                    // TODO: caching headers
-                    .body(body::Body::from(file.contents()))
-                    .unwrap()
+    fn client_static_lookup(path: &Path) -> Option<&'static DirEntry<'static>> {
+        if path == "./" {
+            Some(&CLIENT_STATIC)
+        } else {
+            CLIENT_STATIC.as_dir().unwrap().get_entry(path.strip_prefix("./").unwrap())
+        }
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) struct EmbeddedClient;
+
+    #[derive(Debug)]
+    pub(crate) struct OpenAdapter {
+        cursor: io::Cursor<&'static [u8]>,
+        metadata: MetadataAdapter,
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) struct MetadataAdapter(&'static DirEntry<'static>);
+
+    /// Adapts [`include_dir::Dir`] to [`fs::Backend`].
+    impl fs::Backend for EmbeddedClient {
+        type File = OpenAdapter;
+        type Metadata = MetadataAdapter;
+        type OpenFuture = Ready<io::Result<Self::File>>;
+        type MetadataFuture = Ready<io::Result<Self::Metadata>>;
+
+        fn open(&self, path: PathBuf) -> Self::OpenFuture {
+            ready(match client_static_lookup(&path) {
+                Some(entry @ DirEntry::File(file)) => Ok(OpenAdapter {
+                    cursor: io::Cursor::new(file.contents()),
+                    metadata: MetadataAdapter(entry),
+                }),
+                None => Err(io::ErrorKind::NotFound.into()),
+                Some(DirEntry::Dir(_)) => Err(io::ErrorKind::IsADirectory.into()),
+            })
+        }
+
+        fn metadata(&self, path: PathBuf) -> Self::MetadataFuture {
+            ready(match client_static_lookup(&path) {
+                Some(file) => Ok(MetadataAdapter(file)),
+                None => Err(io::ErrorKind::NotFound.into()),
+            })
+        }
+    }
+
+    impl fs::File for OpenAdapter {
+        type Metadata = MetadataAdapter;
+        type MetadataFuture<'a> = Ready<io::Result<MetadataAdapter>>;
+        fn metadata(&self) -> Self::MetadataFuture<'_> {
+            ready(Ok(self.metadata))
+        }
+    }
+
+    impl OpenAdapter {
+        fn project_cursor(self: Pin<&mut Self>) -> Pin<&mut io::Cursor<&'static [u8]>> {
+            Pin::new(&mut self.get_mut().cursor)
+        }
+    }
+
+    impl AsyncRead for OpenAdapter {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            self.project_cursor().poll_read(cx, buf)
+        }
+    }
+
+    impl AsyncSeek for OpenAdapter {
+        fn start_seek(self: Pin<&mut Self>, position: io::SeekFrom) -> io::Result<()> {
+            self.project_cursor().start_seek(position)
+        }
+
+        fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+            self.project_cursor().poll_complete(cx)
+        }
+    }
+
+    impl fs::Metadata for MetadataAdapter {
+        fn is_dir(&self) -> bool {
+            self.0.as_dir().is_some()
+        }
+
+        fn modified(&self) -> io::Result<std::time::SystemTime> {
+            Err(io::ErrorKind::Unsupported.into())
+        }
+
+        fn len(&self) -> u64 {
+            match self.0 {
+                DirEntry::Dir(_) => 0,
+                DirEntry::File(file) => file.contents().len() as u64,
             }
         }
     }
@@ -81,5 +153,4 @@ mod embedded {
 #[cfg(not(feature = "embed"))]
 mod embedded {
     use include_dir as _;
-    use mime_guess as _;
 }

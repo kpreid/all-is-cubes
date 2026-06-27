@@ -37,10 +37,11 @@ anyhow = { workspace = true }
 axum = { version = "0.8.1", features = ["tower-log"] }
 clap = { workspace = true }
 include_dir = "0.7.2"
-mime_guess = "2.0.4" # also used indirectly by tower-http
 simplelog = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-tower-http = { version = "0.6.8", features = ["fs"] }
+# Note: This causes dependency duplication because it is not the same version axum uses,
+# but we need its newer ServeDir functionality.
+tower-http = { version = "0.7.0", features = ["fs"] }
 
 [dev-dependencies]
 # Note that with default features disabled, reqwest has no TLS/SSL support.
