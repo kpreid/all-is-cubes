@@ -149,10 +149,8 @@ jobs:
 
   # Run `xtask lint`.
   #
-  # This job is separate from the main "build" job so that:
-  # * Lint results are delivered quickly by running them in parallel with other jobs.
-  # * We build with `-Dwarnings` so the failures aren't silent, but don't want this to
-  #   cause *re*building in the main build job and its cache.
+  # This job is separate from the main "build" job so that lint results are delivered quickly
+  # by running them in parallel with other jobs and not waiting for any builds.
   lint:
     strategy:
       fail-fast: false
@@ -161,9 +159,6 @@ jobs:
 
     runs-on: ubuntu-latest
     continue-on-error: false
-
-    env:
-      RUSTFLAGS: "-Dwarnings"
 
     steps:
     - uses: actions/checkout@v7

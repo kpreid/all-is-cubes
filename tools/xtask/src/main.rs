@@ -45,12 +45,26 @@ mod development_files;
 
 // -------------------------------------------------------------------------------------------------
 
+/// Kludge: Certain behavior is tweaked when running in a CI environment.
+/// This constant centralizes where such detection is used.
+const CI: bool = option_env!("CI").is_some();
+
 fn main() -> Result<(), ActionError> {
     let sh = &Shell::new()?;
 
     let main_metadata = cargo_metadata::MetadataCommand::new()
         .manifest_path(PROJECT_DIR.join("Cargo.toml"))
         .exec()?;
+
+    // Can't use build.warnings when linting on unstable/future toolchains, because they might
+    // have new `renamed_and_removed_lints` that should be ignored:
+    //   <https://github.com/rust-lang/cargo/issues/17193>
+    // TODO
+    let use_d_warnings = CI && {
+        let rustc_version_output = sh.cmd("rustc").arg("--version").output().unwrap().stdout;
+        let rustc_version_output = str::from_utf8(&rustc_version_output).unwrap();
+        rustc_version_output.contains("nightly") || rustc_version_output.contains("beta")
+    };
 
     // Using a channel for the time log instead of a `Vec<Timing>` is overkill,
     // but neatly avoids borrow conflicts.
@@ -68,6 +82,7 @@ fn main() -> Result<(), ActionError> {
             cargo_timings: timings,
             cargo_quiet: quiet,
             time_log_quiet: quiet,
+            use_d_warnings,
             scope,
             main_metadata,
             time_log_tx,
@@ -169,9 +184,10 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             print_revision(config, false);
             do_for_all_packages(
                 config,
-                // no Clippy for better throughput; pragmatically we care about "does it build"
+                // No Clippy for better throughput; pragmatically we care about "does it build"
                 // much more than the more pedantic lints, and this will still give us dead code
-                // and unused imports warnings
+                // and unused imports warnings.
+                // Note that this does not fail on warnings.
                 TestOrCheck::Check,
                 Features::Powerset,
             )?;
@@ -785,8 +801,8 @@ fn build_documentation(config: &Config<'_>) -> Result<(), ActionError> {
     let _t = config.capture_time("doc");
     config
         .cargo()
-        .env("RUSTDOCFLAGS", "-Dwarnings")
         .arg("doc")
+        .arg("--config=build.warnings='deny'")
         .args(config.cargo_build_args())
         .run()?;
     Ok(())
