@@ -76,7 +76,10 @@ impl Builder {
             self.device.clone(),
             &self.queue,
             cameras,
-            wgpu::TextureFormat::Rgba8UnormSrgb,
+            (
+                wgpu::TextureFormat::Rgba8UnormSrgb,
+                wgpu::SurfaceColorSpace::Srgb,
+            ),
             &self.adapter,
         );
 

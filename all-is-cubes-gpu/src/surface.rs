@@ -63,7 +63,7 @@ impl SurfaceRenderer {
             device.clone(),
             &queue,
             cameras,
-            choose_surface_format(&surface.get_capabilities(&adapter)),
+            choose_surface_format_and_color_space(&surface.get_capabilities(&adapter)),
             &adapter,
         );
 
@@ -222,7 +222,9 @@ impl SurfaceRenderer {
 // -------------------------------------------------------------------------------------------------
 
 /// Choose the surface format we would prefer from among the supported formats.
-fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::TextureFormat {
+fn choose_surface_format_and_color_space(
+    capabilities: &wgpu::SurfaceCapabilities,
+) -> (wgpu::TextureFormat, wgpu::SurfaceColorSpace) {
     /// A structure whose maximum value in [`Ord`] corresponds to the texture format we'd rather use.
     #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
     struct Rank {
@@ -238,7 +240,7 @@ fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::Text
         original_order: Reverse<usize>,
     }
 
-    let (index, best) = capabilities
+    let (index, best_format) = capabilities
         .formats
         .iter()
         .copied()
@@ -274,10 +276,22 @@ fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::Text
             rank
         })
         .expect("wgpu::Surface::get_supported_formats() was empty");
+
+    let color_space = if capabilities
+        .color_spaces(best_format)
+        .contains(wgpu::SurfaceColorSpaces::EXTENDED_SRGB_LINEAR)
+    {
+        wgpu::SurfaceColorSpace::ExtendedSrgbLinear
+    } else {
+        wgpu::SurfaceColorSpace::Srgb
+    };
+
     log::debug!(
-        "Chose surface format {best:?}, #{index} out of {formats:?}",
+        "Chose surface format {best_format:?} with color space {color_space:?}, \
+        #{index} out of {formats:?}",
         index = index + 1,
         formats = capabilities.formats,
     );
-    best
+
+    (best_format, color_space)
 }
