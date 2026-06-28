@@ -550,7 +550,8 @@ impl RaytraceToTexture {
         } else {
             self.draw_direct_bind_group.get()
         }) else {
-            return Flaws::UNFINISHED;
+            // This shouldn't happen, but if it does, don't panic.
+            return Flaws::OTHER;
         };
 
         render_pass.set_bind_group(0, rt_bind_group, &[]);

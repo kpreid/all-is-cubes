@@ -93,7 +93,7 @@ impl Builder {
             viewport_source,
             viewport_dirty,
             last_update_info: crate::UpdateInfo {
-                flaws: Flaws::UNFINISHED, // unfinished because no update() yet
+                flaws: Flaws::INVOCATION, // Represents that update() hasn’t been called yet.
                 ..Default::default()
             },
         })

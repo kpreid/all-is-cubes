@@ -239,7 +239,7 @@ where
             self.update_once(read_ticket, camera, deadline, &render_data_updater);
 
         // If the first pass did not finish and was startup_chunks_only, try again.
-        if was_startup_chunks_only && !timed_out && info1.flaws.contains(Flaws::UNFINISHED) {
+        if was_startup_chunks_only && !timed_out && info1.flaws.contains(Flaws::OUT_OF_TIME) {
             let (info2, _) = self.update_once(read_ticket, camera, deadline, &render_data_updater);
             info1.add_second_pass(info2);
 
@@ -613,7 +613,7 @@ where
         if !complete {
             // TODO: Make this a little less strict; if we timed out but there is nothing in todo
             // and we were previously complete, then there isn't actually any flaw.
-            flaws |= Flaws::UNFINISHED;
+            flaws |= Flaws::OUT_OF_TIME;
         }
 
         (

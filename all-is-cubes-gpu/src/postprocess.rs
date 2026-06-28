@@ -145,7 +145,7 @@ impl PostprocessResources {
 
         let Some(postprocess_render_pipeline) = self.render_pipeline.get() else {
             // This shouldn't happen, but if it does, don't panic.
-            return (encoder.finish(), Flaws::UNFINISHED);
+            return (encoder.finish(), Flaws::OTHER);
         };
 
         // Render pass

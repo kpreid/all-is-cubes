@@ -993,8 +993,9 @@ async fn no_update(mut context: RenderTestContext) {
     let mut renderer = context.renderer(context.universe());
     let mut image = renderer.draw("").await.unwrap();
 
-    // Check the output, but ignore that it's potentially unfinished.
-    image.flaws.remove(Flaws::UNFINISHED);
+    // Check the output (despite the flaw that may have been reported *because* we did not call
+    // update()).
+    image.flaws.remove(Flaws::INVOCATION);
     context.compare_image(5, image);
 
     // Now run a normal update and see what happens.

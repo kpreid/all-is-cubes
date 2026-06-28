@@ -514,7 +514,7 @@ impl SpaceRenderer {
         } else {
             // If there's no bind group then update() must not have been called, so there's
             // nothing to draw.
-            flaws |= Flaws::UNFINISHED;
+            flaws |= Flaws::INVOCATION;
         }
         if let Some(buffer) = self.instance_buffer.get() {
             render_pass.set_vertex_buffer(BlockBufferSlot::Instance as u32, buffer.slice(..));
@@ -537,8 +537,8 @@ impl SpaceRenderer {
             if !index_range.is_empty() {
                 set_buffers(render_pass, buffers);
                 let Ok(id) = u32::try_from(instance_buffer_writer.len()) else {
-                    if !flaws.contains(Flaws::UNFINISHED) {
-                        *flaws |= Flaws::UNFINISHED;
+                    if !flaws.contains(Flaws::TOO_COMPLEX) {
+                        *flaws |= Flaws::TOO_COMPLEX;
                         log::warn!("tried to have more than 2^32 instances");
                     }
                     return;
@@ -549,8 +549,10 @@ impl SpaceRenderer {
                     &format_args!("Ch{in_world_debug_label}"),
                 ));
                 if !ok {
-                    if !flaws.contains(Flaws::UNFINISHED) {
-                        *flaws |= Flaws::UNFINISHED;
+                    // This shouldn’t happen because update() should have resized the instance
+                    // buffer appropriately, but if it does, don’t panic.
+                    if !flaws.contains(Flaws::OTHER) {
+                        *flaws |= Flaws::OTHER;
                         log::warn!("instance buffer too small for {} instances", id + 1);
                     }
                     return;
@@ -683,8 +685,8 @@ impl SpaceRenderer {
 
             // Send positions of each instance to the instance_buffer_writer.
             let Ok(first_instance_index) = u32::try_from(instance_buffer_writer.len()) else {
-                if !flaws.contains(Flaws::UNFINISHED) {
-                    flaws |= Flaws::UNFINISHED;
+                if !flaws.contains(Flaws::TOO_COMPLEX) {
+                    flaws |= Flaws::TOO_COMPLEX;
                     log::warn!("tried to have more than 2^32 instances");
                 }
                 break;
@@ -698,9 +700,11 @@ impl SpaceRenderer {
                 if ok {
                     count += 1;
                 } else {
-                    if !flaws.contains(Flaws::UNFINISHED) {
-                        flaws |= Flaws::UNFINISHED;
-                        log::warn!("instance buffer too small");
+                    // This shouldn’t happen because update() should have resized the instance
+                    // buffer appropriately, but if it does, don’t panic.
+                    if !flaws.contains(Flaws::OTHER) {
+                        flaws |= Flaws::OTHER;
+                        log::warn!("instance buffer too small for {} instances", count + 1);
                     }
                     break;
                 }

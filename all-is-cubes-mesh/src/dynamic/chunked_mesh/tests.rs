@@ -360,7 +360,7 @@ fn did_not_finish_detection() {
                 tester.csm.did_not_finish_chunks,
                 tester.csm.complete_time
             ),
-            (Flaws::UNFINISHED, true, None)
+            (Flaws::UNFINISHED | Flaws::OUT_OF_TIME, true, None)
         );
     }
 
