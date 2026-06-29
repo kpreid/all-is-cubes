@@ -5,7 +5,12 @@ use core::fmt;
 use bevy_platform::sync::LazyLock;
 
 use crate::block::{self, BlockDef};
+use crate::math::{ps32, zo32};
+use crate::sound::SoundDef;
 use crate::universe::{self, AnyPending, Handle, ReadTicket};
+
+#[cfg(doc)]
+use crate::fluff::Fluff;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -147,6 +152,42 @@ pub enum Builtin {
         value: BlockDef = BlockDef::new(ReadTicket::stub(), block::AIR),
     )]
     Air,
+
+    /// The [`SoundDef`] for [`Fluff::Beep`].
+    /// This may change in the future.
+    #[custom(
+        string = "sound/beep",
+        value: SoundDef = SoundDef {
+            duration: zo32(0.08),
+            frequency: ps32(636.6),
+            amplitude: zo32(0.1),
+        },
+    )]
+    Beep,
+
+    /// The [`SoundDef`] for [`Fluff::Happened`].
+    /// This may change in the future.
+    #[custom(
+        string = "sound/happened",
+        value: SoundDef =  SoundDef {
+            duration: zo32(0.005),
+            frequency: ps32(318.3),
+            amplitude: zo32(0.2),
+        },
+    )]
+    Happened,
+
+    /// The [`SoundDef`] for [`Fluff::BlockImpact`].
+    /// This may change in the future.
+    #[custom(
+        string = "sound/thump",
+        value: SoundDef = SoundDef {
+            duration: zo32(0.02),
+            frequency: ps32(79.6),
+            amplitude: zo32(1.0), // modulated by collision info
+        },
+    )]
+    Thump,
 }
 
 impl<T: universe::UniverseMember> TryFrom<Builtin> for &Handle<T> {

@@ -13,6 +13,7 @@ use web_sys::{AudioBuffer, AudioContext, AudioListener, GainNode};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::listen::{self, Listen as _, Listener as _};
 use all_is_cubes::sound::{self, SoundDef};
+use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes_render::camera::Camera;
 use all_is_cubes_ui::apps::{SessionFluff, SessionFluffSource};
 
@@ -84,7 +85,7 @@ async fn audio_command_task(
     ambient_source: listen::DynSource<sound::SpatialAmbient>,
 ) {
     let sample_rate = context.sample_rate().round() as u32;
-    let mut sound_cache: HashMap<SoundDef, AudioBuffer> = HashMap::new();
+    let mut sound_cache: HashMap<Handle<SoundDef>, AudioBuffer> = HashMap::new();
 
     let mut ambient_noise_gains = match make_ambient_sound_synthesizer(sample_rate, &context) {
         Ok(g) => Some(g),
@@ -99,15 +100,18 @@ async fn audio_command_task(
     while let Ok(message) = receiver.recv_async().await {
         match message {
             AudioCommand::Fluff(SessionFluff { fluff, source }) => {
-                if let Some((sound_def, gain)) = fluff.sound() {
+                if let Some((sound_handle, gain)) = fluff.sound() {
                     // TODO: Need a better solution than comparing sounds by value.
                     // When we have the sounds stored in Universes instead of as constants,
                     // we can compare the Handles by name.
-                    let buffer: AudioBuffer = match sound_cache.get(sound_def) {
+                    let buffer: AudioBuffer = match sound_cache.get(sound_handle) {
                         Some(buffer) => buffer.clone(),
-                        None => match convert_sound_to_buffer(sample_rate, sound_def) {
+                        None => match convert_sound_to_buffer(
+                            sample_rate,
+                            sound_handle.read(ReadTicket::stub()).unwrap(),
+                        ) {
                             Ok(buffer) => {
-                                sound_cache.insert(sound_def.clone(), buffer.clone());
+                                sound_cache.insert(sound_handle.clone(), buffer.clone());
                                 buffer
                             }
                             Err(e) => {

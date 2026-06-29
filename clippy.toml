@@ -7,6 +7,7 @@ enforced-import-renames = [
     { path = "all_is_cubes::rerun_glue", rename = "rg" },
 ]
 ignore-interior-mutability = [
+    "all_is_cubes::universe::Handle", # contains mutex but does not use it as key
     "test_renderers_runner::harness::UniverseFuture", # contains futures::Shared but does not use it as key
 ]
 
