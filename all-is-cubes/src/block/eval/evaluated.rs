@@ -748,7 +748,7 @@ mod tests {
                     voxel_opacity_mask: VoxelOpacityMask {
                         resolution: 2,
                         bounds: GridAab(0..2, 0..2, 0..2),
-                        ..
+                        opacity: [███████ ],
                     },
                     cost: Cost {
                         components: 2,

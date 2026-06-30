@@ -379,6 +379,7 @@ impl VoxelOpacityMask {
 }
 
 impl fmt::Debug for VoxelOpacityMask {
+    #[expect(clippy::shadow_unrelated, reason = "false positive")]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             MaskInner::Uniform(resolution, bounds, opacity) => f
@@ -392,7 +393,25 @@ impl fmt::Debug for VoxelOpacityMask {
                 .debug_struct("VoxelOpacityMask")
                 .field("resolution", &resolution)
                 .field("bounds", &format_args!("{:?}", voxels.bounds()))
-                .finish_non_exhaustive(),
+                .field(
+                    "opacity",
+                    &fmt::from_fn(|f| {
+                        f.write_str("[")?;
+                        const LIMIT: usize = 30;
+                        for opacity in voxels.as_linear().iter().take(LIMIT) {
+                            f.write_str(match opacity {
+                                OpacityCategory::Invisible => " ",
+                                OpacityCategory::Partial => "▒",
+                                OpacityCategory::Opaque => "█",
+                            })?;
+                        }
+                        if voxels.volume() > LIMIT {
+                            f.write_str("..")?;
+                        }
+                        f.write_str("]")
+                    }),
+                )
+                .finish(),
         }
     }
 }
