@@ -14,7 +14,8 @@ macro_rules! derive_for_builtin_name {
         $(#[$ignored_attr:meta])*
         pub enum Builtin {
             $(
-                $( #[doc $($doc:tt)*] )*
+                $( #[doc = $($doc:tt)*] )*
+                $( #[doc($($doc_modifier:tt)*)] )*
                 #[custom(
                     string = $string:literal,
                     value: $member_ty:ident = $value_expr:expr,
@@ -53,6 +54,25 @@ macro_rules! derive_for_builtin_name {
             }
         }
 
+        /// # Builtin handle getters
+        ///
+        /// Each of the following associated functions returns the [`Handle`] for a specific
+        /// [`Builtin`]. It returns the same handle as [`Builtin::erased_handle()`],
+        /// but with the exact type statically defined.
+        impl Builtin {
+            paste::paste! {
+                $(
+                    #[doc = concat!(
+                        "Returns the handle for [`Builtin::", stringify!($variant), "`]."
+                    )]
+                    $( #[doc($($doc_modifier)*)] )*
+                    pub fn [< $variant:snake:lower >]() -> &'static Handle<$member_ty> {
+                        (Builtin::$variant).erased_handle().try_into().unwrap()
+                    }
+                )*
+            }
+        }
+
         impl fmt::Display for Builtin {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.pad(match *self {
@@ -78,11 +98,36 @@ macro_rules! derive_for_builtin_name {
     }
 }
 
+// Putting this impl block before the macro invocation, even though this puts it above the
+// struct declaration, is done in order to adjust the order in rustdoc,
+// putting these above the numerous macro-generated functions.
+impl Builtin {
+    // /// Returns the [`Handle`] to this builtin, assuming that it is of type `Handle<T>`.
+    // ///
+    // /// # Panics
+    // ///
+    // /// Panics if the builtin’s type is not `T`.
+    // ///
+    // /// Note that each builtin has a corresponding function to retrieve its handle.
+    // /// Consider using those instead of this, as they cannot panic.
+    // pub fn handle<T: universe::UniverseMember>(self) -> &'static Handle<T> {
+    //     self.erased_handle()
+    //         .try_into()
+    //         .unwrap_or_else(|error| panic!("type mismatch in Builtin::handle(): {error}"))
+    // }
+
+    /// Returns the type-erased [`Handle`] to this builtin.
+    pub fn erased_handle(self) -> &'static dyn universe::ErasedHandle {
+        self.get().handle()
+    }
+}
+
 #[macro_rules_attribute::derive(derive_for_builtin_name!)]
 /// Name of an immutable object defined by All is Cubes.
 ///
 /// [`Handle`]s to builtins act as if they exist in all universes.
-/// To obtain such a handle, call [`Builtin::handle()`].
+/// To obtain such a handle, call the [function for the specific builtin](#builtin-handle-getters),
+/// or [`Builtin::erased_handle()`] for dynamic lookups.
 #[derive(Clone, Copy, Debug, Hash, Eq, Ord, PartialEq, PartialOrd, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
@@ -104,27 +149,13 @@ pub enum Builtin {
     Air,
 }
 
-impl Builtin {
-    /// Returns the [`Handle`] to this builtin, assuming that it is of type `Handle<T>`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the builtin’s type is not `T`.
-    pub fn handle<T: universe::UniverseMember>(self) -> &'static Handle<T> {
-        self.erased_handle()
-            .try_into()
-            .unwrap_or_else(|error| panic!("type mismatch in Builtin::handle(): {error}"))
-    }
-
-    /// Returns the type-erased [`Handle`] to this builtin.
-    pub fn erased_handle(self) -> &'static dyn universe::ErasedHandle {
-        self.get().handle()
-    }
-}
-
-impl<T: universe::UniverseMember> TryFrom<Builtin> for &'static Handle<T> {
+impl<T: universe::UniverseMember> TryFrom<Builtin> for &Handle<T> {
     type Error = universe::TypeError;
 
+    /// Returns the builtin’s handle, if `T` is its type.
+    ///
+    /// This function is identical to calling [`Builtin::erased_handle()`] and
+    /// converting the result.
     fn try_from(builtin: Builtin) -> Result<Self, Self::Error> {
         builtin.erased_handle().try_into()
     }
@@ -133,14 +164,31 @@ impl<T: universe::UniverseMember> TryFrom<Builtin> for &'static Handle<T> {
 impl<T: universe::UniverseMember> TryFrom<Builtin> for Handle<T> {
     type Error = universe::TypeError;
 
+    /// Returns the builtin’s handle, if `T` is its type.
+    ///
+    /// This function is identical to calling [`Builtin::erased_handle()`] and
+    /// converting the result.
     fn try_from(builtin: Builtin) -> Result<Self, Self::Error> {
         builtin.erased_handle().try_into()
     }
 }
 
 impl From<Builtin> for universe::AnyHandle {
+    /// Returns a type-erased, owned [`Handle`] to this builtin.
+    ///
+    /// This function is identical to calling [`Builtin::erased_handle()`] and
+    /// converting the result.
     fn from(builtin: Builtin) -> Self {
         builtin.erased_handle().into()
+    }
+}
+
+impl From<Builtin> for &dyn universe::ErasedHandle {
+    /// Returns a type-erased, borrowed [`Handle`] to this builtin.
+    ///
+    /// This function is identical to calling [`Builtin::erased_handle()`].
+    fn from(builtin: Builtin) -> Self {
+        builtin.erased_handle()
     }
 }
 
@@ -169,7 +217,7 @@ mod tests {
 
     #[test]
     fn basic_usage() {
-        let handle: &Handle<BlockDef> = Builtin::Air.handle();
+        let handle: &Handle<BlockDef> = Builtin::air();
         assert_eq!(
             *handle.read(ReadTicket::stub()).unwrap().block(),
             block::AIR
@@ -177,21 +225,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic = "type mismatch in Builtin::handle(): expected Space, but found BlockDef builtin 'air'"]
-    fn wrong_static_type() {
-        _ = Builtin::Air.handle::<crate::space::Space>();
-    }
-
-    #[test]
     fn handle_equality() {
-        assert_eq!(
-            Builtin::Air.handle::<BlockDef>(),
-            Builtin::Air.erased_handle(),
-        );
-        assert_eq!(
-            Builtin::Air.handle::<BlockDef>(),
-            Builtin::Air.handle::<BlockDef>(),
-        );
+        assert_eq!(Builtin::air(), Builtin::Air.erased_handle());
+        assert_eq!(Builtin::Air.erased_handle(), Builtin::Air.erased_handle());
+        assert_eq!(Builtin::air(), Builtin::air());
+
+        // Test non-equality
+        assert_ne!(Builtin::Air.erased_handle(), Builtin::Beep.erased_handle());
     }
 
     #[test]

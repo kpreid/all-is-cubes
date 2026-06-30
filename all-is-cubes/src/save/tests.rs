@@ -883,7 +883,7 @@ fn universe_with_one_of_each() -> Box<Universe> {
         .read_ticket(universe.read_ticket())
         .build_and_mutate(|m| {
             m.set([0, 0, 0], Block::from(block_handle))?;
-            m.set([0, 0, 1], Block::from(Builtin::Air.handle().clone()))?;
+            m.set([0, 0, 1], Block::from(Builtin::air().clone()))?;
             Ok(())
         })
         .unwrap();
@@ -1201,7 +1201,7 @@ fn handle_de_builtin() {
     }))
     .unwrap();
 
-    assert_eq!(handle, *Builtin::Air.handle());
+    assert_eq!(handle, *Builtin::air());
     // Unlike other handles, we can actually exercise these even without a universe!
     assert_eq!(handle.read(ReadTicket::stub()).unwrap().block(), &AIR);
 }
@@ -1231,7 +1231,7 @@ fn handle_ser_anon() {
 #[test]
 fn handle_ser_builtin() {
     assert_eq!(
-        to_value(Builtin::Air.handle::<BlockDef>()).unwrap(),
+        to_value(Builtin::air()).unwrap(),
         json!({
             "type": "HandleV1",
             "Builtin": "air",

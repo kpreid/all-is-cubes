@@ -478,7 +478,11 @@ impl Universe {
                     Ok(Handle::new_deserializing(name, self))
                 }
             }
-            Name::Builtin(builtin) => Ok(builtin.handle().clone()),
+            Name::Builtin(builtin) => Ok(builtin
+                .erased_handle()
+                .try_into()
+                .unwrap_or_else(|error| unreachable!("builtin handle type mismatch: {error}"))),
+
             Name::Pending => Err(DeserializeHandlesError {
                 name,
                 kind: DeserializeHandlesErrorKind::InvalidName,

@@ -1467,7 +1467,7 @@ mod tests {
     #[test]
     fn builtin_mutation_via_universe_transaction_fails() {
         let mut u = Universe::new();
-        let handle: Handle<BlockDef> = Builtin::Air.handle().clone();
+        let handle: Handle<BlockDef> = Builtin::air().clone();
         let txn = block::BlockDefTransaction::overwrite(AIR).bind(handle);
 
         let err = txn.execute(&mut u, (), &mut transaction::no_outputs).unwrap_err();
@@ -1485,7 +1485,7 @@ mod tests {
     #[test]
     fn builtin_mutation_via_execute_1_fails() {
         let mut u = Universe::new();
-        let handle: &Handle<BlockDef> = Builtin::Air.handle();
+        let handle: &Handle<BlockDef> = Builtin::air();
         let txn = block::BlockDefTransaction::overwrite(AIR);
 
         let err = u.execute_1(handle, txn).unwrap_err();

@@ -1314,7 +1314,11 @@ mod universe {
                             // is at least useful in deserialization tests.
                             Ok(Handle::new_gone(name))
                         }
-                        Name::Builtin(builtin) => Ok(builtin.handle().clone()),
+                        Name::Builtin(builtin) => {
+                            Ok(builtin.erased_handle().try_into().unwrap_or_else(|error| {
+                                unreachable!("builtin handle type mismatch: {error}")
+                            }))
+                        }
                         Name::Pending => Err(serde::de::Error::custom(
                             "cannot deserialize a pending Handle, \
                                     because they would have lost their association \

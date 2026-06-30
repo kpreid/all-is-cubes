@@ -142,7 +142,7 @@ fn get_any() {
 fn get_builtin_handle() {
     let u = Universe::new();
     let name = Name::Builtin(Builtin::Air);
-    let expected_handle = Builtin::Air.handle::<BlockDef>();
+    let expected_handle = Builtin::air();
 
     assert_eq!(u.get(&name), Some(expected_handle.clone()));
     assert_eq!(
@@ -455,9 +455,7 @@ fn gc_allows_builtins() {
         "foo".into(),
         BlockDef::new(
             u.read_ticket(),
-            Block::from_primitive(block::Primitive::Indirect(
-                Builtin::Air.handle::<BlockDef>().clone(),
-            )),
+            Block::from_primitive(block::Primitive::Indirect(Builtin::air().clone())),
         ),
     )
     .unwrap();
