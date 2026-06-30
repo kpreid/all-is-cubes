@@ -420,21 +420,25 @@ mod tests {
         let mut equals = 0;
         let mut collisions = 0;
         let mut checks = 0;
-        for all1 @ (_index1, (class1, value1)) in samples.iter().enumerate() {
-            for all2 @ (_index2, (class2, value2)) in samples.iter().enumerate() {
+        for (index1, (class1, value1)) in samples.iter().enumerate() {
+            for (index2, (class2, value2)) in samples.iter().enumerate() {
                 println!("checking {value1:?} == {value2:?}");
 
-                let equal12 = value1.cheap_or_ptr_eq(value2);
+                let cheap_equal12 = value1.cheap_or_ptr_eq(value2);
                 let hash1 = cheap_hash_one(value1);
                 let hash2 = cheap_hash_one(value2);
 
-                assert_eq!(
-                    equal12,
-                    class1 == class2,
-                    "equality not as expected for:\nleft: {all1:?}\nright: {all2:?}"
-                );
+                if cheap_equal12 != (class1 == class2) {
+                    panic!(
+                        "equality not as expected for:\n\
+                        left:  item #{index1}, {value2:?}\n\
+                        right: item #{index2}, {value2:?}\n\
+                        cheap_or_ptr_eq() returned {cheap_equal12}\n\
+                        should be equal if class {class1} == {class2}"
+                    )
+                }
 
-                if equal12 {
+                if cheap_equal12 {
                     assert_eq!(hash1, hash2);
                     equals += 1;
                 } else if hash1 == hash2 {
