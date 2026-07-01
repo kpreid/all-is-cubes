@@ -117,7 +117,9 @@ where
                 let mut fast_options = mesh_options.clone();
                 fast_options.ignore_voxels = true;
 
-                self.meshes.reserve(new_len);
+                // Reserve space for the push() loop we are going to do.
+                self.meshes.reserve(new_len - self.meshes.len());
+
                 // Note that the ..= range is necessary; `(old_len as BlockIndex)..` would overflow
                 // before it produces `BlockIndex::MAX`, as documented in
                 // <https://doc.rust-lang.org/std/ops/struct.RangeFrom.html>.
