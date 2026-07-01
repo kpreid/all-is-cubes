@@ -677,9 +677,6 @@ mod tests {
                     resolution: 1,
                     voxel: Evoxel {
                         color: Rgba(1.0, 1.0, 1.0, 1.0),
-                        emission: Rgb(0.0, 0.0, 0.0),
-                        selectable: true,
-                        collision: Hard,
                     },
                     voxel_opacity_mask: VoxelOpacityMask {
                         resolution: 1,

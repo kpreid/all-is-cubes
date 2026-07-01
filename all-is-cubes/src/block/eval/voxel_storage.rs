@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use core::fmt;
 use core::hash::Hash as _;
 use core::ops;
 
@@ -16,7 +17,7 @@ use crate::math::{Cube, GridAab, OpacityCategory, Rgb, Rgba, Vol};
 ///
 /// This is essentially a subset of the information in a full [`EvaluatedBlock`] and
 /// its [`BlockAttributes`].
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Copy, Hash, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct Evoxel {
@@ -100,6 +101,32 @@ impl Evoxel {
             category = OpacityCategory::Partial;
         }
         category
+    }
+}
+
+impl fmt::Debug for Evoxel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            color,
+            emission,
+            selectable,
+            collision,
+        } = *self;
+        let mut ds = f.debug_struct("Evoxel");
+        ds.field("color", &color);
+
+        // Print only non-default fields.
+        if emission != Rgb::ZERO {
+            ds.field("emission", &emission);
+        }
+        if !selectable {
+            ds.field("selectable", &selectable);
+        }
+        if collision != BlockCollision::Hard {
+            ds.field("collision", &self.collision);
+        }
+
+        ds.finish()
     }
 }
 
@@ -380,7 +407,42 @@ mod tests {
     use super::*;
     use crate::block::Resolution::*;
     use core::hash::{BuildHasher as _, Hasher};
-    use std::{dbg, println};
+    use indoc::indoc;
+    use std::{dbg, format, println};
+
+    #[test]
+    fn evoxel_debug_simple() {
+        let voxel = Evoxel::from_color(Rgba::new(1.0, 0.0, 0.0, 1.0));
+        assert_eq!(
+            format!("{voxel:#?}\n"),
+            indoc! {"
+                Evoxel {
+                    color: Rgba(1.0, 0.0, 0.0, 1.0),
+                }
+            "}
+        );
+    }
+
+    #[test]
+    fn evoxel_debug_complex() {
+        let voxel = Evoxel {
+            color: Rgba::new(1.0, 0.0, 0.0, 1.0),
+            emission: Rgb::new(0.0, 1.0, 0.0),
+            selectable: false,
+            collision: BlockCollision::None,
+        };
+        assert_eq!(
+            format!("{voxel:#?}\n"),
+            indoc! {"
+                Evoxel {
+                    color: Rgba(1.0, 0.0, 0.0, 1.0),
+                    emission: Rgb(0.0, 1.0, 0.0),
+                    selectable: false,
+                    collision: None,
+                }
+            "}
+        );
+    }
 
     #[test]
     fn cheap_eq_hash() {
