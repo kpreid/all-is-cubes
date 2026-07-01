@@ -13,6 +13,8 @@ use crate::block::{
 };
 use crate::math::{Cube, GridAab, OpacityCategory, Rgb, Rgba, Vol};
 
+// -------------------------------------------------------------------------------------------------
+
 /// Properties of an individual voxel within [`EvaluatedBlock`].
 ///
 /// This is essentially a subset of the information in a full [`EvaluatedBlock`] and
@@ -130,6 +132,8 @@ impl fmt::Debug for Evoxel {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Storage of an [`EvaluatedBlock`]'s shape — its _evaluated voxels._
 ///
 /// This voxel data may be smaller than the dimensions implied by [`Self::resolution`],
@@ -140,14 +144,14 @@ impl fmt::Debug for Evoxel {
 /// for the case of a single element, returning voxels by value rather than
 /// reference, automatically returning [`Evoxel::AIR`] when appropriate, and
 /// enforcing that the `Vol` has no wasted data outside the block bounds.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct Evoxels(EvoxelsInner);
 
 // TODO: implement Eq and Hash with by-value rather than by-structure comparisons
 // TODO: Consider switching to struct-of-arrays layout that allows uniform properties
 // (e.g. all zero light emission) to not be stored.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 enum EvoxelsInner {
     /// Compact representation of exactly one voxel. The resolution is implicitly 1.
     One(Evoxel),
@@ -394,6 +398,18 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
     }
 }
 
+impl fmt::Debug for Evoxels {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Evoxels(EvoxelsInner::One(evoxel)) => f.debug_tuple("One").field(evoxel).finish(),
+            Evoxels(EvoxelsInner::Many(resolution, vol)) => {
+                // `Vol` will take care of truncating the data.
+                f.debug_tuple("Many").field(resolution).field(vol).finish()
+            }
+        }
+    }
+}
+
 impl crate::universe::VisitHandles for Evoxels {
     fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
         // Currently there are never any handles in voxels, but that could someday change,
@@ -401,6 +417,8 @@ impl crate::universe::VisitHandles for Evoxels {
         let _ = visitor;
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

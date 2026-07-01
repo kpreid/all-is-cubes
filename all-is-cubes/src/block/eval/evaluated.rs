@@ -86,14 +86,32 @@ impl fmt::Debug for EvaluatedBlock {
         ds.field("uniform_collision", &format_args!("{uniform_collision:?}"));
         ds.field("resolution", &self.resolution());
         match voxels.single_voxel() {
-            Some(evoxel) => {
-                ds.field("voxel", &evoxel);
-            }
+            // Shorthand syntax.
+            Some(evoxel) => ds.field("voxel", &evoxel),
+            // Note we don’t print the `Evoxels` directly because that would print an extra copy of
+            // the resolution. Instead, we reach to the `Vol<&[Evoxel]>` and print a limited
+            // number of them.
             None => {
-                // Not printing the entire array which could be huge.
-                ds.field("voxels", &format_args!("{:?}", voxels.bounds()));
+                ds.field("voxels.bounds", &format_args!("{:?}", voxels.bounds()));
+                ds.field(
+                    "voxels",
+                    &fmt::from_fn(|f| {
+                        let mut dl = f.debug_list();
+                        let voxels = voxels.as_vol_ref();
+                        const LIMIT: usize = 8;
+                        for voxel in voxels.as_linear().iter().take(LIMIT) {
+                            // never use alternate/multiline formatting
+                            dl.entry(&format_args!("{voxel:?}"));
+                        }
+                        if voxels.volume() > LIMIT {
+                            dl.finish_non_exhaustive()
+                        } else {
+                            dl.finish()
+                        }
+                    }),
+                )
             }
-        }
+        };
         ds.field("voxel_opacity_mask", &voxel_opacity_mask);
         ds.field("cost", cost);
         ds.finish()
@@ -741,7 +759,17 @@ mod tests {
                     visible: true,
                     uniform_collision: None,
                     resolution: 2,
-                    voxels: GridAab(0..2, 0..2, 0..2),
+                    voxels.bounds: GridAab(0..2, 0..2, 0..2),
+                    voxels: [
+                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
+                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
+                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
+                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
+                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
+                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
+                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
+                        Evoxel { color: Rgba(0.0, 0.0, 0.0, 0.0), selectable: false, collision: None },
+                    ],
                     voxel_opacity_mask: VoxelOpacityMask {
                         resolution: 2,
                         bounds: GridAab(0..2, 0..2, 0..2),
