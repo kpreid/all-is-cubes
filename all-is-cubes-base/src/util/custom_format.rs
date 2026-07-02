@@ -6,6 +6,8 @@ use core::time::Duration;
 
 use manyfmt::{Fmt, Refmt as _};
 
+// -------------------------------------------------------------------------------------------------
+
 /// Format type for [`manyfmt::Fmt`] which prints the name of a type.
 /// The value is a `PhantomData` to avoid requiring an actual instance of the type.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -17,6 +19,8 @@ impl<T> Fmt<TypeName> for PhantomData<T> {
         write!(fmt, "{}", core::any::type_name::<T>())
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Format type for [`manyfmt::Fmt`] which is similar to [`fmt::Debug`], but uses an
 /// alternate concise format.
@@ -73,5 +77,21 @@ impl<T: fmt::Debug, U> Fmt<ConciseDebug> for euclid::Size3D<T, U> {
 impl Fmt<ConciseDebug> for Duration {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &ConciseDebug) -> fmt::Result {
         write!(fmt, "{:5.2?} ms", (self.as_micros() as f32) / 1000.0)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Formatting wrapper which is identical to [`fmt::Debug`],
+/// but suppresses the `alternate` flag (and other formatting options, but that may change),
+/// causing single-line instead of multi-line output.
+///
+/// This is not a [`manyfmt::Fmt`] implementation because trait impl coherence does not allow that.
+#[allow(clippy::exhaustive_structs)]
+pub struct NoAlternateDebug<T>(pub T);
+
+impl<T: fmt::Debug> fmt::Debug for NoAlternateDebug<T> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "{:?}", self.0)
     }
 }

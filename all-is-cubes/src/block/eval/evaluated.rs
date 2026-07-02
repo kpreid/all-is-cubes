@@ -1,5 +1,6 @@
 //! [`EvaluatedBlock`] and [`Evoxel`].
 
+use all_is_cubes_base::util::NoAlternateDebug;
 use alloc::boxed::Box;
 use core::{fmt, ptr};
 
@@ -81,9 +82,9 @@ impl fmt::Debug for EvaluatedBlock {
             ds.field("light_emission", light_emission);
         }
         // Using format_args! this way turns off "alternate" multi-line format
-        ds.field("opaque", &format_args!("{opaque:?}"));
+        ds.field("opaque", &NoAlternateDebug(opaque));
         ds.field("visible", visible);
-        ds.field("uniform_collision", &format_args!("{uniform_collision:?}"));
+        ds.field("uniform_collision", &NoAlternateDebug(uniform_collision));
         ds.field("resolution", &self.resolution());
         match voxels.single_voxel() {
             // Shorthand syntax.
@@ -92,7 +93,7 @@ impl fmt::Debug for EvaluatedBlock {
             // the resolution. Instead, we reach to the `Vol<&[Evoxel]>` and print a limited
             // number of them.
             None => {
-                ds.field("voxels.bounds", &format_args!("{:?}", voxels.bounds()));
+                ds.field("voxels.bounds", &NoAlternateDebug(voxels.bounds()));
                 ds.field(
                     "voxels",
                     &fmt::from_fn(|f| {
@@ -100,8 +101,7 @@ impl fmt::Debug for EvaluatedBlock {
                         let voxels = voxels.as_vol_ref();
                         const LIMIT: usize = 8;
                         for voxel in voxels.as_linear().iter().take(LIMIT) {
-                            // never use alternate/multiline formatting
-                            dl.entry(&format_args!("{voxel:?}"));
+                            dl.entry(&NoAlternateDebug(voxel));
                         }
                         if voxels.volume() > LIMIT {
                             dl.finish_non_exhaustive()

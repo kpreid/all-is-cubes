@@ -43,7 +43,7 @@ use crate::raycast::Ray;
 use crate::space::{self, Space};
 use crate::time::Tick;
 use crate::universe;
-use crate::util::ConciseDebug;
+use crate::util::{ConciseDebug, NoAlternateDebug};
 use crate::{rerun_glue as rg, time};
 
 // -------------------------------------------------------------------------------------------------
@@ -204,7 +204,7 @@ impl manyfmt::Fmt<ConciseDebug> for BodyStepDetails {
             .field(
                 "initial_crush",
                 // single-line formatting for the FaceMap. TODO: truncate digits too
-                &format_args!("{initial_crush:?}"),
+                &NoAlternateDebug(initial_crush),
             )
             .field("move_segments", &move_segments.refmt(fopt))
             .field("delta_v", &delta_v.refmt(fopt))

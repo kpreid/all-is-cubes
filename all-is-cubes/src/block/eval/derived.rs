@@ -12,6 +12,7 @@ use crate::math::{
     Cube, Face, FaceMap, GridAab, Intensity, OpacityCategory, Rgb, Rgba, Vol, ZeroOne,
 };
 use crate::raytracer_components::{EvalTrace, trace_for_eval};
+use crate::util::NoAlternateDebug;
 
 #[cfg(doc)]
 use crate::block::{EvaluatedBlock, Evoxel};
@@ -385,14 +386,14 @@ impl fmt::Debug for VoxelOpacityMask {
             MaskInner::Uniform(resolution, bounds, opacity) => f
                 .debug_struct("VoxelOpacityMask")
                 .field("resolution", &resolution)
-                .field("bounds", &format_args!("{bounds:?}"))
+                .field("bounds", &NoAlternateDebug(bounds))
                 .field("opacity", &opacity)
                 .finish(),
             // mask data is likely to be too large to be useful to print
             MaskInner::Irregular(resolution, ref voxels) => f
                 .debug_struct("VoxelOpacityMask")
                 .field("resolution", &resolution)
-                .field("bounds", &format_args!("{:?}", voxels.bounds()))
+                .field("bounds", &NoAlternateDebug(voxels.bounds()))
                 .field(
                     "opacity",
                     &fmt::from_fn(|f| {

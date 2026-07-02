@@ -3,7 +3,7 @@ use core::fmt::{self, Write as _};
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Box3D, Point3D, Vector3D};
 use all_is_cubes::math::{Cube, Face, GridVector, Rgba};
-use all_is_cubes::util::{ConciseDebug, Refmt};
+use all_is_cubes::util::{ConciseDebug, NoAlternateDebug, Refmt};
 use all_is_cubes_mesh::{self as mesh, BlockVertex, Vertex};
 
 use crate::DebugLineVertex;
@@ -313,9 +313,9 @@ impl fmt::Debug for BColor {
             // texture
             let clamp = self.clamp_box();
             ds.field("atlas_id", &(-1 - alpha_or_atlas as i64));
-            ds.field("tc", &format_args!("{:?}", &self.color_or_texture[..3]));
-            ds.field("clamp_min", &format_args!("{:?}", clamp.min));
-            ds.field("clamp_max", &format_args!("{:?}", clamp.max));
+            ds.field("tc", &NoAlternateDebug(&self.color_or_texture[..3]));
+            ds.field("clamp_min", &NoAlternateDebug(clamp.min));
+            ds.field("clamp_max", &NoAlternateDebug(clamp.max));
         } else if (0.0..=1.0).contains(&alpha_or_atlas) {
             let color = Rgba::new(
                 self.color_or_texture[0],
