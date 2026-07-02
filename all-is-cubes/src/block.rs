@@ -173,11 +173,11 @@ pub enum Primitive {
     /// It cannot be serialized.
     #[doc(hidden)]
     Raw {
-        // Note: the `Arc` is indirection so that `Primitive` is not made very large by this
-        // special case enum, and is an `Arc` in particular so that cloning a `Primitive` does not
-        // allocate.
-        attributes: Arc<BlockAttributes>,
-        voxels: Evoxels,
+        // Note: The `EphemeralOpaque`s avoid comparing the full evaluated data.
+        // Additionally, each one is an `Arc` indirection, which means that `Primitive`
+        // can stay a small enum and cheap to clone.
+        attributes: crate::universe::EphemeralOpaque<BlockAttributes>,
+        voxels: crate::universe::EphemeralOpaque<Evoxels>,
     },
 }
 
@@ -742,7 +742,10 @@ impl Block {
             Primitive::Raw {
                 ref attributes,
                 ref voxels,
-            } => MinEval::new(BlockAttributes::clone(attributes), voxels.clone()),
+            } => MinEval::new(
+                attributes.try_ref().ok_or(InEvalError::DEFUNCT_RAW)?.clone(),
+                voxels.try_ref().ok_or(InEvalError::DEFUNCT_RAW)?.clone(),
+            ),
         };
 
         #[cfg(debug_assertions)]

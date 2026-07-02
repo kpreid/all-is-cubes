@@ -20,7 +20,7 @@ use crate::math::{
     Vol, zo32,
 };
 use crate::space::Space;
-use crate::universe::{ReadTicket, Universe};
+use crate::universe::{EphemeralOpaque, ReadTicket, Universe};
 
 // Helpers for more concise test code
 #[track_caller]
@@ -599,8 +599,8 @@ fn raw_primitive() {
         },
     );
     let block = Block::from_primitive(Primitive::Raw {
-        attributes: attributes.clone(),
-        voxels: voxels.clone(),
+        attributes: EphemeralOpaque::new(attributes.clone()),
+        voxels: EphemeralOpaque::new(Arc::new(voxels.clone())),
     });
     let e = block.evaluate(ReadTicket::stub()).unwrap();
 

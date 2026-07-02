@@ -274,6 +274,12 @@ pub(crate) enum ErrorKind {
     ///
     /// This may be temporary or permanent; consult the [`HandleError`] to determine that.
     Handle(HandleError),
+
+    /// A [`Primitive::Raw`] no longer has its value and cannot be evaluated.
+    ///
+    /// This is analogous to [`HandleError::gone()`], but is not technically one of those.
+    #[doc(hidden)]
+    DefunctRaw,
 }
 
 /// Intra-evaluation error type; corresponds to [`EvalBlockError`]
@@ -302,6 +308,7 @@ impl fmt::Display for EvalBlockError {
                 used {used:?} so far and only {budget:?} available"
             ),
             ErrorKind::Handle(_) => write!(f, "block data inaccessible"),
+            ErrorKind::DefunctRaw => write!(f, "Primitive::Raw data is gone"),
         }
     }
 }
@@ -312,6 +319,7 @@ impl core::error::Error for EvalBlockError {
             ErrorKind::BudgetExceeded => None,
             ErrorKind::PriorBudgetExceeded { .. } => None,
             ErrorKind::Handle(e) => Some(e),
+            ErrorKind::DefunctRaw => None,
         }
     }
 }
@@ -325,6 +333,10 @@ impl From<HandleError> for InEvalError {
 }
 
 impl InEvalError {
+    pub(in crate::block) const DEFUNCT_RAW: Self = Self {
+        kind: ErrorKind::DefunctRaw,
+    };
+
     pub(in crate::block) fn into_eval_error(
         self,
         block: Block,
@@ -357,7 +369,9 @@ impl EvalBlockError {
         InEvalError {
             kind: match kind {
                 ErrorKind::BudgetExceeded => ErrorKind::PriorBudgetExceeded { budget, used },
-                ErrorKind::PriorBudgetExceeded { .. } | ErrorKind::Handle { .. } => kind,
+                ErrorKind::PriorBudgetExceeded { .. }
+                | ErrorKind::Handle { .. }
+                | ErrorKind::DefunctRaw => kind,
             },
         }
     }
@@ -379,6 +393,7 @@ impl EvalBlockError {
             ErrorKind::Handle(ref h) => h.is_transient(),
             ErrorKind::BudgetExceeded => false,
             ErrorKind::PriorBudgetExceeded { .. } => false,
+            ErrorKind::DefunctRaw => false,
         }
     }
 
