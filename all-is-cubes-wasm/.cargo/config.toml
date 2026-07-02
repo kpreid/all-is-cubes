@@ -12,7 +12,7 @@ rustflags = [
     # * Not already enabled for `wasm32-unknown-unknown`, as listed in
     #   <https://doc.rust-lang.org/rustc/platform-support/wasm32-unknown-unknown.html#enabled-webassembly-features>
     "-Ctarget-feature=+extended-const",
-    "-Ctarget-feature=+relaxed-simd",
+    # "-Ctarget-feature=+relaxed-simd", -- not yet stable on Safari
     "-Ctarget-feature=+simd128",
     "-Ctarget-feature=+tail-call",
 ]
