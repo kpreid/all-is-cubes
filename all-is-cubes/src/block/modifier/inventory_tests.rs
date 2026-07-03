@@ -62,7 +62,7 @@ fn inventory_preserves_attributes() {
         .build();
 
     assert_eq!(
-        std::dbg!(inventory_block.evaluate(ReadTicket::stub()).unwrap()).attributes,
+        *std::dbg!(inventory_block.evaluate(ReadTicket::stub()).unwrap()).attributes(),
         block::BlockAttributes {
             display_name: literal!("Inventory"),
             inventory: iib,

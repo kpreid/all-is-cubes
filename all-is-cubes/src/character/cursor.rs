@@ -103,7 +103,7 @@ pub fn cursor_raycast(
 }
 /// Data collected by [`cursor_raycast`] about the blocks struck by the ray; intended to be
 /// sufficient for various player interactions with blocks.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Cursor {
     /// The space the selected cube is in.
     space: Handle<Space>,
@@ -134,7 +134,7 @@ pub struct Cursor {
 /// Snapshot of the contents of one cube of a [`Space`], independent of the [`Space`].
 ///
 /// TODO: Can we find a cleaner name for this class?
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 #[non_exhaustive]
 #[allow(missing_docs, reason = "TODO")]
 pub struct CubeSnapshot {
@@ -285,7 +285,7 @@ mod tests {
     use crate::math::{GridAab, Rgba};
     use crate::universe::Universe;
     use euclid::{Point3D, Vector3D, vec3};
-    use std::dbg;
+    use std::{assert_matches, dbg};
 
     fn test_space<const N: usize>(universe: &mut Universe, blocks: [&Block; N]) -> Handle<Space> {
         let mut space =
@@ -323,7 +323,7 @@ mod tests {
         let [block] = make_some_blocks();
         let space_handle = test_space(universe, [&AIR, &block]);
 
-        assert_eq!(
+        assert_matches!(
             cursor_raycast(universe.read_ticket(), X_RAY, &space_handle, 1.0),
             Ok(None)
         );

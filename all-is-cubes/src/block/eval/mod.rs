@@ -20,11 +20,13 @@ use derived::compute_derived;
 
 mod evaluated;
 pub(crate) use evaluated::AIR_EVALUATED_REF;
+#[cfg(test)]
+pub(crate) use evaluated::EvaluatedBlockEq;
 pub use evaluated::{AIR_EVALUATED, EvKey, EvaluatedBlock};
 pub(in crate::block) use evaluated::{AIR_EVALUATED_MIN, MinEval};
 
 mod voxel_storage;
-pub use voxel_storage::{Evoxel, Evoxels};
+pub use voxel_storage::{Evoxel, Evoxels, EvoxelsEq};
 
 #[cfg(test)]
 mod tests;

@@ -138,8 +138,11 @@ mod tests {
     // to only the data and not the metadata (cost and original block).
     // `MinEval` is not quite it.
     #[inline(never)]
-    fn eval_without_metadata(block: &Block) -> (block::BlockAttributes, block::Evoxels) {
+    fn eval_without_metadata(block: &Block) -> (block::BlockAttributes, block::EvoxelsEq) {
         let evaluated = block.evaluate(universe::ReadTicket::stub()).unwrap();
-        (evaluated.attributes().clone(), evaluated.voxels().clone())
+        (
+            evaluated.attributes().clone(),
+            evaluated.voxels().clone().into(),
+        )
     }
 }

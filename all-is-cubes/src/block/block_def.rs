@@ -881,24 +881,30 @@ mod tests {
         let eval_indirect = indirect_block.evaluate(universe.read_ticket()).unwrap();
 
         assert_eq!(
-            eval_def_standalone, eval_def_handle,
+            eval_def_standalone,
+            block::EvaluatedBlockEq::from(eval_def_handle),
             "BlockDef::evaluate() same as Read::evaluate()"
         );
         assert_eq!(
-            block::EvaluatedBlock {
-                block: indirect_block,
-                ..eval_def_standalone.clone()
-            },
             eval_indirect,
+            block::EvaluatedBlockEq {
+                block: indirect_block,
+                attributes: eval_def_standalone.attributes().clone(),
+                voxels: eval_def_standalone.voxels().into(),
+                cost: eval_def_standalone.cost,
+                derived: None,
+            },
             "BlockDef::evaluate() same except for block as Primitive::Indirect"
         );
         assert_eq!(
-            block::EvaluatedBlock {
-                block,
-                cost: eval_bare.cost,
-                ..eval_def_standalone
-            },
             eval_bare,
+            block::EvaluatedBlockEq {
+                block,
+                attributes: eval_def_standalone.attributes().clone(),
+                voxels: eval_def_standalone.voxels().into(),
+                cost: eval_bare.cost,
+                derived: None,
+            },
             "BlockDef::evaluate() same except for block and cost as the def block"
         );
     }

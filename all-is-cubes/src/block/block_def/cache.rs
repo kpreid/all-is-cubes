@@ -147,7 +147,9 @@ impl CachedBlock {
                 .map(MinEval::from);
 
             // Write the new cache data *unless* it is a transient error.
-            if !matches!(new_cache, Err(ref e) if e.is_transient()) && new_cache != self.cache {
+            if !matches!(new_cache, Err(ref e) if e.is_transient())
+                && !cheap_eval_result_eq(&new_cache, &self.cache)
+            {
                 next = Some(CacheUpdate::NewEvaluation(new_cache));
                 info.updated += 1;
             }
@@ -193,5 +195,13 @@ impl VisitHandles for CachedBlock {
             block_listen_gate: _,
         } = self;
         block.visit_handles(visitor);
+    }
+}
+
+fn cheap_eval_result_eq(a: &EvalResult, b: &EvalResult) -> bool {
+    match (a, b) {
+        (Ok(_), Err(_)) | (Err(_), Ok(_)) => false,
+        (Ok(a), Ok(b)) => a.cheap_or_ptr_eq(b),
+        (Err(a), Err(b)) => a == b,
     }
 }

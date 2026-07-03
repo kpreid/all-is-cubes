@@ -34,8 +34,14 @@ fn check_block(read_ticket: ReadTicket<'_>, block: &Block) {
                 rotated.modifiers_mut().push(block::Modifier::Rotate(Face::PY.clockwise()));
                 if let Ok(ev_rotated) = rotated.evaluate(ReadTicket::stub()) {
                     assert_eq!(
-                        (ev_rotated.attributes(), ev_rotated.voxels()),
-                        (evaluated.attributes(), evaluated.voxels()),
+                        (
+                            ev_rotated.attributes(),
+                            block::EvoxelsEq::from(ev_rotated.voxels())
+                        ),
+                        (
+                            evaluated.attributes(),
+                            block::EvoxelsEq::from(evaluated.voxels())
+                        ),
                         "block said symmetric but evaluation differed"
                     );
                 }

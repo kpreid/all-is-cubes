@@ -7,8 +7,8 @@ use core::assert_matches;
 use pretty_assertions::assert_eq;
 
 use crate::block::{
-    self, Block, BlockAttributes, BlockCollision, EvaluatedBlock, Evoxel, Evoxels, GridRotation,
-    Modifier, Primitive, Resolution::R2, TickAction, Vol,
+    self, Block, BlockAttributes, BlockCollision, Evoxel, Evoxels, GridRotation, Modifier,
+    Primitive, Resolution::R2, TickAction, Vol,
 };
 use crate::content::make_some_voxel_blocks;
 use crate::math::{Cube, Face, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
@@ -52,8 +52,16 @@ fn rotate_evaluation() {
 
     assert_eq!(
         re,
-        EvaluatedBlock {
+        block::EvaluatedBlockEq {
             block: rotated.clone(),
+            attributes: BlockAttributes {
+                display_name: "foo".into(),
+                tick_action: Some(TickAction::from(Operation::Become(
+                    replacement.rotate(rotation).clone()
+                ))),
+                rotation_rule: block::RotationPlacementRule::Attach { by: Face::PY },
+                ..BlockAttributes::default()
+            },
             voxels: Evoxels::from_many(
                 R2,
                 Vol::from_fn(block_bounds, |cube| {
@@ -64,21 +72,14 @@ fn rotate_evaluation() {
                         collision: BlockCollision::Hard,
                     }
                 })
-            ),
-            attributes: BlockAttributes {
-                display_name: "foo".into(),
-                tick_action: Some(TickAction::from(Operation::Become(
-                    replacement.rotate(rotation).clone()
-                ))),
-                rotation_rule: block::RotationPlacementRule::Attach { by: Face::PY },
-                ..BlockAttributes::default()
-            },
+            )
+            .into(),
             cost: block::Cost {
                 components: 5,           // Primitive + 3 attributes + Rotate
                 voxels: 2u32.pow(3) * 2, // original + rotation
                 recursion: 0
             },
-            derived: block::Derived {
+            derived: Some(block::Derived {
                 color: be.color(),
                 face_colors: be.face_colors().rotate(rotation),
                 light_emission: Rgb::ZERO,
@@ -95,7 +96,7 @@ fn rotate_evaluation() {
                         }
                     })
                 ),
-            },
+            })
         }
     );
 }
@@ -124,12 +125,14 @@ fn rotate_rotated_consistency() {
     let ev_two_rotations = two_rotations.evaluate(universe.read_ticket()).unwrap();
 
     assert_eq!(
-        EvaluatedBlock {
-            block: rotated_twice,
-            cost: ev_rotated_twice.cost,
-            ..ev_two_rotations
-        },
         ev_rotated_twice,
+        block::EvaluatedBlockEq {
+            block: rotated_twice,
+            attributes: ev_two_rotations.attributes().clone(),
+            voxels: ev_two_rotations.voxels().into(),
+            cost: ev_rotated_twice.cost,
+            derived: None,
+        }
     );
 }
 

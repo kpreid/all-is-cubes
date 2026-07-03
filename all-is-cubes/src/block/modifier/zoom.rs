@@ -181,7 +181,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Zoom {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{EvaluatedBlock, Resolution::R2};
+    use crate::block::{EvaluatedBlockEq, Resolution::R2};
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::math::{GridVector, Rgba};
     use crate::universe::Universe;
@@ -211,7 +211,7 @@ mod tests {
         assert_eq!(ev_original.resolution(), Resolution::R16);
         let scale = R2; // scale up by two = divide resolution by two
         let zoom_resolution = ev_original.resolution().halve().unwrap();
-        let original_voxels = &ev_original.voxels;
+        let original_voxels = ev_original.voxels();
 
         // Try zoom at multiple offset steps.
         for x in 0i32..2 {
@@ -222,20 +222,21 @@ mod tests {
                 ev_zoomed,
                 if x >= 2 {
                     // out of range
-                    EvaluatedBlock::from_voxels(
-                        zoomed,
-                        ev_original.attributes.clone(),
-                        Evoxels::from_one(Evoxel::from_color(Rgba::TRANSPARENT)),
-                        block::Cost {
+                    EvaluatedBlockEq {
+                        block: zoomed,
+                        attributes: ev_original.attributes().clone(),
+                        voxels: Evoxels::from_one(Evoxel::from_color(Rgba::TRANSPARENT)).into(),
+                        cost: block::Cost {
                             components: ev_original.cost.components + 1,
                             ..ev_original.cost
                         },
-                    )
+                        derived: None,
+                    }
                 } else {
-                    EvaluatedBlock::from_voxels(
-                        zoomed,
-                        ev_original.attributes.clone(),
-                        Evoxels::from_many(
+                    EvaluatedBlockEq {
+                        block: zoomed,
+                        attributes: ev_original.attributes().clone(),
+                        voxels: Evoxels::from_many(
                             zoom_resolution,
                             Vol::from_fn(GridAab::for_block(zoom_resolution), |p| {
                                 original_voxels[p + GridVector::new(
@@ -244,15 +245,17 @@ mod tests {
                                     0,
                                 )]
                             }),
-                        ),
-                        block::Cost {
+                        )
+                        .into(),
+                        cost: block::Cost {
                             components: ev_original.cost.components + 1,
                             // 8 = 16 (original) / 2 (zoom level)
                             voxels: ev_original.cost.voxels
                                 + u32::from((ev_original.resolution() / scale).unwrap()).pow(3),
                             ..ev_original.cost
                         },
-                    )
+                        derived: None,
+                    }
                 }
             );
         }

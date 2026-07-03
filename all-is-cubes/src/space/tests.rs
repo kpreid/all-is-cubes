@@ -91,24 +91,26 @@ fn set_success_despite_eval_error_gone() {
 
     // Check for the expected placeholder.
     assert_eq!(
-        space.get_evaluated([0, 0, 0]),
-        &block::EvalBlockError {
-            block,
-            budget: block::Budget::default().to_cost(),
-            used: block::Cost {
-                components: 1,
-                voxels: 0,
-                recursion: 0
-            },
-            kind: block::ErrorKind::Handle(HandleError {
-                name: "bs".into(),
-                handle_universe_id: None,
-                kind: universe::HandleErrorKind::Gone {
-                    reason: universe::GoneReason::CreatedGone {}
-                }
-            })
-        }
-        .to_placeholder()
+        *space.get_evaluated([0, 0, 0]),
+        block::EvaluatedBlockEq::from(
+            block::EvalBlockError {
+                block,
+                budget: block::Budget::default().to_cost(),
+                used: block::Cost {
+                    components: 1,
+                    voxels: 0,
+                    recursion: 0
+                },
+                kind: block::ErrorKind::Handle(HandleError {
+                    name: "bs".into(),
+                    handle_universe_id: None,
+                    kind: universe::HandleErrorKind::Gone {
+                        reason: universe::GoneReason::CreatedGone {}
+                    }
+                })
+            }
+            .to_placeholder()
+        )
     );
 
     // TODO: Test that evaluation works the next time around. (It will be tricky to
@@ -183,8 +185,8 @@ fn set_updates_evaluated_on_added_block() {
     assert_eq!(Some(0), space.get_block_index([1, 0, 0]));
     // Confirm the data is correct
     assert_eq!(
-        space.get_evaluated([0, 0, 0]),
-        &block.evaluate(ReadTicket::stub()).unwrap()
+        *space.get_evaluated([0, 0, 0]),
+        block::EvaluatedBlockEq::from(block.evaluate(ReadTicket::stub()).unwrap())
     );
     space.consistency_check(); // bonus testing
 }
@@ -204,8 +206,8 @@ fn set_updates_evaluated_and_notifies_on_replaced_block() {
     assert_eq!(Some(0), space.get_block_index(cube));
     // Confirm the data is correct
     assert_eq!(
-        space.get_evaluated(cube),
-        &block.evaluate(ReadTicket::stub()).unwrap()
+        *space.get_evaluated(cube),
+        block::EvaluatedBlockEq::from(block.evaluate(ReadTicket::stub()).unwrap())
     );
     // Confirm expected notifications
     assert_eq!(
@@ -352,7 +354,7 @@ fn extract() {
         let block = e.block_data().block().clone();
         assert_eq!(
             block.evaluate(ReadTicket::stub()).unwrap(),
-            e.block_data().evaluated
+            block::EvaluatedBlockEq::from(&e.block_data().evaluated)
         );
         block
     });
@@ -480,8 +482,8 @@ fn listens_to_block_changes() {
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(log.drain(), vec![SpaceChange::BlockEvaluation(0)]);
     assert_eq!(
-        space.read(universe.read_ticket()).unwrap().get_evaluated([0, 0, 0]),
-        &new_evaluated
+        *space.read(universe.read_ticket()).unwrap().get_evaluated([0, 0, 0]),
+        block::EvaluatedBlockEq::from(new_evaluated)
     );
 }
 
@@ -522,8 +524,10 @@ fn indirect_becomes_evaluation_error() {
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(log.drain(), vec![SpaceChange::BlockEvaluation(0)]);
     assert_eq!(
-        space.read(universe.read_ticket()).unwrap().get_evaluated([0, 0, 0]),
-        &block.evaluate(universe.read_ticket()).unwrap_err().to_placeholder()
+        *space.read(universe.read_ticket()).unwrap().get_evaluated([0, 0, 0]),
+        block::EvaluatedBlockEq::from(
+            block.evaluate(universe.read_ticket()).unwrap_err().to_placeholder()
+        )
     );
 }
 

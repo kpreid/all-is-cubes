@@ -239,7 +239,7 @@ impl universe::VisitHandles for Move {
 #[cfg(not(miri))] // all these tests involve many bulk voxels, and no unsafe
 mod tests {
     use super::*;
-    use crate::block::{Composite, EvaluatedBlock, Resolution::*, VoxelOpacityMask};
+    use crate::block::{Composite, EvaluatedBlockEq, Resolution::*, VoxelOpacityMask};
     use crate::content::make_some_blocks;
     use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgb, Rgba, rgba_const, zo32};
     use crate::space::{self, Space};
@@ -262,22 +262,24 @@ mod tests {
         let expected_bounds = GridAab::from_lower_size([0, 1, 0], [2, 1, 2]);
 
         let ev_original = original.evaluate(ReadTicket::stub()).unwrap();
+        let ev_moved = moved.evaluate(ReadTicket::stub()).unwrap();
         assert_eq!(
-            moved.evaluate(ReadTicket::stub()).unwrap(),
-            EvaluatedBlock {
+            ev_moved,
+            EvaluatedBlockEq {
                 block: moved,
-                attributes: ev_original.attributes.clone(),
+                attributes: ev_original.attributes().clone(),
                 voxels: Evoxels::repeat(
                     resolution,
                     expected_bounds,
                     Evoxel::from_block(&ev_original)
-                ),
+                )
+                .into(),
                 cost: block::Cost {
                     components: ev_original.cost.components + 1,
                     voxels: expected_bounds.volume_f64() as u32,
                     recursion: 0
                 },
-                derived: block::Derived {
+                derived: Some(block::Derived {
                     color: color.to_rgb().with_alpha(zo32(2. / 3.)),
                     face_colors: FaceMap {
                         nx: color.to_rgb().with_alpha(zo32(0.5)),
@@ -295,7 +297,7 @@ mod tests {
                         resolution,
                         Vol::repeat(expected_bounds, OpacityCategory::Opaque)
                     ),
-                }
+                })
             }
         );
     }
@@ -321,22 +323,24 @@ mod tests {
         let expected_bounds = GridAab::from_lower_size([0, 1, 0], [2, 1, 2]);
 
         let ev_original = original.evaluate(universe.read_ticket()).unwrap();
+        let ev_moved = moved.evaluate(universe.read_ticket()).unwrap();
         assert_eq!(
-            moved.evaluate(universe.read_ticket()).unwrap(),
-            EvaluatedBlock {
+            ev_moved,
+            EvaluatedBlockEq {
                 block: moved,
-                attributes: ev_original.attributes.clone(),
+                attributes: ev_original.attributes().clone(),
+                voxels: Evoxels::repeat(
+                    resolution,
+                    expected_bounds,
+                    Evoxel::from_block(&ev_original)
+                )
+                .into(),
                 cost: block::Cost {
                     components: ev_original.cost.components + 1,
                     voxels: 2u32.pow(3) * 3 / 2, // original recur + 1/2 block of Move
                     recursion: 0
                 },
-                voxels: Evoxels::repeat(
-                    resolution,
-                    expected_bounds,
-                    Evoxel::from_block(&ev_original)
-                ),
-                derived: block::Derived {
+                derived: Some(block::Derived {
                     color: color.to_rgb().with_alpha(zo32(2. / 3.)),
                     face_colors: FaceMap {
                         nx: color.to_rgb().with_alpha(zo32(0.5)),
@@ -354,7 +358,7 @@ mod tests {
                         resolution,
                         Vol::repeat(expected_bounds, OpacityCategory::Opaque)
                     ),
-                }
+                })
             }
         );
     }
@@ -381,22 +385,24 @@ mod tests {
         let expected_bounds = GridAab::from_lower_size([0, 1, 0], [4, 3, 4]);
 
         let ev_original = original.evaluate(universe.read_ticket()).unwrap();
+        let ev_moved = moved.evaluate(universe.read_ticket()).unwrap();
         assert_eq!(
-            moved.evaluate(universe.read_ticket()).unwrap(),
-            EvaluatedBlock {
+            ev_moved,
+            EvaluatedBlockEq {
                 block: moved,
-                attributes: ev_original.attributes.clone(),
+                attributes: ev_original.attributes().clone(),
+                voxels: Evoxels::repeat(
+                    move_resolution,
+                    expected_bounds,
+                    Evoxel::from_block(&ev_original)
+                )
+                .into(),
                 cost: block::Cost {
                     components: ev_original.cost.components + 1,
                     voxels: 2 * 2 * 2 + 4 * 4 * 3, // original recur + 3/4 block of Move
                     recursion: 0
                 },
-                voxels: Evoxels::repeat(
-                    move_resolution,
-                    expected_bounds,
-                    Evoxel::from_block(&ev_original)
-                ),
-                derived: block::Derived {
+                derived: Some(block::Derived {
                     color: color.to_rgb().with_alpha(zo32(20. / (6. * 4.))),
                     face_colors: FaceMap {
                         nx: color.to_rgb().with_alpha(zo32(0.75)),
@@ -414,7 +420,7 @@ mod tests {
                         move_resolution,
                         Vol::repeat(expected_bounds, OpacityCategory::Opaque)
                     ),
-                }
+                })
             }
         );
     }
@@ -437,7 +443,7 @@ mod tests {
         });
 
         assert_eq!(
-            moved.evaluate(universe.read_ticket()).unwrap().attributes.tick_action,
+            moved.evaluate(universe.read_ticket()).unwrap().attributes().tick_action,
             None
         );
     }
@@ -524,7 +530,7 @@ mod tests {
             .with_modifier(R);
 
         assert_eq!(
-            block.evaluate(universe.read_ticket()).unwrap().attributes.tick_action,
+            block.evaluate(universe.read_ticket()).unwrap().attributes().tick_action,
             Some(TickAction::from(Operation::Become(expected_after_tick)))
         );
     }
@@ -558,7 +564,7 @@ mod tests {
             .with_modifier(composite);
 
         assert_eq!(
-            block.evaluate(universe.read_ticket()).unwrap().attributes.tick_action,
+            block.evaluate(universe.read_ticket()).unwrap().attributes().tick_action,
             Some(TickAction::from(Operation::Become(expected_after_tick)))
         );
     }
@@ -592,7 +598,7 @@ mod tests {
         ));
 
         assert_eq!(
-            block.evaluate(universe.read_ticket()).unwrap().attributes.tick_action,
+            block.evaluate(universe.read_ticket()).unwrap().attributes().tick_action,
             Some(TickAction::from(Operation::Become(expected_after_tick)))
         );
     }

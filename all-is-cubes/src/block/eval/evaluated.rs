@@ -10,6 +10,7 @@ use core::{fmt, ptr};
 use num_traits::float::FloatCore as _;
 
 use crate::block::eval::derived::Derived;
+use crate::block::eval::voxel_storage::EvoxelsEq;
 use crate::block::{
     self, BlRotate as _, Block, BlockAttributes, BlockCollision, Cost, Evoxel, Evoxels,
     Resolution::{self, R1},
@@ -22,33 +23,34 @@ use crate::math::{Face, Face7, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
 #[cfg(doc)]
 use crate::block::{AIR, Handle, Modifier};
 
+// -------------------------------------------------------------------------------------------------
+
 /// A snapshotted form of [`Block`] which contains all information needed for rendering
 /// and physics, and does not require dereferencing [`Handle`]s or unbounded computation.
 ///
 /// To obtain this, call [`Block::evaluate()`].
 //---
-// TODO: The derived `PartialEq` impl will redundantly check `derived`. Stop doing that.
-//
-// TODO: Consider if we can further restrict field visibility (to ensure integrity of
-// data consistency) by moving the tests that make use of it.
-#[derive(Clone, Eq, PartialEq)]
-#[non_exhaustive]
+// Design note: `EvaluatedBlock` intentionally does not implement `PartialEq`.
+// This allows `EvaluatedBlock` and its contained `Evoxels` to choose data storage
+// techniques based on the circumstances, without being obligated to implement comparison between
+// arbitrary pairs.
+#[derive(Clone)]
 pub struct EvaluatedBlock {
     /// The original block which was evaluated to produce this result.
-    pub(in crate::block) block: Block,
+    block: Block,
 
     /// Cost of performing the evaluation.
     pub(in crate::block) cost: Cost,
 
     /// The block's attributes.
-    pub(in crate::block) attributes: BlockAttributes,
+    attributes: BlockAttributes,
 
     /// The voxels making up the block, and the [`resolution`](Resolution) (scale factor)
     /// of those voxels.
-    pub(in crate::block) voxels: Evoxels,
+    voxels: Evoxels,
 
     /// Information derived from `self.voxels` (only).
-    pub(in crate::block) derived: Derived,
+    derived: Derived,
 }
 
 impl fmt::Debug for EvaluatedBlock {
@@ -334,13 +336,18 @@ impl EvaluatedBlock {
     #[cfg_attr(feature = "_special_testing", visibility::make(pub))] // used by fuzz_block_eval
     #[track_caller]
     pub(crate) fn consistency_check(&self) {
-        let regenerated = EvaluatedBlock::from_voxels(
-            self.block.clone(),
-            self.attributes.clone(),
-            self.voxels.clone(),
-            self.cost,
-        );
-        assert_eq!(self, &regenerated);
+        let &Self {
+            ref block,
+            cost,
+            ref attributes,
+            ref voxels,
+            ref derived,
+        } = self;
+
+        let regenerated =
+            EvaluatedBlock::from_voxels(block.clone(), attributes.clone(), voxels.clone(), cost);
+
+        assert_eq!(*derived, regenerated.derived);
     }
 }
 
@@ -377,7 +384,10 @@ impl<'a> arbitrary::Arbitrary<'a> for EvaluatedBlock {
 /// use all_is_cubes::block::{AIR, AIR_EVALUATED};
 /// use all_is_cubes::universe::ReadTicket;
 ///
-/// assert_eq!(Ok(AIR_EVALUATED), AIR.evaluate(ReadTicket::stub()));
+/// assert_eq!(
+///     AIR_EVALUATED.attributes(),
+///     AIR.evaluate(ReadTicket::stub()).unwrap().attributes(),
+/// );
 /// ```
 pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     block: block::AIR,
@@ -424,6 +434,8 @@ const AIR_DERIVED: Derived = Derived {
     voxel_opacity_mask: VoxelOpacityMask::R1_INVISIBLE,
 };
 
+// -------------------------------------------------------------------------------------------------
+
 /// Alternate form of [`EvaluatedBlock`] which may omit the derived information.
 ///
 /// This type is used as the intermediate type inside block modifier evaluation, so as to
@@ -432,7 +444,7 @@ const AIR_DERIVED: Derived = Derived {
 /// This type is never exposed as part of the public API; only [`EvaluatedBlock`] is.
 ///
 /// TODO: Needs a new name since it isn't necessarily minimal.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub(crate) struct MinEval {
     attributes: BlockAttributes,
     voxels: Evoxels,
@@ -546,6 +558,20 @@ impl MinEval {
         self.attributes().rotationally_symmetric() && self.voxels().resolution() == R1
     }
 
+    /// Check if `self` is equal to `other` without checking every voxel.
+    ///
+    /// May return a false negative if the two are large and do not have equal
+    /// storage pointers.
+    /// May return a false positive if you care about the result of `self.has_derived()`.
+    pub(crate) fn cheap_or_ptr_eq(&self, other: &Self) -> bool {
+        let Self {
+            attributes,
+            voxels,
+            derived: _,
+        } = self;
+        voxels.cheap_or_ptr_eq(&other.voxels) && *attributes == other.attributes
+    }
+
     #[cfg(debug_assertions)]
     pub(crate) fn consistency_check(&self) {
         self.voxels().consistency_check();
@@ -574,6 +600,8 @@ impl<'a> arbitrary::Arbitrary<'a> for MinEval {
         })
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Value derived from an [`EvaluatedBlock`] which can be cheaply hashed and compared.
 ///
@@ -663,6 +691,113 @@ impl core::hash::Hash for EvKey {
         voxels.cheap_or_ptr_hash(state);
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Wrapper for [`EvaluatedBlock`] which implements [`PartialEq`].
+///
+/// This type is intended for use in [`assert_eq!()`] testing and other situations which demand
+/// complete comparison of voxels.
+/// It may be costly to use, and should be avoided when not necessary.
+//---
+// Design note: This is currently cheap, but if we follow plans to make `Evoxels` use a palette
+// representation, it will no longer be.
+pub(crate) struct EvaluatedBlockEq {
+    pub block: Block,
+    pub cost: Cost,
+    pub attributes: BlockAttributes,
+    pub voxels: EvoxelsEq,
+
+    /// If `None`, the derived data is not compared
+    /// (it is assumed to be correctly deterministically computed from the other fields).
+    pub(in crate::block) derived: Option<Derived>,
+}
+
+impl From<EvaluatedBlock> for EvaluatedBlockEq {
+    fn from(value: EvaluatedBlock) -> Self {
+        Self {
+            block: value.block,
+            cost: value.cost,
+            attributes: value.attributes,
+            voxels: EvoxelsEq::from(value.voxels),
+            // This is unlikely to be wrong, but might be due to some incorrect optimization
+            // in e.g. BlockDef or other things that reuse evaluations.
+            derived: Some(value.derived),
+        }
+    }
+}
+impl From<&EvaluatedBlock> for EvaluatedBlockEq {
+    fn from(value: &EvaluatedBlock) -> Self {
+        Self {
+            block: value.block.clone(),
+            cost: value.cost,
+            attributes: value.attributes.clone(),
+            voxels: EvoxelsEq::from(&value.voxels),
+            // This is unlikely to be wrong, but might be due to some incorrect optimization
+            // in e.g. BlockDef or other things that reuse evaluations.
+            derived: Some(value.derived.clone()),
+        }
+    }
+}
+
+impl PartialEq<EvaluatedBlockEq> for EvaluatedBlockEq {
+    /// Compares two [`EvaluatedBlockEq`]s.
+    ///
+    /// Note that if either [`derived`][Self::derived] is [`None`], it is skipped.
+    fn eq(&self, other: &EvaluatedBlockEq) -> bool {
+        let Self {
+            block,
+            cost,
+            attributes,
+            voxels,
+            derived,
+        } = self;
+
+        block == &other.block
+            && cost == &other.cost
+            && attributes == &other.attributes
+            && voxels == &other.voxels
+            && derived.as_ref().zip(other.derived.as_ref()).is_none_or(|(s, o)| s == o)
+    }
+}
+
+impl PartialEq<EvaluatedBlockEq> for EvaluatedBlock {
+    fn eq(&self, other: &EvaluatedBlockEq) -> bool {
+        let Self {
+            block,
+            cost,
+            attributes,
+            voxels,
+            derived,
+        } = self;
+
+        block == &other.block
+            && cost == &other.cost
+            && attributes == &other.attributes
+            && EvoxelsEq::from(voxels) == other.voxels
+            && other.derived.as_ref().is_none_or(|d| derived == d)
+    }
+}
+
+impl fmt::Debug for EvaluatedBlockEq {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // By formatting identically to the original, we cooperate with
+        // [`pretty_assertions::assert_eq!()`] producing textual diffs.
+        EvaluatedBlock {
+            block: self.block.clone(),
+            cost: self.cost,
+            attributes: self.attributes.clone(),
+            derived: self
+                .derived
+                .clone()
+                .unwrap_or_else(|| block::eval::compute_derived(self.voxels.as_ref())),
+            voxels: (&self.voxels).into(),
+        }
+        .fmt(f)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -798,11 +933,11 @@ mod tests {
                 voxels.clone(),
                 Cost::ZERO
             ),
-            EvaluatedBlock {
+            EvaluatedBlockEq {
                 block: block::AIR, // caution: incorrect placeholder value
                 cost: Cost::ZERO,  // TODO wrong
                 attributes,
-                derived: Derived {
+                derived: Some(Derived {
                     color: Rgba::TRANSPARENT,
                     face_colors: FaceMap::splat(Rgba::TRANSPARENT),
                     light_emission: Rgb::ZERO,
@@ -810,8 +945,8 @@ mod tests {
                     visible: false,
                     uniform_collision: Some(BlockCollision::None),
                     voxel_opacity_mask: VoxelOpacityMask::new(resolution, voxels.as_vol_ref()),
-                },
-                voxels,
+                }),
+                voxels: EvoxelsEq::from(voxels),
             }
         );
     }

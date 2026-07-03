@@ -227,8 +227,8 @@ fn overflow_evaluate() {
         u32size(too_many_modifiers),
     ));
     assert_eq!(
-        block.evaluate(universe.read_ticket()),
-        Err(EvalBlockError {
+        block.evaluate(universe.read_ticket()).unwrap_err(),
+        EvalBlockError {
             block,
             budget: block::Budget::default().to_cost(),
             used: block::Cost {
@@ -237,7 +237,7 @@ fn overflow_evaluate() {
                 recursion: 0
             },
             kind: block::ErrorKind::BudgetExceeded,
-        })
+        }
     );
 }
 
@@ -254,11 +254,14 @@ fn self_referential_evaluate(#[values(false, true)] via_mutation: bool) {
         // users, because in this case the block value now has cached state that will be lost
         // on reload.
         assert_eq!(
-            result,
-            Ok(block::EvaluatedBlock {
+            result.unwrap(),
+            block::EvaluatedBlockEq {
                 block: block.clone(),
-                ..block::AIR_EVALUATED
-            })
+                attributes: block::AIR_EVALUATED.attributes().clone(),
+                voxels: block::AIR_EVALUATED.voxels().into(),
+                cost: block::AIR_EVALUATED.cost,
+                derived: None,
+            }
         );
     } else {
         // TODO: the HandleError details are not presented clearly (it is a WrongUniverse).

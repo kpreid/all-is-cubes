@@ -11,7 +11,8 @@ use rstest::rstest;
 
 use crate::block::{
     self, AIR, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision,
-    BlockDef, Cost, EvKey, EvaluatedBlock, Evoxel, Evoxels, Modifier, Primitive,
+    BlockDef, Cost, EvKey, EvaluatedBlock, EvaluatedBlockEq, Evoxel, Evoxels, EvoxelsEq, Modifier,
+    Primitive,
     Resolution::{self, *},
     VoxelOpacityMask, modifier,
 };
@@ -99,13 +100,16 @@ fn air_self_consistent() {
 
 #[test]
 fn air_consistent_with_constant() {
-    assert_eq!(eval_out(&AIR), block::AIR_EVALUATED);
-    assert_eq!(eval_out(&Block::from(Primitive::Air)), block::AIR_EVALUATED);
+    assert_eq!(eval_out(&AIR), EvaluatedBlockEq::from(block::AIR_EVALUATED));
+    assert_eq!(
+        eval_out(&Block::from(Primitive::Air)),
+        EvaluatedBlockEq::from(block::AIR_EVALUATED)
+    );
 }
 
 #[test]
 fn air_consistent_with_evoxel_air() {
-    assert_eq!(eval_out(&AIR).voxels.single_voxel().unwrap(), Evoxel::AIR);
+    assert_eq!(eval_out(&AIR).voxels().single_voxel().unwrap(), Evoxel::AIR);
 }
 
 #[test]
@@ -113,7 +117,7 @@ fn air_in_recursive_block() {
     let mut universe = Universe::new();
     let block = Block::builder().voxels_fn(R1, |_| AIR).unwrap().build_into(&mut universe);
     assert_eq!(
-        eval_in(&block, &universe).voxels.single_voxel().unwrap(),
+        eval_in(&block, &universe).voxels().single_voxel().unwrap(),
         Evoxel::AIR
     );
 }
@@ -132,13 +136,13 @@ fn opaque_atom_and_attributes() {
     assert_eq!(e.face_colors(), FaceMap::splat(color));
     assert_eq!(e.light_emission(), Rgb::ONE);
     assert_eq!(
-        e.voxels,
-        Evoxels::from_one(Evoxel {
+        EvoxelsEq::from(e.voxels()),
+        EvoxelsEq::from(Evoxels::from_one(Evoxel {
             color,
             emission: Rgb::ONE,
             selectable: true,
             collision: BlockCollision::None,
-        })
+        }))
     );
     assert_eq!(e.resolution(), R1);
     assert_eq!(e.opaque(), FaceMap::splat(true));
@@ -157,7 +161,7 @@ fn transparent_atom() {
     assert_eq!(e.color(), color);
     assert_eq!(e.face_colors(), FaceMap::splat(color));
     assert_eq!(e.light_emission(), Rgb::ZERO);
-    assert!(e.voxels.single_voxel().is_some());
+    assert!(e.voxels().single_voxel().is_some());
     assert_eq!(e.opaque(), FaceMap::splat(false));
     assert_eq!(e.visible(), true);
     assert_eq!(
@@ -174,7 +178,7 @@ fn emissive_only_atom() {
     assert_eq!(e.color(), Rgba::TRANSPARENT);
     assert_eq!(e.face_colors(), FaceMap::splat(Rgba::TRANSPARENT));
     assert_eq!(e.light_emission(), emissive_color);
-    assert!(e.voxels.single_voxel().is_some());
+    assert!(e.voxels().single_voxel().is_some());
     assert_eq!(e.opaque(), FaceMap::splat(false));
     assert_eq!(e.visible(), true);
     assert_eq!(
@@ -189,7 +193,7 @@ fn invisible_atom() {
     let e = eval_out(&block);
     assert_eq!(e.color(), Rgba::TRANSPARENT);
     assert_eq!(e.face_colors(), FaceMap::splat(Rgba::TRANSPARENT));
-    assert!(e.voxels.single_voxel().is_some());
+    assert!(e.voxels().single_voxel().is_some());
     assert_eq!(e.opaque(), FaceMap::splat(false));
     assert_eq!(e.visible(), false);
     assert_eq!(
@@ -217,10 +221,10 @@ fn voxels_checked_individually() {
         .build_into(&mut universe);
 
     let e = eval_in(&block, &universe);
-    assert_eq!(e.attributes, attributes);
+    assert_eq!(*e.attributes(), attributes);
     assert_eq!(
-        e.voxels,
-        Evoxels::from_many(
+        EvoxelsEq::from(e.voxels()),
+        EvoxelsEq::from(Evoxels::from_many(
             resolution,
             Vol::from_fn(GridAab::for_block(resolution), |point| {
                 let point = point.lower_bounds().cast::<f32>();
@@ -231,7 +235,7 @@ fn voxels_checked_individually() {
                     collision: BlockCollision::Hard,
                 }
             })
-        )
+        ))
     );
     assert_eq!(e.color(), Rgba::new(0.5, 0.5, 0.5, 1.0));
     assert_eq!(
@@ -459,8 +463,8 @@ fn recur_with_offset() {
 
     let e = eval_in(&block_at_offset, &universe);
     assert_eq!(
-        e.voxels,
-        Evoxels::from_many(
+        EvoxelsEq::from(e.voxels()),
+        EvoxelsEq::from(Evoxels::from_many(
             resolution,
             Vol::from_fn(GridAab::for_block(resolution), |point| {
                 let point = (point.lower_bounds() + offset).cast::<f32>();
@@ -471,7 +475,7 @@ fn recur_with_offset() {
                     collision: BlockCollision::Hard,
                 }
             })
-        )
+        ))
     );
 }
 
@@ -511,7 +515,7 @@ fn recur_animation_hint_propagation() {
 
     let e = eval_in(&block, &universe);
     assert_eq!(
-        e.attributes.animation_hint,
+        e.attributes().animation_hint,
         AnimationHint {
             // Note that what was replacement becomes redefinition,
             // because replacement in the space is redefinition in the block
@@ -546,10 +550,12 @@ fn indirect_equivalence() {
 
     assert_eq!(
         eval_def,
-        EvaluatedBlock {
-            cost: eval_def.cost,
+        EvaluatedBlockEq {
             block: indirect_block.clone(),
-            ..eval_bare
+            attributes: eval_bare.attributes().clone(),
+            voxels: EvoxelsEq::from(eval_bare.voxels()),
+            cost: eval_def.cost,
+            derived: None,
         }
     );
     assert_eq!(
@@ -605,7 +611,7 @@ fn raw_primitive() {
     let e = block.evaluate(ReadTicket::stub()).unwrap();
 
     assert_eq!(e.attributes(), &*attributes);
-    assert_eq!(e.voxels(), &voxels);
+    assert_eq!(EvoxelsEq::from(e.voxels()), EvoxelsEq::from(voxels));
     assert_eq!(
         e.cost,
         Cost {

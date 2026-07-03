@@ -144,14 +144,13 @@ impl fmt::Debug for Evoxel {
 /// for the case of a single element, returning voxels by value rather than
 /// reference, automatically returning [`Evoxel::AIR`] when appropriate, and
 /// enforcing that the `Vol` has no wasted data outside the block bounds.
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone)]
 #[non_exhaustive]
 pub struct Evoxels(EvoxelsInner);
 
-// TODO: implement Eq and Hash with by-value rather than by-structure comparisons
 // TODO: Consider switching to struct-of-arrays layout that allows uniform properties
 // (e.g. all zero light emission) to not be stored.
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone)]
 enum EvoxelsInner {
     /// Compact representation of exactly one voxel. The resolution is implicitly 1.
     One(Evoxel),
@@ -415,6 +414,70 @@ impl crate::universe::VisitHandles for Evoxels {
         // Currently there are never any handles in voxels, but that could someday change,
         // so we offer this implementation to be prepared.
         let _ = visitor;
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Wrapper for [`Evoxels`] which implements [`Eq`].
+///
+/// This type is intended for use in [`assert_eq!()`] testing and other situations which demand
+/// complete comparison of voxels.
+/// It may be costly to use, and should be avoided when not necessary.
+//---
+// Design note: This is currently cheap, but if we follow plans to make `Evoxels` use a palette
+// representation, it will no longer be.
+#[derive(Clone)]
+pub struct EvoxelsEq {
+    original: Evoxels,
+    // When palettes are in use, there will be a field here for a lazily constructed
+    // canonicalized version.
+}
+
+impl EvoxelsEq {
+    const fn new(voxels: Evoxels) -> Self {
+        Self { original: voxels }
+    }
+}
+
+impl From<Evoxels> for EvoxelsEq {
+    fn from(voxels: Evoxels) -> Self {
+        Self::new(voxels)
+    }
+}
+impl From<&Evoxels> for EvoxelsEq {
+    fn from(voxels: &Evoxels) -> Self {
+        Self::new(voxels.clone())
+    }
+}
+impl From<EvoxelsEq> for Evoxels {
+    fn from(value: EvoxelsEq) -> Self {
+        value.original
+    }
+}
+impl From<&EvoxelsEq> for Evoxels {
+    fn from(value: &EvoxelsEq) -> Self {
+        value.original.clone()
+    }
+}
+
+impl AsRef<Evoxels> for EvoxelsEq {
+    fn as_ref(&self) -> &Evoxels {
+        &self.original
+    }
+}
+
+impl Eq for EvoxelsEq {}
+impl PartialEq for EvoxelsEq {
+    fn eq(&self, other: &Self) -> bool {
+        self.original.resolution() == other.original.resolution()
+            && self.original.as_vol_ref() == other.original.as_vol_ref()
+    }
+}
+
+impl fmt::Debug for EvoxelsEq {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.original.fmt(f)
     }
 }
 

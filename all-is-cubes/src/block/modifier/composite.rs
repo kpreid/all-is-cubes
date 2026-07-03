@@ -225,7 +225,9 @@ fn evaluate_composition(
     // TODO: We currently cannot do *any* cases where we return `src_evaluated`, because
     // block attributes are not yet merged in a symmetric way such that this would be consistent
     // with the non-short-circuit case, and the asymmetry is always in the “keep dst” direction.
-    if operator == CompositeOperator::Over && src_evaluated == block::AIR_EVALUATED_MIN {
+    if operator == CompositeOperator::Over
+        && src_evaluated.cheap_or_ptr_eq(&block::AIR_EVALUATED_MIN)
+    {
         return Ok(dst_evaluated);
     }
 

@@ -1066,11 +1066,11 @@ fn universe_success() {
     assert_eq!(a_block_def_ev.attributes().display_name, "0");
 
     assert_eq!(
-        a_space
+        *a_space
             .read(deserialized_universe.read_ticket())
             .unwrap()
             .get_evaluated([0, 0, 0]),
-        &a_block_def_ev
+        block::EvaluatedBlockEq::from(a_block_def_ev)
     );
 
     assert_eq!(
