@@ -857,7 +857,7 @@ fn update_phase_2(
 mod tests {
     use super::*;
     use crate::content::make_some_blocks;
-    use crate::math::Rgba;
+    use crate::math::{Face, Rgba, u32size};
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
     use std::println;
@@ -865,7 +865,7 @@ mod tests {
     /// Test [`BlockDef::evaluate()`] and [`Read::evaluate()`] being the same as
     /// [`Primitive::Indirect`].
     ///
-    /// TODO: Test its behavior on evaluation failures.
+    /// TODO: Test its behavior on evaluation failures (other than budget).
     #[test]
     fn evaluate_equivalence() {
         let mut universe = Universe::new();
@@ -900,6 +900,61 @@ mod tests {
             },
             eval_bare,
             "BlockDef::evaluate() same except for block and cost as the def block"
+        );
+    }
+
+    /// Test the result of evaluation when the block inside the [`BlockDef`] exceeds its budget.
+    #[test]
+    fn evaluate_budget_error() {
+        let mut universe = Universe::new();
+        // Construct block with too many modifiers
+        // The primitive counts as a component.
+        let too_many_components = block::Budget::default().components;
+        let mut block_with_too_many_modifiers = block::AIR;
+        block_with_too_many_modifiers.modifiers_mut().extend(std::iter::repeat_n(
+            block::Modifier::Rotate(Face::PY.clockwise()),
+            u32size(too_many_components),
+        ));
+
+        let eval_bare_error =
+            block_with_too_many_modifiers.evaluate(universe.read_ticket()).unwrap_err();
+        let block_def = BlockDef::new(
+            universe.read_ticket(),
+            block_with_too_many_modifiers.clone(),
+        );
+        let eval_def_standalone_error = block_def.evaluate().unwrap_err();
+        let block_def_handle = universe.insert_anonymous(block_def);
+        let eval_def_handle_error =
+            block_def_handle.read(universe.read_ticket()).unwrap().evaluate().unwrap_err();
+        let indirect_block = Block::from(block_def_handle);
+        let eval_indirect_error = indirect_block.evaluate(universe.read_ticket()).unwrap_err();
+
+        assert_eq!(
+            eval_bare_error.kind,
+            block::ErrorKind::BudgetExceeded,
+            "error without BlockDef involved"
+        );
+        assert_eq!(
+            eval_def_standalone_error.kind,
+            block::ErrorKind::PriorBudgetExceeded {
+                budget: block::Budget::default().to_cost(),
+                used: block::Cost {
+                    components: too_many_components,
+                    voxels: 0,
+                    recursion: 0
+                }
+            },
+            "error with BlockDef::evaluate()"
+        );
+
+        // Errors from BlockDef::evaluate(), read().evaluate() and Indirect evaluation are the same
+        assert_eq!(
+            eval_def_standalone_error.kind, eval_indirect_error.kind,
+            "BlockDef::evaluate() same as indirect evaluation (except for block)"
+        );
+        assert_eq!(
+            eval_def_standalone_error, eval_def_handle_error,
+            "BlockDef::evaluate() same as Read::evaluate()"
         );
     }
 

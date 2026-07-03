@@ -350,17 +350,14 @@ impl EvalBlockError {
     pub(in crate::block) fn into_internal_error_for_block_def(self) -> InEvalError {
         let Self {
             block: _,
-            budget: _,
-            used: _,
+            budget,
+            used,
             kind,
         } = self;
         InEvalError {
             kind: match kind {
-                ErrorKind::PriorBudgetExceeded { budget, used } => {
-                    ErrorKind::PriorBudgetExceeded { budget, used }
-                }
-                ErrorKind::BudgetExceeded => ErrorKind::BudgetExceeded,
-                ErrorKind::Handle(e) => ErrorKind::Handle(e),
+                ErrorKind::BudgetExceeded => ErrorKind::PriorBudgetExceeded { budget, used },
+                ErrorKind::PriorBudgetExceeded { .. } | ErrorKind::Handle { .. } => kind,
             },
         }
     }
