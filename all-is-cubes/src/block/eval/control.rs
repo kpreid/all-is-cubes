@@ -93,11 +93,15 @@ pub(crate) struct Budget {
 }
 
 impl Budget {
+    const ERROR: InEvalError = InEvalError {
+        kind: ErrorKind::BudgetExceeded,
+    };
+
     pub(in crate::block) fn decrement_components(cell: &Cell<Budget>) -> Result<(), InEvalError> {
         let mut budget = cell.get();
         match budget.components.checked_sub(1) {
             Some(updated) => budget.components = updated,
-            None => return Err(InEvalError::BudgetExceeded),
+            None => return Err(Self::ERROR),
         }
         cell.set(budget);
         Ok(())
@@ -110,7 +114,9 @@ impl Budget {
         let mut budget = cell.get();
         match u32::try_from(amount).ok().and_then(|amount| budget.voxels.checked_sub(amount)) {
             Some(updated) => budget.voxels = updated,
-            None => return Err(InEvalError::BudgetExceeded),
+            None => {
+                return Err(Self::ERROR);
+            }
         }
         cell.set(budget);
         Ok(())
@@ -126,7 +132,9 @@ impl Budget {
                 recursed.recursion = updated;
                 recursed.min_recursion = recursed.min_recursion.min(updated);
             }
-            None => return Err(InEvalError::BudgetExceeded),
+            None => {
+                return Err(Self::ERROR);
+            }
         }
         cell.set(recursed);
         Ok(BudgetRecurseGuard { cell })
@@ -271,12 +279,10 @@ pub(crate) enum ErrorKind {
 /// Intra-evaluation error type; corresponds to [`EvalBlockError`]
 /// as `MinEval` corresponds to `EvaluatedBlock`.
 ///
-/// TODO: This seems no longer needed since it has ended up identical.
+/// This could be
 #[derive(Debug)]
-pub(in crate::block) enum InEvalError {
-    BudgetExceeded,
-    PriorBudgetExceeded { budget: Cost, used: Cost },
-    Handle(HandleError),
+pub(in crate::block) struct InEvalError {
+    kind: ErrorKind,
 }
 
 impl fmt::Display for EvalBlockError {
@@ -312,7 +318,9 @@ impl core::error::Error for EvalBlockError {
 
 impl From<HandleError> for InEvalError {
     fn from(value: HandleError) -> Self {
-        InEvalError::Handle(value)
+        InEvalError {
+            kind: ErrorKind::Handle(value),
+        }
     }
 }
 
@@ -323,18 +331,12 @@ impl InEvalError {
         budget: Cost,
         used: Cost,
     ) -> EvalBlockError {
+        let Self { kind } = self;
         EvalBlockError {
             block,
             budget,
             used,
-            kind: match self {
-                InEvalError::BudgetExceeded => ErrorKind::BudgetExceeded,
-                #[expect(clippy::shadow_unrelated)]
-                InEvalError::PriorBudgetExceeded { budget, used } => {
-                    ErrorKind::PriorBudgetExceeded { budget, used }
-                }
-                InEvalError::Handle(e) => ErrorKind::Handle(e),
-            },
+            kind,
         }
     }
 }
@@ -346,12 +348,20 @@ impl EvalBlockError {
     }
 
     pub(in crate::block) fn into_internal_error_for_block_def(self) -> InEvalError {
-        match self.kind {
-            ErrorKind::PriorBudgetExceeded { budget, used } => {
-                InEvalError::PriorBudgetExceeded { budget, used }
-            }
-            ErrorKind::BudgetExceeded => InEvalError::BudgetExceeded,
-            ErrorKind::Handle(e) => InEvalError::Handle(e),
+        let Self {
+            block: _,
+            budget: _,
+            used: _,
+            kind,
+        } = self;
+        InEvalError {
+            kind: match kind {
+                ErrorKind::PriorBudgetExceeded { budget, used } => {
+                    ErrorKind::PriorBudgetExceeded { budget, used }
+                }
+                ErrorKind::BudgetExceeded => ErrorKind::BudgetExceeded,
+                ErrorKind::Handle(e) => ErrorKind::Handle(e),
+            },
         }
     }
 
