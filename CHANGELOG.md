@@ -57,6 +57,7 @@
     * `universe::Universe` no longer implements `Default` and `Deserialize`; instead, `Box<Universe>` does.
     * Universe members `TagDef` and `SoundDef` now use a shared generic transaction type `transaction::ValueTransaction`, replacing `tag::DefTransaction` and `sound::DefTransaction`.
 
+    * Renamed `inv::EphemeralOpaque` to `universe::EphemeralOpaque`.
     * Renamed `math::Aab::face_coordinate()` to `math::Aab::face_coordinate_outward()`.
     * Renamed `math::Face6` to `Face`.
     * Renamed `space::{Space, Read}::get_lighting()` to `get_light()`.

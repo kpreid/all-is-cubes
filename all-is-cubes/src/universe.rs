@@ -45,6 +45,9 @@ use ecs_details::NameMap;
 pub use ecs_details::PubliclyMutableComponent;
 pub(crate) use ecs_details::{CurrentStep, InfoCollector, Membership, QueryStateBundle};
 
+mod ephemeral;
+pub use ephemeral::EphemeralOpaque;
+
 mod gc;
 
 mod universe_txn;

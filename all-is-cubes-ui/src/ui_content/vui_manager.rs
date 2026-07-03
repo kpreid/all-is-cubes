@@ -8,13 +8,14 @@ use flume::TryRecvError;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::character::{Character, Cursor};
-use all_is_cubes::inv::{EphemeralOpaque, Tool, ToolError, ToolInput};
+use all_is_cubes::inv::{Tool, ToolError, ToolInput};
 use all_is_cubes::listen::{self, Notifier};
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::{
-    Handle, ReadTicket, StrongHandle, Universe, UniverseStepInfo, UniverseTransaction,
+    EphemeralOpaque, Handle, ReadTicket, StrongHandle, Universe, UniverseStepInfo,
+    UniverseTransaction,
 };
 use all_is_cubes_render::camera::{FogOption, GraphicsOptions, UiViewState, Viewport};
 

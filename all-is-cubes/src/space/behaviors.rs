@@ -1,7 +1,6 @@
 use all_is_cubes_base::math::{GridAab, GridRotation};
 
 use crate::behavior;
-use crate::inv::EphemeralOpaque;
 use crate::space::Space;
 use crate::universe;
 
@@ -60,7 +59,7 @@ impl SpaceBehaviorAttachment {
 #[expect(clippy::exhaustive_structs)]
 pub struct ActivatableRegion {
     /// The function to call when this region is activated.
-    pub effect: EphemeralOpaque<dyn Fn() + Send + Sync>,
+    pub effect: universe::EphemeralOpaque<dyn Fn() + Send + Sync>,
 }
 
 impl ActivatableRegion {

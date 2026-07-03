@@ -9,9 +9,9 @@ use exhaust::Exhaust;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::Block;
-use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking;
 use all_is_cubes::listen;
+use all_is_cubes::universe::EphemeralOpaque;
 
 use crate::vui;
 use crate::vui::widgets::{BoxStyle, WidgetBlocks, WidgetTheme};

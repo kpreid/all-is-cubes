@@ -20,7 +20,7 @@ use crate::block::{
 };
 use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
-use crate::inv::{self, EphemeralOpaque, Inventory, Tool};
+use crate::inv::{self, Inventory, Tool};
 use crate::math::{Cube, Face, GridAab, GridRotation, Rgb, Rgba, notnan, ps32, zo32};
 use crate::op;
 use crate::save::compress::{GzSerde, Leu16};
@@ -29,7 +29,9 @@ use crate::tag;
 use crate::text;
 use crate::time;
 use crate::transaction::Transaction as _;
-use crate::universe::{self, Builtin, Handle, Name, PartialUniverse, ReadTicket, Universe};
+use crate::universe::{
+    self, Builtin, EphemeralOpaque, Handle, Name, PartialUniverse, ReadTicket, Universe,
+};
 
 #[track_caller]
 /// Serialize and deserialize and assert the value is equal.

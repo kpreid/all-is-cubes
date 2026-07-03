@@ -4,4 +4,4 @@ mod r#impl;
 mod widget;
 pub use widget::*;
 
-type Action = all_is_cubes::inv::EphemeralOpaque<dyn Fn() + Send + Sync>;
+type Action = all_is_cubes::universe::EphemeralOpaque<dyn Fn() + Send + Sync>;

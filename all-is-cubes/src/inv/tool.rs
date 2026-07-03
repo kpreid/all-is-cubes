@@ -3,8 +3,6 @@
 use alloc::borrow::Cow;
 use alloc::format;
 use alloc::string::{String, ToString};
-use alloc::sync::Arc;
-use core::{fmt, hash};
 
 use crate::block::{self, AIR, Block, Primitive, RotationPlacementRule};
 use crate::character::{self, Character, CharacterTransaction, Cursor};
@@ -603,98 +601,6 @@ impl From<op::OperationError> for ToolError {
 impl From<HandleError> for ToolError {
     fn from(value: HandleError) -> Self {
         ToolError::SpaceHandle(value)
-    }
-}
-
-/// A wrapper around a value which cannot be printed or serialized,
-/// used primarily to allow external functions to be called from objects
-/// within a [`Universe`](crate::universe::Universe).
-///
-/// TODO: relocate this type once we figure out where it belongs.
-/// TODO: Probably they should be their own kind of `UniverseMember`, so that they can
-/// be reattached in the future.
-pub struct EphemeralOpaque<T: ?Sized>(pub(crate) Option<Arc<T>>);
-
-impl<T: ?Sized> EphemeralOpaque<T> {
-    /// Constructs an [`EphemeralOpaque`] that holds the given value.
-    pub fn new(contents: Arc<T>) -> Self {
-        Self(Some(contents))
-    }
-
-    /// Constructs an [`EphemeralOpaque`] that is already defunct
-    /// (holds no value).
-    pub fn defunct() -> Self {
-        Self(None)
-    }
-
-    /// Get a reference to the value if it still exists.
-    pub fn try_ref(&self) -> Option<&T> {
-        self.0.as_deref()
-    }
-}
-
-impl<T: ?Sized> From<Arc<T>> for EphemeralOpaque<T> {
-    fn from(contents: Arc<T>) -> Self {
-        Self(Some(contents))
-    }
-}
-
-impl<T: ?Sized> fmt::Debug for EphemeralOpaque<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "EphemeralOpaque(..)")
-    }
-}
-impl<T: ?Sized> PartialEq for EphemeralOpaque<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.as_ref().map(Arc::as_ptr) == other.0.as_ref().map(Arc::as_ptr)
-        //self.0.as_ref().zip(other.0.as_ref())
-        //Arc::ptr_eq(&self.0, &other.0)
-    }
-}
-impl<T: ?Sized> Eq for EphemeralOpaque<T> {}
-impl<T: ?Sized> Clone for EphemeralOpaque<T> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-impl<T: ?Sized> hash::Hash for EphemeralOpaque<T> {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.0.as_ref().map(Arc::as_ptr).hash(state)
-    }
-}
-
-impl<T: ?Sized> VisitHandles for EphemeralOpaque<T> {
-    fn visit_handles(&self, _: &mut dyn HandleVisitor) {
-        // Being opaque, an `EphemeralOpaque` doesn’t count as containing any handles.
-        // In the future, we might replace it with something that *does* constitute a handle
-        // to a special “external connection” entity, and if we do that, this will change.
-    }
-}
-
-#[cfg(feature = "arbitrary")]
-#[mutants::skip]
-impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for EphemeralOpaque<T> {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(EphemeralOpaque(if u.arbitrary()? {
-            Some(Arc::new(u.arbitrary()?))
-        } else {
-            None
-        }))
-    }
-
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        Self::try_size_hint(depth).unwrap_or_default()
-    }
-    fn try_size_hint(
-        depth: usize,
-    ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
-        use arbitrary::{Arbitrary, size_hint};
-        size_hint::try_recursion_guard(depth, |depth| {
-            Ok(size_hint::and(
-                <bool as Arbitrary>::size_hint(depth),
-                <T as Arbitrary>::try_size_hint(depth)?,
-            ))
-        })
     }
 }
 

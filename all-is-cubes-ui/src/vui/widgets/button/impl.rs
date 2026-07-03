@@ -7,10 +7,10 @@ use core::fmt;
 use core::sync::atomic::{AtomicU8, Ordering::Relaxed};
 
 use all_is_cubes::behavior::BehaviorSetTransaction;
-use all_is_cubes::inv::EphemeralOpaque;
+use all_is_cubes::linking;
 use all_is_cubes::listen;
 use all_is_cubes::space::{self, SpaceBehaviorAttachment, SpaceTransaction};
-use all_is_cubes::{linking, universe};
+use all_is_cubes::universe;
 
 use crate::vui;
 
@@ -80,7 +80,7 @@ impl CommonController {
             effect: {
                 let recently_pressed = self.recently_pressed.clone();
 
-                EphemeralOpaque::new(Arc::new(move || {
+                Action::new(Arc::new(move || {
                     recently_pressed.store(Self::PRESSED_TIMER_DURATION, Relaxed);
                     if let Some(f) = action.try_ref() {
                         f();
