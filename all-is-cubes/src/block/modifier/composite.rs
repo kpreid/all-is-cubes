@@ -662,16 +662,17 @@ pub(in crate::block) fn render_inventory(
 
     let original_attributes = input.attributes().clone();
 
-    // TODO(inventory): clone necessary to avoid a borrow conflict
+    // This clone is necessary to avoid a borrow conflict between mutating `input` and calling
+    // `InvInBlock::icon_positions()`. Its effect is largely to clone one `Arc<[IconRow]>`.
     let config = input.attributes().inventory.clone();
     let icon_size_in_resolution = GridCoordinate::from(config.icon_size_in_resolution());
 
-    for (slot_index, placed_icon_bounds) in config.icon_positions(inventory.size()) {
+    for (slot_index, placed_icon_logical_bounds) in config.icon_positions(inventory.size()) {
         // TODO(inventory): icon_only_if_intrinsic is a kludge
         let Some(icon): Option<&Block> =
             inventory.get(slot_index).and_then(|slot| slot.icon_only_if_intrinsic())
         else {
-            // No slot to render at this position.
+            // No icon to render at this position.
             continue;
         };
 
@@ -680,23 +681,45 @@ pub(in crate::block) fn render_inventory(
             icon.evaluate_impl(filter)?
         };
 
-        // TODO(inventory): Instead of roughly downsampling the icons here, we should be
-        // asking evaluation to generate a lower resolution as per `config.render_resolution()`).
+        // TODO: Move more of this arithmetic into `InvInBlock`’s methods so that it can be
+        // tested in isolation.
+
+        // Scales coordinates from the icon coordinate system to the block coordinate system.
+        // Rounds towards zero (which is rounding down for the non-negative coordinates).
+        let scale_from_icon_to_block = |p| {
+            p * icon_size_in_resolution / GridCoordinate::from(icon_evaluated.voxels().resolution())
+                + placed_icon_logical_bounds.lower_bounds().to_vector()
+        };
+
+        // Intersection of `placed_icon_logical_bounds` with the data in `icon_evaluated`,
+        // in the coordinate system of the inventory-bearing block rather than the icon block.
+        let Some(placed_icon_data_bounds) = GridAab::from_lower_upper(
+            scale_from_icon_to_block(icon_evaluated.voxels().bounds().lower_bounds()),
+            scale_from_icon_to_block(icon_evaluated.voxels().bounds().upper_bounds()),
+        )
+        .intersection_cubes(placed_icon_logical_bounds) else {
+            // Icon’s data doesn't intersect the block's bounds.
+            continue;
+        };
+
+        // Compute the scale and offset to use for sampling the icon’s voxels.
         let resample_scale =
             GridCoordinate::from(icon_evaluated.voxels().resolution()) / icon_size_in_resolution;
         let resample_point_offset = GridVector::splat(resample_scale / 2);
+
+        // TODO(inventory): Instead of roughly downsampling the icons here, we should be
+        // asking evaluation to generate a lower resolution as per `config.render_resolution()`).
         icon_evaluated.set_voxels(Evoxels::from_many(
             config.render_resolution(),
-            Vol::from_fn(placed_icon_bounds, |render_cube| {
+            Vol::from_fn(placed_icon_data_bounds, |render_cube| {
                 // Translate to the coordinate system with the icon's lower corner as origin.
-                let translated: Cube = render_cube - placed_icon_bounds.lower_bounds().to_vector();
+                let translated: Cube =
+                    render_cube - placed_icon_logical_bounds.lower_bounds().to_vector();
                 // Scale to the icon's voxels' resolution.
                 let translated_and_scaled: Cube =
                     Cube::from(GridPoint::from(translated) * resample_scale);
-                icon_evaluated
-                    .voxels()
-                    .get(translated_and_scaled + resample_point_offset)
-                    .unwrap_or(Evoxel::AIR)
+                let sample_point = translated_and_scaled + resample_point_offset;
+                icon_evaluated.voxels()[sample_point]
             }),
         ));
 
