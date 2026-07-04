@@ -40,8 +40,13 @@ impl<M: MeshTypes> MeshOptions<M> {
 
         let transparency_format = match transparency {
             TransparencyOption::Surface => TransparencyFormat::Surfaces,
-            // TODO: Do this only if the textures support it (but we don't have MeshTypes here)
-            TransparencyOption::Volumetric => TransparencyFormat::BoundingBox,
+            TransparencyOption::Volumetric => {
+                if <M::Tile as texture::Tile>::SUPPORTS_3D {
+                    TransparencyFormat::BoundingBox
+                } else {
+                    TransparencyFormat::Surfaces
+                }
+            }
             TransparencyOption::Threshold(_) => TransparencyFormat::Surfaces,
             ref o => {
                 if cfg!(debug_assertions) {
@@ -107,7 +112,11 @@ impl<'a, M: MeshTypes> arbitrary::Arbitrary<'a> for MeshOptions<M> {
             // Note: This can produce nonsensical combinations of TransparencyOption and
             // TransparencyFormat, but that is probably harmless.
             transparency: u.arbitrary()?,
-            transparency_format: u.arbitrary()?,
+            transparency_format: if <M::Tile as texture::Tile>::SUPPORTS_3D {
+                u.arbitrary()?
+            } else {
+                TransparencyFormat::Surfaces
+            },
             ignore_voxels: u.arbitrary()?,
             _mt: PhantomData,
         })
@@ -122,7 +131,11 @@ impl<'a, M: MeshTypes> arbitrary::Arbitrary<'a> for MeshOptions<M> {
     ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
         Ok(arbitrary::size_hint::and_all(&[
             TransparencyOption::try_size_hint(depth)?,
-            TransparencyFormat::try_size_hint(depth)?,
+            if <M::Tile as texture::Tile>::SUPPORTS_3D {
+                TransparencyFormat::try_size_hint(depth)?
+            } else {
+                (0, Some(0))
+            },
             bool::try_size_hint(depth)?,
         ]))
     }
