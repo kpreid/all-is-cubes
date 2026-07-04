@@ -163,7 +163,7 @@ impl Analysis {
         analyze(
             block.resolution(),
             block.voxels().as_vol_ref(),
-            options.transparency_format(),
+            options.transparency_format,
             &mut Viz::Disabled,
         )
     }

@@ -135,6 +135,7 @@ fn exhaustive_geometry() {
     // TODO: add a constructor for MeshOptions for this
     let mesh_options = MeshOptions {
         transparency: TransparencyOption::Volumetric,
+        transparency_format: crate::TransparencyFormat::BoundingBox,
         ignore_voxels: false,
         _mt: PhantomData,
     };

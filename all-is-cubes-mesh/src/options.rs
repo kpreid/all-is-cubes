@@ -20,6 +20,10 @@ pub struct MeshOptions<M: MeshTypes> {
     /// Input to [`TransparencyOption::limit_alpha()`] applied to all vertex colors and voxels.
     pub(crate) transparency: TransparencyOption,
 
+    /// Determines what geometry should be produced when a mesh contains transparent voxels,
+    /// after filtering by [`TransparencyOption::limit_alpha()`].
+    pub(crate) transparency_format: TransparencyFormat,
+
     /// Ignore blocks' [`voxels`] data and use only the overall color.
     ///
     /// [`voxels`]: all_is_cubes::block::EvaluatedBlock::voxels
@@ -34,28 +38,7 @@ impl<M: MeshTypes> MeshOptions<M> {
     pub fn new(graphics_options: &GraphicsOptions) -> Self {
         let transparency = graphics_options.transparency.clone();
 
-        Self {
-            transparency,
-            ignore_voxels: false,
-            _mt: PhantomData,
-        }
-    }
-
-    /// Placeholder for use in tests which do not care about any of the
-    /// characteristics that are affected by options (yet).
-    #[doc(hidden)]
-    pub fn dont_care_for_test() -> Self {
-        Self {
-            transparency: TransparencyOption::Volumetric,
-            ignore_voxels: false,
-            _mt: PhantomData,
-        }
-    }
-
-    /// Determines what geometry should be produced when a mesh contains transparent voxels,
-    /// after filtering by [`TransparencyOption::limit_alpha()`].
-    pub(crate) fn transparency_format(&self) -> TransparencyFormat {
-        match self.transparency {
+        let transparency_format = match transparency {
             TransparencyOption::Surface => TransparencyFormat::Surfaces,
             // TODO: Do this only if the textures support it (but we don't have MeshTypes here)
             TransparencyOption::Volumetric => TransparencyFormat::BoundingBox,
@@ -67,6 +50,25 @@ impl<M: MeshTypes> MeshOptions<M> {
                     TransparencyFormat::Surfaces
                 }
             }
+        };
+
+        Self {
+            transparency,
+            transparency_format,
+            ignore_voxels: false,
+            _mt: PhantomData,
+        }
+    }
+
+    /// Placeholder for use in tests which do not care about any of the
+    /// characteristics that are affected by options (yet).
+    #[doc(hidden)]
+    pub fn dont_care_for_test() -> Self {
+        Self {
+            transparency: TransparencyOption::Volumetric,
+            transparency_format: TransparencyFormat::BoundingBox,
+            ignore_voxels: false,
+            _mt: PhantomData,
         }
     }
 }
@@ -76,10 +78,13 @@ impl<M: MeshTypes> PartialEq for MeshOptions<M> {
     fn eq(&self, other: &Self) -> bool {
         let Self {
             transparency,
+            transparency_format,
             ignore_voxels,
             _mt: _,
         } = self;
-        *transparency == other.transparency && *ignore_voxels == other.ignore_voxels
+        *transparency == other.transparency
+            && *transparency_format == other.transparency_format
+            && *ignore_voxels == other.ignore_voxels
     }
 }
 
@@ -87,6 +92,7 @@ impl<M: MeshTypes> Clone for MeshOptions<M> {
     fn clone(&self) -> Self {
         Self {
             transparency: self.transparency.clone(),
+            transparency_format: self.transparency_format,
             ignore_voxels: self.ignore_voxels,
             _mt: PhantomData,
         }
@@ -98,7 +104,10 @@ impl<M: MeshTypes> Clone for MeshOptions<M> {
 impl<'a, M: MeshTypes> arbitrary::Arbitrary<'a> for MeshOptions<M> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(MeshOptions {
+            // Note: This can produce nonsensical combinations of TransparencyOption and
+            // TransparencyFormat, but that is probably harmless.
             transparency: u.arbitrary()?,
+            transparency_format: u.arbitrary()?,
             ignore_voxels: u.arbitrary()?,
             _mt: PhantomData,
         })
@@ -111,10 +120,11 @@ impl<'a, M: MeshTypes> arbitrary::Arbitrary<'a> for MeshOptions<M> {
     fn try_size_hint(
         depth: usize,
     ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
-        Ok(arbitrary::size_hint::and(
+        Ok(arbitrary::size_hint::and_all(&[
             TransparencyOption::try_size_hint(depth)?,
+            TransparencyFormat::try_size_hint(depth)?,
             bool::try_size_hint(depth)?,
-        ))
+        ]))
     }
 }
 

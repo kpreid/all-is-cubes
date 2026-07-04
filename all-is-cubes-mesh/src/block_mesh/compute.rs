@@ -137,7 +137,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
         let analysis = analyze(
             resolution,
             voxels_array,
-            options.transparency_format(),
+            options.transparency_format,
             &mut viz,
         )?;
 
@@ -459,7 +459,7 @@ fn get_voxel_with_limit(
 ) -> Evoxel {
     let mut evoxel = *voxels.get(cube).unwrap_or(&Evoxel::AIR);
     // TODO: this is clunky and might get out of sync with other places that read voxels
-    evoxel.color = match options.transparency_format() {
+    evoxel.color = match options.transparency_format {
         TransparencyFormat::Surfaces => options.transparency.limit_alpha(evoxel.color),
         // If we are doing volumetric transparency where there is a special bounding-box mesh,
         // then when computing the rest of the mesh, ignore everything transparent.
