@@ -80,7 +80,7 @@ where
     startup_chunks_only: bool,
 
     /// The [`MeshOptions`] specified by the last [`Camera`] provided.
-    last_mesh_options: Option<MeshOptions>,
+    last_mesh_options: Option<MeshOptions<M>>,
 
     /// Most recent time at which we reset to no data.
     zero_time: time::Instant,

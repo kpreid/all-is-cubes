@@ -73,7 +73,7 @@ where
         &mut self,
         todo: &mut hashbrown::HashSet<BlockIndex>,
         space: &space::Read<'_>,
-        mesh_options: &MeshOptions,
+        mesh_options: &MeshOptions<M>,
         deadline: time::Deadline,
         render_data_updater: &F,
     ) -> VbmUpdateInfo
@@ -387,7 +387,7 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
         &mut self,
         block_index: BlockIndex,
         block: EvaluatedBlock,
-        mesh_options: MeshOptions,
+        mesh_options: MeshOptions<M>,
         jobs: &job::QueueOwner<M>,
     ) {
         let response_receiver = jobs.send_block_job(block_index, block, mesh_options);

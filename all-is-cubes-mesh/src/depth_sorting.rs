@@ -812,6 +812,7 @@ fn manhattan_length(v: Vector3D<PosCoord, MeshRel>) -> f32 {
 mod tests {
     use super::*;
     use crate::SpaceMesh;
+    use crate::testing::TextureMt;
     use all_is_cubes::block;
     use all_is_cubes::euclid::point3;
     use all_is_cubes::math::{Aab, Cube, GridAab};
@@ -929,8 +930,9 @@ mod tests {
         #[values(false, true)] transparent: bool,
         #[values(false, true)] force_non_rect: bool,
     ) {
-        let options =
-            &crate::MeshOptions::new(&all_is_cubes_render::camera::GraphicsOptions::default());
+        let options = &crate::MeshOptions::new(
+            &all_is_cubes_render::camera::GraphicsOptions::default(),
+        );
         let tex = crate::testing::Allocator::new();
         let opaque_block = &block::from_color!(1.0, 0.0, 0.0, 1.0);
         let maybe_transparent_block = if transparent {
@@ -954,7 +956,7 @@ mod tests {
                 mesh.force_non_rect_depth_sorting();
             }
         }
-        let mut space_mesh: SpaceMesh<crate::testing::TextureMt> =
+        let mut space_mesh: SpaceMesh<TextureMt> =
             SpaceMesh::new(&space.read(), space.bounds(), options, &*block_meshes);
 
         let result = space_mesh.depth_sort_for_view(DepthOrdering::WITHIN, point3(0., 0., 0.));

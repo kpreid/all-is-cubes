@@ -19,7 +19,8 @@ use crate::block_mesh::extend::{
 use crate::block_mesh::planar;
 use crate::texture::{self, Plane as _, Tile as _};
 use crate::{
-    BlockMesh, IndexSlice, Ixtend as _, MeshOptions, MeshTypes, OutOfMemory, SubMesh, Viz, vertex,
+    BlockMesh, IndexSlice, Ixtend as _, MeshOptions, MeshTypes, OutOfMemory, SubMesh,
+    TransparencyFormat, Viz, vertex,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -31,7 +32,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
     output: &mut BlockMesh<M>,
     block: &EvaluatedBlock,
     texture_allocator: &M::Alloc,
-    options: &MeshOptions,
+    options: &MeshOptions<M>,
     // Calls to `Viz` compile to nothing when the "rerun" feature is not enabled.
     mut viz: Viz,
 ) -> Result<(), OutOfMemory> {
@@ -182,7 +183,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     analysis: &Analysis,
     prefer_textures: bool,
     texture_allocator: &M::Alloc,
-    options: &MeshOptions,
+    options: &MeshOptions<M>,
     voxel_opacity_mask: &block::VoxelOpacityMask,
     viz: &mut Viz,
 ) -> Result<(), OutOfMemory> {
@@ -451,14 +452,18 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
 
 // -------------------------------------------------------------------------------------------------
 
-fn get_voxel_with_limit(voxels: Vol<&[Evoxel]>, cube: Cube, options: &MeshOptions) -> Evoxel {
+fn get_voxel_with_limit(
+    voxels: Vol<&[Evoxel]>,
+    cube: Cube,
+    options: &MeshOptions<impl MeshTypes>,
+) -> Evoxel {
     let mut evoxel = *voxels.get(cube).unwrap_or(&Evoxel::AIR);
-    // TODO: this is clunky and might get out of sync
+    // TODO: this is clunky and might get out of sync with other places that read voxels
     evoxel.color = match options.transparency_format() {
-        crate::TransparencyFormat::Surfaces => options.transparency.limit_alpha(evoxel.color),
+        TransparencyFormat::Surfaces => options.transparency.limit_alpha(evoxel.color),
         // If we are doing volumetric transparency where there is a special bounding-box mesh,
         // then when computing the rest of the mesh, ignore everything transparent.
-        crate::TransparencyFormat::BoundingBox => {
+        TransparencyFormat::BoundingBox => {
             if evoxel.color.fully_opaque() {
                 evoxel.color
             } else {

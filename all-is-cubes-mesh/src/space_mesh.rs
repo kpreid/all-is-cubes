@@ -55,7 +55,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     pub fn new<'p, P>(
         space: &space::Read<'_>,
         bounds: GridAab,
-        options: &MeshOptions,
+        options: &MeshOptions<M>,
         block_meshes: P,
     ) -> Self
     where
@@ -200,7 +200,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
         &mut self,
         space: &space::Read<'_>,
         bounds: GridAab,
-        options: &MeshOptions,
+        options: &MeshOptions<M>,
         block_meshes: P,
     ) where
         P: GetBlockMesh<'p, M>,
@@ -222,7 +222,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     pub(crate) fn compute_from_snapshot<'p, P>(
         &mut self,
         snapshot: &Snapshot,
-        options: &MeshOptions,
+        options: &MeshOptions<M>,
         block_meshes: P,
     ) where
         P: GetBlockMesh<'p, M>,
@@ -239,7 +239,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
         &mut self,
         space_data_source: impl Fn(Cube) -> Option<BlockIndex>,
         bounds: GridAab,
-        _options: &MeshOptions,
+        _options: &MeshOptions<M>,
         mut block_meshes: P,
     ) where
         P: GetBlockMesh<'p, M>,

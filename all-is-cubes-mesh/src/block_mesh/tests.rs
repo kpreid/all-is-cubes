@@ -1,6 +1,8 @@
 //! Stand-alone tests of [`BlockMesh`].
 //! See [`crate::tests`] for additional tests.
 
+use core::marker::PhantomData;
+
 use alloc::vec::Vec;
 
 use exhaust::Exhaust;
@@ -13,12 +15,13 @@ use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
+use crate::testing::NoTextureMt;
 use crate::tests::test_block_mesh;
 use crate::texture::NoTextures;
 use crate::{Aabbs, BlockMesh, MeshOptions};
 use crate::{BlockVertex, Coloring};
 
-type TestMesh = BlockMesh<crate::testing::NoTextureMt>;
+type TestMesh = BlockMesh<NoTextureMt>;
 
 /// Test that `default()` returns an empty mesh and the characteristics of such a mesh.
 #[test]
@@ -129,9 +132,11 @@ fn exhaustive_geometry() {
     let resolution = Resolution::R2;
     let partial = block::from_color!(Rgba::new(0.0, 1.0, 0.0, 0.5));
     let opaque = block::from_color!(Rgba::WHITE);
+    // TODO: add a constructor for MeshOptions for this
     let mesh_options = MeshOptions {
         transparency: TransparencyOption::Volumetric,
         ignore_voxels: false,
+        _mt: PhantomData,
     };
 
     // Block definition.

@@ -140,7 +140,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 fn iter_reused_block_mesh(
     b: &mut criterion::Bencher<'_>,
     universe: &Universe,
-    options: &MeshOptions,
+    options: &MeshOptions<Mt>,
     block: &Block,
 ) {
     let evaluated = block.evaluate(universe.read_ticket()).unwrap();
@@ -155,7 +155,7 @@ fn iter_reused_block_mesh(
 fn iter_new_block_mesh(
     b: &mut criterion::Bencher<'_>,
     universe: &Universe,
-    options: &MeshOptions,
+    options: &MeshOptions<Mt>,
     block: &Block,
 ) {
     let evaluated = block.evaluate(universe.read_ticket()).unwrap();
@@ -540,7 +540,7 @@ fn planar_benches(c: &mut Criterion) {
 // Helpers, not benches
 
 fn checkerboard_space_bench_setup(
-    options: MeshOptions,
+    options: MeshOptions<Mt>,
     block: Block,
     read_ticket: universe::ReadTicket<'_>,
 ) -> SpaceMeshIngredients {
@@ -597,11 +597,11 @@ fn tetrahedron_block(universe: &mut Universe, resolution: block::Resolution) -> 
 struct SpaceMeshIngredients {
     space: Space,
     block_meshes: BlockMeshes<Mt>,
-    options: MeshOptions,
+    options: MeshOptions<Mt>,
 }
 
 impl SpaceMeshIngredients {
-    fn new(options: MeshOptions, space: Space) -> Self {
+    fn new(options: MeshOptions<Mt>, space: Space) -> Self {
         let block_meshes = mesh::block_meshes_for_space(&space.read(), &Allocator::new(), &options);
 
         SpaceMeshIngredients {

@@ -152,7 +152,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         &mut self,
         chunk_todo: &mut ChunkTodo,
         space: &space::Read<'_>,
-        options: &MeshOptions,
+        options: &MeshOptions<M>,
         block_meshes: &dynamic::VersionedBlockMeshes<M>,
     ) -> bool {
         // let compute_start: Option<I> = dynamic::LOG_CHUNK_UPDATES.then(Instant::now);

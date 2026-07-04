@@ -1,4 +1,5 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
@@ -14,9 +15,8 @@ use crate::{Vertex, texture};
 /// to make the API future-proof against additional configuration being needed.
 ///
 /// See also [`MeshTypes`] for statically chosen properties of meshes.
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct MeshOptions {
+#[derive(Debug)]
+pub struct MeshOptions<M: MeshTypes> {
     /// Input to [`TransparencyOption::limit_alpha()`] applied to all vertex colors and voxels.
     pub(crate) transparency: TransparencyOption,
 
@@ -24,14 +24,20 @@ pub struct MeshOptions {
     ///
     /// [`voxels`]: all_is_cubes::block::EvaluatedBlock::voxels
     pub(crate) ignore_voxels: bool,
+
+    /// Does not own an M but depends on it.
+    pub(crate) _mt: PhantomData<fn(&M)>,
 }
 
-impl MeshOptions {
+impl<M: MeshTypes> MeshOptions<M> {
     /// Take the options relevant to mesh generation from the given [`GraphicsOptions`].
     pub fn new(graphics_options: &GraphicsOptions) -> Self {
+        let transparency = graphics_options.transparency.clone();
+
         Self {
-            transparency: graphics_options.transparency.clone(),
+            transparency,
             ignore_voxels: false,
+            _mt: PhantomData,
         }
     }
 
@@ -42,6 +48,7 @@ impl MeshOptions {
         Self {
             transparency: TransparencyOption::Volumetric,
             ignore_voxels: false,
+            _mt: PhantomData,
         }
     }
 
@@ -61,6 +68,53 @@ impl MeshOptions {
                 }
             }
         }
+    }
+}
+
+impl<M: MeshTypes> Eq for MeshOptions<M> {}
+impl<M: MeshTypes> PartialEq for MeshOptions<M> {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            transparency,
+            ignore_voxels,
+            _mt: _,
+        } = self;
+        *transparency == other.transparency && *ignore_voxels == other.ignore_voxels
+    }
+}
+
+impl<M: MeshTypes> Clone for MeshOptions<M> {
+    fn clone(&self) -> Self {
+        Self {
+            transparency: self.transparency.clone(),
+            ignore_voxels: self.ignore_voxels,
+            _mt: PhantomData,
+        }
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+#[mutants::skip]
+impl<'a, M: MeshTypes> arbitrary::Arbitrary<'a> for MeshOptions<M> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(MeshOptions {
+            transparency: u.arbitrary()?,
+            ignore_voxels: u.arbitrary()?,
+            _mt: PhantomData,
+        })
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        Self::try_size_hint(depth).unwrap_or_default()
+    }
+
+    fn try_size_hint(
+        depth: usize,
+    ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+        Ok(arbitrary::size_hint::and(
+            TransparencyOption::try_size_hint(depth)?,
+            bool::try_size_hint(depth)?,
+        ))
     }
 }
 

@@ -281,7 +281,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     pub fn new(
         block: &EvaluatedBlock,
         texture_allocator: &M::Alloc,
-        options: &MeshOptions,
+        options: &MeshOptions<M>,
     ) -> Self {
         let mut new_self = Self::default();
         new_self.compute(block, texture_allocator, options);
@@ -320,7 +320,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         &mut self,
         block: &EvaluatedBlock,
         texture_allocator: &M::Alloc,
-        options: &MeshOptions,
+        options: &MeshOptions<M>,
     ) {
         match compute::compute_block_mesh(self, block, texture_allocator, options, Viz::disabled())
         {
@@ -338,7 +338,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         &mut self,
         block: &EvaluatedBlock,
         texture_allocator: &M::Alloc,
-        options: &MeshOptions,
+        options: &MeshOptions<M>,
         viz: Viz,
     ) {
         match compute::compute_block_mesh(self, block, texture_allocator, options, viz) {
@@ -599,7 +599,7 @@ impl<V: Vertex> HeapUsage for SubMesh<V> {
 pub fn block_meshes_for_space<M: MeshTypes>(
     space: &space::Read<'_>,
     texture_allocator: &M::Alloc,
-    options: &MeshOptions,
+    options: &MeshOptions<M>,
 ) -> BlockMeshes<M>
 where
     // These bounds are redundant with `MeshTypes` but the compiler needs to see them

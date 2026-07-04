@@ -154,9 +154,11 @@ impl Analysis {
     //---
     // Note: This function is only for public use; internally we short-circuit some cases to
     // avoid building the analysis at all.
-    pub fn analyze(
+    //
+    // TODO: Consider taking `TransparencyFormat` directly to avoid false dependencies.
+    pub fn analyze<M: crate::MeshTypes>(
         block: &block::EvaluatedBlock,
-        options: &crate::MeshOptions,
+        options: &crate::MeshOptions<M>,
     ) -> Result<Self, OutOfMemory> {
         analyze(
             block.resolution(),

@@ -86,7 +86,7 @@ pub(crate) fn block_to_stl_triangles(block: &block::EvaluatedBlock) -> Vec<Trian
     space_mesh_to_triangles(&mesh::SpaceMesh::from(&block_mesh))
 }
 
-fn mesh_options_for_stl() -> mesh::MeshOptions {
+fn mesh_options_for_stl() -> mesh::MeshOptions<StlMt> {
     let mut g = GraphicsOptions::default();
     g.transparency = all_is_cubes_render::camera::TransparencyOption::Threshold(zo32(0.01));
     mesh::MeshOptions::new(&g)

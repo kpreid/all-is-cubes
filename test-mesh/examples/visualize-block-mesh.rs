@@ -18,6 +18,7 @@ use all_is_cubes_content as content;
 use all_is_cubes_mesh as mesh;
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 use content::DemoBlocks;
+use mesh::testing::NoTextureMt as Mt;
 
 /// Private — do not use.
 use all_is_cubes::{arcstr, rerun_glue as rg};
@@ -108,14 +109,14 @@ fn show(
     destination: rg::Destination,
     position: Point3D<f32, ()>,
     evaluated: &EvaluatedBlock,
-    options: &mesh::MeshOptions,
+    options: &mesh::MeshOptions<Mt>,
 ) {
     destination.log_static(
         &rg::entity_path![],
         &rg::archetypes::Transform3D::from_translation(rg::convert_vec(position.to_vector())),
     );
 
-    let mut mesh = mesh::BlockMesh::<mesh::testing::NoTextureMt>::default();
+    let mut mesh = mesh::BlockMesh::<Mt>::default();
     mesh.compute_with_viz(
         evaluated,
         &mesh::texture::NoTextures,

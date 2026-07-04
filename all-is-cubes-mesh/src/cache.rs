@@ -25,7 +25,7 @@ use crate::{BlockMesh, MeshOptions, MeshTypes};
 #[derive(Clone, Debug)]
 pub(crate) struct BlockMeshCache<M: MeshTypes> {
     storage: Arc<Mutex<Storage<M>>>,
-    options: MeshOptions,
+    options: MeshOptions<M>,
     texture_allocator: M::Alloc,
 }
 
@@ -35,7 +35,7 @@ struct Storage<M: MeshTypes> {
 }
 
 impl<M: MeshTypes> BlockMeshCache<M> {
-    pub fn new(options: MeshOptions, texture_allocator: M::Alloc) -> Self {
+    pub fn new(options: MeshOptions<M>, texture_allocator: M::Alloc) -> Self {
         Self {
             storage: Arc::new(Mutex::new(Storage {
                 blocks: HashMap::new(),

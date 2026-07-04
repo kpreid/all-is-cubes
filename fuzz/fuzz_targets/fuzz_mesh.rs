@@ -14,7 +14,7 @@ struct SpaceIngredients {
 
 libfuzzer_sys::fuzz_target!(|input: ArbitraryWithUniverse<(
     SpaceIngredients,
-    mesh::MeshOptions,
+    mesh::MeshOptions<mesh::testing::TextureMt>,
     [mesh::Position; 2],
 )>| {
     let (sing, options, view_positions) = input.contents;

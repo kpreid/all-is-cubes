@@ -202,7 +202,7 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
         &self,
         block_index: BlockIndex,
         block: EvaluatedBlock,
-        mesh_options: MeshOptions,
+        mesh_options: MeshOptions<M>,
     ) -> Receiver<CompletedMeshJob<M>> {
         let (response_sender, receiver) = oneshot::channel();
         self.job_queue_sender
@@ -225,7 +225,7 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
         &self,
         chunk_pos: ChunkPos<CHUNK_SIZE>,
         // TODO: actual args
-        mesh_options: MeshOptions,
+        mesh_options: MeshOptions<M>,
     ) -> Receiver<CompletedMeshJob<M>> {
         let (response_sender, receiver) = oneshot::channel();
         self.job_queue_sender
@@ -354,7 +354,7 @@ struct CompletedJobShell<T> {
 /// Inputs for a calculation stored in the [`MeshJobQueue`].
 struct MeshJob<M: DynamicMeshTypes> {
     kind: JobInputData,
-    mesh_options: MeshOptions,
+    mesh_options: MeshOptions<M>,
 
     counter_ticket: state::Ticket,
 
