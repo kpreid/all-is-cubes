@@ -14,7 +14,7 @@ use core::ops::{Deref, DerefMut};
 )]
 use alloc::vec::Vec;
 
-use euclid::{Point3D, Size3D, vec3};
+use euclid::{Point3D, Size3D, point3, size3, vec3};
 use manyfmt::Refmt as _;
 
 use crate::math::{Axis, Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector, u32size};
@@ -121,6 +121,21 @@ impl<O> Vol<(), O> {
 }
 
 impl Vol<(), ZMaj> {
+    /// Volume of the unit cube from `[0, 0, 0]` to `[1, 1, 1]`, with no data.
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{GridAab, Vol};
+    ///
+    /// assert_eq!(Vol::ORIGIN_CUBE.bounds(), GridAab::ORIGIN_CUBE);
+    ///
+    /// assert_eq!(
+    ///     Vol::ORIGIN_CUBE.with_elements(vec!["hello"]).unwrap(),
+    ///     Vol::from_element("hello"),
+    /// );
+    /// ```
+    pub const ORIGIN_CUBE: Self = Vol::tiny(point3(0, 0, 0), size3(1, 1, 1), ZMaj);
+
     /// Divide `self` into two approximately equal-sized parts which, if they had elements, would
     /// each be contiguous in the linear ordering.
     ///
