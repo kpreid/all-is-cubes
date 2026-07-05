@@ -37,12 +37,7 @@ fn inventory_preserves_attributes() {
         1,
         R2,
         R2,
-        vec![inv::IconRow {
-            first_slot: 0,
-            count: 1,
-            origin: point3(0, 0, 0),
-            stride: vec3(0, 0, 0),
-        }],
+        vec![inv::IconRow::new(0..1, point3(0, 0, 0), vec3(0, 0, 0))],
     );
     let inventory_block = Block::builder()
         .display_name("Inventory")

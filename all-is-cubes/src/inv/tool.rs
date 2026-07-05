@@ -433,7 +433,7 @@ impl<'ticket> ToolInput<'ticket> {
 
             // TODO: there should probably be one canonical implementation of "add the inventory
             // modifier" between this and `EvaluatedBlock::with_inventory()`.
-            let inventory_size = new_ev.attributes().inventory.size;
+            let inventory_size = new_ev.attributes().inventory.inventory_size();
             if inventory_size > 0 {
                 new_block = new_block.with_modifier(inv::Inventory::new(inventory_size));
             }

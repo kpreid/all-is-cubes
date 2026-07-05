@@ -486,7 +486,7 @@ mod fluff {
 
 mod inv {
     use super::*;
-    use crate::inv::{self, Inventory, Slot, Tool};
+    use crate::inv::{Inventory, Slot, Tool};
 
     impl Serialize for Inventory {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -580,73 +580,7 @@ mod inv {
         }
     }
 
-    impl From<&inv::InvInBlock> for schema::InvInBlockSerV1 {
-        fn from(value: &inv::InvInBlock) -> Self {
-            let inv::InvInBlock {
-                size,
-                icon_scale,
-                icon_resolution,
-                ref icon_rows,
-            } = *value;
-            schema::InvInBlockSerV1 {
-                size,
-                icon_scale,
-                icon_resolution,
-                icon_rows: icon_rows.iter().map(schema::IconRowSerV1::from).collect(),
-            }
-        }
-    }
-
-    impl From<schema::InvInBlockSerV1> for inv::InvInBlock {
-        fn from(value: schema::InvInBlockSerV1) -> Self {
-            let schema::InvInBlockSerV1 {
-                size,
-                icon_scale,
-                icon_resolution,
-                icon_rows,
-            } = value;
-            inv::InvInBlock {
-                size,
-                icon_scale,
-                icon_resolution,
-                icon_rows: icon_rows.into_iter().map(inv::IconRow::from).collect(),
-            }
-        }
-    }
-
-    impl From<&inv::IconRow> for schema::IconRowSerV1 {
-        fn from(value: &inv::IconRow) -> Self {
-            let inv::IconRow {
-                first_slot,
-                count,
-                origin,
-                stride,
-            } = *value;
-            schema::IconRowSerV1 {
-                first_slot,
-                count,
-                origin: origin.into(),
-                stride: stride.into(),
-            }
-        }
-    }
-
-    impl From<schema::IconRowSerV1> for inv::IconRow {
-        fn from(value: schema::IconRowSerV1) -> Self {
-            let schema::IconRowSerV1 {
-                first_slot,
-                count,
-                origin,
-                stride,
-            } = value;
-            inv::IconRow {
-                first_slot,
-                count,
-                origin: origin.into(),
-                stride: stride.into(),
-            }
-        }
-    }
+    // Since `InvInBlock` has private fields, its serialization is in its own module.
 }
 
 mod op {

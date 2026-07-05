@@ -664,6 +664,7 @@ pub(in crate::block) fn render_inventory(
 
     // TODO(inventory): clone necessary to avoid a borrow conflict
     let config = input.attributes().inventory.clone();
+    let icon_size_in_resolution = GridCoordinate::from(config.icon_size_in_resolution());
 
     for (slot_index, placed_icon_bounds) in config.icon_positions(inventory.size()) {
         // TODO(inventory): icon_only_if_intrinsic is a kludge
@@ -680,13 +681,12 @@ pub(in crate::block) fn render_inventory(
         };
 
         // TODO(inventory): Instead of roughly downsampling the icons here, we should be
-        // asking evaluation to generate a lower resolution as per `config.icon_resolution`).
-        let resample_scale = GridCoordinate::from(icon_evaluated.voxels().resolution())
-            * GridCoordinate::from(config.icon_scale)
-            / GridCoordinate::from(config.icon_resolution);
+        // asking evaluation to generate a lower resolution as per `config.render_resolution()`).
+        let resample_scale =
+            GridCoordinate::from(icon_evaluated.voxels().resolution()) / icon_size_in_resolution;
         let resample_point_offset = GridVector::splat(resample_scale / 2);
         icon_evaluated.set_voxels(Evoxels::from_many(
-            config.icon_resolution,
+            config.render_resolution(),
             Vol::from_fn(placed_icon_bounds, |render_cube| {
                 // Translate to the coordinate system with the icon's lower corner as origin.
                 let translated: Cube = render_cube - placed_icon_bounds.lower_bounds().to_vector();

@@ -37,34 +37,33 @@ impl From<Inventory> for Modifier {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct InvInBlock {
     /// Number of slots the inventory should have.
-    pub(crate) size: Ix,
+    inventory_size: Ix,
 
     /// Scale factor by which to scale down the inventory icon blocks,
     /// relative to the bounds of the block in which they are being displayed.
-    pub(crate) icon_scale: Resolution,
+    icon_scale: Resolution,
 
     /// Maximum resolution of inventory icons, and resolution in which the `icon_rows`
     /// position coordinates are expressed.
     ///
     /// [`Modifier::Inventory`] is guaranteed not to increase the block resolution
     /// beyond this resolution.
-    pub(crate) icon_resolution: Resolution,
+    render_resolution: Resolution,
 
     // TODO: following the rule for all `BlockAttributes` being cheap to clone,
     // this should be `Arc<[IconRow]>`, but that's mildly inconvenient for `Arbitrary`, so
     // I'm not bothering for this first iteration.
     // (But maybe we should be handling that at a higher level of the structure.)
-    pub(crate) icon_rows: Vec<IconRow>,
+    icon_rows: Vec<IconRow>,
 }
 
 /// Positioning of a displayed row of inventory icons; part of [`InvInBlock`].
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct IconRow {
-    // visible for serialization -- TODO: improve on that
-    pub(crate) first_slot: Ix,
-    pub(crate) count: Ix,
-    pub(crate) origin: GridPoint,
-    pub(crate) stride: GridVector,
+    first_slot: Ix,
+    count: Ix,
+    origin: GridPoint,
+    stride: GridVector,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -72,9 +71,9 @@ pub struct IconRow {
 impl InvInBlock {
     /// Value appropriate for “normal” blocks which should not carry inventories.
     pub const EMPTY: Self = Self {
-        size: 0,
-        icon_scale: Resolution::R1,      // arbitrary
-        icon_resolution: Resolution::R1, // arbitrary
+        inventory_size: 0,
+        icon_scale: Resolution::R1,        // arbitrary
+        render_resolution: Resolution::R1, // arbitrary
         icon_rows: Vec::new(),
     };
 
@@ -83,30 +82,81 @@ impl InvInBlock {
     /// * `inventory_size` is the number of slots the inventory should have.
     /// * `icon_scale` is the scale factor by which to scale down the inventory icon blocks,
     ///   relative to the bounds of the block in which they are being displayed.
-    /// * `icon_resolution` is the maximum resolution of inventory icons, and resolution in which
+    ///   It must be no greater than `render_resolution`.
+    /// * `render_resolution` is the maximum resolution of inventory icons, and resolution in which
     ///   the `icon_rows`’ position coordinates are expressed.
     ///   [`Modifier::Inventory`] is guaranteed not to increase the block resolution
     ///   beyond this resolution.
     /// * `icon_rows` specifies where in the block the inventory icons should be displayed.
     ///   It may be empty in order to keep the inventory invisible.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `icon_scale` is greater than `render_resolution`.
+    #[track_caller]
     pub fn new(
         inventory_size: Ix,
         icon_scale: Resolution,
-        icon_resolution: Resolution,
+        render_resolution: Resolution,
         icon_rows: impl IntoIterator<Item = IconRow>,
     ) -> Self {
+        assert!(icon_scale <= render_resolution);
         Self {
-            size: inventory_size,
+            inventory_size,
             icon_scale,
-            icon_resolution,
+            render_resolution,
             icon_rows: icon_rows.into_iter().collect(),
         }
     }
 
-    /// Returns the size of a single icon, in the voxel coordinate system with resolution
-    /// `self.icon_resolution`.
-    pub(crate) fn icon_size(&self) -> GridSize {
-        GridSize::splat((self.icon_resolution / self.icon_scale).unwrap_or(Resolution::R1).into())
+    /// Returns the number of slots which inventories created based on this configuration will have.
+    pub fn inventory_size(&self) -> Ix {
+        self.inventory_size
+    }
+
+    /// Returns the scale factor by which to scale down the inventory icon blocks,
+    /// relative to the bounds of the block in which they are being displayed.
+    ///
+    /// This is always less than or equal to [`render_resolution`][Self::render_resolution].
+    #[inline]
+    pub fn icon_scale(&self) -> Resolution {
+        self.icon_scale
+    }
+
+    /// Returns the maximum resolution of inventory icons in the block,
+    /// which is also the resolution in which the `icon_rows`’ position coordinates are expressed.
+    ///
+    /// This is always greater than or equal to [`icon_scale`][Self::icon_scale].
+    #[inline]
+    pub fn render_resolution(&self) -> Resolution {
+        self.render_resolution
+    }
+
+    /// Returns the size of a single rendered icon, in the voxel coordinate system with resolution
+    /// [`render_resolution`][Self::render_resolution].
+    ///
+    /// This is equal to `self.render_resolution() / self.icon_scale()`.
+    #[inline]
+    pub fn icon_size_in_resolution(&self) -> Resolution {
+        #[cold]
+        #[inline(never)]
+        fn panic_invalid_icon_size(this: &InvInBlock) -> ! {
+            unreachable!("InvInBlock icon_scale invariant broken: {this:?}")
+        }
+
+        match self.render_resolution / self.icon_scale {
+            Some(size) => size,
+            None => panic_invalid_icon_size(self),
+        }
+    }
+
+    /// Returns the [`IconRow`]s, which specify where in the block to render its inventory.
+    ///
+    /// If this is empty, then none of the inventory is rendered, and the other icon configuration
+    /// has no effect.
+    #[inline]
+    pub fn icon_rows(&self) -> &[IconRow] {
+        &self.icon_rows
     }
 
     /// Returns which inventory slots should be rendered as icons, and the cubical bounds in which
@@ -119,7 +169,9 @@ impl InvInBlock {
         &self,
         inventory_size: Ix,
     ) -> impl Iterator<Item = (Ix, GridAab)> + '_ {
-        let icon_size: GridSize = self.icon_size();
+        let icon_size: GridSize = GridSize::splat(
+            (self.render_resolution / self.icon_scale).unwrap_or(Resolution::R1).into(),
+        );
 
         self.icon_rows.iter().flat_map(move |row| {
             (0..row.count)
@@ -146,7 +198,9 @@ impl InvInBlock {
                     //
                     // TODO: it would be more efficient to stop looping exactly when the next icon
                     // can’t possibly intersect.
-                    if bounds.intersection_cubes(GridAab::for_block(self.icon_resolution)).is_some()
+                    if bounds
+                        .intersection_cubes(GridAab::for_block(self.render_resolution))
+                        .is_some()
                     {
                         Some((slot_index, bounds))
                     } else {
@@ -158,19 +212,19 @@ impl InvInBlock {
 
     /// Combine the two inputs to form one which has the size and display of both.
     pub(crate) fn concatenate(self, other: InvInBlock) -> InvInBlock {
-        if self.size == 0 {
+        if self.inventory_size == 0 {
             other
         } else {
             Self {
-                size: self.size.saturating_add(other.size),
+                inventory_size: self.inventory_size.saturating_add(other.inventory_size),
                 // TODO(inventory): scale and resolution need adaptation
                 icon_scale: self.icon_scale,
-                icon_resolution: self.icon_resolution,
+                render_resolution: self.render_resolution,
                 icon_rows: self
                     .icon_rows
                     .into_iter()
                     .chain(other.icon_rows.into_iter().filter_map(|mut row| {
-                        row.first_slot = row.first_slot.checked_add(self.size)?;
+                        row.first_slot = row.first_slot.checked_add(self.inventory_size)?;
                         Some(row)
                     }))
                     .collect(),
@@ -193,9 +247,9 @@ impl Default for InvInBlock {
 impl crate::universe::VisitHandles for InvInBlock {
     fn visit_handles(&self, _: &mut dyn crate::universe::HandleVisitor) {
         let Self {
-            size: _,
+            inventory_size: _,
             icon_scale: _,
-            icon_resolution: _,
+            render_resolution: _,
             icon_rows: _,
         } = self;
     }
@@ -209,18 +263,18 @@ impl crate::block::BlRotate for InvInBlock {
 
     fn rotate(self, rotation: GridRotation) -> Self {
         let Self {
-            size,
+            inventory_size: size,
             icon_scale,
-            icon_resolution,
+            render_resolution,
             icon_rows,
         } = self;
-        let transform = rotation.to_positive_octant_transform(icon_resolution.into());
+        let transform = rotation.to_positive_octant_transform(render_resolution.into());
         let icon_size =
-            GridCoordinate::from((icon_resolution / icon_scale).unwrap_or(Resolution::R1));
+            GridCoordinate::from((render_resolution / icon_scale).unwrap_or(Resolution::R1));
         Self {
-            size,
+            inventory_size: size,
             icon_scale,
-            icon_resolution,
+            render_resolution,
             icon_rows: icon_rows
                 .into_iter()
                 .filter_map(|row| row.rotate(transform, icon_size))
@@ -257,6 +311,30 @@ impl IconRow {
             origin,
             stride,
         }
+    }
+
+    /// Returns the range of inventory slots to be rendered.
+    #[inline]
+    pub fn slot_range(&self) -> core::range::Range<Ix> {
+        core::range::Range {
+            start: self.first_slot,
+            end: self.first_slot.wrapping_add(self.count), // cannot overflow
+        }
+    }
+
+    /// Returns the lower corner of the location within the voxels where the first slot
+    /// in [`slot_range`][Self::slot_range] is to be displayed.
+    ///
+    /// The scale of these coordinates is determined by the [`InvInBlock::render_resolution()`].
+    pub fn origin(&self) -> GridPoint {
+        self.origin
+    }
+
+    /// Returns the translation between adjacent slots in this row’s range.
+    ///
+    /// The scale of these coordinates is determined by the [`InvInBlock::render_resolution()`].
+    pub fn stride(&self) -> GridVector {
+        self.stride
     }
 
     /// Rotate this row.
@@ -296,6 +374,80 @@ impl fmt::Debug for IconRow {
             origin = origin.refmt(&ConciseDebug),
             stride = stride.refmt(&ConciseDebug)
         )
+    }
+}
+
+#[cfg(feature = "save")]
+mod serde {
+    use crate::inv;
+    use crate::save::schema;
+
+    impl From<&inv::InvInBlock> for schema::InvInBlockSerV1 {
+        fn from(value: &inv::InvInBlock) -> Self {
+            let inv::InvInBlock {
+                inventory_size,
+                icon_scale,
+                render_resolution,
+                ref icon_rows,
+            } = *value;
+            schema::InvInBlockSerV1 {
+                size: inventory_size,
+                icon_scale,
+                icon_resolution: render_resolution,
+                icon_rows: icon_rows.iter().map(schema::IconRowSerV1::from).collect(),
+            }
+        }
+    }
+
+    impl From<schema::InvInBlockSerV1> for inv::InvInBlock {
+        fn from(value: schema::InvInBlockSerV1) -> Self {
+            let schema::InvInBlockSerV1 {
+                size: inventory_size,
+                icon_scale,
+                icon_resolution: render_resolution,
+                icon_rows,
+            } = value;
+            inv::InvInBlock {
+                inventory_size,
+                icon_scale,
+                render_resolution,
+                icon_rows: icon_rows.into_iter().map(inv::IconRow::from).collect(),
+            }
+        }
+    }
+
+    impl From<&inv::IconRow> for schema::IconRowSerV1 {
+        fn from(value: &inv::IconRow) -> Self {
+            let inv::IconRow {
+                first_slot,
+                count,
+                origin,
+                stride,
+            } = *value;
+            schema::IconRowSerV1 {
+                first_slot,
+                count,
+                origin: origin.into(),
+                stride: stride.into(),
+            }
+        }
+    }
+
+    impl From<schema::IconRowSerV1> for inv::IconRow {
+        fn from(value: schema::IconRowSerV1) -> Self {
+            let schema::IconRowSerV1 {
+                first_slot,
+                count,
+                origin,
+                stride,
+            } = value;
+            inv::IconRow {
+                first_slot,
+                count,
+                origin: origin.into(),
+                stride: stride.into(),
+            }
+        }
     }
 }
 
@@ -362,9 +514,9 @@ mod tests {
             indoc::indoc! {
                 "
                 InvInBlock {
-                    size: 9,
+                    inventory_size: 9,
                     icon_scale: 4,
-                    icon_resolution: 16,
+                    render_resolution: 16,
                     icon_rows: [
                         IconRow(0..3 @ (+1, +1, +1) + (+5, +0, +0)),
                         IconRow(3..6 @ (+1, +1, +6) + (+5, +0, +0)),
@@ -415,9 +567,9 @@ mod tests {
     #[test]
     fn icon_positions_are_truncated_to_inventory_size() {
         let iib = InvInBlock {
-            size: 1,
+            inventory_size: 1,
             icon_scale: R4,
-            icon_resolution: R16,
+            render_resolution: R16,
             icon_rows: vec![
                 IconRow {
                     first_slot: 0,
@@ -448,9 +600,9 @@ mod tests {
     #[test]
     fn icon_positions_are_truncated_to_block_bounds() {
         let iib = InvInBlock {
-            size: 1,
+            inventory_size: 1,
             icon_scale: R4,
-            icon_resolution: R8,
+            render_resolution: R8,
             icon_rows: vec![IconRow {
                 first_slot: 0,
                 count: 100,
@@ -459,7 +611,7 @@ mod tests {
             }],
         };
 
-        assert_eq!(iib.icon_size().width, 2, "assumption check");
+        assert_eq!(iib.icon_size_in_resolution(), R2, "assumption check");
         assert_eq!(
             iib.icon_positions(999).take(100).collect::<Vec<_>>(),
             vec![

@@ -10,6 +10,7 @@
       New items `block::Animation` and `block::BlockDef::new_animated()` support this functionality.
     * `block::SetAttribute` is a modifier which overrides a single attribute of a block, instead of all of them.
       It replaces `Modifier::Attributes`.
+    * `inv::InvInBlock` and `inv::IconRow` now have a complete set of getters for reading their data.
     * `math::Aab::expand_or_shrink()`
     * `math::Aab::face_coordinate_on_axis()`, a non-negating version of `face_coordinate()`.
     * `math::FaceMap::{as_array, as_array_mut}()`
@@ -52,6 +53,7 @@
       * `block::text::{Text, TextBuilder}` are now in the top-level `block` module.
     * `Handle::<BlockDef>::read()` no longer returns a `&BlockDef`, but a separate `Read` type.
     * `chunking::point_to_chunk()` now returns `None` in case of out-of-range input instead of panicking.
+    * `inv::InvInBlock::new()` now enforces invariants about its input.
     * `math::Aab::expand()` now takes `PositiveSign<f64>` instead of `f64` and cannot be used to shrink the box.
       Use `Aab::expand_or_shrink()` instead.
     * `universe::Universe` no longer implements `Default` and `Deserialize`; instead, `Box<Universe>` does.
