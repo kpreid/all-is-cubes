@@ -1,12 +1,10 @@
 use alloc::vec;
 use core::mem;
 
-use crate::block::{
-    self, AIR, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, Resolution::R1,
-};
+use crate::block::{self, AIR, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier};
 use crate::math::{
-    Cube, GridAab, GridCoordinate, GridPoint, GridRotation, GridSize, GridVector, PositiveSign,
-    Rgb, Vol, ZeroOne,
+    Cube, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, PositiveSign, Rgb, Vol,
+    ZeroOne,
 };
 use crate::op::Operation;
 use crate::universe;
@@ -667,17 +665,7 @@ pub(in crate::block) fn render_inventory(
     // TODO(inventory): clone necessary to avoid a borrow conflict
     let config = input.attributes().inventory.clone();
 
-    for (slot_index, icon_position) in config.icon_positions(inventory.size()) {
-        let Some(placed_icon_bounds) = GridAab::checked_from_lower_size(
-            icon_position,
-            GridSize::splat((config.icon_resolution / config.icon_scale).unwrap_or(R1).into()),
-        )
-        .ok()
-        .and_then(|b| b.intersection_cubes(GridAab::for_block(config.icon_resolution))) else {
-            // Icon's position doesn't intersect the block's bounds.
-            continue;
-        };
-
+    for (slot_index, placed_icon_bounds) in config.icon_positions(inventory.size()) {
         // TODO(inventory): icon_only_if_intrinsic is a kludge
         let Some(icon): Option<&Block> =
             inventory.get(slot_index).and_then(|slot| slot.icon_only_if_intrinsic())

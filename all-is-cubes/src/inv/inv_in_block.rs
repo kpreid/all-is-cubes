@@ -9,7 +9,9 @@ use manyfmt::Refmt;
 
 use crate::block::{Modifier, Resolution};
 use crate::inv::{Inventory, Ix};
-use crate::math::{GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid};
+use crate::math::{
+    GridAab, GridCoordinate, GridPoint, GridRotation, GridSize, GridVector, Gridgid,
+};
 use crate::util::ConciseDebug;
 
 #[cfg(doc)]
@@ -42,7 +44,7 @@ pub struct InvInBlock {
     pub(crate) icon_scale: Resolution,
 
     /// Maximum resolution of inventory icons, and resolution in which the `icon_rows`
-    /// position coordinatess are expressed.
+    /// position coordinates are expressed.
     ///
     /// [`Modifier::Inventory`] is guaranteed not to increase the block resolution
     /// beyond this resolution.
@@ -82,7 +84,7 @@ impl InvInBlock {
     /// * `icon_scale` is the scale factor by which to scale down the inventory icon blocks,
     ///   relative to the bounds of the block in which they are being displayed.
     /// * `icon_resolution` is the maximum resolution of inventory icons, and resolution in which
-    ///   the `icon_rows`’ position coordinatess are expressed.
+    ///   the `icon_rows`’ position coordinates are expressed.
     ///   [`Modifier::Inventory`] is guaranteed not to increase the block resolution
     ///   beyond this resolution.
     /// * `icon_rows` specifies where in the block the inventory icons should be displayed.
@@ -101,8 +103,14 @@ impl InvInBlock {
         }
     }
 
-    /// Returns which inventory slots should be rendered as icons, and the lower corners
-    /// of the icons.
+    /// Returns the size of a single icon, in the voxel coordinate system with resolution
+    /// `self.icon_resolution`.
+    pub(crate) fn icon_size(&self) -> GridSize {
+        GridSize::splat((self.icon_resolution / self.icon_scale).unwrap_or(Resolution::R1).into())
+    }
+
+    /// Returns which inventory slots should be rendered as icons, and the cubical bounds in which
+    /// those icons should be placed.
     ///
     /// `inventory_size` should be the size of the inventory to be rendered, which will be used
     /// to filter out nonexistent slots and limit the amount of computation performed to match
@@ -110,24 +118,41 @@ impl InvInBlock {
     pub(crate) fn icon_positions(
         &self,
         inventory_size: Ix,
-    ) -> impl Iterator<Item = (Ix, GridPoint)> + '_ {
+    ) -> impl Iterator<Item = (Ix, GridAab)> + '_ {
+        let icon_size: GridSize = self.icon_size();
+
         self.icon_rows.iter().flat_map(move |row| {
-            (0..row.count).map_while(move |sub_index| {
-                let slot_index = row.first_slot.checked_add(sub_index)?;
-                if slot_index >= inventory_size {
-                    return None;
-                }
-                let index_coord = GridCoordinate::from(sub_index);
-                let position: GridPoint = transpose_point_option(
-                    row.origin
-                        .to_vector()
-                        .zip(row.stride, |origin_c, stride_c| {
-                            origin_c.checked_add(stride_c.checked_mul(index_coord)?)
-                        })
-                        .to_point(),
-                )?;
-                Some((slot_index, position))
-            })
+            (0..row.count)
+                .map_while(move |sub_index| {
+                    let slot_index = row.first_slot.checked_add(sub_index)?;
+                    if slot_index >= inventory_size {
+                        return None;
+                    }
+                    let index_coord = GridCoordinate::from(sub_index);
+                    let lower_bounds: GridPoint = transpose_point_option(
+                        row.origin
+                            .to_vector()
+                            .zip(row.stride, |origin_c, stride_c| {
+                                origin_c.checked_add(stride_c.checked_mul(index_coord)?)
+                            })
+                            .to_point(),
+                    )?;
+                    Some((slot_index, lower_bounds))
+                })
+                .filter_map(move |(slot_index, lower_bounds)| {
+                    let bounds = GridAab::checked_from_lower_size(lower_bounds, icon_size).ok()?;
+
+                    // Filter out all slots whose icons’ bounds don’t actually intersect the block.
+                    //
+                    // TODO: it would be more efficient to stop looping exactly when the next icon
+                    // can’t possibly intersect.
+                    if bounds.intersection_cubes(GridAab::for_block(self.icon_resolution)).is_some()
+                    {
+                        Some((slot_index, bounds))
+                    } else {
+                        None
+                    }
+                })
         })
     }
 
@@ -313,6 +338,7 @@ fn checked_add_point_vector(p: GridPoint, v: GridVector) -> Option<GridPoint> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::Resolution::*;
     use alloc::format;
     use alloc::vec;
     use euclid::{point3, vec3};
@@ -322,8 +348,8 @@ mod tests {
     fn inv_in_block_debug() {
         let iib = InvInBlock::new(
             9,
-            Resolution::R4,
-            Resolution::R16,
+            R4,
+            R16,
             vec![
                 IconRow::new(0..3, point3(1, 1, 1), vec3(5, 0, 0)),
                 IconRow::new(3..6, point3(1, 1, 6), vec3(5, 0, 0)),
@@ -349,12 +375,21 @@ mod tests {
         );
     }
 
+    fn cubic_aab(
+        size: Resolution,
+        x: GridCoordinate,
+        y: GridCoordinate,
+        z: GridCoordinate,
+    ) -> GridAab {
+        GridAab::from_lower_size([x, y, z], GridSize::splat(size.into()))
+    }
+
     #[test]
     fn icon_positions_output() {
         let iib = InvInBlock::new(
             9,
-            Resolution::R4,
-            Resolution::R16,
+            R4,
+            R16,
             vec![
                 IconRow::new(0..3, point3(1, 1, 1), vec3(5, 0, 0)),
                 IconRow::new(3..6, point3(1, 1, 6), vec3(5, 0, 0)),
@@ -364,15 +399,15 @@ mod tests {
         assert_eq!(
             iib.icon_positions(999).take(100).collect::<Vec<_>>(),
             vec![
-                (0, point3(1, 1, 1)),
-                (1, point3(6, 1, 1)),
-                (2, point3(11, 1, 1)),
-                (3, point3(1, 1, 6)),
-                (4, point3(6, 1, 6)),
-                (5, point3(11, 1, 6)),
-                (6, point3(1, 1, 11)),
-                (7, point3(6, 1, 11)),
-                (8, point3(11, 1, 11)),
+                (0, cubic_aab(R4, 1, 1, 1)),
+                (1, cubic_aab(R4, 6, 1, 1)),
+                (2, cubic_aab(R4, 11, 1, 1)),
+                (3, cubic_aab(R4, 1, 1, 6)),
+                (4, cubic_aab(R4, 6, 1, 6)),
+                (5, cubic_aab(R4, 11, 1, 6)),
+                (6, cubic_aab(R4, 1, 1, 11)),
+                (7, cubic_aab(R4, 6, 1, 11)),
+                (8, cubic_aab(R4, 11, 1, 11)),
             ]
         );
     }
@@ -381,8 +416,8 @@ mod tests {
     fn icon_positions_are_truncated_to_inventory_size() {
         let iib = InvInBlock {
             size: 1,
-            icon_scale: Resolution::R4,
-            icon_resolution: Resolution::R16,
+            icon_scale: R4,
+            icon_resolution: R16,
             icon_rows: vec![
                 IconRow {
                     first_slot: 0,
@@ -401,11 +436,44 @@ mod tests {
         assert_eq!(
             iib.icon_positions(3).take(100).collect::<Vec<_>>(),
             vec![
-                (0, point3(0, 0, 0)),
-                (1, point3(5, 0, 0)),
-                (2, point3(10, 0, 0)),
-                (1, point3(0, 0, 5)),
-                (2, point3(5, 0, 5)),
+                (0, cubic_aab(R4, 0, 0, 0)),
+                (1, cubic_aab(R4, 5, 0, 0)),
+                (2, cubic_aab(R4, 10, 0, 0)),
+                (1, cubic_aab(R4, 0, 0, 5)),
+                (2, cubic_aab(R4, 5, 0, 5)),
+            ]
+        );
+    }
+
+    #[test]
+    fn icon_positions_are_truncated_to_block_bounds() {
+        let iib = InvInBlock {
+            size: 1,
+            icon_scale: R4,
+            icon_resolution: R8,
+            icon_rows: vec![IconRow {
+                first_slot: 0,
+                count: 100,
+                origin: GridPoint::new(-4, 0, 0),
+                stride: GridVector::new(1, 0, 0),
+            }],
+        };
+
+        assert_eq!(iib.icon_size().width, 2, "assumption check");
+        assert_eq!(
+            iib.icon_positions(999).take(100).collect::<Vec<_>>(),
+            vec![
+                // we skip slot 0 at -4..-2, slot 1 at -3..-1, and slot 2 at -2..0
+                (3, cubic_aab(R2, -1, 0, 0)),
+                (4, cubic_aab(R2, 0, 0, 0)),
+                (5, cubic_aab(R2, 1, 0, 0)),
+                (6, cubic_aab(R2, 2, 0, 0)),
+                (7, cubic_aab(R2, 3, 0, 0)),
+                (8, cubic_aab(R2, 4, 0, 0)),
+                (9, cubic_aab(R2, 5, 0, 0)),
+                (10, cubic_aab(R2, 6, 0, 0)),
+                (11, cubic_aab(R2, 7, 0, 0)),
+                // 8..10 would be outside of block bounds, so no more slots appear
             ]
         );
     }
