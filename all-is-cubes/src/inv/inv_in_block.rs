@@ -1,8 +1,8 @@
 //! Configuration of inventories owned by blocks ([`Modifier::Inventory`]).
 
+use alloc::sync::Arc;
 use core::fmt;
-
-use alloc::vec::Vec;
+use core::iter;
 
 use euclid::Point3D;
 use manyfmt::Refmt;
@@ -33,7 +33,7 @@ impl From<Inventory> for Modifier {
 //---
 // TODO(inventory): better name?
 // TODO(inventory): needs accessors or public fields
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct InvInBlock {
     /// Number of slots the inventory should have.
@@ -50,11 +50,10 @@ pub struct InvInBlock {
     /// beyond this resolution.
     render_resolution: Resolution,
 
-    // TODO: following the rule for all `BlockAttributes` being cheap to clone,
-    // this should be `Arc<[IconRow]>`, but that's mildly inconvenient for `Arbitrary`, so
-    // I'm not bothering for this first iteration.
-    // (But maybe we should be handling that at a higher level of the structure.)
-    icon_rows: Vec<IconRow>,
+    /// Specifies where in the block the inventory icons should be displayed.
+    ///
+    /// The [`Option`] is solely to avoid allocations for empty lists.
+    icon_rows: Option<Arc<[IconRow]>>,
 }
 
 /// Positioning of a displayed row of inventory icons; part of [`InvInBlock`].
@@ -74,7 +73,7 @@ impl InvInBlock {
         inventory_size: 0,
         icon_scale: Resolution::R1,        // arbitrary
         render_resolution: Resolution::R1, // arbitrary
-        icon_rows: Vec::new(),
+        icon_rows: None,
     };
 
     /// Constructs a [`InvInBlock`].
@@ -105,7 +104,14 @@ impl InvInBlock {
             inventory_size,
             icon_scale,
             render_resolution,
-            icon_rows: icon_rows.into_iter().collect(),
+            icon_rows: {
+                let collected: Arc<[IconRow]> = icon_rows.into_iter().collect();
+                if collected.is_empty() {
+                    None
+                } else {
+                    Some(collected)
+                }
+            },
         }
     }
 
@@ -156,7 +162,10 @@ impl InvInBlock {
     /// has no effect.
     #[inline]
     pub fn icon_rows(&self) -> &[IconRow] {
-        &self.icon_rows
+        match self.icon_rows {
+            Some(ref arc_rows) => arc_rows,
+            None => &[],
+        }
     }
 
     /// Returns which inventory slots should be rendered as icons, and the cubical bounds in which
@@ -173,7 +182,7 @@ impl InvInBlock {
             (self.render_resolution / self.icon_scale).unwrap_or(Resolution::R1).into(),
         );
 
-        self.icon_rows.iter().flat_map(move |row| {
+        self.icon_rows().iter().flat_map(move |row| {
             (0..row.count)
                 .map_while(move |sub_index| {
                     let slot_index = row.first_slot.checked_add(sub_index)?;
@@ -215,20 +224,20 @@ impl InvInBlock {
         if self.inventory_size == 0 {
             other
         } else {
-            Self {
-                inventory_size: self.inventory_size.saturating_add(other.inventory_size),
+            Self::new(
+                self.inventory_size.saturating_add(other.inventory_size),
                 // TODO(inventory): scale and resolution need adaptation
-                icon_scale: self.icon_scale,
-                render_resolution: self.render_resolution,
-                icon_rows: self
-                    .icon_rows
-                    .into_iter()
-                    .chain(other.icon_rows.into_iter().filter_map(|mut row| {
+                self.icon_scale,
+                self.render_resolution,
+                iter::chain(
+                    self.icon_rows().iter().cloned(),
+                    other.icon_rows().iter().filter_map(|row| {
+                        let mut row = row.clone();
                         row.first_slot = row.first_slot.checked_add(self.inventory_size)?;
                         Some(row)
-                    }))
-                    .collect(),
-            }
+                    }),
+                ),
+            )
         }
     }
 }
@@ -258,7 +267,7 @@ impl crate::universe::VisitHandles for InvInBlock {
 impl crate::block::BlRotate for InvInBlock {
     fn rotationally_symmetric(&self) -> bool {
         // If it doesn't display any icons, then it's symmetric.
-        self.icon_rows.is_empty()
+        self.icon_rows().is_empty()
     }
 
     fn rotate(self, rotation: GridRotation) -> Self {
@@ -266,20 +275,19 @@ impl crate::block::BlRotate for InvInBlock {
             inventory_size: size,
             icon_scale,
             render_resolution,
-            icon_rows,
+            icon_rows: _,
         } = self;
         let transform = rotation.to_positive_octant_transform(render_resolution.into());
         let icon_size =
             GridCoordinate::from((render_resolution / icon_scale).unwrap_or(Resolution::R1));
-        Self {
-            inventory_size: size,
+        Self::new(
+            size,
             icon_scale,
             render_resolution,
-            icon_rows: icon_rows
-                .into_iter()
-                .filter_map(|row| row.rotate(transform, icon_size))
-                .collect(),
-        }
+            self.icon_rows()
+                .iter()
+                .filter_map(|row| row.clone().rotate(transform, icon_size)),
+        )
     }
 }
 
@@ -359,6 +367,23 @@ impl IconRow {
     }
 }
 
+impl fmt::Debug for InvInBlock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let InvInBlock {
+            inventory_size,
+            icon_scale,
+            render_resolution,
+            icon_rows: _,
+        } = self;
+        f.debug_struct("InvInBlock")
+            .field("inventory_size", inventory_size)
+            .field("icon_scale", icon_scale)
+            .field("render_resolution", render_resolution)
+            .field("icon_rows", &self.icon_rows())
+            .finish()
+    }
+}
+
 impl fmt::Debug for IconRow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let &Self {
@@ -388,13 +413,13 @@ mod serde {
                 inventory_size,
                 icon_scale,
                 render_resolution,
-                ref icon_rows,
+                icon_rows: _,
             } = *value;
             schema::InvInBlockSerV1 {
                 size: inventory_size,
                 icon_scale,
                 icon_resolution: render_resolution,
-                icon_rows: icon_rows.iter().map(schema::IconRowSerV1::from).collect(),
+                icon_rows: value.icon_rows().iter().map(schema::IconRowSerV1::from).collect(),
             }
         }
     }
@@ -407,12 +432,12 @@ mod serde {
                 icon_resolution: render_resolution,
                 icon_rows,
             } = value;
-            inv::InvInBlock {
+            inv::InvInBlock::new(
                 inventory_size,
                 icon_scale,
                 render_resolution,
-                icon_rows: icon_rows.into_iter().map(inv::IconRow::from).collect(),
-            }
+                icon_rows.into_iter().map(inv::IconRow::from),
+            )
         }
     }
 
@@ -492,7 +517,7 @@ mod tests {
     use super::*;
     use crate::block::Resolution::*;
     use alloc::format;
-    use alloc::vec;
+    use alloc::{vec, vec::Vec};
     use euclid::{point3, vec3};
     use pretty_assertions::assert_eq;
 
@@ -570,7 +595,7 @@ mod tests {
             inventory_size: 1,
             icon_scale: R4,
             render_resolution: R16,
-            icon_rows: vec![
+            icon_rows: Some(Arc::new([
                 IconRow {
                     first_slot: 0,
                     count: 100,
@@ -583,7 +608,7 @@ mod tests {
                     origin: GridPoint::new(0, 0, 5),
                     stride: GridVector::new(5, 0, 0),
                 },
-            ],
+            ])),
         };
         assert_eq!(
             iib.icon_positions(3).take(100).collect::<Vec<_>>(),
@@ -599,17 +624,17 @@ mod tests {
 
     #[test]
     fn icon_positions_are_truncated_to_block_bounds() {
-        let iib = InvInBlock {
-            inventory_size: 1,
-            icon_scale: R4,
-            render_resolution: R8,
-            icon_rows: vec![IconRow {
+        let iib = InvInBlock::new(
+            1,
+            R4,
+            R8,
+            [IconRow {
                 first_slot: 0,
                 count: 100,
                 origin: GridPoint::new(-4, 0, 0),
                 stride: GridVector::new(1, 0, 0),
             }],
-        };
+        );
 
         assert_eq!(iib.icon_size_in_resolution(), R2, "assumption check");
         assert_eq!(

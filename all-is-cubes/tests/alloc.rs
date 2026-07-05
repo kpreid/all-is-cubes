@@ -4,9 +4,10 @@
 
 use allocation_counter::{AllocationInfo, measure};
 
+use all_is_cubes::block::Resolution::R1;
 use all_is_cubes::block::{self, BlockAttributes};
 use all_is_cubes::inv;
-use all_is_cubes::math::{GridAab, GridPoint};
+use all_is_cubes::math::{GridAab, GridPoint, GridVector};
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
@@ -27,10 +28,16 @@ fn clone_block_attributes() {
         })
         .tick_action(block::TickAction::from(Operation::Become(block::AIR)))
         .activation_action(Operation::Become(block::AIR))
-        //
-        // TODO(inventory): This field will allocate when cloned if it is nonempty,
-        // and we should fix that and test it.
-        .inventory_config(inv::InvInBlock::default())
+        .inventory_config(inv::InvInBlock::new(
+            1,
+            R1,
+            R1,
+            [inv::IconRow::new(
+                0..1,
+                GridPoint::new(0, 0, 0),
+                GridVector::new(1, 0, 0),
+            )],
+        ))
         //
         // These fields currently will never allocate when cloned
         .rotation_rule(block::RotationPlacementRule::Never)
