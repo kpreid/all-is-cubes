@@ -34,7 +34,6 @@ impl From<Inventory> for Modifier {
 // TODO(inventory): better name?
 // TODO(inventory): needs accessors or public fields
 #[derive(Clone, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct InvInBlock {
     /// Number of slots the inventory should have.
     inventory_size: Ix,
@@ -479,26 +478,58 @@ mod serde {
 // Manual implementation of `Arbitrary` because, currently, if we don't then the
 // size hint will be missing, because the `euclid` vector types don't give one.
 #[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for IconRow {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // TODO: there are lots of extremely useless out-of-bounds values here;
-        // bias to useful ones?
-        Ok(Self {
-            first_slot: u.arbitrary()?,
-            count: u.arbitrary()?,
-            origin: <[i32; 3]>::arbitrary(u)?.into(),
-            stride: <[i32; 3]>::arbitrary(u)?.into(),
-        })
+mod impl_arbitrary {
+    use super::*;
+    use arbitrary::size_hint::and_all;
+
+    impl<'a> arbitrary::Arbitrary<'a> for InvInBlock {
+        fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+            let render_resolution: Resolution = u.arbitrary()?;
+            let icon_scale: Resolution = u.choose_iter(Resolution::iter_in_range(
+                Resolution::R1..=render_resolution,
+            ))?;
+            Ok(Self::new(
+                u.arbitrary()?,
+                icon_scale,
+                render_resolution,
+                <alloc::vec::Vec<IconRow>>::arbitrary(u)?,
+            ))
+        }
+
+        fn arbitrary_take_rest(mut u: arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+            Self::arbitrary(&mut u)
+        }
+
+        fn size_hint(depth: usize) -> (usize, Option<usize>) {
+            and_all(&[
+                Ix::size_hint(depth),
+                Resolution::size_hint(depth),
+                Resolution::size_hint(depth),
+                <alloc::vec::Vec<IconRow>>::size_hint(depth),
+            ])
+        }
     }
 
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        use arbitrary::{Arbitrary, size_hint::and_all};
-        and_all(&[
-            <usize as Arbitrary>::size_hint(depth),
-            <usize as Arbitrary>::size_hint(depth),
-            <[GridCoordinate; 3] as Arbitrary>::size_hint(depth),
-            <[GridCoordinate; 3] as Arbitrary>::size_hint(depth),
-        ])
+    impl<'a> arbitrary::Arbitrary<'a> for IconRow {
+        fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+            // TODO: there are lots of extremely useless out-of-bounds values here;
+            // bias to useful ones?
+            Ok(Self {
+                first_slot: u.arbitrary()?,
+                count: u.arbitrary()?,
+                origin: <[i32; 3]>::arbitrary(u)?.into(),
+                stride: <[i32; 3]>::arbitrary(u)?.into(),
+            })
+        }
+
+        fn size_hint(depth: usize) -> (usize, Option<usize>) {
+            and_all(&[
+                usize::size_hint(depth),
+                usize::size_hint(depth),
+                <[GridCoordinate; 3]>::size_hint(depth),
+                <[GridCoordinate; 3]>::size_hint(depth),
+            ])
+        }
     }
 }
 
