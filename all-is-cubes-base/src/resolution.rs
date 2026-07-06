@@ -1,5 +1,6 @@
 use core::fmt;
 use core::ops;
+use core::range::RangeInclusive;
 
 use crate::math::GridCoordinate;
 
@@ -150,6 +151,24 @@ impl Resolution {
         let doubled_log = u32::from(self.log2()).wrapping_mul(2);
         let squared_int = 1u32.wrapping_shl(doubled_log);
         squared_int as f32
+    }
+
+    /// Iterate over resolutions within the given range.
+    ///
+    // impl Into is for the upcoming range migration; remove it when `..=` stably produces `RangeInclusive`.
+    #[inline]
+    pub fn iter_in_range(
+        range: impl Into<RangeInclusive<Resolution>>,
+    ) -> impl DoubleEndedIterator<Item = Resolution> + ExactSizeIterator {
+        let range: RangeInclusive<Resolution> = range.into();
+        let range: RangeInclusive<u8> = RangeInclusive {
+            start: range.start.log2(),
+            last: range.last.log2(),
+        };
+        range.into_iter().map(|i| match Resolution::from_log2(i) {
+            Some(res) => res,
+            None => unreachable!(),
+        })
     }
 }
 
@@ -312,7 +331,7 @@ impl<N: fmt::Display> fmt::Display for IntoResolutionError<N> {
 mod tests {
     use super::*;
     use Resolution::*;
-    use alloc::vec::Vec;
+    use alloc::{vec, vec::Vec};
     use exhaust::Exhaust as _;
 
     const RS: [Resolution; 8] = [R1, R2, R4, R8, R16, R32, R64, R128];
@@ -392,5 +411,13 @@ mod tests {
             let float = f32::from(resolution);
             assert_eq!(resolution.squared_f32(), float * float);
         }
+    }
+
+    #[test]
+    fn iter_in_range() {
+        assert_eq!(
+            Resolution::iter_in_range(R2..=R32).collect::<Vec<Resolution>>(),
+            vec![R2, R4, R8, R16, R32]
+        )
     }
 }
