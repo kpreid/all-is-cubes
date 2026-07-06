@@ -1,4 +1,9 @@
+use core::fmt;
 use core::ops;
+
+use crate::math::GridCoordinate;
+
+// -------------------------------------------------------------------------------------------------
 
 // Note: Public documentation for this is in its re-export from `all_is_cubes::block`.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, exhaust::Exhaust)]
@@ -17,13 +22,29 @@ pub enum Resolution {
     R64 = 6,
     R128 = 7,
 }
-use core::fmt;
-
-use crate::math::GridCoordinate;
 
 impl Resolution {
     /// The maximum available resolution.
     pub const MAX: Resolution = Resolution::R128;
+
+    /// Returns the [`Resolution`] which is equal to 2<sup><var>exponent</var></sup>.
+    ///
+    /// This is the inverse of [`Resolution::log2()`].
+    #[inline]
+    pub const fn from_log2(exponent: u8) -> Option<Self> {
+        // This match should compile down to a single comparison.
+        match exponent {
+            0 => Some(Self::R1),
+            1 => Some(Self::R2),
+            2 => Some(Self::R4),
+            3 => Some(Self::R8),
+            4 => Some(Self::R16),
+            5 => Some(Self::R32),
+            6 => Some(Self::R64),
+            7 => Some(Self::R128),
+            8..=255 => None,
+        }
+    }
 
     /// Returns the [`Resolution`] that’s twice this one, or [`None`] at the limit.
     #[inline]
@@ -65,6 +86,7 @@ impl Resolution {
     /// Returns the logarithm base 2 of this resolution.
     ///
     /// This is always an exact integer value; all resolutions are powers of 2.
+    /// This is the inverse of [`Resolution::from_log2()`].
     ///
     /// # Example
     ///
@@ -143,7 +165,7 @@ impl fmt::Display for Resolution {
         GridCoordinate::from(*self).fmt(f)
     }
 }
-
+//
 macro_rules! impl_try_from {
     ($t:ty) => {
         impl TryFrom<$t> for Resolution {
@@ -170,6 +192,7 @@ impl_try_from!(i32);
 impl_try_from!(i64);
 impl_try_from!(i128);
 impl_try_from!(isize);
+impl_try_from!(u8);
 impl_try_from!(u16);
 impl_try_from!(u32);
 impl_try_from!(u64);
@@ -228,20 +251,24 @@ impl From<Resolution> for f64 {
 impl ops::Mul<Resolution> for Resolution {
     type Output = Option<Resolution>;
 
+    /// Multiplies `self` by `rhs`.
+    ///
+    /// Returns [`None`] if the result exceeds [`Resolution::MAX`].
     #[inline]
     fn mul(self, rhs: Resolution) -> Self::Output {
-        // not the most efficient way to implement this, but straightforward
-        Self::try_from(u32::from(self) * u32::from(rhs)).ok()
+        Resolution::from_log2(self.log2().checked_add(rhs.log2())?)
     }
 }
 
 impl ops::Div<Resolution> for Resolution {
     type Output = Option<Resolution>;
 
+    /// Divides `self` by `rhs`.
+    ///
+    /// Returns [`None`] if the result would be fractional (if `rhs` is greater than `self`).
     #[inline]
     fn div(self, rhs: Resolution) -> Self::Output {
-        // not the most efficient way to implement this, but straightforward
-        Self::try_from(u32::from(self) / u32::from(rhs)).ok()
+        Self::from_log2(self.log2().checked_sub(rhs.log2())?)
     }
 }
 
@@ -257,7 +284,7 @@ impl serde::Serialize for Resolution {
 impl<'de> serde::Deserialize<'de> for Resolution {
     #[allow(clippy::missing_inline_in_public_items)]
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        u16::deserialize(deserializer)?.try_into().map_err(serde::de::Error::custom)
+        u8::deserialize(deserializer)?.try_into().map_err(serde::de::Error::custom)
     }
 }
 
@@ -278,6 +305,8 @@ impl<N: fmt::Display> fmt::Display for IntoResolutionError<N> {
         )
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -316,6 +345,22 @@ mod tests {
         assert_eq!(RS.map(u16::from), [1, 2, 4, 8, 16, 32, 64, 128]);
         assert_eq!(RS.map(u32::from), [1, 2, 4, 8, 16, 32, 64, 128]);
         assert_eq!(RS.map(usize::from), [1, 2, 4, 8, 16, 32, 64, 128]);
+    }
+
+    #[test]
+    fn log_pow_inverses() {
+        for resolution in RS {
+            assert_eq!(Resolution::from_log2(resolution.log2()), Some(resolution));
+        }
+    }
+
+    #[test]
+    fn pow_failure() {
+        assert_eq!(Resolution::from_log2(8), None);
+        assert_eq!(Resolution::from_log2(9), None);
+        assert_eq!(Resolution::from_log2(10), None);
+        assert_eq!(Resolution::from_log2(254), None);
+        assert_eq!(Resolution::from_log2(255), None);
     }
 
     #[test]

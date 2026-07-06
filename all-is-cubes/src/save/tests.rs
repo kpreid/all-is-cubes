@@ -453,7 +453,7 @@ fn resolution_de_err() {
     use serde_json::{from_value, json};
     assert_eq!(
         from_value::<Resolution>(json!(-16)).unwrap_err().to_string(),
-        "invalid value: integer `-16`, expected u16"
+        "invalid value: integer `-16`, expected u8"
     );
     assert_eq!(
         from_value::<Resolution>(json!(0)).unwrap_err().to_string(),
@@ -461,7 +461,7 @@ fn resolution_de_err() {
     );
     assert_eq!(
         from_value::<Resolution>(json!(1.5)).unwrap_err().to_string(),
-        "invalid type: floating point `1.5`, expected u16"
+        "invalid type: floating point `1.5`, expected u8"
     );
 }
 
