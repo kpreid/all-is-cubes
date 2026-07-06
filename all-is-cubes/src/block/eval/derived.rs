@@ -1,5 +1,7 @@
 use alloc::sync::Arc;
-use core::{fmt, ops};
+use core::fmt;
+use core::iter;
+use core::ops;
 
 use euclid::Vector3D;
 use itertools::{AllEqualValueError, Itertools as _, iproduct};
@@ -148,31 +150,17 @@ pub(in crate::block::eval) fn compute_derived(voxels: &block::Evoxels) -> Derive
     };
 
     // Compute if the collision is uniform in all voxels.
-    let uniform_collision = {
-        let mut collision: Option<block::BlockCollision> = if less_than_full {
+    let uniform_collision = iter::chain(
+        if less_than_full {
+            // Some of the block’s volume is occupied by implicit air voxels.
             Some(block::BlockCollision::None)
         } else {
             None
-        };
-        let mut collision_unequal = false;
-        for voxel in voxels.as_vol_ref().as_linear().iter() {
-            match (collision, collision_unequal) {
-                // Already unequal
-                (_, true) => {}
-                // First voxel
-                (None, false) => collision = Some(voxel.collision),
-                // Matching voxel
-                (Some(prev), false) if prev == voxel.collision => {}
-                // Non-matching voxel
-                (Some(_), false) => {
-                    collision = None;
-                    collision_unequal = true;
-                }
-            }
-        }
-
-        collision
-    };
+        },
+        voxels.as_vol_ref().as_linear().iter().map(|voxel| voxel.collision),
+    )
+    .all_equal_value()
+    .ok();
 
     let voxel_opacity_mask = VoxelOpacityMask::new(resolution, voxels.as_vol_ref());
 
