@@ -9,6 +9,8 @@
     * `block::BlockDef` can now be used to make block definitions that are looping animations.
       New items `block::Animation` and `block::BlockDef::new_animated()` support this functionality.
     * `block::Resolution::from_log2()`, constructor from the logarithmic form.
+    * `block::Resolution::iter_in_range()`
+    * `block::Resolution::least_common_multiple_and_scales()`
     * `block::SetAttribute` is a modifier which overrides a single attribute of a block, instead of all of them.
       It replaces `Modifier::Attributes`.
     * `inv::InvInBlock` and `inv::IconRow` now have a complete set of getters for reading their data.

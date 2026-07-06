@@ -235,11 +235,8 @@ fn evaluate_composition(
 
     let src_resolution = src_voxels.resolution();
     let dst_resolution = dst_voxels.resolution();
-    // TODO: This "max and then divide" pattern occurs both here and in `Modifier::Move`;
-    // add a function to express it without unwraps.
-    let effective_resolution = src_resolution.max(dst_resolution);
-    let src_scale = (effective_resolution / src_resolution).unwrap();
-    let dst_scale = (effective_resolution / dst_resolution).unwrap();
+    let (effective_resolution, src_scale, dst_scale) =
+        src_resolution.least_common_multiple_and_scales(dst_resolution);
 
     let src_bounds_scaled = bounds_excluding_air(&src_voxels, src_scale);
     let dst_bounds_scaled = bounds_excluding_air(&dst_voxels, dst_scale);

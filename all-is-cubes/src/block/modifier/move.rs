@@ -117,8 +117,8 @@ impl Move {
 
         // The resolution of the output evaluation must be at least the resolution of the voxels
         // being moved, and also at least the resolution of the movement.
-        let output_resolution = input_voxels.resolution().max(movement_resolution);
-        let resolution_increase = (output_resolution / input_voxels.resolution()).unwrap();
+        let (output_resolution, resolution_increase, _) =
+            input_voxels.resolution().least_common_multiple_and_scales(movement_resolution);
 
         // Bounds of the input, expressed in the resolution of the output.
         let original_bounds_in_res =

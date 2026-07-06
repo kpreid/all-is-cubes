@@ -170,6 +170,32 @@ impl Resolution {
             None => unreachable!(),
         })
     }
+
+    /// Returns a tuple containing the [least common multiple] of `self` and `other`, and the result
+    /// of dividing that multiple by each input.
+    ///
+    /// The least common multiple is also the maximum.
+    ///
+    /// [least common multiple]: https://en.wikipedia.org/wiki/Least_common_multiple
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use all_is_cubes_base::resolution::Resolution;
+    /// assert_eq!(
+    ///     Resolution::R2.least_common_multiple_and_scales(Resolution::R8),
+    ///     (Resolution::R8, Resolution::R4, Resolution::R1)
+    /// );
+    /// ```
+    #[expect(clippy::missing_panics_doc, reason = "cannot actually fail")]
+    #[expect(clippy::missing_inline_in_public_items, reason = "unclear if wise")]
+    pub fn least_common_multiple_and_scales(
+        self: Resolution,
+        other: Resolution,
+    ) -> (Resolution, Resolution, Resolution) {
+        let lcm = self.max(other);
+        (lcm, (lcm / self).unwrap(), (lcm / other).unwrap())
+    }
 }
 
 impl fmt::Debug for Resolution {
