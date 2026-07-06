@@ -5,7 +5,7 @@
 use alloc::sync::Arc;
 use std::dbg;
 
-use euclid::Vector3D;
+use euclid::{Vector3D, point3};
 use pretty_assertions::assert_eq;
 use rstest::rstest;
 
@@ -436,6 +436,68 @@ fn voxels_partial_not_filling() {
     assert_eq!(e.resolution(), resolution);
     assert_eq!(e.opaque(), FaceMap::splat(false).with(Face::NX, true));
     assert_eq!(e.visible(), true);
+}
+
+#[test]
+fn uniform_collision() {
+    let mut universe = Universe::new();
+    let resolution = R2;
+    // One space which shall have three blocks made from it.
+    // (This shared palette may matter in future implementations.)
+    let mut space = Space::empty_positive(6, 2, 2);
+    space.mutate(universe.read_ticket(), |m| {
+        // Cover the first two 2×2×2 areas.
+        m.fill_uniform(
+            GridAab::from_lower_upper([0, 0, 0], [4, 2, 2]),
+            &block::from_color!(Rgba::WHITE),
+        )
+        .unwrap();
+        // Make the collision non-uniform in the first area.
+        m.set([0, 0, 0], AIR).unwrap();
+    });
+    let space_handle = universe.insert_anonymous(space);
+
+    // This block has its low corner `None` and the rest `Hard`
+    let non_uniform_block =
+        Block::builder().voxels_handle(resolution, space_handle.clone()).build();
+
+    // This block has all 8 voxels `Hard`
+    let uniform_hard_block = Block::builder()
+        .voxels_handle(resolution, space_handle.clone())
+        .offset(point3(2, 0, 0))
+        .build();
+
+    // This block has all 8 voxels `None`
+    let uniform_none_block = Block::builder()
+        .voxels_handle(resolution, space_handle.clone())
+        .offset(point3(4, 0, 0))
+        .build();
+
+    // This block goes off the edge of the space and is thus half `None` half `Hard`.
+    let partial_block = Block::builder()
+        .voxels_handle(resolution, space_handle)
+        .offset(point3(2, 1, 0))
+        .build();
+
+    let non_uniform_eval = eval_in(&non_uniform_block, &universe);
+    let uniform_hard_eval = eval_in(&uniform_hard_block, &universe);
+    let uniform_none_eval = eval_in(&uniform_none_block, &universe);
+    let partial_eval = eval_in(&partial_block, &universe);
+
+    assert_eq!(
+        (
+            non_uniform_eval.uniform_collision(),
+            uniform_hard_eval.uniform_collision(),
+            uniform_none_eval.uniform_collision(),
+            partial_eval.uniform_collision(),
+        ),
+        (
+            None,
+            Some(BlockCollision::Hard),
+            Some(BlockCollision::None),
+            None,
+        )
+    );
 }
 
 /// Tests that the `offset` field of `Primitive::Recur` is respected.

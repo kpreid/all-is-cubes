@@ -1,5 +1,7 @@
 //! Tests for [`Block`] as a whole.
+//!
 //! Other submodules also have their own tests.
+//! Note in particular that [`super::eval::tests`] contains tests for the results of evaluation.
 
 use alloc::format;
 use alloc::vec;
