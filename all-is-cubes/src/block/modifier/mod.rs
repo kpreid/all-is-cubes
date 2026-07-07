@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 
 use crate::block::{self, BlRotate as _, Block, Evoxels, MinEval};
 use crate::inv;
-use crate::math::{GridRotation, Vol};
+use crate::math::GridRotation;
 use crate::tag;
 use crate::universe::{HandleVisitor, VisitHandles};
 
@@ -313,11 +313,10 @@ fn evaluate_rotate(
 
             MinEval::new(
                 attributes.rotate(rotation),
-                Evoxels::from_many(
+                Evoxels::from_fn(
                     resolution,
-                    Vol::from_fn(voxels.bounds().transform(inner_to_outer).unwrap(), |cube| {
-                        voxels.get(outer_to_inner.transform_cube(cube)).unwrap()
-                    }),
+                    voxels.bounds().transform(inner_to_outer).unwrap(),
+                    |cube| voxels.get(outer_to_inner.transform_cube(cube)).unwrap(),
                 ),
             )
         },

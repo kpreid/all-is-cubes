@@ -802,7 +802,7 @@ impl fmt::Debug for EvaluatedBlockEq {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::{Cube, Vol};
+    use crate::math::Cube;
     use crate::universe::{ReadTicket, Universe};
     use alloc::format;
     use indoc::indoc;
@@ -925,7 +925,7 @@ mod tests {
         let attributes = BlockAttributes::default();
         let resolution = Resolution::R4;
         let bounds = GridAab::from_lower_size([1, 2, 3], [0, 0, 0]);
-        let voxels = Evoxels::from_many(resolution, Vol::from_fn(bounds, |_| unreachable!()));
+        let voxels = Evoxels::from_fn(resolution, bounds, |_| unreachable!());
         assert_eq!(
             EvaluatedBlock::from_voxels(
                 block::AIR, // caution: incorrect placeholder value

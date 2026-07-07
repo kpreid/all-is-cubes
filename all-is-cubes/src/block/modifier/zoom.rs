@@ -4,7 +4,7 @@ use crate::block::{
     self, Evoxel, Evoxels, MinEval, Modifier,
     Resolution::{self, R1},
 };
-use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, GridRotation, Vol};
+use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, GridRotation};
 use crate::universe;
 
 /// Data for [`Modifier::Zoom`], describing a portion of the original block that is scaled
@@ -105,10 +105,9 @@ impl Zoom {
                         )?;
                         MinEval::new(
                             attributes,
-                            Evoxels::from_many(
-                                zoom_resolution,
-                                Vol::from_fn(intersected_bounds, |p| voxels[p + voxel_offset]),
-                            ),
+                            Evoxels::from_fn(zoom_resolution, intersected_bounds, |cube| {
+                                voxels[cube + voxel_offset]
+                            }),
                         )
                     }
                 }
@@ -236,15 +235,16 @@ mod tests {
                     EvaluatedBlockEq {
                         block: zoomed,
                         attributes: ev_original.attributes().clone(),
-                        voxels: Evoxels::from_many(
+                        voxels: Evoxels::from_fn(
                             zoom_resolution,
-                            Vol::from_fn(GridAab::for_block(zoom_resolution), |p| {
+                            GridAab::for_block(zoom_resolution),
+                            |p| {
                                 original_voxels[p + GridVector::new(
                                     GridCoordinate::from(zoom_resolution) * x,
                                     0,
                                     0,
                                 )]
-                            }),
+                            },
                         )
                         .into(),
                         cost: block::Cost {

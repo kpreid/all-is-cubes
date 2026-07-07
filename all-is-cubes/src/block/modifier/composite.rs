@@ -3,8 +3,7 @@ use core::mem;
 
 use crate::block::{self, AIR, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier};
 use crate::math::{
-    Cube, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, PositiveSign, Rgb, Vol,
-    ZeroOne,
+    Cube, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, PositiveSign, Rgb, ZeroOne,
 };
 use crate::op::Operation;
 use crate::universe;
@@ -345,15 +344,12 @@ fn evaluate_composition(
     } else {
         // Allocate new output array that encloses the full output bounds.
         block::Budget::decrement_voxels(&filter.budget, output_bounds.volume().unwrap())?;
-        Evoxels::from_many(
-            effective_resolution,
-            Vol::from_fn(output_bounds, |cube| {
-                operator.blend_evoxel(
-                    src_voxels.get(cube / src_scale).unwrap_or(Evoxel::AIR),
-                    dst_voxels.get(cube / dst_scale).unwrap_or(Evoxel::AIR),
-                )
-            }),
-        )
+        Evoxels::from_fn(effective_resolution, output_bounds, |cube| {
+            operator.blend_evoxel(
+                src_voxels.get(cube / src_scale).unwrap_or(Evoxel::AIR),
+                dst_voxels.get(cube / dst_scale).unwrap_or(Evoxel::AIR),
+            )
+        })
     };
 
     Ok(MinEval::new(attributes, voxels))
@@ -706,9 +702,10 @@ pub(in crate::block) fn render_inventory(
 
         // TODO(inventory): Instead of roughly downsampling the icons here, we should be
         // asking evaluation to generate a lower resolution as per `config.render_resolution()`).
-        icon_evaluated.set_voxels(Evoxels::from_many(
+        icon_evaluated.set_voxels(Evoxels::from_fn(
             config.render_resolution(),
-            Vol::from_fn(placed_icon_data_bounds, |render_cube| {
+            placed_icon_data_bounds,
+            |render_cube| {
                 // Translate to the coordinate system with the icon's lower corner as origin.
                 let translated: Cube =
                     render_cube - placed_icon_logical_bounds.lower_bounds().to_vector();
@@ -717,7 +714,7 @@ pub(in crate::block) fn render_inventory(
                     Cube::from(GridPoint::from(translated) * resample_scale);
                 let sample_point = translated_and_scaled + resample_point_offset;
                 icon_evaluated.voxels()[sample_point]
-            }),
+            },
         ));
 
         input = evaluate_composition(

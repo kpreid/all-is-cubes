@@ -76,16 +76,13 @@ fn overall_color_ignores_interior() {
     let inner_bounds = outer_bounds.shrink(FaceMap::splat(1)).unwrap();
     let outer_color = Rgba::new(1.0, 0.0, 0.0, 1.0);
     let inner_color = Rgba::new(0.0, 1.0, 0.0, 1.0);
-    let voxels = Evoxels::from_many(
-        resolution,
-        Vol::from_fn(outer_bounds, |p| {
-            Evoxel::from_color(if inner_bounds.contains_cube(p) {
-                inner_color
-            } else {
-                outer_color
-            })
-        }),
-    );
+    let voxels = Evoxels::from_fn(resolution, outer_bounds, |p| {
+        Evoxel::from_color(if inner_bounds.contains_cube(p) {
+            inner_color
+        } else {
+            outer_color
+        })
+    });
 
     // The inner_color should be ignored because it is not visible.
     let ev = EvaluatedBlock::from_voxels(AIR, BlockAttributes::default(), voxels, Cost::ZERO);
@@ -224,18 +221,15 @@ fn voxels_checked_individually() {
     assert_eq!(*e.attributes(), attributes);
     assert_eq!(
         EvoxelsEq::from(e.voxels()),
-        EvoxelsEq::from(Evoxels::from_many(
-            resolution,
-            Vol::from_fn(GridAab::for_block(resolution), |point| {
-                let point = point.lower_bounds().cast::<f32>();
-                Evoxel {
-                    color: Rgba::new(point.x, point.y, point.z, 1.0),
-                    emission: Rgb::ZERO,
-                    selectable: true,
-                    collision: BlockCollision::Hard,
-                }
-            })
-        ))
+        EvoxelsEq::from_fn(resolution, GridAab::for_block(resolution), |point| {
+            let point = point.lower_bounds().cast::<f32>();
+            Evoxel {
+                color: Rgba::new(point.x, point.y, point.z, 1.0),
+                emission: Rgb::ZERO,
+                selectable: true,
+                collision: BlockCollision::Hard,
+            }
+        })
     );
     assert_eq!(e.color(), Rgba::new(0.5, 0.5, 0.5, 1.0));
     assert_eq!(
@@ -526,18 +520,15 @@ fn recur_with_offset() {
     let e = eval_in(&block_at_offset, &universe);
     assert_eq!(
         EvoxelsEq::from(e.voxels()),
-        EvoxelsEq::from(Evoxels::from_many(
-            resolution,
-            Vol::from_fn(GridAab::for_block(resolution), |point| {
-                let point = (point.lower_bounds() + offset).cast::<f32>();
-                Evoxel {
-                    color: Rgba::new(point.x, point.y, point.z, 1.0),
-                    emission: Rgb::ZERO,
-                    selectable: true,
-                    collision: BlockCollision::Hard,
-                }
-            })
-        ))
+        EvoxelsEq::from_fn(resolution, GridAab::for_block(resolution), |cube| {
+            let point = (cube.lower_bounds() + offset).cast::<f32>();
+            Evoxel {
+                color: Rgba::new(point.x, point.y, point.z, 1.0),
+                emission: Rgb::ZERO,
+                selectable: true,
+                collision: BlockCollision::Hard,
+            }
+        })
     );
 }
 

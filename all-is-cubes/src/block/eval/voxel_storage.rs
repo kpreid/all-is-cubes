@@ -5,7 +5,7 @@ use core::ops;
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
-use crate::block::{AIR, Atom, Primitive};
+use crate::block::{self, AIR, Atom, Primitive};
 
 use crate::block::{
     BlockAttributes, BlockCollision, EvaluatedBlock,
@@ -144,6 +144,10 @@ impl fmt::Debug for Evoxel {
 /// for the case of a single element, returning voxels by value rather than
 /// reference, automatically returning [`Evoxel::AIR`] when appropriate, and
 /// enforcing that the `Vol` has no wasted data outside the block bounds.
+///
+/// Note: Constructing an [`Evoxels`] using the provided functions is only useful for testing.
+/// Actual voxel objects to be used with the rest of All is Cubes should be constructed using
+/// [`block::Builder`].
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Evoxels(EvoxelsInner);
@@ -168,6 +172,8 @@ impl Evoxels {
 
     /// Construct an [`Evoxels`] storing the given voxels.
     ///
+    /// Note
+    ///
     /// # Panics
     ///
     /// Panics if `voxels` contains any data outside the block bounds.
@@ -184,6 +190,20 @@ impl Evoxels {
         // TODO: Should this check if the resolution is 1 and switch to `Evoxels::One`,
         // or is sharing of the `Arc` desirable since it already exists?
         Evoxels(EvoxelsInner::Many(resolution, voxels))
+    }
+
+    /// Construct an [`Evoxels`] by calling the given function for each voxel.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bounds` exceeds [`GridAab::for_block(resolution)`][GridAab::for_block].
+    #[track_caller]
+    pub fn from_fn(
+        resolution: Resolution,
+        bounds: GridAab,
+        function: impl FnMut(Cube) -> Evoxel,
+    ) -> Self {
+        Self::from_many(resolution, Vol::from_fn(bounds, function))
     }
 
     /// Constructs an [`Evoxels`] which is made up of copies of a single voxel in a given volume.
@@ -437,6 +457,18 @@ pub struct EvoxelsEq {
 impl EvoxelsEq {
     const fn new(voxels: Evoxels) -> Self {
         Self { original: voxels }
+    }
+
+    /// Construct an [`EvoxelsEq`] by calling the given function for each voxel.
+    ///
+    /// This is identical to [`Evoxels::from_fn()`] except for the return type.
+    #[track_caller]
+    pub fn from_fn(
+        resolution: Resolution,
+        bounds: GridAab,
+        function: impl FnMut(Cube) -> Evoxel,
+    ) -> Self {
+        Self::new(Evoxels::from_fn(resolution, bounds, function))
     }
 }
 

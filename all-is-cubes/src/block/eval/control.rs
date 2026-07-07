@@ -10,7 +10,7 @@ use crate::block::{
 };
 use crate::content::palette;
 use crate::listen;
-use crate::math::{GridAab, Rgba, Vol};
+use crate::math::{GridAab, Rgba};
 use crate::universe::{HandleError, ReadTicket};
 
 #[cfg(doc)]
@@ -414,12 +414,9 @@ impl EvalBlockError {
                 selectable: false, // TODO: make this selectable but immutable
                 ..Default::default()
             },
-            Evoxels::from_many(
-                resolution,
-                Vol::from_fn(GridAab::for_block(resolution), |cube| {
-                    pattern[((cube.x + cube.y + cube.z).rem_euclid(2)) as usize]
-                }),
-            ),
+            Evoxels::from_fn(resolution, GridAab::for_block(resolution), |cube| {
+                pattern[((cube.x + cube.y + cube.z).rem_euclid(2)) as usize]
+            }),
             self.used,
         )
     }

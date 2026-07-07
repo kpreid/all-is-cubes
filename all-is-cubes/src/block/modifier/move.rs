@@ -3,7 +3,7 @@ use core::assert_matches;
 use crate::block::{
     self, AIR, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution, TickAction,
 };
-use crate::math::{Face, GridAab, GridCoordinate, GridRotation, GridVector, Vol};
+use crate::math::{Face, GridAab, GridCoordinate, GridRotation, GridVector};
 use crate::op::Operation;
 use crate::time;
 use crate::universe;
@@ -201,12 +201,9 @@ impl Move {
                 let displaced_voxels = match input_voxels.single_voxel() {
                     None => {
                         let voxels = input_voxels.as_vol_ref();
-                        Evoxels::from_many(
-                            output_resolution,
-                            Vol::from_fn(displaced_bounds, |cube| {
-                                voxels[(cube - translation_in_res) / resolution_increase]
-                            }),
-                        )
+                        Evoxels::from_fn(output_resolution, displaced_bounds, |cube| {
+                            voxels[(cube - translation_in_res) / resolution_increase]
+                        })
                     }
                     Some(voxel) => Evoxels::repeat(output_resolution, displaced_bounds, voxel),
                 };
@@ -241,7 +238,7 @@ mod tests {
     use super::*;
     use crate::block::{Composite, EvaluatedBlockEq, Resolution::*, VoxelOpacityMask};
     use crate::content::make_some_blocks;
-    use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgb, Rgba, rgba_const, zo32};
+    use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgb, Rgba, Vol, rgba_const, zo32};
     use crate::space::{self, Space};
     use crate::universe::{ReadTicket, Universe};
     use pretty_assertions::assert_eq;

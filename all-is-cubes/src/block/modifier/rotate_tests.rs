@@ -62,17 +62,14 @@ fn rotate_evaluation() {
                 rotation_rule: block::RotationPlacementRule::Attach { by: Face::PY },
                 ..BlockAttributes::default()
             },
-            voxels: Evoxels::from_many(
-                R2,
-                Vol::from_fn(block_bounds, |cube| {
-                    Evoxel {
-                        color: rotated_color_fn(cube),
-                        emission: Rgb::ZERO,
-                        selectable: true,
-                        collision: BlockCollision::Hard,
-                    }
-                })
-            )
+            voxels: Evoxels::from_fn(R2, block_bounds, |cube| {
+                Evoxel {
+                    color: rotated_color_fn(cube),
+                    emission: Rgb::ZERO,
+                    selectable: true,
+                    collision: BlockCollision::Hard,
+                }
+            })
             .into(),
             cost: block::Cost {
                 components: 5,           // Primitive + 3 attributes + Rotate
