@@ -29,6 +29,7 @@ fn benches() {
     space_mesh_benches(&mut c);
     #[cfg(feature = "dynamic")]
     dynamic_benches(&mut c);
+    analyze_benches(&mut c);
     planar_benches(&mut c);
 }
 
@@ -449,6 +450,25 @@ fn dynamic_benches(c: &mut Criterion) {
         });
     }
     // TODO: Add a test for updates past the initial one
+}
+
+/// Benchmarks of the public `analyze` function.
+///
+/// While this uses public API for independent analysis, it’s primarily intended to study the cost
+/// of the analysis that is otherwise happening within `BlockMesh` construction.
+fn analyze_benches(c: &mut Criterion) {
+    let mut g = c.benchmark_group("analyze");
+    let options = &MeshOptions::<Mt>::new(&GraphicsOptions::default());
+
+    // If we add more blocks here, then we should have some kind of shared list with
+    // `block_mesh_benches` instead of doing all the setup code separately.
+
+    g.bench_function("tetrahedron", |b| {
+        let universe = &mut Universe::new();
+        let block = tetrahedron_block(universe, R16);
+        let evaluated = block.evaluate(universe.read_ticket()).unwrap();
+        b.iter_with_large_drop(|| mesh::Analysis::analyze(&evaluated, options));
+    });
 }
 
 /// Benchmarks of the [`planar`] algorithm module by itself.
