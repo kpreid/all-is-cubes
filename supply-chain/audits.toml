@@ -66,6 +66,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.5.0 -> 0.6.0"
 
+[[audits.crossbeam-epoch]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.9.18 -> 0.9.20"
+
 [[audits.crunchy]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
@@ -495,7 +500,7 @@ end = "2026-04-26"
 
 [[trusted.emath]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2024-12-16"
 end = "2026-03-11"
 
@@ -555,325 +560,325 @@ end = "2026-03-08"
 
 [[trusted.re_arrow2]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2024-01-22"
 end = "2026-03-11"
 
 [[trusted.re_arrow2]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2024-01-22"
 end = "2026-03-08"
 
 [[trusted.re_arrow_util]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2025-02-05"
 end = "2026-03-11"
 
 [[trusted.re_arrow_util]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2025-02-05"
 end = "2026-03-08"
 
 [[trusted.re_build_info]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-03-06"
 end = "2026-03-11"
 
 [[trusted.re_build_info]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-03-06"
 end = "2026-03-08"
 
 [[trusted.re_build_tools]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-07-05"
 end = "2026-03-11"
 
 [[trusted.re_build_tools]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-07-05"
 end = "2026-03-08"
 
 [[trusted.re_byte_size]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2025-02-05"
 end = "2026-03-11"
 
 [[trusted.re_byte_size]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2025-02-05"
 end = "2026-03-08"
 
 [[trusted.re_case]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2024-06-10"
 end = "2026-03-11"
 
 [[trusted.re_case]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2024-06-10"
 end = "2026-03-08"
 
 [[trusted.re_chunk]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2024-06-10"
 end = "2026-03-11"
 
 [[trusted.re_chunk]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2024-06-10"
 end = "2026-03-08"
 
 [[trusted.re_error]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-11"
 
 [[trusted.re_error]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-08"
 
 [[trusted.re_format]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-11"
 
 [[trusted.re_format]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-08"
 
 [[trusted.re_format_arrow]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2024-05-07"
 end = "2026-03-11"
 
 [[trusted.re_format_arrow]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2024-05-07"
 end = "2026-03-08"
 
 [[trusted.re_grpc_client]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2024-11-11"
 end = "2026-04-26"
 
 [[trusted.re_grpc_server]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2025-02-05"
 end = "2026-04-26"
 
 [[trusted.re_log]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-11"
 
 [[trusted.re_log]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-08"
 
 [[trusted.re_log_encoding]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-04-19"
 end = "2026-03-11"
 
 [[trusted.re_log_encoding]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-04-19"
 end = "2026-03-08"
 
 [[trusted.re_log_types]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-11"
 
 [[trusted.re_log_types]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-08"
 
 [[trusted.re_memory]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-11"
 
 [[trusted.re_memory]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-08"
 
 [[trusted.re_protos]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2024-11-11"
 end = "2026-03-11"
 
 [[trusted.re_protos]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2024-11-11"
 end = "2026-03-08"
 
 [[trusted.re_sdk]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-11"
 
 [[trusted.re_sdk]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-08"
 
 [[trusted.re_sdk_comms]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-11"
 
 [[trusted.re_sdk_comms]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-08"
 
 [[trusted.re_smart_channel]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-11"
 
 [[trusted.re_smart_channel]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-08"
 
 [[trusted.re_sorbet]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2025-02-05"
 end = "2026-03-11"
 
 [[trusted.re_sorbet]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2025-02-05"
 end = "2026-03-08"
 
 [[trusted.re_span]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2025-07-01"
 end = "2026-09-16"
 
 [[trusted.re_string_interner]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-11"
 
 [[trusted.re_string_interner]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-08"
 
 [[trusted.re_tracing]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-07-05"
 end = "2026-03-11"
 
 [[trusted.re_tracing]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-07-05"
 end = "2026-03-08"
 
 [[trusted.re_tuid]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-11"
 
 [[trusted.re_tuid]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-02-12"
 end = "2026-03-08"
 
 [[trusted.re_types]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-07-05"
 end = "2026-03-11"
 
 [[trusted.re_types]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-07-05"
 end = "2026-03-08"
 
 [[trusted.re_types_builder]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-07-05"
 end = "2026-03-11"
 
 [[trusted.re_types_builder]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-07-05"
 end = "2026-03-08"
 
 [[trusted.re_types_core]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-10-26"
 end = "2026-03-11"
 
 [[trusted.re_types_core]]
 criteria = "safe-to-run"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2023-10-26"
 end = "2026-03-08"
 
 [[trusted.re_uri]]
 criteria = "safe-to-deploy"
-user-id = 197939 # rerun.io (rerunio)
+user-id = 197939 # Rerun (rerunio)
 start = "2025-04-07"
 end = "2026-04-26"
 
