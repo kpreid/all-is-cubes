@@ -1,5 +1,6 @@
 use core::fmt;
 
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use crate::block::{self, BlRotate, Block, Evoxels, MinEval};
@@ -312,14 +313,24 @@ fn evaluate_rotate(
             let outer_to_inner = rotation.inverse().to_positive_octant_transform(resolution.into());
 
             let rotated_voxels = match voxels.single_voxel_or_palette() {
-                Ok(_) => voxels,
-                Err(paletted) => Evoxels::from_paletted(resolution, paletted.palette_arc(), {
-                    let indices = paletted.indices();
-                    Vol::from_fn(
-                        indices.bounds().transform(inner_to_outer).unwrap(),
-                        |cube| indices[outer_to_inner.transform_cube(cube)],
-                    )
-                }),
+                Ok(voxel) => Evoxels::from_one(voxel.rotate(rotation)),
+                Err(paletted) => {
+                    let mut palette = paletted.palette_arc();
+
+                    if !palette.iter().all(BlRotate::rotationally_symmetric) {
+                        for voxel in Arc::make_mut(&mut palette).iter_mut() {
+                            *voxel = voxel.rotate(rotation);
+                        }
+                    }
+
+                    Evoxels::from_paletted(resolution, palette, {
+                        let indices = paletted.indices();
+                        Vol::from_fn(
+                            indices.bounds().transform(inner_to_outer).unwrap(),
+                            |cube| indices[outer_to_inner.transform_cube(cube)],
+                        )
+                    })
+                }
             };
 
             MinEval::new(attributes.rotate(rotation), rotated_voxels)

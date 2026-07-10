@@ -560,7 +560,9 @@ impl MinEval {
     }
 
     pub(crate) fn rotationally_symmetric(&self) -> bool {
-        self.attributes().rotationally_symmetric() && self.voxels().resolution() == R1
+        self.attributes().rotationally_symmetric()
+            && self.voxels().resolution() == R1
+            && self.voxels().palette().iter().all(Evoxel::rotationally_symmetric)
     }
 
     /// Check if `self` is equal to `other` without checking every voxel.

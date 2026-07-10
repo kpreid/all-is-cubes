@@ -147,6 +147,23 @@ impl fmt::Debug for Evoxel {
     }
 }
 
+impl crate::block::BlRotate for Evoxel {
+    fn rotate(self, _rotation: all_is_cubes_base::math::GridRotation) -> Self {
+        // Currently, none of these fields need rotation.
+        let Self {
+            color: _,
+            emission: _,
+            selectable: _,
+            collision: _,
+        } = self;
+        self
+    }
+
+    fn rotationally_symmetric(&self) -> bool {
+        true
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Storage of an [`EvaluatedBlock`]'s shape — its _evaluated voxels._
