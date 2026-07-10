@@ -350,7 +350,7 @@ impl Evoxels {
     /// If this has a resolution of 1, then return that single voxel, otherwise return the
     /// palette representation.
     #[inline] // TODO: revisit whether this is good
-    fn single_voxel_or_palette(&self) -> Result<Evoxel, &EvoxelsPaletted> {
+    pub(in crate::block) fn single_voxel_or_palette(&self) -> Result<Evoxel, &EvoxelsPaletted> {
         match self.0 {
             EvoxelsInner::One(v) => Ok(v),
             EvoxelsInner::Many(EvoxelsPaletted {
@@ -545,6 +545,16 @@ impl Evoxels {
                 "index {bad_index_value} at {bad_index_cube:?} is outside of the palette length, {palette_len}",
             );
         }
+    }
+}
+
+impl EvoxelsPaletted {
+    pub(in crate::block) fn palette_arc(&self) -> Arc<[Evoxel]> {
+        self.palette.clone()
+    }
+
+    pub(in crate::block) fn indices(&self) -> Vol<&[VoxelIndex]> {
+        self.indices.as_ref()
     }
 }
 
