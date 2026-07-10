@@ -883,6 +883,34 @@ mod impl_rotate {
             <T as BlRotate>::rotationally_symmetric(self)
         }
     }
+
+    impl BlRotate for crate::math::Octant {
+        fn rotate(self, rotation: GridRotation) -> Self {
+            // calling the inherent method
+            self.rotate(rotation)
+        }
+
+        fn rotationally_symmetric(&self) -> bool {
+            // A single octant is, by definition, not symmetric.
+            false
+        }
+    }
+
+    impl BlRotate for crate::math::OctantMask {
+        fn rotate(self, rotation: GridRotation) -> Self {
+            if rotation != GridRotation::IDENTITY {
+                Self::from_iter(self.into_iter().map(|octant| octant.rotate(rotation)))
+            } else {
+                self
+            }
+        }
+
+        fn rotationally_symmetric(&self) -> bool {
+            // If there is any nonuniformity at all, then there exists some rotation/reflection that
+            // will reveal it.
+            *self != Self::ALL && *self != Self::NONE
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

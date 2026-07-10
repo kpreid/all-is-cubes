@@ -5,7 +5,7 @@ use core::ops;
 
 use euclid::{Vector3D, vec3};
 
-use crate::math::{Axis, Cube, Face, FreeVector, GridCoordinate, GridPoint};
+use crate::math::{Axis, Cube, Face, FreeVector, GridCoordinate, GridPoint, GridRotation};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -214,6 +214,31 @@ impl Octant {
             Self::Ppn => Self::Nnp,
             Self::Ppp => Self::Nnn,
         }
+    }
+
+    /// Rotates this octant about the origin by `rotation`.
+    #[allow(clippy::missing_inline_in_public_items)]
+    #[must_use]
+    pub fn rotate(self, rotation: GridRotation) -> Self {
+        // This is the same algorithm currently used by `GridRotation`’s other rotation functions,
+        // but implemented on single bits instead of whole vector components.
+
+        let basis = rotation.to_basis();
+
+        // Negate the axes that are negated.
+        let negated = self.to_zmaj_index()
+            ^ (u8::from(basis.x.is_negative()) << 2)
+            ^ (u8::from(basis.y.is_negative()) << 1)
+            ^ u8::from(basis.z.is_negative());
+
+        // Shuffle axes.
+        // Each axis's bit is shifted left into the 0b100 position, then shifted right
+        // to where it needs to go.
+        let shuffled = (negated & 0b100) >> basis.x.axis() as u8
+            | ((negated & 0b010) << 1) >> basis.y.axis() as u8
+            | ((negated & 0b001) << 2) >> basis.z.axis() as u8;
+
+        Self::from_zmaj_index(shuffled)
     }
 }
 
@@ -704,6 +729,21 @@ mod tests {
                 octant.reflect(test_vector),
                 "{octant:?}"
             );
+        }
+    }
+
+    #[test]
+    fn rotate_consistent_vs_rotating_vectors() {
+        // Note: this test only works with such a main-diagonal vector.
+        // If it has different values per component, then rotating it is not the same as reflecting it.
+        let test_vector = vec3(1, 1, 1);
+        for octant in Octant::ALL {
+            for rotation in GridRotation::ALL {
+                assert_eq!(
+                    octant.rotate(rotation).reflect(test_vector),
+                    rotation.transform_vector(octant.reflect(test_vector))
+                )
+            }
         }
     }
 
