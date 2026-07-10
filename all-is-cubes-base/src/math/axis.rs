@@ -129,6 +129,7 @@ impl From<Axis> for usize {
 
 mod impl_index_axis {
     use super::Axis;
+    use crate::math;
     use core::ops;
 
     impl<T> ops::Index<Axis> for [T; 3] {
@@ -146,9 +147,14 @@ mod impl_index_axis {
         }
     }
 
-    macro_rules! impl_xyz_e {
-        ($x:ident $y:ident $z:ident, $($type:tt)*) => {
-            impl<T, U> ops::Index<Axis> for $($type)*<T, U> {
+    // TODO: Changing the below implementations to reinterpret the vector as an array instead of
+    // `match`ing has notable positive and negative effects on performance. We should find a way
+    // to get only the positive ones (in the worst case, by providing a wrapper type to choose
+    // which style to use).
+
+    macro_rules! impl_euclid_generic {
+        ($x:ident $y:ident $z:ident, $($container_type:tt)*) => {
+            impl<T, U> ops::Index<Axis> for $($container_type)*<T, U> {
                 type Output = T;
 
                 #[inline]
@@ -160,7 +166,7 @@ mod impl_index_axis {
                     }
                 }
             }
-            impl<T, U> ops::IndexMut<Axis> for $($type)*<T, U> {
+            impl<T, U> ops::IndexMut<Axis> for $($container_type)*<T, U> {
                 #[inline]
                 fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
                     match index {
@@ -172,17 +178,48 @@ mod impl_index_axis {
             }
         };
     }
-    impl_xyz_e!(x y z, euclid::Vector3D);
-    impl_xyz_e!(x y z, euclid::Point3D);
-    impl_xyz_e!(width height depth, euclid::Size3D);
+    impl_euclid_generic!(x y z, euclid::Vector3D);
+    impl_euclid_generic!(x y z, euclid::Point3D);
+    impl_euclid_generic!(width height depth, euclid::Size3D);
 
-    // `Cube` also has implementations like this, in its own module.
+    macro_rules! impl_concrete {
+        ($x:ident $y:ident $z:ident, $container_type:ty, $field_type:ty) => {
+            impl ops::Index<Axis> for $container_type {
+                type Output = $field_type;
+
+                #[inline]
+                fn index(&self, index: Axis) -> &Self::Output {
+                    match index {
+                        Axis::X => &self.$x,
+                        Axis::Y => &self.$y,
+                        Axis::Z => &self.$z,
+                    }
+                }
+            }
+            impl ops::IndexMut<Axis> for $container_type {
+                #[inline]
+                fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
+                    match index {
+                        Axis::X => &mut self.$x,
+                        Axis::Y => &mut self.$y,
+                        Axis::Z => &mut self.$z,
+                    }
+                }
+            }
+        };
+    }
+
+    impl_concrete!(x y z, euclid::BoolVector3D, bool);
+    impl_concrete!(x y z, math::Cube, math::GridCoordinate);
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::math::Cube;
+
     use super::*;
     use alloc::format;
+    use euclid::{UnknownUnit as Uu, bvec3, point3, size3, vec3};
 
     #[test]
     fn axis_conversion() {
@@ -213,5 +250,87 @@ mod tests {
             assert_eq!(axis, axis.increment().decrement());
             assert_eq!(axis, axis.decrement().increment());
         }
+    }
+
+    #[test]
+    fn indexing_array() {
+        let mut array = ['a', 'b', 'c'];
+        assert_eq!(
+            [array[Axis::Z], array[Axis::Y], array[Axis::X]],
+            ['c', 'b', 'a']
+        );
+
+        array[Axis::X] = 'd';
+        array[Axis::Y] = 'e';
+        array[Axis::Z] = 'f';
+        assert_eq!(array, ['d', 'e', 'f']);
+    }
+
+    #[test]
+    fn indexing_vector() {
+        let mut vector = vec3::<char, Uu>('a', 'b', 'c');
+        assert_eq!(
+            [vector[Axis::Z], vector[Axis::Y], vector[Axis::X]],
+            ['c', 'b', 'a']
+        );
+
+        vector[Axis::X] = 'd';
+        vector[Axis::Y] = 'e';
+        vector[Axis::Z] = 'f';
+        assert_eq!(vector, vec3('d', 'e', 'f'));
+    }
+
+    #[test]
+    fn indexing_point() {
+        let mut point = point3::<char, Uu>('a', 'b', 'c');
+        assert_eq!(
+            [point[Axis::Z], point[Axis::Y], point[Axis::X]],
+            ['c', 'b', 'a']
+        );
+
+        point[Axis::X] = 'd';
+        point[Axis::Y] = 'e';
+        point[Axis::Z] = 'f';
+        assert_eq!(point, point3('d', 'e', 'f'));
+    }
+
+    #[test]
+    fn indexing_size() {
+        let mut size = size3::<char, Uu>('a', 'b', 'c');
+        assert_eq!(
+            [size[Axis::Z], size[Axis::Y], size[Axis::X]],
+            ['c', 'b', 'a']
+        );
+
+        size[Axis::X] = 'd';
+        size[Axis::Y] = 'e';
+        size[Axis::Z] = 'f';
+        assert_eq!(size, size3('d', 'e', 'f'));
+    }
+
+    #[test]
+    fn indexing_bool_vector() {
+        let mut vector = bvec3(true, false, false);
+        assert_eq!(
+            [vector[Axis::Z], vector[Axis::Y], vector[Axis::X]],
+            [false, false, true]
+        );
+
+        vector[Axis::X] = false;
+        vector[Axis::Y] = true;
+        assert_eq!(vector, bvec3(false, true, false));
+        vector[Axis::Z] = true;
+        assert_eq!(vector, bvec3(false, true, true));
+    }
+
+    #[test]
+    fn indexing_cube() {
+        let mut size = Cube::new(10, 20, 30);
+        assert_eq!([size[Axis::Z], size[Axis::Y], size[Axis::X]], [30, 20, 10]);
+
+        size[Axis::X] = 40;
+        size[Axis::Y] = 50;
+        size[Axis::Z] = 60;
+        assert_eq!(size, Cube::new(40, 50, 60));
     }
 }
