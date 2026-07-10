@@ -242,6 +242,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.1.1 -> 0.2.0"
 
+[[audits.pollster]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.4.0 -> 1.0.0"
+
 [[audits.pretty_assertions]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
