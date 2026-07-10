@@ -71,6 +71,8 @@ pub struct OutOfMemory {
 }
 
 impl OutOfMemory {
+    #[cold] // Every code path which reaches this function is unlikely.
+    #[inline(always)] // But there is still no reason not to inline this ZST construction.
     pub(crate) fn new() -> Self {
         Self { _private: () }
     }
@@ -85,6 +87,8 @@ impl fmt::Display for OutOfMemory {
 }
 
 impl From<alloc::collections::TryReserveError> for OutOfMemory {
+    #[cold]
+    #[inline(always)]
     fn from(_: alloc::collections::TryReserveError) -> Self {
         Self::new()
     }
