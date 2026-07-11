@@ -327,7 +327,9 @@ fn evaluate_rotate(
                         let indices = paletted.indices();
                         Vol::from_fn(
                             indices.bounds().transform(inner_to_outer).unwrap(),
-                            |cube| indices[outer_to_inner.transform_cube(cube)],
+                            // We can use wrapping_transform_cube() here because the inputs
+                            // are known to be within the block coordinate range.
+                            |cube| indices[outer_to_inner.wrapping_transform_cube(cube)],
                         )
                     })
                 }

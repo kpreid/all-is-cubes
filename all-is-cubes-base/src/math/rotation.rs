@@ -380,7 +380,8 @@ impl GridRotation {
     ///
     /// # Panics
     ///
-    /// May panic or wrap if `vector` has any components equal to [`GridCoordinate::MIN`].
+    /// Panics if `vector` has any components equal to [`GridCoordinate::MIN`] that would overflow
+    /// when rotated.
     #[inline]
     #[track_caller]
     pub fn transform_vector(self, vector: GridVector) -> GridVector {
@@ -393,6 +394,26 @@ impl GridRotation {
                 "overflow due to sign change in GridVector::transform_vector({self:?}, {vector:?})"
             ),
         }
+    }
+
+    /// Rotate the vector by this rotation.
+    ///
+    /// May wrap if `vector` has any components equal to [`GridCoordinate::MIN`] that overflow when
+    /// rotated.
+    #[inline]
+    #[track_caller]
+    pub fn wrapping_transform_vector(self, vector: GridVector) -> GridVector {
+        let basis = self.to_basis();
+
+        let signums = vec3(basis.x.signum(), basis.y.signum(), basis.z.signum());
+        let flipped = vector.zip(signums, GridCoordinate::wrapping_mul);
+
+        let mut result = GridVector::zero();
+        result[basis.x.axis()] = flipped.x;
+        result[basis.y.axis()] = flipped.y;
+        result[basis.z.axis()] = flipped.z;
+
+        result
     }
 
     /// Rotate the vector by this rotation.
@@ -769,15 +790,18 @@ mod tests {
         );
     }
 
-    /// Test that `transform_vector()` and `to_rotation_matrix()` do the same thing.
+    /// Test that `transform_vector()`, `wrapping_transform_vector()` and `to_rotation_matrix()` do the same thing.
     #[test]
-    fn equivalent_rotation_matrix() {
+    fn equivalent_transforms_and_rotation_matrix() {
         for rot in GridRotation::ALL {
             let point = GridPoint::new(1, 20, 300);
-            assert_eq!(
-                rot.transform_vector(point.to_vector()).to_point(),
-                rot.to_rotation_matrix().transform_point(point),
-            );
+
+            let tv = rot.transform_vector(point.to_vector()).to_point();
+            let wtv = rot.wrapping_transform_vector(point.to_vector()).to_point();
+            let mtp = rot.to_rotation_matrix().transform_point(point);
+
+            assert_eq!(tv, mtp);
+            assert_eq!(tv, wtv);
         }
     }
 

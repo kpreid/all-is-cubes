@@ -100,12 +100,33 @@ impl Gridgid {
         )
     }
 
+    /// Applies this transform to the given point.
+    /// Returns a wrapped value if the resulting point’s coordinates overflow.
+    ///
+    /// Note that a point is not a unit cube; if the point identifies a cube then use
+    /// [`Gridgid::transform_cube()`] instead.
+    #[inline]
+    pub fn wrapping_transform_point(self, point: GridPoint) -> GridPoint {
+        self.rotation
+            .wrapping_transform_vector(point.to_vector())
+            .zip(self.translation, GridCoordinate::wrapping_add)
+            .to_point()
+    }
+
     /// Equivalent to temporarily applying an offset of `[0.5, 0.5, 0.5]` while
     /// transforming `cube`'s coordinates as per [`Gridgid::transform_point()`], despite
     /// the fact that integer arithmetic is being used.
     ///
     /// This operation thus transforms the [`Cube`] considered as a solid object
     /// the same as a [`GridAab::single_cube`] containing that cube.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the transformed position of `cube` does not exist.
+    /// May also panic if an intermediate step overflows; but this will not happen unless at least
+    /// one of the coordinates of `cube` is equal to [`GridCoordinate::MIN`].
+    ///
+    /// # Examples
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
@@ -131,6 +152,19 @@ impl Gridgid {
         Cube::from(
             self.transform_point(cube.lower_bounds())
                 .min(self.transform_point(cube.upper_bounds())),
+        )
+    }
+
+    /// Identical to [`Gridgid::transform_cube`] except that in the event of numeric overflow,
+    /// it returns a meaningless value instead of panicking.
+    ///
+    /// This returns the correct result for all cubes which are within the representable numeric
+    /// range and which do not have any coordinates equal to [`GridCoordinate::MIN`].
+    #[inline]
+    pub fn wrapping_transform_cube(&self, cube: Cube) -> Cube {
+        Cube::from(
+            self.wrapping_transform_point(cube.lower_bounds())
+                .min(self.wrapping_transform_point(cube.upper_bounds())),
         )
     }
 
@@ -234,6 +268,14 @@ mod tests {
             assert_eq!(
                 m.transform_point(GridPoint::new(2, 300, 40000)),
                 m.to_matrix().transform_point(GridPoint::new(2, 300, 40000)),
+            );
+            assert_eq!(
+                m.transform_point(GridPoint::new(2, 300, 40000)),
+                m.wrapping_transform_point(GridPoint::new(2, 300, 40000)),
+            );
+            assert_eq!(
+                m.transform_cube(Cube::new(2, 300, 40000)),
+                m.wrapping_transform_cube(Cube::new(2, 300, 40000)),
             );
         }
     }
