@@ -24,6 +24,7 @@ use itertools::Itertools as _;
 use crate::block::{self, AIR, AIR_EVALUATED, Block, BlockChange, EvaluatedBlock};
 use crate::listen::{self, Listener as _};
 use crate::math::{self, OpacityCategory};
+use crate::rerun_glue as rg;
 use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
 use crate::time::{self, TimeStats};
 use crate::universe::{self, ReadTicket};
@@ -807,10 +808,12 @@ pub(in crate::space) struct PaletteUpdates(HbHashMap<BlockIndex, EvaluatedBlock>
 ///
 /// TODO: this is basically a copy of similar code for `BlockDef`
 pub(crate) fn update_palette_phase_1(
+    lex: rg::LogExecution,
     mut info_collector: ecs::ResMut<universe::InfoCollector<TimeStats, PaletteStatsTag>>,
     mut spaces: ecs::Query<'_, '_, (&Palette, &mut PaletteUpdates)>,
     data_sources: universe::QueryBlockDataSources<'_, '_>,
 ) {
+    let _lex = lex.name("space_palette", "p1");
     let data_sources = data_sources.get();
     let read_ticket = ReadTicket::from_queries(&data_sources);
 
@@ -875,11 +878,13 @@ pub(crate) fn update_palette_phase_1(
 /// This system being separate resolves the borrow conflict between writing to a [`Space`]
 /// and block evaluation (which may read from any [`Space`]).
 pub(crate) fn update_palette_phase_2(
+    lex: rg::LogExecution,
     mut spaces: ecs::Query<
         (&mut Palette, &mut PaletteUpdates, &super::Notifiers),
         ecs::Changed<PaletteUpdates>,
     >,
 ) {
+    let _lex = lex.name("space_palette", "p2");
     spaces
         .par_iter_mut()
         .for_each(|(mut current_palette, mut next_palette, notifiers)| {

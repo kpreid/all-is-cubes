@@ -40,11 +40,11 @@ use crate::math::{
 };
 use crate::physics::{Body, BodyStepInfo, Contact, ContactSet, StopAt, Velocity};
 use crate::raycast::Ray;
+use crate::rerun_glue as rg;
 use crate::space::{self, Space};
-use crate::time::Tick;
+use crate::time::{self, Tick};
 use crate::universe;
 use crate::util::{ConciseDebug, NoAlternateDebug};
-use crate::{rerun_glue as rg, time};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -66,6 +66,7 @@ pub(crate) fn add_systems(world: &mut ecs::World) {
 
 /// System function to run physics for [`Body`].
 pub(super) fn body_physics_step_system(
+    lex: rg::LogExecution,
     current_step: ecs::Res<universe::CurrentStep>,
     mut info_collector: ecs::ResMut<universe::InfoCollector<BodyStepInfo>>,
     characters: ecs::Query<(
@@ -77,6 +78,7 @@ pub(super) fn body_physics_step_system(
     )>,
     spaces: universe::HandleReadQuery<Space>,
 ) -> ecs::Result {
+    let _lex = lex.name("physics", "step");
     let tick = current_step.get()?.tick;
     debug_assert!(!tick.paused(), "should not be called with a paused tick");
 

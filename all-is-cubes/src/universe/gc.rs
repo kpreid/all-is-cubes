@@ -3,6 +3,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use bevy_ecs::prelude as ecs;
 
+use crate::rerun_glue as rg;
 use crate::universe::{ErasedHandle, Membership, UniverseId, VisitableComponents};
 
 // -------------------------------------------------------------------------------------------------
@@ -63,6 +64,7 @@ pub(in crate::universe) fn gc_if_requested(world: &mut ecs::World) {
 /// See [`Universe::gc()`].
 #[allow(clippy::needless_pass_by_value)]
 fn gc_system(
+    lex: rg::LogExecution<'_>,
     universe_id: ecs::Res<'_, UniverseId>,
     world: &ecs::World,
     // Used for the initial scan for roots and final scan for garbage.
@@ -73,6 +75,7 @@ fn gc_system(
     gc_state_query: ecs::Query<'_, '_, &GcState>,
     mut commands: ecs::Commands<'_, '_>,
 ) -> ecs::Result {
+    let _lex = lex.name("gc", "-");
     let universe_id = *universe_id;
 
     // Mark all GC roots (named members) and unmark all non-roots (anonymous members).

@@ -632,6 +632,12 @@ impl Universe {
         self.queries.update_archetypes(&self.world);
     }
 
+    /// Activate logging this universe's system execution state to a Rerun stream.
+    #[cfg(feature = "rerun")]
+    pub fn log_ecs_perf_to_rerun(&mut self, destination: rg::Destination) {
+        self.world.insert_resource(rg::SystemTimingLogger(destination));
+    }
+
     /// Activate logging this universe's time to a Rerun stream.
     #[cfg(feature = "rerun")]
     pub fn log_time_to_rerun(&mut self, destination: rg::RootDestination) {

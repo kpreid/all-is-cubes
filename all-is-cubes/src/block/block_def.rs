@@ -18,6 +18,7 @@ use nosy::Listen as _;
 
 use crate::block::{self, Block, BlockChange, EvalBlockError, InEvalError, MinEval};
 use crate::listen::{self, Notifier};
+use crate::rerun_glue as rg;
 use crate::time;
 use crate::transaction::{self, Equal, Transaction};
 use crate::universe::{self, HandleVisitor, ReadTicket, VisitHandles};
@@ -777,9 +778,11 @@ pub(crate) fn add_block_def_systems(world: &mut ecs::World) {
 
 /// ECS system function that advances [`BlockDef`] animations.
 fn animate(
+    lex: rg::LogExecution,
     current_step: ecs::Res<universe::CurrentStep>,
     mut defs: ecs::Query<(&mut BlockDefState, &NotifierComponent)>,
 ) -> ecs::Result {
+    let _lex = lex.name("block_def", "animate");
     let current_phase = current_step.get()?.tick.next_phase();
     for (mut def_state, NotifierComponent(notifier)) in defs.iter_mut() {
         let (new_frame, _) = find_frame(&def_state.frames, current_phase);
@@ -796,12 +799,14 @@ fn animate(
 /// evaluations into `CacheUpdate`.
 #[allow(clippy::needless_pass_by_value)]
 fn update_phase_1(
+    lex: rg::LogExecution,
     mut info_collector: ecs::ResMut<universe::InfoCollector<BlockDefStepInfo>>,
     // mutex used to allow collecting data from parallel execution (`InfoCollector` doesn't help)
     info_buffer: ecs::Local<bevy_platform::sync::Mutex<BlockDefStepInfo>>,
     mut defs: ecs::Query<(&BlockDefState, &mut CacheUpdate)>,
     data_sources: universe::QueryBlockDataSources,
 ) {
+    let _lex = lex.name("block_def", "p1");
     let mq = data_sources.get();
     let read_ticket = ReadTicket::from_queries(&mq);
 
@@ -830,6 +835,7 @@ fn update_phase_1(
 /// This system being separate resolves the borrow conflict between different `BlockDef`s reading
 /// each other (possibly circularly) and writing themselves.
 fn update_phase_2(
+    lex: rg::LogExecution,
     mut defs: ecs::Query<
         '_,
         '_,
@@ -837,6 +843,7 @@ fn update_phase_2(
         ecs::Changed<CacheUpdate>,
     >,
 ) {
+    let _lex = lex.name("block_def", "p2");
     defs.par_iter_mut()
         .for_each(|(mut def_state, NotifierComponent(notifier), mut next)| {
             // By bypassing change detection, we avoid detecting this consumption of the change.

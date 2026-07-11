@@ -20,6 +20,7 @@ use crate::block;
 use crate::fluff::{self, Fluff};
 use crate::inv;
 use crate::math::{Cube, GridCoordinate, Gridgid};
+use crate::rerun_glue as rg;
 use crate::space::{
     self, Contents, LightStorage, LightUpdatesInfo, Notifiers, Palette, Space, SpacePhysics,
     SpaceStepInfo, SpaceTransaction, Ticks,
@@ -51,15 +52,15 @@ pub(crate) fn add_space_systems(world: &mut ecs::World) {
     let mut schedules = world.resource_mut::<ecs::Schedules>();
     schedules.add_systems(
         time::schedule::Step,
-        execute_tick_actions_system.in_set(SpaceUpdateSet),
-    );
-
-    schedules.add_systems(
-        time::schedule::Step,
-        step_behaviors_system
-            .pipe(execute_behavior_transactions_system)
-            .after(execute_tick_actions_system)
-            .in_set(SpaceUpdateSet),
+        // TODO: Tick actions and behaviors need to be in an order because, for simulation logic,
+        // they both do mutations the other can see, and because, for borrowing, they both use
+        // `&mut World`, but we have not yet decided that this order is the “correct” in which to
+        // execute them.
+        ecs::IntoScheduleConfigs::chain((
+            execute_tick_actions_system,
+            step_behaviors_system.pipe(execute_behavior_transactions_system),
+        ))
+        .in_set(SpaceUpdateSet),
     );
 
     // Light updates should:
@@ -120,6 +121,7 @@ pub(crate) fn execute_tick_actions_system(
     )>,
     read_queries: &mut universe::MemberReadQueryStates,
 ) -> ecs::Result {
+    let _lex = rg::LogExecution::from_world(world, "tick_actions", "running");
     let universe_id: UniverseId = *world.resource();
     read_queries.update_archetypes(world);
     let tick = world.resource::<universe::CurrentStep>().get()?.tick;
@@ -336,10 +338,12 @@ pub(crate) fn execute_tick_actions_system(
 }
 
 fn update_light_system(
+    lex: rg::LogExecution,
     current_step: ecs::Res<'_, universe::CurrentStep>,
     info_collector: ecs::ResMut<InfoCollector<LightUpdatesInfo>>,
     mut spaces_query: ecs::Query<(&Palette, &mut LightStorage, &mut Contents, &Notifiers)>,
 ) -> ecs::Result {
+    let _lex = lex.name("light", "-");
     let step_input = current_step.get()?;
 
     // for access from par_iter
@@ -365,6 +369,7 @@ fn update_light_system(
 }
 
 pub(crate) fn step_behaviors_system(
+    lex: rg::LogExecution,
     current_step: ecs::Res<universe::CurrentStep>,
     mut info_collector: ecs::ResMut<InfoCollector<behavior::BehaviorSetStepInfo, Space>>,
     spaces: ecs::Query<(
@@ -372,7 +377,8 @@ pub(crate) fn step_behaviors_system(
         <Space as universe::SealedMember>::ReadQueryData,
     )>,
     everything: universe::AllMemberReadQueries,
-) -> Result<Vec<universe::UniverseTransaction>, ecs::BevyError> {
+) -> Result<(Vec<universe::UniverseTransaction>, rg::LogExecutionActive), ecs::BevyError> {
+    let lex = lex.name("behaviors", "step");
     let step_input = current_step.get()?;
     let tick = step_input.tick;
     let everything = everything.get();
@@ -399,14 +405,19 @@ pub(crate) fn step_behaviors_system(
         }
     }
 
-    Ok(transactions)
+    lex.set_state("schedule wait");
+    Ok((transactions, lex))
 }
 
 pub(crate) fn execute_behavior_transactions_system(
-    ecs::In(transactions): ecs::In<Vec<universe::UniverseTransaction>>,
+    ecs::In((transactions, lex)): ecs::In<(
+        Vec<universe::UniverseTransaction>,
+        rg::LogExecutionActive,
+    )>,
     world: &mut ecs::World,
     read_queries: &mut universe::MemberReadQueryStates,
 ) {
+    lex.set_state("execute");
     // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
     for t in transactions {
         if let Err(e) = t.execute_on_world(world, read_queries) {

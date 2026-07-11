@@ -7,6 +7,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
+use core::mem;
 
 use bevy_ecs::prelude as ecs;
 use re_sdk::blueprint as b;
@@ -237,6 +238,92 @@ pub fn create_blueprint(stems: &mut dyn Iterator<Item = Stem>) -> re_sdk::bluepr
             //
             //.with_timeline("session_step_time"),
         )
+}
+
+// -------------------------------------------------------------------------------------------------
+
+#[derive(ecs::Resource)]
+pub(crate) struct SystemTimingLogger(
+    /// Destination for *all* system logging (not specific to a system).
+    pub(crate) Destination,
+);
+
+/// [`ecs::SystemParam`] to use to log that a system is executing.
+///
+/// You *must* call [`LogExecution::name()`] to begin logging.
+#[derive(bevy_ecs::system::SystemParam)]
+pub(crate) struct LogExecution<'w> {
+    stl_res: Option<ecs::Res<'w, SystemTimingLogger>>,
+}
+
+pub(crate) struct LogExecutionActive {
+    /// Destination for this specific system we are logging the activity of.
+    destination: Destination,
+}
+
+impl Drop for LogExecution<'_> {
+    fn drop(&mut self) {
+        panic!("`LogExecution` must be given a name to log");
+    }
+}
+
+impl LogExecution<'_> {
+    /// Use this when you have a `&mut World` and can't use the `SystemParam` form.
+    #[must_use = "you must assign the result to a variable"]
+    pub fn from_world(
+        world: &ecs::World,
+        name: &'static str,
+        initial_state: &'static str,
+    ) -> LogExecutionActive {
+        let active = match world.get_resource::<SystemTimingLogger>() {
+            Some(SystemTimingLogger(destination)) => LogExecutionActive {
+                destination: destination.child(&entity_path![name]),
+            },
+            None => LogExecutionActive {
+                destination: Destination::default(),
+            },
+        };
+        active.set_state(initial_state);
+        active
+    }
+
+    #[must_use = "you must assign the result to a variable"]
+    pub fn name(mut self, name: &'static str, initial_state: &'static str) -> LogExecutionActive {
+        assert!(!initial_state.is_empty());
+        let active = match self.stl_res.take().map(|stl_res| stl_res.into_inner()) {
+            Some(SystemTimingLogger(destination)) if destination.stream.is_enabled() => {
+                let inner_destination = destination.child(&entity_path![name]);
+
+                LogExecutionActive {
+                    destination: inner_destination,
+                }
+            }
+            _ => LogExecutionActive {
+                destination: Destination::default(),
+            },
+        };
+
+        mem::forget(self); // disarm Drop panic
+        active.set_state(initial_state);
+        active
+    }
+}
+
+impl LogExecutionActive {
+    pub fn set_state(&self, state: &'static str) {
+        assert!(!state.is_empty());
+
+        self.destination.log(
+            &entity_path![],
+            &archetypes::StateChange::new().with_state([state]),
+        );
+    }
+}
+
+impl Drop for LogExecutionActive {
+    fn drop(&mut self) {
+        self.destination.clear_recursive(&entity_path![]);
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

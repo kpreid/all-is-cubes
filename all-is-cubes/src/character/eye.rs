@@ -19,6 +19,7 @@ use crate::camera::ViewTransform;
 use crate::character::{self, ParentSpace, exposure};
 use crate::math::{Cube, FreeCoordinate, FreeVector};
 use crate::physics::{Body, Velocity};
+use crate::rerun_glue as rg;
 use crate::space;
 use crate::time;
 use crate::universe;
@@ -87,9 +88,11 @@ fn record_previous_velocity(query: ecs::Query<'_, '_, (&Body, &mut PreviousBodyV
 
 /// System function to update [`CharacterEye`]'s dynamics.
 fn step_eye_position(
+    lex: rg::LogExecution,
     current_step: ecs::Res<'_, universe::CurrentStep>,
     characters: ecs::Query<'_, '_, (&Body, &PreviousBodyVelocity, &mut CharacterEye)>,
 ) -> ecs::Result {
+    let _lex = lex.name("eye_position", "-");
     let tick = current_step.get()?.tick;
     let dt = tick.delta_t_f64();
     for (body, &PreviousBodyVelocity(previous_body_velocity), mut eye) in characters {
@@ -118,10 +121,12 @@ fn step_eye_position(
 }
 
 fn step_exposure(
+    lex: rg::LogExecution,
     current_step: ecs::Res<universe::CurrentStep>,
     eyes: ecs::Query<(&ParentSpace, &CharacterEye, &mut exposure::State)>,
     spaces: universe::HandleReadQuery<space::Space>,
 ) -> ecs::Result {
+    let _lex = lex.name("exposure", "-");
     let tick = current_step.get()?.tick;
     let dt = tick.delta_t_f64();
 
@@ -148,6 +153,7 @@ fn step_exposure(
 }
 
 fn step_ambient_sound(
+    lex: rg::LogExecution,
     current_step: ecs::Res<universe::CurrentStep>,
     eyes: ecs::Query<(
         &ParentSpace,
@@ -156,6 +162,7 @@ fn step_ambient_sound(
     )>,
     spaces: universe::HandleReadQuery<space::Space>,
 ) -> ecs::Result {
+    let _lex = lex.name("ambient_sound", "-");
     let tick = current_step.get()?.tick;
     let dt = tick.delta_t_f64();
 

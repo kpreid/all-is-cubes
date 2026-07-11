@@ -209,6 +209,9 @@ pub(crate) enum RerunDataKind {
     /// Send spatial data about the world around the player character (particularly collisions).
     World,
 
+    /// Send timing data about the world simulation.
+    EcsPerf,
+
     /// Send the mesh used for rendering.
     RenderMesh,
 
@@ -230,6 +233,7 @@ impl RerunDataKind {
     fn stems(&self) -> impl Iterator<Item = rg::Stem> {
         <[_]>::iter(match self {
             RerunDataKind::World => &[rg::Stem::World],
+            RerunDataKind::EcsPerf => &[rg::Stem::World],
             RerunDataKind::RenderMesh => &[rg::Stem::World],
             RerunDataKind::RenderImage => &[rg::Stem::World, rg::Stem::WorldImage],
             RerunDataKind::RenderTextures => &[rg::Stem::Textures],
@@ -343,6 +347,12 @@ fn log_universe_to_rerun(this: &LateLogging, universe: &mut all_is_cubes::univer
                 )
                 .unwrap();
         }
+    }
+
+    if kinds.contains(&RerunDataKind::EcsPerf) {
+        universe.log_ecs_perf_to_rerun(
+            destination.get(rg::Stem::World).into_child(&rg::entity_path!["systems"]),
+        );
     }
 
     if kinds.contains(&RerunDataKind::RenderMesh) {
