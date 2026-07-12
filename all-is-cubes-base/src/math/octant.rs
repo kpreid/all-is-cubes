@@ -492,6 +492,21 @@ impl ops::BitAndAssign for OctantMask {
     }
 }
 
+impl IntoIterator for OctantMask {
+    type Item = Octant;
+
+    type IntoIter = OctantMaskIter;
+
+    /// Returns all the octants in this set.
+    ///
+    /// The order in which the octants are returned is deterministic, but may change to a
+    /// different deterministic order in future versions.
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        OctantMaskIter(self)
+    }
+}
+
 impl FromIterator<Octant> for OctantMask {
     #[inline]
     fn from_iter<T: IntoIterator<Item = Octant>>(iter: T) -> Self {
@@ -508,6 +523,40 @@ impl From<Octant> for OctantMask {
     #[inline]
     fn from(octant: Octant) -> Self {
         Self::from_octant(octant)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Iterator for [`OctantMask`].
+#[derive(Debug)]
+pub struct OctantMaskIter(OctantMask);
+
+/// The order in which the octants are returned is deterministic, but may change to a
+/// different deterministic order in future versions.
+impl Iterator for OctantMaskIter {
+    type Item = Octant;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = self.0.first();
+        if let Some(octant) = next {
+            self.0.clear(octant);
+        }
+        next
+    }
+}
+
+/// The order in which the octants are returned is deterministic, but may change to a
+/// different deterministic order in future versions.
+impl DoubleEndedIterator for OctantMaskIter {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let next = self.0.last();
+        if let Some(octant) = next {
+            self.0.clear(octant);
+        }
+        next
     }
 }
 
@@ -725,14 +774,29 @@ mod tests {
     }
 
     #[test]
-    fn octant_mask_smoke_test() {
+    fn first_last() {
         let mut mask = OctantMask::NONE;
-        assert_eq!(mask, OctantMask::NONE);
+        assert_eq!(mask, OctantMask { flags: 0b0000_0000 });
         mask.set(Octant::from_vector(vec3(1., 1., 1.)));
         assert_eq!(mask, OctantMask { flags: 0b1000_0000 });
         mask.set(Octant::from_vector(vec3(-1., -1., -1.)));
         assert_eq!(mask, OctantMask { flags: 0b1000_0001 });
         assert_eq!(mask.first(), Some(Octant::from_zmaj_index(0)));
         assert_eq!(mask.last(), Some(Octant::from_zmaj_index(7)));
+    }
+
+    #[test]
+    fn mask_iter() {
+        let mask = OctantMask::from_iter([Octant::Nnn, Octant::Nnp, Octant::Ppn, Octant::Ppp]);
+        assert_eq!(mask, OctantMask { flags: 0b1100_0011 });
+
+        let mut iter = mask.into_iter();
+
+        assert_eq!(iter.next(), Some(Octant::Nnn));
+        assert_eq!(iter.next_back(), Some(Octant::Ppp));
+        assert_eq!(iter.next(), Some(Octant::Nnp));
+        assert_eq!(iter.next_back(), Some(Octant::Ppn));
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next_back(), None);
     }
 }
