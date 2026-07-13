@@ -1552,12 +1552,12 @@ impl<'space> Mutation<'_, 'space> {
         &'this mut ChangeBuffer<'space>,
     ) {
         (
-            &mut *self.light,
+            self.light,
             light::UpdateCtx {
                 contents: self.contents.as_ref(),
                 palette: self.palette,
             },
-            &mut self.change_buffer,
+            self.change_buffer,
         )
     }
 
