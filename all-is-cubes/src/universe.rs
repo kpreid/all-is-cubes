@@ -570,22 +570,6 @@ impl Universe {
         }
     }
 
-    /// Delete a member.
-    ///
-    /// (Use [`UniverseTransaction::delete()`] as the public, checked interface to this.)
-    ///
-    /// Returns whether the entry actually existed.
-    pub(crate) fn delete(&mut self, name: &Name) -> bool {
-        let Some(handle) = self.get_any(name) else {
-            return false;
-        };
-        let entity = handle.as_entity(self.id).unwrap();
-        handle.to_any_handle().set_state_to_gone(GoneReason::Deleted {});
-        let success = self.world.despawn(entity);
-        assert!(success);
-        true
-    }
-
     /// Perform garbage collection: delete all anonymous members which have no handles to them.
     ///
     /// This may happen at any time during operations of the universe; calling this method

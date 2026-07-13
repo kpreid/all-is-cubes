@@ -9,7 +9,7 @@ use hashbrown::HashMap as HbHashMap;
 
 use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transactional};
 use crate::universe::{
-    AnyPending, Builtin, ErasedHandle, Handle, HandleError, InsertError, InsertErrorKind,
+    self, AnyPending, Builtin, ErasedHandle, Handle, HandleError, InsertError, InsertErrorKind,
     MemberBoilerplate, Name, ReadTicket, Universe, UniverseId, UniverseMember,
 };
 
@@ -984,8 +984,7 @@ impl MemberTxn {
             }
             MemberTxn::Delete => {
                 assert!(check.is_none());
-                let did_delete = universe.delete(name);
-                assert!(did_delete);
+                universe::ecs_details::delete(&mut universe.world, name);
                 Ok(())
             }
         }

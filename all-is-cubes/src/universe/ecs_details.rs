@@ -90,6 +90,22 @@ pub(in crate::universe) fn get_handle_by_name<'w>(
     }
 }
 
+/// Delete a member.
+///
+/// (Use [`UniverseTransaction::delete()`] as the public, checked interface to this.)
+///
+/// Panics if the given name does not refer to an existing member.
+pub(in crate::universe) fn delete(world: &mut ecs::World, name: &Name) {
+    let Some(handle) = get_handle_by_name(world, name) else {
+        panic!("{name} does not exist in the universe");
+    };
+    let universe_id = *world.resource::<universe::UniverseId>();
+    let entity = handle.as_entity(universe_id).unwrap();
+    handle.to_any_handle().set_state_to_gone(universe::GoneReason::Deleted {});
+    let success = world.despawn(entity);
+    assert!(success);
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Trait implemented for components which are exposed for arbitrary mutation
