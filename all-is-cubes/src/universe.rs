@@ -256,21 +256,7 @@ impl Universe {
     ///
     /// This is a dynamically-typed version of [`Universe::get()`].
     pub fn get_any(&self, name: &Name) -> Option<&dyn ErasedHandle> {
-        match *name {
-            // Normal case.
-            Name::Specific(_) | Name::Anonym(_) => self
-                .world
-                .resource::<NameMap>()
-                .map
-                .get(name)
-                .map(|ah: &AnyHandle| -> &dyn ErasedHandle { &**ah }),
-
-            // Builtins are treated as if they exist in every universe.
-            Name::Builtin(builtin) => Some(builtin.erased_handle()),
-
-            // Can never succeed, so don’t bother trying.
-            Name::Pending => None,
-        }
+        ecs_details::get_handle_by_name(&self.world, name)
     }
 
     /// Returns the character named `"character"`.

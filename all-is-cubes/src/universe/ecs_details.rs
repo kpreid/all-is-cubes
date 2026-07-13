@@ -8,14 +8,14 @@ use core::ops;
 use bevy_ecs::prelude as ecs;
 
 use crate::time;
-use crate::universe::{AnyHandle, Handle, Name, UniverseMember};
+use crate::universe::{self, AnyHandle, Handle, Name, UniverseMember};
 
 // -------------------------------------------------------------------------------------------------
 
 /// Index of all entities in the associated [`ecs::World`] that have a [`Membership`].
 #[derive(Debug, Default, ecs::Resource)]
 pub(in crate::universe) struct NameMap {
-    pub map: BTreeMap<Name, AnyHandle>,
+    map: BTreeMap<Name, AnyHandle>,
 }
 
 /// Component attached to all entities that are universe members.
@@ -65,6 +65,28 @@ impl Membership {
             Ok(handle) => handle.clone(),
             Err(error) => panic!("type mismatch in Membership::handle(): {error}"),
         }
+    }
+}
+
+/// Implementation of looking up a [`Name`] in a universe’s ECS world to get a handle
+/// (not an entity).
+pub(in crate::universe) fn get_handle_by_name<'w>(
+    world: &'w ecs::World,
+    name: &Name,
+) -> Option<&'w dyn universe::ErasedHandle> {
+    match *name {
+        // Normal case.
+        Name::Specific(_) | Name::Anonym(_) => world
+            .resource::<NameMap>()
+            .map
+            .get(name)
+            .map(|ah: &AnyHandle| -> &dyn universe::ErasedHandle { &**ah }),
+
+        // Builtins are treated as if they exist in every universe.
+        Name::Builtin(builtin) => Some(builtin.erased_handle()),
+
+        // Can never succeed, so don’t bother trying.
+        Name::Pending => None,
     }
 }
 
