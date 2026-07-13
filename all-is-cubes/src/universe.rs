@@ -164,7 +164,6 @@ pub struct Universe {
 #[derive(ecs::FromWorld)]
 #[macro_rules_attribute::derive(ecs_details::derive_manual_query_bundle!)]
 struct Queries {
-    all_entities_query: ecs::QueryState<ecs::EntityRef<'static>>,
     all_members_query: ecs::QueryState<(Entity, &'static Membership)>,
     read_members: MemberReadQueryStates,
 }
@@ -709,12 +708,10 @@ impl fmt::Debug for Universe {
 
         if false {
             // A more “raw” dump of the ECS world which doesn't depend for correctness on
-            // all_members_query having been updated, and can see non-"member" entities.
+            // queries having been updated, and can see non-"member" entities.
             // TODO(ecs): Decide whether to keep or discard this.
-            let raw_entities: Vec<(Option<Name>, Vec<_>)> = self
-                .queries
-                .all_entities_query
-                .iter_manual(world)
+            let raw_entities: Vec<(Option<Name>, Vec<_>)> = world
+                .iter_entities()
                 .map(|er| {
                     let components = er
                         .archetype()
