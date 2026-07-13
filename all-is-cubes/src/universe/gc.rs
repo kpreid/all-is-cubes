@@ -1,3 +1,4 @@
+use core::mem;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use bevy_ecs::prelude as ecs;
@@ -21,6 +22,24 @@ pub(super) struct GcState {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, bevy_ecs::schedule::ScheduleLabel)]
 pub(in crate::universe) struct Gc;
 
+/// Flag set to request GC.
+///
+/// This is set to true whenever a new member is inserted, which policy ensures
+/// that repeated insertion and dropping references cannot lead to unbounded growth
+/// as long as steps occur routinely.
+///
+/// TODO: Should we perhaps replace this flag with `bevy_ecs` change detection on `NameMap`?
+#[derive(ecs::Resource)]
+pub(in crate::universe) struct WantsGc(bool);
+
+// -------------------------------------------------------------------------------------------------
+
+impl WantsGc {
+    pub(in crate::universe) fn request_gc(&mut self) {
+        self.0 = true;
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 
 const GC_DEBUG_LOG: bool = false;
@@ -29,7 +48,15 @@ const GC_DEBUG_LOG: bool = false;
 ///
 /// See [`Universe::gc()`].
 pub(in crate::universe) fn add_gc(world: &mut ecs::World) {
+    world.insert_resource(WantsGc(false));
     world.resource_mut::<ecs::Schedules>().add_systems(Gc, gc_system);
+}
+
+pub(in crate::universe) fn gc_if_requested(world: &mut ecs::World) {
+    let mut wants_gc = world.resource_mut::<WantsGc>();
+    if mem::take(&mut wants_gc.0) {
+        world.run_schedule(Gc);
+    }
 }
 
 /// ECS system function that performs mark-and-sweep garbage collection on universe members.

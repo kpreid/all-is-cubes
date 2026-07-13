@@ -644,7 +644,7 @@ impl<T: 'static> Handle<T> {
         assert_matches!(old_state, State::Pending);
 
         // Inserting new members is a good time to check if there are old ones to remove.
-        universe.wants_gc = true;
+        universe.world.resource_mut::<universe::gc::WantsGc>().request_gc();
 
         Ok(())
     }

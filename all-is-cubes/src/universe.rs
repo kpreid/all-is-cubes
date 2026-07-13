@@ -137,12 +137,6 @@ pub struct Universe {
     /// Next number to assign to a [`Name::Anonym`].
     next_anonym: usize,
 
-    /// Whether to run a garbage collection on the next [`Self::step()`].
-    /// This is set to true whenever a new member is inserted, which policy ensures
-    /// that repeated insertion and dropping references cannot lead to unbounded growth
-    /// as long as steps occur routinely.
-    wants_gc: bool,
-
     /// Where the contents of `self` came from, and where they might be able to be written
     /// back to.
     ///
@@ -235,7 +229,6 @@ impl Universe {
                 world,
                 id,
                 next_anonym: 0,
-                wants_gc: false,
                 whence: Arc::new(()),
                 session_step_time: 0,
                 spaces_with_work: 0,
@@ -349,10 +342,7 @@ impl Universe {
 
         self.log_rerun_time();
 
-        if self.wants_gc {
-            self.gc();
-            self.wants_gc = false;
-        }
+        gc::gc_if_requested(&mut self.world);
 
         if !tick.paused() {
             self.session_step_time += 1;
@@ -761,7 +751,6 @@ impl fmt::Debug for Universe {
             queries: _,
             id: _,
             next_anonym: _,
-            wants_gc: _,
             whence,
             session_step_time,
             spaces_with_work,
