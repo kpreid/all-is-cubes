@@ -536,20 +536,10 @@ impl Universe {
     ///
     /// If this finds a handle which was used but not defined, deserialization will fail.
     #[cfg(feature = "save")]
-    pub(crate) fn validate_deserialized_members(&self) -> Result<(), DeserializeHandlesError> {
-        let read_ticket = self.read_ticket();
-        self.queries.all_members_query.iter_manual(&self.world).try_for_each(
-            |(_entity, membership)| {
-                if membership.handle.not_still_deserializing(read_ticket) {
-                    Ok(())
-                } else {
-                    Err(DeserializeHandlesError {
-                        name: membership.handle.name(),
-                        kind: DeserializeHandlesErrorKind::MissingValue,
-                    })
-                }
-            },
-        )
+    pub(crate) fn validate_deserialized_members(&mut self) -> Result<(), DeserializeHandlesError> {
+        self.world
+            .run_system_cached(ecs_details::validate_deserialized_members_system)
+            .unwrap()
     }
 
     /// Unchecked access to the ECS world.

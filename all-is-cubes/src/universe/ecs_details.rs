@@ -164,6 +164,26 @@ pub(in crate::universe) fn delete(world: &mut ecs::World, name: &Name) {
     assert!(success);
 }
 
+#[cfg(feature = "save")]
+pub(in crate::universe) fn validate_deserialized_members_system(
+    all_members: ecs::Query<(ecs::Entity, &Membership)>,
+    all_queries: universe::AllMemberReadQueries,
+) -> Result<(), universe::DeserializeHandlesError> {
+    let q = all_queries.get();
+    let read_ticket = universe::ReadTicket::from_queries(&q);
+
+    all_members.into_iter().try_for_each(|(_entity, membership)| {
+        if membership.handle.not_still_deserializing(read_ticket) {
+            Ok(())
+        } else {
+            Err(universe::DeserializeHandlesError {
+                name: membership.handle.name(),
+                kind: universe::DeserializeHandlesErrorKind::MissingValue,
+            })
+        }
+    })
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Trait implemented for components which are exposed for arbitrary mutation
