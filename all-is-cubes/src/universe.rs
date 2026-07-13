@@ -134,9 +134,6 @@ pub struct Universe {
 
     id: UniverseId,
 
-    /// Next number to assign to a [`Name::Anonym`].
-    next_anonym: usize,
-
     /// Where the contents of `self` came from, and where they might be able to be written
     /// back to.
     ///
@@ -228,7 +225,6 @@ impl Universe {
 
                 world,
                 id,
-                next_anonym: 0,
                 whence: Arc::new(()),
                 session_step_time: 0,
                 spaces_with_work: 0,
@@ -529,47 +525,6 @@ impl Universe {
         )
     }
 
-    /// Convert a possibly-[pending](Name::Pending) [`Name`] into a name that may be an
-    /// actual name in this universe (which is always either [`Name::Specific`] or
-    /// [`Name::Anonym`] if it succeeds).
-    ///
-    /// Fails if:
-    ///
-    /// * The name is already present.
-    /// * The name is an [`Name::Anonym`] (which may not be pre-selected, only allocated).
-    fn allocate_name(&mut self, proposed_name: &Name) -> Result<Name, InsertError> {
-        // TODO: This logic is semi-duplicated in MemberTxn::check.
-        // Resolve that by making all inserts happen via transactions, or by sharing
-        // the code (this will need a "don't actually allocate anonym" mode).
-
-        match proposed_name {
-            Name::Specific(_) => {
-                // Check that the name is not already used, under *any* type.
-                if self.get_any(proposed_name).is_some() {
-                    return Err(InsertError {
-                        name: proposed_name.clone(),
-                        kind: InsertErrorKind::AlreadyExists,
-                    });
-                }
-                Ok(proposed_name.clone())
-            }
-            Name::Anonym(_) | Name::Builtin(_) => Err(InsertError {
-                name: proposed_name.clone(),
-                kind: InsertErrorKind::InvalidName,
-            }),
-            Name::Pending => {
-                let new_name = Name::Anonym(self.next_anonym);
-                self.next_anonym += 1;
-
-                assert!(
-                    self.get_any(&new_name).is_none(),
-                    "shouldn't happen: newly created anonym already in use"
-                );
-                Ok(new_name)
-            }
-        }
-    }
-
     /// Perform garbage collection: delete all anonymous members which have no handles to them.
     ///
     /// This may happen at any time during operations of the universe; calling this method
@@ -720,7 +675,6 @@ impl fmt::Debug for Universe {
             world,
             queries: _,
             id: _,
-            next_anonym: _,
             whence,
             session_step_time,
             spaces_with_work,

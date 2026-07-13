@@ -610,7 +610,10 @@ impl<T: 'static> Handle<T> {
         T: UniverseMember,
     {
         let pending_name = self.inner.permanent_name.get().unwrap_or(&Name::Pending).clone();
-        let new_name = universe.allocate_name(&pending_name)?;
+        let new_name = universe
+            .world
+            .resource_mut::<universe::NameMap>()
+            .allocate_name(&pending_name)?;
 
         // We have now completed all checks that could fail under reasonable circumstances, and can
         // commence making permanent changes.

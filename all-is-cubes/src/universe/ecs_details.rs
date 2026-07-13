@@ -16,6 +16,9 @@ use crate::universe::{self, AnyHandle, Handle, Name, UniverseMember};
 #[derive(Debug, Default, ecs::Resource)]
 pub(in crate::universe) struct NameMap {
     map: BTreeMap<Name, AnyHandle>,
+
+    /// Next number to assign to a [`Name::Anonym`].
+    next_anonym: usize,
 }
 
 /// Component attached to all entities that are universe members.
@@ -51,6 +54,53 @@ fn remove_membership_hook(
 ) {
     let name: Name = world.get::<Membership>(context.entity).unwrap().name.clone();
     world.resource_mut::<NameMap>().map.remove(&name);
+}
+
+impl NameMap {
+    /// Convert a possibly-[pending](Name::Pending) [`Name`] into a name that may be an
+    /// actual name in this universe (which is always either [`Name::Specific`] or
+    /// [`Name::Anonym`] if it succeeds).
+    ///
+    /// Fails if:
+    ///
+    /// * The name is already present.
+    /// * The name is an [`Name::Anonym`] (which may not be pre-selected, only allocated).
+    /// * The name is an [`Name::Builtin`] (which is always taken).
+    pub(in crate::universe) fn allocate_name(
+        &mut self,
+        proposed_name: &Name,
+    ) -> Result<Name, universe::InsertError> {
+        // TODO: This logic is semi-duplicated in MemberTxn::check.
+        // Resolve that by making all inserts happen via transactions, or by sharing
+        // the code (this will need a "don't actually allocate anonym" mode).
+
+        match proposed_name {
+            Name::Specific(_) => {
+                // Check that the name is not already used, under *any* type.
+                if self.map.contains_key(proposed_name) {
+                    return Err(universe::InsertError {
+                        name: proposed_name.clone(),
+                        kind: universe::InsertErrorKind::AlreadyExists,
+                    });
+                }
+                Ok(proposed_name.clone())
+            }
+            Name::Anonym(_) | Name::Builtin(_) => Err(universe::InsertError {
+                name: proposed_name.clone(),
+                kind: universe::InsertErrorKind::InvalidName,
+            }),
+            Name::Pending => {
+                let new_name = Name::Anonym(self.next_anonym);
+                self.next_anonym += 1;
+
+                assert!(
+                    !self.map.contains_key(&new_name),
+                    "shouldn't happen: newly created anonym already in use"
+                );
+                Ok(new_name)
+            }
+        }
+    }
 }
 
 impl Membership {
