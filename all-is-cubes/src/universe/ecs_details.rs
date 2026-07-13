@@ -109,6 +109,10 @@ impl NameMap {
             }
         }
     }
+
+    pub(in crate::universe) fn iter(&self) -> impl Iterator<Item = (&Name, &AnyHandle)> {
+        self.map.iter()
+    }
 }
 
 impl Membership {

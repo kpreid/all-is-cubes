@@ -1,7 +1,6 @@
 //! [`Universe`], the top-level game-world container.
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -717,13 +716,8 @@ impl fmt::Debug for Universe {
         }
 
         // Print members, sorted by name.
-        let members: BTreeMap<&Name, Type> = self
-            .queries
-            .all_members_query
-            .iter_manual(&self.world)
-            .map(|(_entity, membership)| (&membership.name, membership.handle.handle_type()))
-            .collect();
-        for (member_name, type_name) in members {
+        for (member_name, handle) in self.world.resource::<NameMap>().iter() {
+            let type_name = handle.handle_type();
             ds.field(&format!("{member_name}"), &type_name);
         }
 
