@@ -103,12 +103,6 @@ pub(in crate::universe) trait MemberBoilerplate: Sized {
     where
         Self: UniverseMember;
 
-    fn member_mutation_query_state(
-        queries: &mut MemberWriteQueryStates,
-    ) -> &mut ecs::QueryState<<<Self as universe::Transactional>::Transaction as universe::TransactionOnEcs>::WriteQueryData>
-    where
-        Self: UniverseMember + transaction::Transactional<Transaction: universe::TransactionOnEcs>;
-
     /// Fetch the query for for this member tyype from [`MemberReadQueries`].
     /// May fail if such a query was not provided.
     fn member_read_query<'q, 'w, 's>(
@@ -204,20 +198,12 @@ macro_rules! impl_universe_for_member {
                 &queries.$table
             }
 
-            fn member_mutation_query_state(
-                queries: &mut MemberWriteQueryStates,
-            ) -> &mut ecs::QueryState<<<Self as universe::Transactional>::Transaction as universe::TransactionOnEcs>::WriteQueryData> {
-                &mut queries.$table
-            }
-
             fn member_read_query<'q, 'w, 's>(
                 queries: &'q MemberReadQueries<'w, 's>,
-            ) -> Option<&'q ecs::Query<'w, 's, <Self as SealedMember>::ReadQueryData>>
-            {
+            ) -> Option<&'q ecs::Query<'w, 's, <Self as SealedMember>::ReadQueryData>> {
                 queries.$table.as_ref()
             }
         }
-
 
         impl ut::UTransactional for $member_type {
             fn bind(
@@ -673,23 +659,6 @@ macro_rules! member_enums_and_impls {
                     )*
                 }
             }
-        }
-
-        /// Queries for mutating members, used by transaction commits.
-        /// Contains one `QueryState` per member type, whose `QueryData` is that member's
-        /// `TransactionOnEcs::WriteQueryData`.
-        #[derive(ecs::FromWorld)]
-        #[macro_rules_attribute::derive($crate::universe::ecs_details::derive_manual_query_bundle!)]
-        pub(in crate::universe) struct MemberWriteQueryStates {
-            $(
-                pub(in crate::universe) $table_name:
-                    ::bevy_ecs::query::QueryState<
-                        <
-                            <$member_type as universe::Transactional>::Transaction
-                            as universe::TransactionOnEcs
-                        >::WriteQueryData
-                    >,
-            )*
         }
 
         /// Queries for reading members, sometimes used by [`Handle::read()`].

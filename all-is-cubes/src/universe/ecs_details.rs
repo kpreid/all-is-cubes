@@ -1,4 +1,8 @@
-#![allow(elided_lifetimes_in_paths, reason = "Bevy systems")]
+#![allow(
+    elided_lifetimes_in_paths,
+    clippy::needless_pass_by_value,
+    reason = "Bevy systems"
+)]
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -6,9 +10,13 @@ use core::marker::PhantomData;
 use core::ops;
 
 use bevy_ecs::prelude as ecs;
+use bevy_ecs::query::QueryData;
 
 use crate::time;
-use crate::universe::{self, AnyHandle, Handle, Name, UniverseMember};
+use crate::transaction::Transactional;
+use crate::universe::{
+    self, AnyHandle, Handle, Name, TransactionOnEcs, UniverseId, UniverseMember,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -149,7 +157,7 @@ pub(in crate::universe) fn delete(world: &mut ecs::World, name: &Name) {
     let Some(handle) = get_handle_by_name(world, name) else {
         panic!("{name} does not exist in the universe");
     };
-    let universe_id = *world.resource::<universe::UniverseId>();
+    let universe_id = *world.resource::<UniverseId>();
     let entity = handle.as_entity(universe_id).unwrap();
     handle.to_any_handle().set_state_to_gone(universe::GoneReason::Deleted {});
     let success = world.despawn(entity);
@@ -280,3 +288,51 @@ macro_rules! derive_manual_query_bundle {
     };
 }
 pub(crate) use derive_manual_query_bundle;
+
+// -------------------------------------------------------------------------------------------------
+
+/// A `bevy_ecs` system function that executes an arbitrary callback on the mutation query.
+///
+/// This is analogous to the transaction `commit_system` but less restricted.
+/// It is used to implement [`universe::Universe::mutate_space()`].
+pub(in crate::universe) fn mutate_member_system<O>(
+    (ecs::InRef(target_handle), DynFnMutSystemInput(function)): (
+        ecs::InRef<'_, Handle<O>>,
+        DynFnMutSystemInput<
+            '_,
+            <<O as Transactional>::Transaction as TransactionOnEcs>::WriteQueryData,
+        >,
+    ),
+    universe_id: ecs::Res<'_, UniverseId>,
+    mut mutation_query: ecs::Query<
+        <<O as Transactional>::Transaction as TransactionOnEcs>::WriteQueryData,
+    >,
+) -> Result<(), universe::HandleError>
+where
+    O: UniverseMember + Transactional<Transaction: TransactionOnEcs>,
+{
+    let entity: ecs::Entity = target_handle.as_entity(*universe_id)?;
+    let target_query_data =
+        mutation_query.get_mut(entity).expect("member should have its components");
+    function(target_query_data);
+    Ok(())
+}
+
+/// A `&'i mut dyn FnMut + 'i` as a `SystemInput`. Helper for [`mutate_member_system`].
+///
+/// This can't be just `InMut<dyn FnMut>` because that would not let the trait object lifetime bound
+/// be `'i` like it must.
+pub(in crate::universe) struct DynFnMutSystemInput<'i, T>(
+    &'i mut (dyn for<'w, 's> FnMut(<T as QueryData>::Item<'w, 's>) + 'i),
+)
+where
+    T: QueryData + 'static;
+
+impl<T: QueryData> bevy_ecs::system::SystemInput for DynFnMutSystemInput<'_, T> {
+    type Param<'i> = DynFnMutSystemInput<'i, T>;
+    type Inner<'i> = &'i mut (dyn for<'w, 's> FnMut(<T as QueryData>::Item<'w, 's>) + 'i);
+
+    fn wrap(this: Self::Inner<'_>) -> Self::Param<'_> {
+        DynFnMutSystemInput(this)
+    }
+}

@@ -10,6 +10,7 @@ use core::fmt;
 
 use bevy_ecs::entity::Entity;
 use bevy_ecs::prelude as ecs;
+use bevy_ecs::query::QueryData;
 use bevy_ecs::world::FromWorld as _;
 use manyfmt::Fmt;
 
@@ -166,7 +167,6 @@ struct Queries {
     all_entities_query: ecs::QueryState<ecs::EntityRef<'static>>,
     all_members_query: ecs::QueryState<(Entity, &'static Membership)>,
     read_members: MemberReadQueryStates,
-    write_members: MemberWriteQueryStates,
 }
 
 impl Universe {
@@ -599,26 +599,37 @@ impl Universe {
     ///
     /// Returns an error if the given [`Handle`] does not belong to this universe.
     #[inline(never)]
-    pub fn mutate_space<'u, Out>(
-        &'u mut self,
+    pub fn mutate_space<Out: 'static>(
+        &mut self,
         handle: &Handle<Space>,
-        function: impl FnOnce(&mut space::Mutation<'_, 'u>) -> Out,
+        function: impl FnOnce(&mut space::Mutation<'_, '_>) -> Out,
     ) -> Result<Out, HandleError> {
-        let entity = handle.as_entity(self.id)?;
-        #[expect(clippy::missing_panics_doc)]
-        let Ok(write_query_data) =
-            self.queries.write_members.spaces.get_mut(&mut self.world, entity)
-        else {
-            // This should never happen even with concurrent access, because as_entity() checks
-            // all cases that would lead to the entity being absent.
-            panic!("{handle:?}.as_entity() succeeded but query failed");
+        #![expect(clippy::missing_panics_doc)]
+
+        // Wrap the `FnOnce` to make it a `FnMut` without output, for dynamic dispatch.
+        let mut output: Option<Out> = None;
+        let mut function_in: Option<_> = Some(function);
+        let mut function_shim =
+            |
+                query_data: <
+                    <space::SpaceTransaction as TransactionOnEcs>::WriteQueryData as QueryData
+                >::Item<'_, '_>
+            | {
+            output = Some(space::Mutation::with_write_query(
+                // TODO(ecs): provide non-stub ticket
+                ReadTicket::stub(),
+                query_data,
+                function_in.take().expect("only one function execution"),
+            ));
         };
-        // TODO(ecs): non-stub ticket using `get_one_mut_and_ticket()`
-        Ok(space::Mutation::with_write_query(
-            ReadTicket::stub(),
-            write_query_data,
-            function,
-        ))
+
+        self.world
+            .run_system_cached_with(
+                ecs_details::mutate_member_system,
+                (handle, &mut function_shim),
+            )
+            .unwrap()?;
+        Ok(output.expect("function output saved"))
     }
 
     /// Update stored queries to account for new archetypes.

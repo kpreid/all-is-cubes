@@ -1,3 +1,5 @@
+#![allow(clippy::needless_pass_by_value, reason = "Bevy systems")]
+
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::ToString;
@@ -92,12 +94,35 @@ where
     O: UniverseMember + Transactional,
     <O as Transactional>::Transaction: TransactionOnEcs,
 {
-    let entity: ecs::Entity = target
-        .as_entity(universe.universe_id())
+    universe
+        .world
+        .run_system_cached_with(commit_system::<O>, (target, transaction, check))
+        .unwrap()
+}
+
+/// A `bevy_ecs` system function that executes a member’s `Transactional::Transaction` type.
+fn commit_system<O>(
+    (ecs::InRef(target_handle), ecs::In(transaction), ecs::In(check)): (
+        ecs::InRef<'_, Handle<O>>,
+        ecs::In<<O as Transactional>::Transaction>,
+        ecs::In<<O::Transaction as Transaction>::CommitCheck>,
+    ),
+    universe_id: ecs::Res<'_, UniverseId>,
+    mut mutation_query: ecs::Query<
+        '_,
+        '_,
+        <<O as Transactional>::Transaction as TransactionOnEcs>::WriteQueryData,
+    >,
+) -> Result<(), CommitError>
+where
+    O: UniverseMember + Transactional<Transaction: TransactionOnEcs>,
+{
+    let entity: ecs::Entity = target_handle
+        .as_entity(*universe_id)
         .expect("as_entity() failed; universe state changed between check and commit");
-    let query_state = O::member_mutation_query_state(&mut universe.queries.write_members);
-    let target_query_data = query_state
-        .get_mut(&mut universe.world, entity)
+
+    let target_query_data = mutation_query
+        .get_mut(entity)
         .expect("target query failed; universe state changed between check and commit");
 
     TransactionOnEcs::commit(transaction, target_query_data, check)
