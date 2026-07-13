@@ -11,8 +11,7 @@
 use alloc::vec::Vec;
 use core::time::Duration;
 
-use bevy_ecs::prelude as ecs;
-use bevy_ecs::schedule::IntoScheduleConfigs as _;
+use bevy_ecs::{prelude as ecs, schedule::IntoScheduleConfigs as _, system::IntoSystem as _};
 use bevy_platform::time::Instant;
 use hashbrown::{HashMap as HbHashMap, HashSet as HbHashSet};
 
@@ -54,6 +53,15 @@ pub(crate) fn add_space_systems(world: &mut ecs::World) {
         time::schedule::Step,
         execute_tick_actions_system.in_set(SpaceUpdateSet),
     );
+
+    schedules.add_systems(
+        time::schedule::Step,
+        step_behaviors_system
+            .pipe(execute_behavior_transactions_system)
+            .after(execute_tick_actions_system)
+            .in_set(SpaceUpdateSet),
+    );
+
     // Light updates should:
     // * happen after changes to the world so the user sees the freshest light, and
     // * still happen if time is paused,
@@ -392,4 +400,19 @@ pub(crate) fn step_behaviors_system(
     }
 
     Ok(transactions)
+}
+
+pub(crate) fn execute_behavior_transactions_system(
+    ecs::In(transactions): ecs::In<Vec<universe::UniverseTransaction>>,
+    world: &mut ecs::World,
+    read_queries: &mut universe::MemberReadQueryStates,
+) {
+    // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
+    for t in transactions {
+        if let Err(e) = t.execute_on_world(world, read_queries) {
+            // TODO: Need to report these failures back to the source
+            // ... and perhaps in the UniverseStepInfo
+            log::info!("Transaction failure: {e}");
+        }
+    }
 }

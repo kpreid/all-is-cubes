@@ -19,7 +19,7 @@ use crate::physics::{self, BodyStepInfo};
 use crate::save::WhenceUniverse;
 use crate::space::{self, Space, SpaceStepInfo};
 use crate::time;
-use crate::transaction::{self, ExecuteError, Transaction, Transactional};
+use crate::transaction::{ExecuteError, Transactional};
 use crate::util::{ConciseDebug, Refmt as _, ShowStatus, StatusText};
 
 #[cfg(feature = "rerun")]
@@ -345,25 +345,8 @@ impl Universe {
         // Synchronize in case BeforeStep did anything.
         self.world.run_schedule(time::schedule::Synchronize);
 
-        // TODO: Move this out of `Universe::step()` into schedules (requires rewording the transactions).
-        let transactions_from_space_behaviors: Vec<UniverseTransaction> =
-            self.world.run_system_cached(space::step::step_behaviors_system).unwrap();
-
-        self.world.run_schedule(time::schedule::Synchronize);
-
         if !tick.paused() {
             self.world.run_schedule(time::schedule::Step);
-        }
-
-        // Finalize behavior stuff
-
-        // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
-        for t in transactions_from_space_behaviors {
-            if let Err(e) = t.execute(self, (), &mut transaction::no_outputs) {
-                // TODO: Need to report these failures back to the source
-                // ... and perhaps in the UniverseStepInfo
-                log::info!("Transaction failure: {e}");
-            }
         }
 
         self.world.run_schedule(time::schedule::Synchronize);

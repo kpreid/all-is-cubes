@@ -648,7 +648,6 @@ macro_rules! member_enums_and_impls {
         }
 
         impl MemberReadQueryStates {
-        #[expect(dead_code, reason = "TODO(ecs): going to use this in systems")]
             pub fn query_manual<'w, 's>(
                 &'s self,
                 world: &'w ecs::World,

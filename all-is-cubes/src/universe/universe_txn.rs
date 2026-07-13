@@ -9,7 +9,9 @@ use core::fmt;
 use bevy_ecs::prelude as ecs;
 use hashbrown::HashMap as HbHashMap;
 
-use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transactional};
+use crate::transaction::{
+    self, CommitError, Equal, ExecuteError, Merge, Transaction, Transactional,
+};
 use crate::universe::{
     self, AnyPending, Builtin, ErasedHandle, Handle, HandleError, InsertError, InsertErrorKind,
     MemberBoilerplate, Name, ReadTicket, Universe, UniverseId, UniverseMember,
@@ -160,7 +162,7 @@ impl<T: Transaction> core::error::Error for MismatchOrHandleError<T> {
     }
 }
 
-impl<T: Transaction> From<MismatchOrHandleError<T>> for transaction::ExecuteError<T> {
+impl<T: Transaction> From<MismatchOrHandleError<T>> for ExecuteError<T> {
     fn from(error: MismatchOrHandleError<T>) -> Self {
         match error {
             MismatchOrHandleError::Handle(e) => Self::Handle(e),
@@ -722,15 +724,13 @@ impl UniverseTransaction {
     /// Check this transaction without requiring an `&Universe`.
     ///
     /// This can be used together with [`Self::commit_in_world()`].
-    ///
-    /// TODO: Ideally, `ecs::World` would not be needed and we would use only the ticket.
-    /// This requires giving up on using the `Transaction` trait for the innards.
     fn check_with_world(
         &self,
         world: &ecs::World,
-        read_ticket: ReadTicket<'_>,
+        read_queries: &universe::MemberReadQueryStates,
     ) -> Result<UniverseCommitCheck, UniverseMismatch> {
-        // TODO: enforce world matches ticket
+        let queries = read_queries.query_manual(world);
+        let read_ticket = ReadTicket::from_queries(&queries);
 
         if let Some(txn_id) = self.universe_id()
             && let Some(ticket_id) = self.universe_id()
@@ -819,6 +819,16 @@ impl UniverseTransaction {
 
         Ok(())
     }
+
+    pub(crate) fn execute_on_world(
+        self,
+        world: &mut ecs::World,
+        read_queries: &mut universe::MemberReadQueryStates,
+    ) -> Result<(), ExecuteError<Self>> {
+        let check = self.check_with_world(world, read_queries).map_err(ExecuteError::Check)?;
+        self.commit_to_world(world, check, &mut transaction::no_outputs)
+            .map_err(ExecuteError::Commit)
+    }
 }
 
 impl From<AnyTransaction> for UniverseTransaction {
@@ -843,7 +853,7 @@ impl Transaction for UniverseTransaction {
         target: &Universe,
         (): Self::Context<'_>,
     ) -> Result<Self::CommitCheck, UniverseMismatch> {
-        self.check_with_world(&target.world, target.read_ticket())
+        self.check_with_world(&target.world, &target.queries.read_members)
     }
 
     fn commit(
