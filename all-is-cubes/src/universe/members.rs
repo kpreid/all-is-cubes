@@ -119,9 +119,9 @@ pub(crate) struct IntoBundleContext<'u> {
 }
 
 impl<'u> IntoBundleContext<'u> {
-    pub(crate) fn new(universe: &'u Universe) -> Self {
+    pub(in crate::universe) fn from_world(world: &'u ecs::World) -> Self {
         Self {
-            clock: universe.clock(),
+            clock: *world.resource::<time::Clock>(),
             _phantom: PhantomData,
         }
     }
@@ -573,15 +573,16 @@ macro_rules! member_enums_and_impls {
             }
 
             /// Used by [`MemberTxn::commit()`] to perform inserts.
-            pub(crate) fn insert_pending_into_universe(
+            /// See documentation of [`Handle::insert_pending_into_world`].
+            pub(crate) fn insert_pending_into_world(
                 self,
-                universe: &mut Universe
+                world: &mut ecs::World
             ) -> Result<(), InsertError> {
                 match self {
                     $(
                         AnyPending::$member_type { handle, value } => {
                             if let Some(value) = value {
-                                handle.insert_pending_into_universe(universe, value)
+                                handle.insert_pending_into_world(world, value)
                             } else {
                                 Err(InsertError {
                                     name: handle.name(),

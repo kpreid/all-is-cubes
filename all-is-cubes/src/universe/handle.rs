@@ -254,7 +254,10 @@ impl<T: 'static> Handle<T> {
         *state_guard = State::Member { entity };
         drop(state_guard);
 
-        let bundle = SealedMember::into_bundle(value, &universe::IntoBundleContext::new(universe));
+        let bundle = SealedMember::into_bundle(
+            value,
+            &universe::IntoBundleContext::from_world(&universe.world),
+        );
         universe
             .world
             .get_entity_mut(entity)
@@ -601,19 +604,18 @@ impl<T: 'static> Handle<T> {
     /// we do not need to worry about race conditions due to that uniqueness; however, we do
     /// need to consider what order different parts of the state become visible in, in case
     /// another thread is viewing the handle.
-    pub(in crate::universe) fn insert_pending_into_universe(
+    ///
+    /// The universe may need [`Universe::update_archetypes()`] after this.
+    pub(in crate::universe) fn insert_pending_into_world(
         self,
-        universe: &mut Universe,
+        world: &mut ecs::World,
         #[allow(clippy::boxed_local)] value: Box<T>,
     ) -> Result<(), InsertError>
     where
         T: UniverseMember,
     {
         let pending_name = self.inner.permanent_name.get().unwrap_or(&Name::Pending).clone();
-        let new_name = universe
-            .world
-            .resource_mut::<universe::NameMap>()
-            .allocate_name(&pending_name)?;
+        let new_name = world.resource_mut::<universe::NameMap>().allocate_name(&pending_name)?;
 
         // We have now completed all checks that could fail under reasonable circumstances, and can
         // commence making permanent changes.
@@ -624,7 +626,7 @@ impl<T: 'static> Handle<T> {
         // Set handle’s universe ID.
         self.inner
             .universe_id
-            .set(universe.universe_id())
+            .set(*world.resource::<UniverseId>())
             .expect("can't happen: universe ID already set");
 
         // Create handle’s corresponding entity in the universe.
@@ -633,11 +635,9 @@ impl<T: 'static> Handle<T> {
                 name: new_name,
                 handle: T::into_any_handle(self.clone()),
             },
-            SealedMember::into_bundle(value, &universe::IntoBundleContext::new(universe)),
+            SealedMember::into_bundle(value, &universe::IntoBundleContext::from_world(world)),
         );
-        let entity = universe.world.spawn(bundle).id();
-        // We may have created a new archetype.
-        universe.update_archetypes();
+        let entity = world.spawn(bundle).id();
 
         // Set handle state.
         let old_state = mem::replace(
@@ -647,7 +647,7 @@ impl<T: 'static> Handle<T> {
         assert_matches!(old_state, State::Pending);
 
         // Inserting new members is a good time to check if there are old ones to remove.
-        universe.world.resource_mut::<universe::gc::WantsGc>().request_gc();
+        world.resource_mut::<universe::gc::WantsGc>().request_gc();
 
         Ok(())
     }

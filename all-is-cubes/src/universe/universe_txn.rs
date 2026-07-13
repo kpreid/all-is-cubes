@@ -1003,8 +1003,9 @@ impl MemberTxn {
             }
             MemberTxn::Insert(pending) => {
                 pending
-                    .insert_pending_into_universe(universe)
+                    .insert_pending_into_world(&mut universe.world)
                     .map_err(CommitError::catch::<UniverseTransaction, InsertError>)?;
+                universe.update_archetypes();
                 Ok(())
             }
             MemberTxn::Delete => {

@@ -430,7 +430,11 @@ impl Universe {
     {
         let handle = Handle::new_pending(name);
         MemberBoilerplate::into_any_pending(handle.clone(), Some(Box::new(value)))
-            .insert_pending_into_universe(self)?;
+            .insert_pending_into_world(&mut self.world)?;
+
+        // We may have created a new archetype.
+        self.update_archetypes();
+
         Ok(handle)
     }
 
