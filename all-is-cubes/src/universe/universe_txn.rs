@@ -825,6 +825,8 @@ impl Transaction for UniverseTransaction {
             )?;
         }
 
+        target.update_archetypes();
+
         Ok(())
     }
 }
@@ -1005,7 +1007,6 @@ impl MemberTxn {
                 pending
                     .insert_pending_into_world(&mut universe.world)
                     .map_err(CommitError::catch::<UniverseTransaction, InsertError>)?;
-                universe.update_archetypes();
                 Ok(())
             }
             MemberTxn::Delete => {

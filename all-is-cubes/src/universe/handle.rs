@@ -190,7 +190,8 @@ impl<T: 'static> Handle<T> {
 
     /// Constructs a [`Handle`] that has an associated entity but not yet a value.
     ///
-    /// The caller is responsible for validating the [`Name`] is not duplicate or invalid.
+    /// The caller is responsible for validating the [`Name`] is not duplicate or invalid
+    /// and for calling [`Universe::update_archetypes()`].
     #[cfg(feature = "save")]
     pub(in crate::universe) fn new_deserializing(name: Name, universe: &mut Universe) -> Handle<T>
     where
@@ -218,8 +219,6 @@ impl<T: 'static> Handle<T> {
             name,
             handle: T::into_any_handle(handle.clone()),
         });
-        // We may have created a new archetype.
-        universe.update_archetypes();
 
         handle
     }

@@ -127,6 +127,9 @@ mod tests;
 #[doc = include_str!("save/serde-warning.md")]
 pub struct Universe {
     /// ECS storage for most of the data of the universe.
+    ///
+    /// **Caution:** If any mutation is performed that might have added an archetype,
+    /// you must call [`Universe::update_archetypes()`].
     world: ecs::World,
 
     /// [`QueryState`]s derived from `world` that we use manually and therefore need to keep fresh.
@@ -297,8 +300,10 @@ impl Universe {
         T: UniverseMember + Transactional,
     {
         let check = check_transaction_in_universe(self, handle, &transaction)?;
-        commit_transaction_in_universe(self, handle, transaction, check)
-            .map_err(ExecuteError::Commit)
+        let result = commit_transaction_in_universe(self, handle, transaction, check)
+            .map_err(ExecuteError::Commit);
+        self.update_archetypes();
+        result
     }
 
     /// Advance time for all members.
@@ -365,6 +370,9 @@ impl Universe {
         self.world.run_schedule(time::schedule::AfterStep);
 
         self.world.run_schedule(time::schedule::Synchronize);
+
+        // Update archetypes so read-only queries performed after this step are not stale.
+        self.update_archetypes();
 
         // Post-step state cleanup
         self.world.resource_mut::<CurrentStep>().0 = None;
@@ -452,7 +460,9 @@ impl Universe {
                 if let Some(handle) = self.get(&name) {
                     Ok(handle)
                 } else {
-                    Ok(Handle::new_deserializing(name, self))
+                    let handle = Handle::new_deserializing(name, self);
+                    self.update_archetypes();
+                    Ok(handle)
                 }
             }
             Name::Builtin(builtin) => Ok(builtin
@@ -483,7 +493,9 @@ impl Universe {
             .map_err(|()| DeserializeHandlesError {
                 name,
                 kind: DeserializeHandlesErrorKind::MultipleValues,
-            })
+            })?;
+        self.update_archetypes();
+        Ok(())
     }
 
     /// Iterate over all of the objects of type `T`.
@@ -533,6 +545,7 @@ impl Universe {
     /// merely ensures that it happens now and not earlier.
     pub fn gc(&mut self) {
         self.world.run_schedule(gc::Gc);
+        self.update_archetypes();
     }
 
     /// Validate handles in a universe after deserializing it.
@@ -621,12 +634,16 @@ impl Universe {
                 (handle, &mut function_shim),
             )
             .unwrap()?;
+
+        self.update_archetypes();
         Ok(output.expect("function output saved"))
     }
 
-    /// Update stored queries to account for new archetypes.
+    /// Update stored queries to ensure they account for new archetypes.
     ///
-    /// This is called whenever [`UniverseMember`]s are added.
+    /// This is called by [`Universe::step()`], and also each `&mut self` method that can mutate the
+    /// [`ecs::World`] in a way that could possibly add new archetypes (and which isn’t only called
+    /// by another method that does the same).
     fn update_archetypes(&mut self) {
         self.queries.update_archetypes(&self.world);
     }
