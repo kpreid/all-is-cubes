@@ -111,6 +111,25 @@ impl Builtin {
     pub fn erased_handle(self) -> &'static dyn universe::ErasedHandle {
         self.get().handle()
     }
+
+    /// Returns the value of this builtin.
+    ///
+    /// This is equivalent to calling [`Handle::read()`] on this builtin, but avoids the need to
+    /// mention `ReadTicket` and failure.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the builtin’s type is not `T`.
+    //---
+    // TODO: ideally this would come in a fully statically typed form, perhaps by having separate
+    // enums for each type of builtin.
+    #[doc(hidden)]
+    pub fn read<T: universe::UniverseMember>(self) -> T::Read<'static> {
+        <&Handle<T>>::try_from(self.erased_handle())
+            .unwrap_or_else(|error| panic!("type mismatch in Builtin::handle(): {error}"))
+            .read(ReadTicket::stub())
+            .unwrap()
+    }
 }
 
 #[macro_rules_attribute::derive(derive_for_builtin_name!)]
@@ -249,6 +268,17 @@ mod tests {
             *handle.read(ReadTicket::stub()).unwrap().block(),
             block::AIR
         );
+    }
+
+    #[test]
+    fn direct_read() {
+        assert_eq!(*Builtin::Air.read::<BlockDef>().block(), block::AIR);
+    }
+
+    #[test]
+    #[should_panic = "expected BlockDef, but found SoundDef builtin 'sound/beep'"]
+    fn direct_read_type_error() {
+        Builtin::Beep.read::<BlockDef>();
     }
 
     #[test]
