@@ -107,20 +107,6 @@ macro_rules! derive_for_builtin_name {
 // struct declaration, is done in order to adjust the order in rustdoc,
 // putting these above the numerous macro-generated functions.
 impl Builtin {
-    // /// Returns the [`Handle`] to this builtin, assuming that it is of type `Handle<T>`.
-    // ///
-    // /// # Panics
-    // ///
-    // /// Panics if the builtin’s type is not `T`.
-    // ///
-    // /// Note that each builtin has a corresponding function to retrieve its handle.
-    // /// Consider using those instead of this, as they cannot panic.
-    // pub fn handle<T: universe::UniverseMember>(self) -> &'static Handle<T> {
-    //     self.erased_handle()
-    //         .try_into()
-    //         .unwrap_or_else(|error| panic!("type mismatch in Builtin::handle(): {error}"))
-    // }
-
     /// Returns the type-erased [`Handle`] to this builtin.
     pub fn erased_handle(self) -> &'static dyn universe::ErasedHandle {
         self.get().handle()
