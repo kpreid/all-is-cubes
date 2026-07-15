@@ -12,6 +12,8 @@ use all_is_cubes::math::{
     lines::Wireframe as _, rgba_const,
 };
 use all_is_cubes::space::{self, BlockIndex};
+use all_is_cubes::time::Instant;
+use all_is_cubes::util::{ConciseDebug, Refmt as _};
 use all_is_cubes_render::camera::Camera;
 
 use crate::dynamic::{self, DynamicMeshTypes};
@@ -155,7 +157,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         options: &MeshOptions<M>,
         block_meshes: &dynamic::VersionedBlockMeshes<M>,
     ) -> bool {
-        // let compute_start: Option<I> = dynamic::LOG_CHUNK_UPDATES.then(Instant::now);
+        let compute_start: Option<Instant> = dynamic::LOG_CHUNK_UPDATES.then(Instant::now);
         let bounds = self.position.bounds();
         let absolute_to_relative = Translation3D::from(-bounds.lower_bounds().to_vector());
 
@@ -214,30 +216,27 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
             }
         };
 
-        // Logging
-        // TODO: This logging code has been disabled to avoid`std::time::Instant
-        //
-        // if let Some(start) = compute_start {
-        //     let duration_ms = Instant::now().duration_since(start).as_secs_f32() * 1000.0;
-        //
-        //     let chunk_origin = bounds.lower_bounds();
-        //     let vertices = self.mesh.vertices().len();
-        //     if vertices == 0 {
-        //         log::trace!(
-        //             "meshed {:?}+ in {:.3} ms, 0",
-        //             chunk_origin.refmt(&ConciseDebug),
-        //             duration_ms,
-        //         );
-        //     } else {
-        //         log::trace!(
-        //             "meshed {:?}+ in {:.3} ms, {} in {:.3} µs/v",
-        //             chunk_origin.refmt(&ConciseDebug),
-        //             duration_ms,
-        //             vertices,
-        //             duration_ms * (1000.0 / vertices as f32),
-        //         );
-        //     }
-        // }
+        if let Some(start) = compute_start {
+            let duration_ms = Instant::now().duration_since(start).as_secs_f32() * 1000.0;
+
+            let chunk_origin = bounds.lower_bounds();
+            let vertices = self.mesh.vertices().0.len();
+            if vertices == 0 {
+                log::trace!(
+                    "meshed {:?}+ in {:.3} ms, 0",
+                    chunk_origin.refmt(&ConciseDebug),
+                    duration_ms,
+                );
+            } else {
+                log::trace!(
+                    "meshed {:?}+ in {:.3} ms, {} in {:.3} µs/v",
+                    chunk_origin.refmt(&ConciseDebug),
+                    duration_ms,
+                    vertices,
+                    duration_ms * (1000.0 / vertices as f32),
+                );
+            }
+        }
 
         // TODO: figure out a way to distinguish mesh updates from instances updates in the debug visualization, and then give it enough info to do that
         self.update_debug = !self.update_debug;

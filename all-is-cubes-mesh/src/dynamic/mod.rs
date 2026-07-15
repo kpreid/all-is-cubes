@@ -4,7 +4,7 @@ use core::fmt;
 
 use crate::MeshTypes;
 
-// --- Modules ---
+// -------------------------------------------------------------------------------------------------
 
 mod blocks;
 pub use blocks::InstanceMesh;
@@ -30,7 +30,8 @@ use render_data::MeshIdImpl;
 pub use render_data::noop_render_data_updater;
 pub use render_data::{MeshId, RenderDataUpdate};
 
-// --- Types and traits ---
+// -------------------------------------------------------------------------------------------------
+// Types and traits
 
 /// Bundle of types chosen to support dynamically-updating meshes within a specific graphics API.
 ///
@@ -62,3 +63,6 @@ pub trait DynamicMeshTypes: MeshTypes<Vertex: Send + Sync + crate::Vertex> {
     /// To disable instancing, set this to [`usize::MAX`]. To always use instancing, set this to 0.
     const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize;
 }
+
+/// If true, enables reporting chunk update timing at [`log::trace`] level.
+const LOG_CHUNK_UPDATES: bool = false;
