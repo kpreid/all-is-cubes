@@ -237,14 +237,15 @@ struct TooltipController {
 impl WidgetController for TooltipController {
     fn synchronize(
         &mut self,
-        _context: &vui::WidgetContext<'_, '_>,
+        context: &vui::WidgetContext<'_, '_>,
         world_read_ticket: ReadTicket<'_>,
-        ui_read_ticket: ReadTicket<'_>,
     ) {
         match self.definition.state.try_lock().ok() {
-            Some(mut state) => {
-                state.synchronize(world_read_ticket, ui_read_ticket, &self.definition.icons)
-            }
+            Some(mut state) => state.synchronize(
+                world_read_ticket,
+                context.ui_read_ticket(),
+                &self.definition.icons,
+            ),
             None => {}
         }
     }

@@ -285,12 +285,11 @@ impl WidgetController for ToolbarController {
 
     fn synchronize(
         &mut self,
-        _context: &vui::WidgetContext<'_, '_>,
+        context: &vui::WidgetContext<'_, '_>,
         world_read_ticket: ReadTicket<'_>,
-        ui_read_ticket: ReadTicket<'_>,
     ) {
         let watcher = &mut *self.definition.watcher.lock().unwrap();
-        watcher.update(world_read_ticket, ui_read_ticket);
+        watcher.update(world_read_ticket, context.ui_read_ticket());
     }
 
     fn step(

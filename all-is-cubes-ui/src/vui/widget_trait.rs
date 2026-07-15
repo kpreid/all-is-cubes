@@ -20,6 +20,8 @@ pub use all_is_cubes::behavior::Then;
 
 use crate::vui::{LayoutGrant, Layoutable, Positioned, validate_widget_transaction};
 
+// -------------------------------------------------------------------------------------------------
+
 /// Transaction type produced by [`WidgetController`]s.
 /// Placeholder for likely wanting to change this later.
 pub type WidgetTransaction = SpaceTransaction;
@@ -104,19 +106,16 @@ pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     /// this is called every frame before [`Self::step()`] to allow the widget controller to fetch
     /// information from the game universe via the provided [`ReadTicket`].
     ///
+    /// The read ticket for the universe in which the widget is installed is provided via `context`
+    /// (in the same way as all other methods).
+    ///
     /// If this is not overridden, it will do nothing.
     ///
     /// TODO: This is a kludge which should go away soon (or be merged into `step()`)
     /// along with substantial refactoring of the UI as a whole.
-    fn synchronize(
-        &mut self,
-        context: &WidgetContext<'_, '_>,
-        world_read_ticket: ReadTicket<'_>,
-        ui_read_ticket: ReadTicket<'_>,
-    ) {
+    fn synchronize(&mut self, context: &WidgetContext<'_, '_>, world_read_ticket: ReadTicket<'_>) {
         _ = context;
         _ = world_read_ticket;
-        _ = ui_read_ticket;
     }
 
     /// Called every frame (except as [`Then`] specifies otherwise)
@@ -174,13 +173,8 @@ impl WidgetController for Box<dyn WidgetController> {
         (**self).initialize(context)
     }
 
-    fn synchronize(
-        &mut self,
-        context: &WidgetContext<'_, '_>,
-        world_read_ticket: ReadTicket<'_>,
-        ui_read_ticket: ReadTicket<'_>,
-    ) {
-        (**self).synchronize(context, world_read_ticket, ui_read_ticket)
+    fn synchronize(&mut self, context: &WidgetContext<'_, '_>, world_read_ticket: ReadTicket<'_>) {
+        (**self).synchronize(context, world_read_ticket)
     }
 
     fn step(&mut self, context: &WidgetContext<'_, '_>) -> Result<StepSuccess, StepError> {
@@ -191,6 +185,8 @@ impl WidgetController for Box<dyn WidgetController> {
         (**self).draw(context, from_scratch)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Wraps a [`WidgetController`] to make it into a [`Behavior`].
 // TODO: Eliminate this iff it doesn't continue to be a useful abstraction.
@@ -211,12 +207,11 @@ impl WidgetBehavior {
     pub(crate) fn installation(
         positioned_widget: Positioned<Arc<dyn Widget>>,
         mut controller: Box<dyn WidgetController>,
-        // TODO: unused; revisit this when we have a better story for widget updating/synchronizing
-        _read_ticket: ReadTicket<'_>,
+        read_ticket: ReadTicket<'_>,
     ) -> Result<SpaceTransaction, InstallVuiError> {
         let draw_requested = AtomicBool::new(false);
         let context = &WidgetContext {
-            behavior_context: None,
+            kind: CtxKind::TicketOnly(read_ticket),
             grant: &positioned_widget.position,
             draw_requested: &draw_requested,
         };
@@ -272,7 +267,7 @@ impl Behavior<Space> for WidgetBehavior {
         let (txn, then) = {
             let controller = &mut *self.controller.lock().unwrap();
             let widget_context = WidgetContext {
-                behavior_context: Some(context),
+                kind: CtxKind::Behavior(context),
                 grant: &self.widget.position,
                 draw_requested: &self.draw_requested,
             };
@@ -300,22 +295,31 @@ impl Behavior<Space> for WidgetBehavior {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Context passed to [`WidgetController::step()`].
 #[derive(Debug)]
 pub struct WidgetContext<'ctx, 'read> {
-    behavior_context: Option<&'ctx behavior::Context<'ctx, 'read, Space>>,
+    kind: CtxKind<'ctx, 'read>,
     grant: &'ctx LayoutGrant,
     draw_requested: &'ctx AtomicBool,
+}
+#[derive(Debug)]
+enum CtxKind<'ctx, 'read> {
+    /// In behavior stepping.
+    Behavior(&'ctx behavior::Context<'ctx, 'read, Space>),
+    /// Only a read ticket for the UI universe.
+    TicketOnly(ReadTicket<'read>),
 }
 
 impl<'a> WidgetContext<'a, '_> {
     /// The time tick that is currently passing, causing this step.
     pub fn tick(&self) -> Tick {
-        match self.behavior_context {
-            Some(context) => context.tick,
-            None => {
+        match self.kind {
+            CtxKind::Behavior(context) => context.tick,
+            CtxKind::TicketOnly(_) => {
                 // In this case we are initializing the widget
-                // TODO: This violates Tick::from_paused's documented "This should only be used in tests"
+                // TODO: This violates Tick::from_seconds's documented "This should only be used in tests"
                 Tick::from_seconds(0.0)
             }
         }
@@ -331,7 +335,17 @@ impl<'a> WidgetContext<'a, '_> {
     pub fn request_draw(&self) {
         self.draw_requested.store(true, atomic::Ordering::Release);
     }
+
+    /// Returns a [`ReadTicket`] for the universe this widget is installed into.
+    pub fn ui_read_ticket(&self) -> ReadTicket<'_> {
+        match self.kind {
+            CtxKind::Behavior(context) => context.read_ticket,
+            CtxKind::TicketOnly(read_ticket) => read_ticket,
+        }
+    }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Errors that may arise from setting up [`LayoutTree`]s and [`Widget`]s and installing
 /// them in a [`Space`].
@@ -410,6 +424,8 @@ impl From<InstallVuiError> for all_is_cubes::linking::InGenError {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Calls [`WidgetController::synchronize()`] on every widget installed in the space.
 #[cfg_attr(not(feature = "session"), allow(dead_code))]
 pub(crate) fn synchronize_widgets(
@@ -419,15 +435,11 @@ pub(crate) fn synchronize_widgets(
 ) {
     for item in space.behaviors().query::<WidgetBehavior>() {
         let context = &WidgetContext {
-            behavior_context: None,
+            kind: CtxKind::TicketOnly(ui_read_ticket),
             grant: &item.behavior.widget.position,
             draw_requested: &item.behavior.draw_requested,
         };
-        item.behavior.controller.lock().unwrap().synchronize(
-            context,
-            world_read_ticket,
-            ui_read_ticket,
-        );
+        item.behavior.controller.lock().unwrap().synchronize(context, world_read_ticket);
     }
 }
 
@@ -450,6 +462,8 @@ pub(crate) fn instantiate_widget<W: Widget + 'static>(
         .expect("widget transaction");
     (bounds, space)
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
