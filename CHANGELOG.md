@@ -14,6 +14,7 @@
     * `block::SetAttribute` is a modifier which overrides a single attribute of a block, instead of all of them.
       It replaces `Modifier::Attributes`.
     * `inv::InvInBlock` and `inv::IconRow` now have a complete set of getters for reading their data.
+    * `linking::InGenError::Handle` variant and its corresponding `From<HandleError>` implementation.
     * `math::Aab::expand_or_shrink()`
     * `math::Aab::face_coordinate_on_axis()`, a non-negating version of `face_coordinate()`.
     * `math::FaceMap::{as_array, as_array_mut}()`

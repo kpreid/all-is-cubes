@@ -234,7 +234,7 @@ impl UniverseTemplate {
             universe.insert(
                 character_name.clone(),
                 Character::spawn_default(universe.read_ticket(), space_handle)
-                    .map_err(|e| GenError::failure(InGenError::other(e), character_name))?,
+                    .map_err(|e| GenError::failure(InGenError::Handle(e), character_name))?,
             )?;
         }
 

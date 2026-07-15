@@ -487,6 +487,9 @@ impl From<ExecuteError<UniverseTransaction>> for GenError {
 /// “nested” [`GenError`] will be obligated to be wrapped in `InGenError` rather than
 /// mistakenly taken as the same level.
 ///
+/// As an implementor of [`Error`], it acts as a proxy to its contained error type,
+/// rather than having its own message and reporting the contained error as [`Error::source()`].
+///
 /// TODO: Work this into a coherent set of error cases rather than purely
 /// "I saw one of these once, so add it".
 #[derive(Debug)]
@@ -497,6 +500,9 @@ pub enum InGenError {
 
     /// Something else needed to be generated and that failed.
     Gen(Box<GenError>), // boxed due to being a recursive type
+
+    /// Failed to read already-existing data.
+    Handle(universe::HandleError),
 
     /// Failed to insert the generated items in the [`Universe`].
     Insert(InsertError),
@@ -531,6 +537,7 @@ impl Error for InGenError {
         match self {
             InGenError::Other(e) => e.source(),
             InGenError::Gen(e) => e.source(),
+            InGenError::Handle(e) => e.source(),
             InGenError::Insert(e) => e.source(),
             InGenError::Provider(e) => e.source(),
             InGenError::Space(e) => e.source(),
@@ -546,6 +553,7 @@ impl fmt::Display for InGenError {
         match self {
             InGenError::Other(e) => e.fmt(f),
             InGenError::Gen(e) => e.fmt(f),
+            InGenError::Handle(e) => e.fmt(f),
             InGenError::Insert(e) => e.fmt(f),
             InGenError::Provider(e) => e.fmt(f),
             InGenError::Space(e) => e.fmt(f),
@@ -560,6 +568,11 @@ impl From<GenError> for InGenError {
     fn from(error: GenError) -> Self {
         // We need to box this to avoid an unboxed recursive type.
         InGenError::Gen(Box::new(error))
+    }
+}
+impl From<universe::HandleError> for InGenError {
+    fn from(error: universe::HandleError) -> Self {
+        InGenError::Handle(error)
     }
 }
 impl From<InsertError> for InGenError {
