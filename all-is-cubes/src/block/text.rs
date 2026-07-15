@@ -154,11 +154,11 @@ impl Text {
     }
 
     /// Computes and returns the dimensions of the rendered text.
-    pub fn measure(&self) -> text::Measurement<'_> {
+    pub fn measure(&self) -> text::Measurement {
         text::Measurement {
             resolution: self.resolution(),
             layout_bounds: self.layout_bounds(),
-            layout: self.get_or_init_layout(),
+            layout_header: *self.get_or_init_layout().header(),
         }
     }
 

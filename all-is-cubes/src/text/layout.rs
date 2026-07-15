@@ -28,6 +28,7 @@ pub(crate) struct Layout(
 );
 
 // TODO: refactor so visibility can be crate::text only?
+#[derive(Clone, Copy)]
 pub(crate) struct LayoutHeader {
     /// Logical bounding box of the text as determined by font metrics and outline style.
     ///
@@ -418,14 +419,15 @@ fn char_to_glyph_index(c: char) -> usize {
 // -------------------------------------------------------------------------------------------------
 
 /// Information about the space a [`Text`] takes up.
-#[derive(Debug)]
-pub struct Measurement<'a> {
+pub struct Measurement {
     pub(crate) resolution: Resolution,
     pub(crate) layout_bounds: GridAab,
-    pub(crate) layout: &'a Layout,
+    /// Note: Using `LayoutHeader` here is a shortcut. If `LayoutHeader` starts having lots of
+    /// data irrelevant to measurement, we should stop using it.
+    pub(crate) layout_header: LayoutHeader,
 }
 
-impl Measurement<'_> {
+impl Measurement {
     /// Returns the voxel resolution which text blocks made from this [`Text`] will have.
     /// This is the scale factor between the sizes the `*_blocks` and `*_voxels` methods report.
     pub fn resolution(&self) -> Resolution {
@@ -454,7 +456,7 @@ impl Measurement<'_> {
     /// This box is in the same units as [`Self::layout_bounds()`] but reflects the actual text
     /// layout rather than the configuration.
     pub fn logical_bounding_voxels(&self) -> GridAab {
-        self.layout.header().logical_bounding_box
+        self.layout_header.logical_bounding_box
     }
 
     /// Returns the bounding box that the text as drawn actually covers,
@@ -463,7 +465,7 @@ impl Measurement<'_> {
     /// This box is in the same units as [`Self::layout_bounds()`] but reflects the actual text
     /// layout rather than the configuration.
     pub fn rendering_bounding_voxels(&self) -> GridAab {
-        self.layout.header().rendering_bounding_box
+        self.layout_header.rendering_bounding_box
     }
 
     /// Returns the bounding box that the text logically occupies,
@@ -480,6 +482,28 @@ impl Measurement<'_> {
     /// This is identical to [`Self::rendering_bounding_voxels()`] scaled down by [`Self::resolution()`].
     pub fn rendering_bounding_blocks(&self) -> GridAab {
         self.rendering_bounding_voxels().divide(self.resolution.into())
+    }
+}
+
+impl fmt::Debug for Measurement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            resolution,
+            layout_bounds,
+            layout_header:
+                LayoutHeader {
+                    logical_bounding_box,
+                    rendering_bounding_box,
+                    z,
+                },
+        } = self;
+        f.debug_struct("Measurement")
+            .field("resolution", resolution)
+            .field("layout_bounds", layout_bounds)
+            .field("logical_bounding_box", logical_bounding_box)
+            .field("rendering_bounding_box", rendering_bounding_box)
+            .field("z", z)
+            .finish()
     }
 }
 
