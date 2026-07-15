@@ -304,6 +304,21 @@ impl<E: Exhaust + fmt::Debug + Clone + Eq + Hash, V> Provider<E, V> {
         }
     }
 
+    /// Create another [`Provider`] with a fallible modification to each value.
+    #[expect(clippy::missing_errors_doc, reason = "errors are caller-chosen")]
+    pub fn try_map<V2, Error>(
+        &self,
+        mut function: impl FnMut(&E, &V) -> Result<V2, Error>,
+    ) -> Result<Provider<E, V2>, Error> {
+        Ok(Provider {
+            map: self
+                .map
+                .iter()
+                .map(|(key, value)| Ok((key.clone(), function(key, value)?)))
+                .collect::<Result<_, Error>>()?,
+        })
+    }
+
     /// Iterate over the entire contents of this.
     pub fn iter(&self) -> ModuleIter<'_, E, V> {
         ModuleIter {

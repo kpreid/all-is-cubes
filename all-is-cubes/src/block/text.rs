@@ -42,6 +42,9 @@ use crate::{
 /// To combine the text with other shapes, use [`Modifier::Composite`].
 pub struct Text {
     data: TextData,
+
+    // TODO: When fonts become actually mutable, this layout cache will have to start supporting
+    // invalidation.
     layout_cache: OnceLock<text::Layout>,
 }
 
@@ -154,12 +157,20 @@ impl Text {
     }
 
     /// Computes and returns the dimensions of the rendered text.
-    pub fn measure(&self) -> text::Measurement {
-        text::Measurement {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `read_ticket` is not sufficient access to read
+    /// [`self.font()`][Self::font]
+    pub fn measure(
+        &self,
+        read_ticket: universe::ReadTicket<'_>,
+    ) -> Result<text::Measurement, universe::HandleError> {
+        Ok(text::Measurement {
             resolution: self.resolution(),
             layout_bounds: self.layout_bounds(),
-            layout_header: *self.get_or_init_layout().header(),
-        }
+            layout_header: *self.get_or_init_layout(read_ticket)?.header(),
+        })
     }
 
     /// Returns a transaction which places [`Primitive::Text`] blocks containing this text.
@@ -171,6 +182,11 @@ impl Text {
     ///
     /// The transaction has no preconditions.
     ///
+    /// # Errors
+    ///
+    /// Returns an error if `read_ticket` is not sufficient access to read
+    /// [`self.font()`][Self::font]
+    ///
     /// # Panics
     ///
     /// Panics if `transform` causes coordinate overflow.
@@ -178,13 +194,14 @@ impl Text {
     /// [`self.measure().rendering_bounding_blocks()`]: text::Measurement::rendering_bounding_blocks
     pub fn installation(
         &self,
+        read_ticket: universe::ReadTicket<'_>,
         transform: Gridgid,
         block_fn: impl Fn(Block) -> Block,
-    ) -> SpaceTransaction {
-        let measurement = self.measure();
+    ) -> Result<SpaceTransaction, universe::HandleError> {
+        let measurement = self.measure(read_ticket)?;
         let dst_to_src_transform = transform.inverse();
         let block_rotation = transform.rotation;
-        SpaceTransaction::filling(
+        Ok(SpaceTransaction::filling(
             measurement.rendering_bounding_blocks().transform(transform).unwrap(),
             |cube| {
                 space::CubeTransaction::replacing(
@@ -201,7 +218,7 @@ impl Text {
                     )),
                 )
             },
-        )
+        ))
     }
 
     /// Returns a `Block` whose primitive is this text with no offset,
@@ -220,12 +237,6 @@ impl Text {
         block_offset: GridVector,
         filter: &super::EvalFilter<'_>,
     ) -> Result<MinEval, block::InEvalError> {
-        if filter.skip_eval {
-            // TODO: Once we have a `Handle<FontDef>` or something, this will need to
-            // check that before returning.
-            return Ok(block::AIR_EVALUATED_MIN); // placeholder value
-        }
-
         let (
             &text::LayoutHeader {
                 logical_bounding_box: _,
@@ -233,7 +244,7 @@ impl Text {
                 z: layout_z,
             },
             text_glyphs,
-        ) = self.get_or_init_layout().parts();
+        ) = self.get_or_init_layout(filter.read_ticket)?.parts();
 
         // Apply `block_offset` to the result of the layout.
         // TODO: handle overflow
@@ -364,7 +375,12 @@ impl Text {
     /// TODO: This is quickly slapped together for the `LargeText` widget, and may not be good
     /// general API.
     #[doc(hidden)]
-    pub fn draw_voxels_to_transaction(&self, txn: &mut SpaceTransaction, transform: Gridgid) {
+    pub fn draw_voxels_to_transaction(
+        &self,
+        read_ticket: universe::ReadTicket<'_>,
+        txn: &mut SpaceTransaction,
+        transform: Gridgid,
+    ) -> Result<(), universe::HandleError> {
         let (
             &text::LayoutHeader {
                 logical_bounding_box: _,
@@ -372,7 +388,7 @@ impl Text {
                 z: layout_z,
             },
             glyphs,
-        ) = self.get_or_init_layout().parts();
+        ) = self.get_or_init_layout(read_ticket)?.parts();
 
         let font_glyphs = &self.data.font.font_def().glyphs;
 
@@ -396,10 +412,23 @@ impl Text {
                 }
             });
         }
+
+        Ok(())
     }
 
-    fn get_or_init_layout(&self) -> &text::Layout {
-        self.layout_cache.get_or_init(|| {
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "fallible case not yet implemented"
+    )]
+    fn get_or_init_layout(
+        &self,
+        read_ticket: universe::ReadTicket<'_>,
+    ) -> Result<&text::Layout, universe::HandleError> {
+        // This ticket is not yet used, but will be necessary when we have user-defined fonts
+        // to read.
+        let _ = read_ticket;
+
+        Ok(self.layout_cache.get_or_init(|| {
             text::compute_layout(
                 &self.data.string,
                 self.data.font.font_def(),
@@ -407,7 +436,7 @@ impl Text {
                 self.data.layout_bounds,
                 self.data.positioning,
             )
-        })
+        }))
     }
 }
 

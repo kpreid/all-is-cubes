@@ -22,7 +22,7 @@ use all_is_cubes::euclid::{Vector2D, vec3};
 use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::math::{Cube, Face, GridCoordinate, GridRotation, GridSize, GridVector, Rgba};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{Handle, ReadTicket, UniverseTransaction};
+use all_is_cubes::universe::{self, Handle, ReadTicket, UniverseTransaction};
 
 use crate::vui::{self, Layoutable as _};
 
@@ -41,7 +41,12 @@ impl<St> vui::Layoutable for ButtonCommon<St> {
 impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St> {
     /// For a specific layout grant, generate the transaction which draws the button in a specific
     /// state.
-    fn create_draw_txn(&self, grant: &vui::LayoutGrant, state: &St) -> vui::WidgetTransaction {
+    fn create_draw_txn(
+        &self,
+        read_ticket: ReadTicket<'_>,
+        grant: &vui::LayoutGrant,
+        state: &St,
+    ) -> Result<vui::WidgetTransaction, universe::HandleError> {
         let grant = self.shrink_bounds(*grant);
 
         // Create transaction for the button shape of the required size *without label*.
@@ -49,7 +54,7 @@ impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St>
         let mut shape_txn = self.shape[state.clone()].create_box(grant.bounds);
 
         // Composite label and shape
-        for (x, label_block) in iter::zip(0.., self.label.blocks(grant.gravity)) {
+        for (x, label_block) in iter::zip(0.., self.label.blocks(read_ticket, grant.gravity)?) {
             // TODO: centered in case the button is larger
             let cube = Cube::from(grant.bounds.lower_bounds() + vec3(x, 0, 0));
 
@@ -62,14 +67,17 @@ impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St>
             }
         }
 
-        shape_txn
+        Ok(shape_txn)
     }
 
     pub(in crate::vui::widgets::button) fn create_draw_txns(
         &self,
+        read_ticket: ReadTicket<'_>,
         grant: &vui::LayoutGrant,
-    ) -> linking::Provider<St, vui::WidgetTransaction> {
-        self.shape.clone().map(|state, _| self.create_draw_txn(grant, state))
+    ) -> Result<linking::Provider<St, vui::WidgetTransaction>, universe::HandleError> {
+        self.shape
+            .clone()
+            .try_map(|state, _| self.create_draw_txn(read_ticket, grant, state))
     }
 
     pub(in crate::vui::widgets::button) fn shrink_bounds(
@@ -103,7 +111,13 @@ impl vui::Layoutable for ButtonLabel {
 impl ButtonLabel {
     /// Return an iterator of the blocks in the label, increasing along the X axis.
     /// Always has as many elements as `requirements().minimum`.
-    pub(crate) fn blocks(&self, mut gravity: vui::Gravity) -> impl Iterator<Item = Block> + '_ {
+    ///
+    /// `read_ticket` is used to obtain text layout.
+    pub(crate) fn blocks<'a>(
+        &'a self,
+        read_ticket: ReadTicket<'a>,
+        mut gravity: vui::Gravity,
+    ) -> Result<impl Iterator<Item = Block> + 'a, universe::HandleError> {
         // TODO: need a better plan for how gravity interacts with icons;
         // this is a kludge to get okay layout of the text for now, by left-aligning the
         // text to meet the icon.
@@ -111,17 +125,23 @@ impl ButtonLabel {
             gravity.x = vui::Align::Low;
         }
 
-        self.icon.clone().into_iter().chain(self.text.as_ref().into_iter().flat_map(
-            move |label_widget| {
+        let opt_text_iter = match self.text {
+            Some(ref label_widget) => {
                 let text = label_widget.text(gravity);
-                let bb = text.measure().logical_bounding_blocks();
-                bb.x_range().into_iter().map(move |x| {
+                let bb = text.measure(read_ticket)?.logical_bounding_blocks();
+                Some(bb.x_range().into_iter().map(move |x| {
                     Block::from_primitive(block::Primitive::Text {
                         text: text.clone(),
                         offset: GridVector::new(x, bb.lower_bounds().y, bb.lower_bounds().z),
                     })
-                })
-            },
+                }))
+            }
+            None => None,
+        };
+
+        Ok(iter::chain(
+            self.icon.clone(),
+            opt_text_iter.into_iter().flatten(),
         ))
     }
 }

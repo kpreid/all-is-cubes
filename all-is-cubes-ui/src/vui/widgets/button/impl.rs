@@ -22,7 +22,9 @@ impl vui::Widget for ActionButton {
     fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         Box::new(ActionButtonController {
             common: CommonController::new(),
-            txns: self.common.create_draw_txns(grant),
+            // TODO: refactor so we lazily/updatably (re)create the txns with a current read ticket
+            // when inputs are mutated.
+            txns: self.common.create_draw_txns(universe::ReadTicket::stub(), grant).unwrap(),
             definition: self,
         })
     }
@@ -35,7 +37,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton
         Box::new(ToggleButtonController {
             common: CommonController::new(),
             todo: listen::Flag::listening(true, &self.data_source),
-            txns: self.common.create_draw_txns(grant),
+            txns: self.common.create_draw_txns(universe::ReadTicket::stub(), grant).unwrap(),
             definition: self,
         })
     }

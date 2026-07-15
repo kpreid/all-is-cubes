@@ -6,30 +6,35 @@ use all_is_cubes::{
     arcstr::literal,
     block::{self, Block},
     content::palette,
-    text,
+    text, universe,
 };
 
 use crate::vui;
 
 /// All is Cubes logo text as a widget, at "1:1" scale (1 block per font pixel).
 #[expect(clippy::module_name_repetitions)]
+#[expect(clippy::missing_panics_doc, reason = "infallible")]
 pub fn logo_text() -> Arc<dyn vui::Widget> {
     let foreground_text_block: Block = palette::LOGO_FILL.into();
     let background_text_block: Block = palette::LOGO_STROKE.into();
 
-    Arc::new(vui::widgets::LargeText {
-        text: block::Text::builder()
-            .string(literal!("All is Cubes"))
-            .font(text::Font::Logo)
-            .foreground(foreground_text_block)
-            .outline(Some(background_text_block))
-            .positioning(text::Positioning {
-                x: text::PositioningX::Center,
-                line_y: text::PositioningY::BodyMiddle,
-                z: text::PositioningZ::Back,
-            })
-            .build(),
-    })
+    Arc::new(
+        vui::widgets::LargeText::new(
+            universe::ReadTicket::stub(), // only using a builtin font
+            block::Text::builder()
+                .string(literal!("All is Cubes"))
+                .font(text::Font::Logo)
+                .foreground(foreground_text_block)
+                .outline(Some(background_text_block))
+                .positioning(text::Positioning {
+                    x: text::PositioningX::Center,
+                    line_y: text::PositioningY::BodyMiddle,
+                    z: text::PositioningZ::Back,
+                })
+                .build(),
+        )
+        .unwrap(),
+    )
 }
 
 #[cfg(test)]

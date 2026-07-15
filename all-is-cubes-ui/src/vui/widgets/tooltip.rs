@@ -290,7 +290,7 @@ impl WidgetController for TooltipController {
         // Remember what we are about to draw so we know we don't need to redraw it.
         self.currently_displayed = new_contents;
 
-        widgets::text::draw_text_txn(&text, grant, false)
+        widgets::text::draw_text_txn(context.ui_read_ticket(), &text, grant, false).unwrap() // TODO: widget trait must change to allow error propagation
     }
 }
 

@@ -882,8 +882,9 @@ fn draw_exhibit_info(read_ticket: ReadTicket<'_>, exhibit: &Exhibit) -> Result<S
     let info_widgets: vui::WidgetTree = Arc::new(vui::LayoutTree::Stack {
         direction: Face::NY,
         children: vec![
-            vui::leaf_widget(widgets::LargeText {
-                text: block::Text::builder()
+            vui::leaf_widget(widgets::LargeText::new(
+                read_ticket,
+                block::Text::builder()
                     .string(exhibit.name.into())
                     .font(text::Font::System16)
                     .foreground(block::from_color!(palette::ALMOST_BLACK))
@@ -893,9 +894,10 @@ fn draw_exhibit_info(read_ticket: ReadTicket<'_>, exhibit: &Exhibit) -> Result<S
                         z: text::PositioningZ::Back,
                     })
                     .build(),
-            }),
-            vui::leaf_widget(widgets::LargeText {
-                text: block::Text::builder()
+            )?),
+            vui::leaf_widget(widgets::LargeText::new(
+                read_ticket,
+                block::Text::builder()
                     .string(
                         {
                             let t = exhibit.subtitle;
@@ -911,7 +913,7 @@ fn draw_exhibit_info(read_ticket: ReadTicket<'_>, exhibit: &Exhibit) -> Result<S
                         z: text::PositioningZ::Back,
                     })
                     .build(),
-            }),
+            )?),
         ],
     });
 

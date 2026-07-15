@@ -6,7 +6,7 @@ use super::prelude::*;
     subtitle: "",
     placement: Placement::SurfaceWithBackWall,
 )]
-fn TEXT(_: Context<'_>) {
+fn TEXT(ctx: Context<'_>) {
     let foreground_block = block::from_color!(palette::HUD_TEXT_FILL);
     let outline_block = block::from_color!(palette::HUD_TEXT_STROKE);
 
@@ -107,7 +107,13 @@ fn TEXT(_: Context<'_>) {
 
     let bounds_for_text = texts
         .iter()
-        .map(|ex| ex.text.measure().rendering_bounding_blocks().translate(ex.offset))
+        .map(|ex| {
+            ex.text
+                .measure(ReadTicket::stub())
+                .unwrap()
+                .rendering_bounding_blocks()
+                .translate(ex.offset)
+        })
         .reduce(|a, b| a.union_box(b))
         .unwrap();
 
@@ -115,9 +121,14 @@ fn TEXT(_: Context<'_>) {
 
     // TODO: detect collisions
     for Texhibit { text, f, offset } in texts {
-        text.installation(Gridgid::from_translation(offset), f)
-            .execute(&mut space, ReadTicket::stub(), &mut transaction::no_outputs)
-            .unwrap();
+        text.installation(
+            ctx.universe.read_ticket(),
+            Gridgid::from_translation(offset),
+            f,
+        )
+        .unwrap()
+        .execute(&mut space, ReadTicket::stub(), &mut transaction::no_outputs)
+        .unwrap();
     }
 
     Ok((space, ExhibitTransaction::default()))

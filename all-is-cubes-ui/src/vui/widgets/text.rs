@@ -1,12 +1,13 @@
-use all_is_cubes::{listen, universe};
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::{self, Resolution::*, Text};
+use all_is_cubes::listen;
 use all_is_cubes::math::{GridAab, GridSize, Gridgid};
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::text;
+use all_is_cubes::universe::{self, ReadTicket};
 
 use crate::vui::{self, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetController, widgets};
 
@@ -15,23 +16,34 @@ use crate::vui::{self, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetCon
 /// Widget which draws text using a block per font pixel.
 ///
 /// It is “large” in that it is not building blocks that fit entire characters.
-///
-/// TODO: Give this a more precise name, and a nice constructor...
 #[derive(Clone, Debug)]
-#[expect(clippy::exhaustive_structs)] // TODO: find a better strategy
 pub struct LargeText {
     /// Text to be displayed, and its style.
     ///
     /// The `resolution` field is ignored.
     /// The `positioning` field does not override UI layout gravity but does affect the
     /// relationships among the text’s lines.
-    pub text: Text,
+    text: Text,
+
+    bounding_voxels: GridAab,
 }
 
 impl LargeText {
+    /// Constructs a [`LargeText`].
+    ///
+    /// `read_ticket` will be used to access the font of the text to determine its size for layout.
+    /// If the font changes size later, that will be ignored.
+    #[expect(clippy::missing_errors_doc)]
+    pub fn new(read_ticket: ReadTicket<'_>, text: Text) -> Result<Self, universe::HandleError> {
+        Ok(Self {
+            // TODO: offer rendering_bounding_voxels as an option?
+            bounding_voxels: text.measure(read_ticket)?.logical_bounding_voxels(),
+            text,
+        })
+    }
+
     fn bounds(&self) -> GridAab {
-        // TODO: offer rendering_bounding_voxels as an option?
-        self.text.measure().logical_bounding_voxels()
+        self.bounding_voxels
     }
 }
 
@@ -48,10 +60,13 @@ impl Widget for LargeText {
         let mut txn = SpaceTransaction::default();
         let draw_bounds = self.bounds();
         let text_bounds = position.shrink_to(draw_bounds.size(), false).bounds;
-        self.text.draw_voxels_to_transaction(
-            &mut txn,
-            Gridgid::from_translation(text_bounds.lower_bounds() - draw_bounds.lower_bounds()),
-        );
+        self.text
+            .draw_voxels_to_transaction(
+                ReadTicket::stub(), // TODO: should get a ticket from the widget instantiation process.
+                &mut txn,
+                Gridgid::from_translation(text_bounds.lower_bounds() - draw_bounds.lower_bounds()),
+            )
+            .unwrap(); // TODO: widget trait must change to allow error propagation
 
         widgets::OneshotController::new(txn)
     }
@@ -122,7 +137,8 @@ impl Layoutable for Label {
         LayoutRequest {
             minimum: self
                 .text(vui::Gravity::splat(vui::Align::Low))
-                .measure()
+                .measure(ReadTicket::stub())
+                .unwrap() // TODO: should make this measurement on construction
                 .logical_bounding_blocks()
                 .size(),
         }
@@ -134,7 +150,15 @@ impl Widget for Label {
         // TODO: memoize `Text` construction for slightly more efficient reuse of widget
         // (this will only matter once `Text` memoizes glyph layout)
 
-        widgets::OneshotController::new(draw_text_txn(&self.text(grant.gravity), grant, true))
+        widgets::OneshotController::new(
+            draw_text_txn(
+                ReadTicket::stub(), // TODO: should get a ticket from the widget instantiation process.
+                &self.text(grant.gravity),
+                grant,
+                true,
+            )
+            .unwrap(), // TODO: error propagation
+        )
     }
 }
 
@@ -244,10 +268,11 @@ impl WidgetController for TextBoxController {
 
     fn draw(
         &mut self,
-        _: &vui::WidgetContext<'_, '_>,
+        context: &vui::WidgetContext<'_, '_>,
         _from_scratch: bool,
     ) -> vui::WidgetTransaction {
         draw_text_txn(
+            context.ui_read_ticket(),
             &text_for_widget(
                 self.definition.text_source.get(),
                 self.definition.font.clone(),
@@ -258,6 +283,7 @@ impl WidgetController for TextBoxController {
             &self.grant,
             false, // overwrite any previous text
         )
+        .unwrap() // TODO: widget trait must change to allow error propagation
     }
 }
 
@@ -311,18 +337,19 @@ fn gravity_to_positioning(gravity: vui::Gravity, ignore_y: bool) -> text::Positi
 /// If `shrink` is true, does not affect cubes outside the bounds of the text.
 /// If `shrink` is false, draws to the entire grant.
 pub(crate) fn draw_text_txn(
+    read_ticket: ReadTicket<'_>,
     text: &Text,
     full_grant: &LayoutGrant,
     shrink: bool,
-) -> SpaceTransaction {
-    let text_aabb = text.measure().logical_bounding_blocks();
+) -> Result<SpaceTransaction, universe::HandleError> {
+    let text_aabb = text.measure(read_ticket)?.logical_bounding_blocks();
     let shrunk_grant = full_grant.shrink_to(text_aabb.size(), true);
     let translation = shrunk_grant.bounds.lower_bounds() - text_aabb.lower_bounds();
 
     // This is like `Text::installation()` but if the text ends up too big it is truncated.
     // TODO: But it shouldn't necessarily be truncated to the lower-left corner which is what
     // our choice of translation calculation is doing
-    SpaceTransaction::filling(
+    Ok(SpaceTransaction::filling(
         if shrink {
             shrunk_grant.bounds
         } else {
@@ -340,7 +367,7 @@ pub(crate) fn draw_text_txn(
             };
             CubeTransaction::replacing(None, Some(block))
         },
-    )
+    ))
 }
 
 #[cfg(test)]
@@ -355,8 +382,9 @@ mod tests {
     #[test]
     fn large_text_size() {
         let text = "abc";
-        let widget = LargeText {
-            text: Text::builder()
+        let widget = LargeText::new(
+            ReadTicket::stub(),
+            Text::builder()
                 .string(text.into())
                 .font(text::Font::System16)
                 .foreground(block::from_color!(Rgba::WHITE))
@@ -366,7 +394,8 @@ mod tests {
                     z: text::PositioningZ::Back,
                 })
                 .build(),
-        };
+        )
+        .unwrap();
         assert_eq!(
             widget.requirements(),
             LayoutRequest {
