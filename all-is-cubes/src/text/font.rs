@@ -280,8 +280,11 @@ pub(crate) struct Glyphs {
     /// Bit-packed glyph data.
     ///
     /// Each glyph starts on a whole byte.
+    /// The bits of the glyph are interpred according to [`Value`].
     pixels: Vec<u8>,
 
+    /// Indices of this vector are [`GlyphIndex`].
+    /// Elements specify where in `self.pixels` the glyph data can be found.
     lookup: Vec<GlyphInfo>,
 }
 
@@ -435,12 +438,15 @@ impl Glyphs {
     ///
     /// This box covers exactly the pixels that would be drawn, and does not have any guaranteed
     /// relationship to the font’s metrics.
+    ///
+    /// Panics if `glyph_index` is out of range.
     pub(crate) fn rendering_bounding_box(
         &self,
         glyph_index: GlyphIndex,
         outline: bool,
     ) -> Box2D<GridCoordinate, InGlyph> {
-        let bbox = self.lookup[glyph_index].bounding_box_including_outline.cast();
+        let info: &GlyphInfo = self.get_info(glyph_index);
+        let bbox = info.bounding_box_including_outline.cast();
         if outline || bbox.is_empty() {
             bbox
         } else {
@@ -451,13 +457,15 @@ impl Glyphs {
 
     /// Returns an iterator over all the pixels making up one glyph.
     ///
+    /// Panics if `glyph_index` is out of range.
+    ///
     /// TODO: the results of this should be typed, not as points, but as unit squares like `Cube`
     /// is a unit cube (or literally `Cube` if we choose to denote voxels this early).
     pub(crate) fn get(
         &self,
         glyph_index: GlyphIndex,
     ) -> impl Iterator<Item = (Point2D<GridCoordinate, InGlyph>, Value)> {
-        let info: &GlyphInfo = self.lookup.get(glyph_index).expect("glyph index out of range");
+        let info: &GlyphInfo = self.get_info(glyph_index);
         // this slice includes extra pixels beyond this glyph ones, but those are not used
         let this_glyph_pixels = &self.pixels[info.data_offset..];
 
@@ -491,6 +499,10 @@ impl Glyphs {
                 _ => unreachable!(),
             }
         })
+    }
+
+    fn get_info(&self, glyph_index: GlyphIndex) -> &GlyphInfo {
+        self.lookup.get(glyph_index).expect("glyph index out of range")
     }
 }
 
