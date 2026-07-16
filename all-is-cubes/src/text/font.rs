@@ -94,6 +94,14 @@ impl Metrics {
 
 // -------------------------------------------------------------------------------------------------
 
+/// An index into a font’s glyph table.
+///
+/// These are produced by [`FontDef::glyph_for_char()`].
+///
+/// TODO: optimize using smaller index type.
+/// We could probably get away with using u16 for now.
+pub(in crate::text) type GlyphIndex = usize;
+
 /// The data of a font that may be used with [`Text`] blocks.
 ///
 /// Currently, the only available fonts are obtained through [`Builtin`];
@@ -164,6 +172,31 @@ impl FontDef {
             self.glyphs.get(glyph.glyph_index).for_each(|(position, value)| {
                 set_pixel(translation.transform_point(position), value);
             });
+        }
+    }
+
+    /// Returns the [`GlyphIndex`] for the glyph in this font that should be used to represent the
+    /// given character.
+    ///
+    /// TODO: Both the input and the output of this will have to change eventually:
+    ///
+    /// * Some characters could be more efficiently represented as combinations of glyphs, e.g.
+    ///   accented characters.
+    /// * Some single glyphs will be chosen from a grapheme cluster consisting of multiple `char`s.
+    #[expect(clippy::unused_self, reason = "TODO")]
+    pub(in crate::text) fn char_to_glyph_index(&self, c: char) -> GlyphIndex {
+        // Currently, all fonts’ repertoire is exactly ISO-8859-1, plus some Unicode lookalikes.
+
+        // Remap characters for which we use the same glyphs
+        let c = match c {
+            '\u{2018}' | '\u{2019}' => '\'', // curly single quotes/apostrophes
+            '\u{201C}' | '\u{201D}' => '"',  // curly double quotes
+            c => c,
+        };
+        match c {
+            '\u{20}'..='\u{7F}' => (c as GlyphIndex) - 0x20,
+            '\u{80}'..='\u{FF}' => (c as GlyphIndex) - 0x40,
+            _ => 0x1f, // unavailable glyphs become question marks -- TODO: dedicate a glyph
         }
     }
 }
@@ -404,7 +437,7 @@ impl Glyphs {
     /// relationship to the font’s metrics.
     pub(crate) fn rendering_bounding_box(
         &self,
-        glyph_index: usize,
+        glyph_index: GlyphIndex,
         outline: bool,
     ) -> Box2D<GridCoordinate, InGlyph> {
         let bbox = self.lookup[glyph_index].bounding_box_including_outline.cast();
@@ -418,11 +451,11 @@ impl Glyphs {
 
     /// Returns an iterator over all the pixels making up one glyph.
     ///
-    /// TODO: the results of this should typed, not as points, but as unit squares like `Cube`
+    /// TODO: the results of this should be typed, not as points, but as unit squares like `Cube`
     /// is a unit cube (or literally `Cube` if we choose to denote voxels this early).
     pub(crate) fn get(
         &self,
-        glyph_index: usize,
+        glyph_index: GlyphIndex,
     ) -> impl Iterator<Item = (Point2D<GridCoordinate, InGlyph>, Value)> {
         let info: &GlyphInfo = self.lookup.get(glyph_index).expect("glyph index out of range");
         // this slice includes extra pixels beyond this glyph ones, but those are not used

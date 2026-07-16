@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use euclid::{Box2D, Point2D, SideOffsets2D, Vector3D, point2, vec3};
 
 use crate::math::{Cube, GridAab, GridCoordinate, GridPoint};
-use crate::text;
+use crate::text::{self, GlyphIndex};
 
 #[cfg(doc)]
 use crate::block::{Primitive, Text};
@@ -62,11 +62,8 @@ pub(crate) struct LayoutHeader {
 // TODO: refactor so visibility can be crate::text only?
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct PositionedGlyph {
-    /// Index into the font's glyph table (ISO-8859-1 minus 0x20).
-    ///
-    /// TODO: optimize using smaller index type.
-    /// We could probably get away with using u16.
-    pub glyph_index: usize,
+    /// Index into the font's glyph table.
+    pub glyph_index: GlyphIndex,
 
     /// Position, in X-right Y-up coordinates (same as `Evoxels` coordinates),
     /// relative to (TODO: explain), of the top-left corner of this glyph.
@@ -185,7 +182,7 @@ pub(crate) fn compute_layout(
         // TODO: chars() is not the correct tool; we should be splitting on grapheme clusters
         // and mapping those to glyphs.
         for c in line.chars() {
-            let glyph_index = char_to_glyph_index(c);
+            let glyph_index = font.char_to_glyph_index(c);
             let position: Point2D<GridCoordinate, ()> = point2(
                 cursor_x.saturating_add(layout_offset.x),
                 cursor_y.saturating_add(layout_offset.y),
@@ -394,25 +391,6 @@ impl fmt::Debug for Layout {
             .field("rendering_bounding_box", rendering_bounding_box)
             .field("z", z)
             .finish_non_exhaustive()
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-/// Convert a Unicode character to a glyph index.
-///
-/// This is a placeholder for fonts eventually having their own glyph tables.
-fn char_to_glyph_index(c: char) -> usize {
-    // Remap characters for which we use the same glyphs
-    let c = match c {
-        '\u{2018}' | '\u{2019}' => '\'',
-        '\u{201C}' | '\u{201D}' => '"',
-        c => c,
-    };
-    match c {
-        '\u{20}'..='\u{7F}' => (c as usize) - 0x20,
-        '\u{80}'..='\u{FF}' => (c as usize) - 0x40,
-        _ => 0x1f, // unavailable glyphs become question marks -- TODO: dedicate a glyph
     }
 }
 
