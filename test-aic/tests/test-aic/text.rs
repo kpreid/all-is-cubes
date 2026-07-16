@@ -1,3 +1,5 @@
+//! Tests for [`all_is_cubes::text`] and [`all_is_cubes::block::Text`].
+
 use pretty_assertions::assert_eq;
 
 use all_is_cubes::arcstr::literal;
