@@ -342,6 +342,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.6.24 -> 1.0.0"
 
+[[audits.spin]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.9.8 -> 0.9.9"
+
 [[audits.stl_io]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
