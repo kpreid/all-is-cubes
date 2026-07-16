@@ -113,7 +113,7 @@ pub(crate) fn generate_texture_atlas(
     let outline_radius_i = outline_radius_u.cast_signed();
 
     // Size of the on-screen cell, which the outline may overflow.
-    let logical_cell_size: ImageSize = font.metrics().character_cell_size();
+    let logical_cell_size: ImageSize = font.metrics().character_cell_size().cast_unit();
     // Size of the atlas glyph cell, which has to be big enough for the added outline.
     let atlas_cell_size = logical_cell_size + ImageSize::splat(outline_radius_u * 2);
 

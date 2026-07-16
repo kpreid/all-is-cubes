@@ -68,7 +68,7 @@ fn single_block_test_case(text: Text) -> (Box<Universe>, Block) {
 /// Test the publicly-visible metrics of built-in fonts (rather than any more indirect thing like
 /// the bounding box of drawn text).
 #[test]
-fn public_metrics() {
+fn metrics_of_builtin_fonts() {
     assert_eq!(
         Builtin::FontSystem16.read::<FontDef>().metrics().character_cell_size(),
         size2(7, 16)
@@ -77,6 +77,58 @@ fn public_metrics() {
         Builtin::FontBodyText.read::<FontDef>().metrics().character_cell_size(),
         size2(6, 14)
     );
+}
+
+/// Test that every font’s reported baseline has the expected relationship to its glyphs.
+#[test]
+fn baseline_of_builtin_fonts() {
+    for font_builtin in [Builtin::FontSystem16, Builtin::FontBodyText] {
+        dbg!(font_builtin);
+
+        let baseline = font_builtin.read::<FontDef>().metrics().baseline();
+
+        let text_above_baseline = Text::builder()
+            .string(literal!("ab"))
+            .font(font_builtin.try_into().unwrap())
+            .resolution(Resolution::R16)
+            .positioning(Positioning {
+                x: PositioningX::Left,
+                line_y: PositioningY::Baseline,
+                z: PositioningZ::Back,
+            })
+            .build();
+
+        let text_from_top_left = text_above_baseline
+            .clone()
+            .into_builder()
+            .layout_bounds(Resolution::R16, GridAab::ORIGIN_EMPTY)
+            .positioning(Positioning {
+                x: PositioningX::Left,
+                line_y: PositioningY::BodyTop,
+                z: PositioningZ::Back,
+            })
+            .build();
+
+        // Because we asked for baseline positioning, it should always be the case that the text does
+        // not extend below the bottom of the layout bounds (which is 0).
+        let b_measurement = text_above_baseline.measure(ReadTicket::stub()).unwrap();
+        dbg!(&b_measurement);
+        assert_eq!(
+            b_measurement.rendering_bounding_voxels().lower_bounds().y,
+            0
+        );
+
+        // With `BodyTop` positioning, which is currently always identical to the origin of the
+        // `InGlyph` coordinate system, we should see that the bottom edge coordinate is also the
+        // baseline coordinate.
+        let t_measurement = text_from_top_left.measure(ReadTicket::stub()).unwrap();
+        dbg!(&t_measurement);
+        assert_eq!(
+            t_measurement.rendering_bounding_voxels().lower_bounds().y,
+            // negated because voxel coordinates are Y-up
+            -baseline.get()
+        );
+    }
 }
 
 #[test]

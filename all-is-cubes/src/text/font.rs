@@ -1,13 +1,13 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use euclid::{Box2D, Point2D, Size2D, Translation2D, point2, size2, vec2};
+use euclid::{Box2D, Length, Point2D, Size2D, Translation2D, point2, size2, vec2};
 use itertools::iproduct;
 
-use crate::camera::{ImagePixel, ImageSize};
+use crate::camera::ImagePixel;
 use crate::content::load_image::DecodedPng;
 use crate::math::{GridAab, GridCoordinate, u32size};
-use crate::text::{self, InGlyph};
+use crate::text;
 use crate::transaction;
 use crate::universe;
 #[cfg_attr(not(any(doc, feature = "arbitrary")), allow(unused_imports))]
@@ -25,7 +25,7 @@ pub(crate) static FONT_SYSTEM_16: FontDecl = FontDecl {
     png_path: "font-system-7x16.png",
     metrics: Metrics {
         character_size: size2(7, 16),
-        baseline: 12,
+        baseline: Length::new(13),
     },
 };
 
@@ -34,7 +34,7 @@ pub(crate) static FONT_BODY_TEXT: FontDecl = FontDecl {
     png_path: "font-body-text-6x14.png",
     metrics: Metrics {
         character_size: size2(6, 14),
-        baseline: 10,
+        baseline: Length::new(11),
     },
 };
 
@@ -62,6 +62,17 @@ pub type Font = universe::Handle<FontDef>;
 
 // -------------------------------------------------------------------------------------------------
 
+/// [`euclid`] coordinate system type for coordinates within a single glyph image.
+///
+/// X increases rightward and Y increases downward.
+/// There is no Z.
+/// The origin is the top-left corner of the abstract character cell,
+/// not counting the effect of outlining or any other transformation or combination of glyphs
+/// that may spill out of the cell.
+#[derive(Debug, Eq, PartialEq)]
+#[expect(clippy::exhaustive_structs)]
+pub struct InGlyph;
+
 /// The metrics of a [`FontDef`]: measurements of dimensions which all characters in the font share.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Metrics {
@@ -74,8 +85,12 @@ pub struct Metrics {
 
     /// Y position of the baseline in the glyph.
     ///
-    /// TODO: Clarify pixel-edge/pixel-center interpretation of this coordinate
-    pub(in crate::text) baseline: u8,
+    /// The baseline, for the Latin alphabet, is the line which most characters’ bottoms touch,
+    /// and which descenders extend past.
+    ///
+    /// Note that this coordinate identifies a vertical position between pixels, not a row of
+    /// pixels.
+    pub(in crate::text) baseline: Length<u8, InGlyph>,
 }
 
 impl Metrics {
@@ -86,9 +101,20 @@ impl Metrics {
     /// produces.
     /// Currently, All is Cubes uses strictly monospaced layout for all text, and so
     /// the `width` of this is equal to the advance width of the font.
-    pub fn character_cell_size(&self) -> ImageSize {
+    pub fn character_cell_size(&self) -> Size2D<u32, InGlyph> {
         let s = self.character_size;
         size2(u32::from(s.width), u32::from(s.height))
+    }
+
+    /// Y position of the baseline in the glyph.
+    ///
+    /// The baseline, for the Latin alphabet, is the line which most characters’ bottoms touch,
+    /// and which descenders extend past.
+    ///
+    /// Note that this coordinate identifies a vertical position between pixels, not a row of
+    /// pixels, in the [`InGlyph`] coordinate system.
+    pub fn baseline(&self) -> Length<GridCoordinate, InGlyph> {
+        Length::new(self.baseline.get().into())
     }
 }
 

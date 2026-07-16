@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use euclid::{Box2D, Point2D, SideOffsets2D, Vector3D, point2, vec3};
 
 use crate::math::{Cube, GridAab, GridCoordinate, GridPoint};
-use crate::text::{self, GlyphIndex};
+use crate::text::{self, GlyphIndex, InGlyph};
 
 #[cfg(doc)]
 use crate::block::{Primitive, Text};
@@ -72,15 +72,6 @@ pub(crate) struct PositionedGlyph {
     pub position: Point2D<GridCoordinate, ()>,
 }
 
-/// [`euclid`] coordinate system type for coordinates within a single glyph image.
-///
-/// X increases rightward and Y increases downward.
-/// There is no Z.
-/// The origin is the top-left corner of the abstract character cell,
-/// not counting the effect of outlining or any other transformation or combination of glyphs
-/// that may spill out of the cell.
-pub(crate) struct InGlyph;
-
 // -------------------------------------------------------------------------------------------------
 
 /// Glyphs whose [`PositionedGlyph::position()`] would be outside this range are discarded instead
@@ -140,7 +131,7 @@ pub(crate) fn compute_layout(
                     .saturating_add((character_size_g.height - 1) / 2)
             }
             text::PositioningY::Baseline => {
-                lb.lower_bounds().y.saturating_add(GridCoordinate::from(metrics.baseline))
+                lb.lower_bounds().y.saturating_add(metrics.baseline().get()).saturating_sub(1)
             }
             text::PositioningY::BodyBottom => {
                 lb.lower_bounds().y.saturating_add(character_size_g.height).saturating_sub(1)
