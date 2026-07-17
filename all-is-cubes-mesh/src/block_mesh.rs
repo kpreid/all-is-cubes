@@ -55,11 +55,11 @@ pub struct BlockMesh<M: MeshTypes> {
     /// the block occupies.
     /// In the future, vertices that make up the surfaces of concavities on the block faces might
     /// also be included here.
-    pub(super) face_vertices: FaceMap<SubMesh<M::Vertex>>,
+    pub(super) face_vertices: FaceMap<SubMesh<M>>,
 
     /// All vertices not in [`Self::face_vertices`], grouped by their face normals.
     /// All of these vertices have positions in the interior of the unit cube.
-    pub(super) interior_vertices: FaceMap<SubMesh<M::Vertex>>,
+    pub(super) interior_vertices: FaceMap<SubMesh<M>>,
 
     /// Texture used by the vertices;
     /// holding this handle ensures that the texture coordinates stay valid.
@@ -87,13 +87,16 @@ pub struct BlockMesh<M: MeshTypes> {
 /// All opaque triangles are ordered by depth (that is, position along the perpendicular axis),
 /// front to back.
 //--
+// Design note: `SubMesh` would be simpler if it were generic over the vertex type only
+// (it could derive many traits), but this would make it less consistent with `BlockMesh` and
+// harder to extend in the future.
+//
 // Optimization note: I tried moving the non-generic parts of this into a separate struct and
 // methods to improve compilation performance. That turned out to affect too little code to be
 // worthwhile.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct SubMesh<V: Vertex> {
+pub(super) struct SubMesh<M: MeshTypes> {
     /// Vertices, as used by the indices vectors.
-    pub(super) vertices: (Vec<V>, Vec<V::SecondaryData>),
+    pub(super) vertices: (Vec<M::Vertex>, Vec<<M::Vertex as Vertex>::SecondaryData>),
 
     /// Indices into `self.vertices` that form triangles (i.e. length is a multiple of 3)
     /// in counterclockwise order, for vertices whose coloring is fully opaque (or
@@ -163,9 +166,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     /// * face/normal
     /// * whether these vertices are on the face of the block and not the interior
     /// * mesh data
-    pub(super) fn all_sub_meshes_keyed(
-        &self,
-    ) -> impl Iterator<Item = (Face, bool, &SubMesh<M::Vertex>)> {
+    pub(super) fn all_sub_meshes_keyed(&self) -> impl Iterator<Item = (Face, bool, &SubMesh<M>)> {
         Iterator::chain(
             self.interior_vertices.iter().map(|(f, mesh)| (f, false, mesh)),
             self.face_vertices.iter().map(|(f, mesh)| (f, true, mesh)),
@@ -173,11 +174,11 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     }
 
     /// As [`Self::all_sub_meshes_keyed()`] but without the keys, just the mesh data.
-    pub(super) fn all_sub_meshes(&self) -> impl Iterator<Item = &SubMesh<M::Vertex>> {
+    pub(super) fn all_sub_meshes(&self) -> impl Iterator<Item = &SubMesh<M>> {
         Iterator::chain(self.interior_vertices.values(), self.face_vertices.values())
     }
 
-    fn all_sub_meshes_mut(&mut self) -> impl Iterator<Item = &mut SubMesh<M::Vertex>> {
+    fn all_sub_meshes_mut(&mut self) -> impl Iterator<Item = &mut SubMesh<M>> {
         Iterator::chain(
             self.interior_vertices.values_mut(),
             self.face_vertices.values_mut(),
@@ -292,7 +293,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     }
 
     fn clear(&mut self) {
-        fn clear_sub_mesh_map<V: Vertex>(m: &mut FaceMap<SubMesh<V>>) {
+        fn clear_sub_mesh_map<M: MeshTypes>(m: &mut FaceMap<SubMesh<M>>) {
             for sm in m.values_mut() {
                 sm.clear();
             }
@@ -451,7 +452,9 @@ impl<M: MeshTypes> Clone for BlockMesh<M> {
     }
 }
 
-impl<V: Vertex> SubMesh<V> {
+// -------------------------------------------------------------------------------------------------
+
+impl<M: MeshTypes> SubMesh<M> {
     pub const EMPTY: Self = Self {
         vertices: (Vec::new(), Vec::new()),
         indices_opaque: IndexVec::new(),
@@ -568,13 +571,71 @@ impl<V: Vertex> SubMesh<V> {
     }
 }
 
-impl<V: Vertex> Default for SubMesh<V> {
+impl<M: MeshTypes> Default for SubMesh<M> {
     fn default() -> Self {
         Self::EMPTY
     }
 }
 
-impl<V: Vertex> HeapUsage for SubMesh<V> {
+// These implementations are not derivable because they should not bound `M: PartialEq`.
+impl<M: MeshTypes> Eq for SubMesh<M> where M::Vertex: Eq {}
+impl<M: MeshTypes> PartialEq for SubMesh<M> {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            vertices,
+            indices_opaque,
+            indices_transparent,
+            fully_opaque,
+            has_non_rect_transparency,
+            bounding_box,
+        } = self;
+        // For performance, ordered to compare the most likely to differ, or small, fields first.
+        *bounding_box == other.bounding_box
+            && *has_non_rect_transparency == other.has_non_rect_transparency
+            && *fully_opaque == other.fully_opaque
+            && *vertices == other.vertices
+            && *indices_opaque == other.indices_opaque
+            && *indices_transparent == other.indices_transparent
+    }
+}
+
+// This implementation is not derivable because it should not bound `M: Debug`.
+impl<M: MeshTypes> fmt::Debug for SubMesh<M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            vertices,
+            indices_opaque,
+            indices_transparent,
+            fully_opaque,
+            has_non_rect_transparency,
+            bounding_box,
+        } = self;
+        f.debug_struct("SubMesh")
+            .field("vertices", vertices)
+            .field("indices_opaque", indices_opaque)
+            .field("indices_transparent", indices_transparent)
+            .field("fully_opaque", fully_opaque)
+            .field("has_non_rect_transparency", has_non_rect_transparency)
+            .field("bounding_box", bounding_box)
+            .finish()
+    }
+}
+
+// This implementation is not derivable because it should not bound `M: Clone`.
+impl<M: MeshTypes> Clone for SubMesh<M> {
+    fn clone(&self) -> Self {
+        Self {
+            vertices: self.vertices.clone(),
+            indices_opaque: self.indices_opaque.clone(),
+            indices_transparent: self.indices_transparent.clone(),
+            fully_opaque: self.fully_opaque,
+            has_non_rect_transparency: self.has_non_rect_transparency,
+            bounding_box: self.bounding_box,
+        }
+    }
+}
+
+impl<M: MeshTypes> HeapUsage for SubMesh<M> {
     fn heap_bytes_owned(&self) -> usize {
         let Self {
             vertices: (v0, v1),
