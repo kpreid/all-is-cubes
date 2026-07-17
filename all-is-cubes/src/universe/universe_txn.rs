@@ -779,7 +779,6 @@ impl UniverseTransaction {
         self,
         world: &mut ecs::World,
         checks: UniverseCommitCheck,
-        outputs: &mut dyn FnMut(core::convert::Infallible),
     ) -> Result<(), CommitError> {
         let Self {
             mut members,
@@ -804,7 +803,7 @@ impl UniverseTransaction {
             members
                 .remove(&name)
                 .expect("invalid check value")
-                .commit(world, &name, check, outputs)
+                .commit(world, &name, check)
                 .map_err(|e| e.context(format!("universe member {name}")))?;
         }
 
@@ -813,7 +812,6 @@ impl UniverseTransaction {
                 world,
                 &Name::Pending,
                 check,
-                outputs,
             )?;
         }
 
@@ -826,8 +824,7 @@ impl UniverseTransaction {
         read_queries: &mut universe::MemberReadQueryStates,
     ) -> Result<(), ExecuteError<Self>> {
         let check = self.check_with_world(world, read_queries).map_err(ExecuteError::Check)?;
-        self.commit_to_world(world, check, &mut transaction::no_outputs)
-            .map_err(ExecuteError::Commit)
+        self.commit_to_world(world, check).map_err(ExecuteError::Commit)
     }
 }
 
@@ -860,9 +857,9 @@ impl Transaction for UniverseTransaction {
         self,
         target: &mut Universe,
         checks: Self::CommitCheck,
-        outputs: &mut dyn FnMut(Self::Output),
+        _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
-        self.commit_to_world(&mut target.world, checks, outputs)?;
+        self.commit_to_world(&mut target.world, checks)?;
         target.update_archetypes();
         Ok(())
     }
@@ -1035,16 +1032,17 @@ impl MemberTxn {
         world: &mut ecs::World,
         name: &Name,
         MemberCommitCheck(check): MemberCommitCheck,
-        outputs: &mut dyn FnMut(core::convert::Infallible),
     ) -> Result<(), CommitError> {
         match self {
             MemberTxn::Noop => {
                 assert!(check.is_none());
                 Ok(())
             }
-            MemberTxn::Modify(txn) => {
-                txn.commit(world, check.expect("missing check value"), outputs)
-            }
+            MemberTxn::Modify(txn) => txn.commit(
+                world,
+                check.expect("missing check value"),
+                &mut transaction::no_outputs,
+            ),
             MemberTxn::Insert(pending) => {
                 pending
                     .insert_pending_into_world(world)
