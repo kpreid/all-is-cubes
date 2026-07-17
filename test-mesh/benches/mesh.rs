@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 
+use std::hint::black_box;
+
 use criterion::{BatchSize, Criterion, criterion_main};
 use rand::RngExt as _;
 use rand::SeedableRng as _;
@@ -31,6 +33,10 @@ fn benches() {
     dynamic_benches(&mut c);
     analyze_benches(&mut c);
     planar_benches(&mut c);
+    if false {
+        // highly specialized, omit from default set
+        index_benches(&mut c);
+    }
 }
 
 fn block_mesh_benches(c: &mut Criterion) {
@@ -553,6 +559,30 @@ fn planar_benches(c: &mut Criterion) {
             },
             BatchSize::LargeInput,
         );
+    });
+}
+
+fn index_benches(c: &mut Criterion) {
+    let mut g = c.benchmark_group("index-cmp");
+
+    // All equal; the cost is in checking.
+    let v_16_a = Vec::from_iter(0..=0x1000);
+    let v_16_b = Vec::from_iter(0..=0x1000);
+    let v_32_a = Vec::from_iter(0..=0x1000);
+    let v_32_b = Vec::from_iter(0..=0x1000);
+    let i_16_a = mesh::IndexSlice::U16(&v_16_a);
+    let i_16_b = mesh::IndexSlice::U16(&v_16_b);
+    let i_32_a = mesh::IndexSlice::U32(&v_32_a);
+    let i_32_b = mesh::IndexSlice::U32(&v_32_b);
+
+    g.bench_function("16_16", |b| {
+        b.iter(|| *black_box(&i_16_a) == *black_box(&i_16_b));
+    });
+    g.bench_function("32_32", |b| {
+        b.iter(|| *black_box(&i_32_a) == *black_box(&i_32_b));
+    });
+    g.bench_function("16_32", |b| {
+        b.iter(|| *black_box(&i_16_a) == *black_box(&i_32_b));
     });
 }
 

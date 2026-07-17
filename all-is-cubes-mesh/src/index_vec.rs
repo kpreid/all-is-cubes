@@ -1,6 +1,7 @@
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 use core::fmt;
+use core::iter;
 use core::mem;
 use core::ops;
 
@@ -14,7 +15,7 @@ use crate::{OutOfMemory, heap};
 
 /// Data storage for meshes’ index lists, automatically choosing an element type which is
 /// large enough for the range of the index values.
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone)]
 pub(crate) enum IndexVec {
     /// 16-bit indices.
     U16(Vec<u16>),
@@ -32,7 +33,7 @@ pub(crate) enum IndexVec {
 /// an equally valid implementation would be a gap buffer, where we have two fixed ends and insert
 /// on either side of a gap in the middle. These are identical except for the choice of ordering
 /// of the two halves of the storage.)
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone)]
 pub(crate) enum IndexVecDeque {
     /// 16-bit indices.
     U16(VecDeque<u16>),
@@ -41,7 +42,7 @@ pub(crate) enum IndexVecDeque {
 }
 
 /// Data for meshes’ index lists, which may use either 16 or 32-bit values.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy)]
 #[expect(clippy::exhaustive_enums)]
 pub enum IndexSlice<'a> {
     /// 16-bit indices.
@@ -147,6 +148,24 @@ impl IndexVec {
             Self::U32(vec) => vec.try_reserve_exact(additional),
         }
         .map_err(OutOfMemory::from)
+    }
+}
+
+impl IndexVecDeque {
+    /// Returns the two disjoint slices making up this deque, in the same way as
+    /// [`VecDeque::as_slices()`].
+    #[inline]
+    fn as_slices(&self) -> [IndexSlice<'_>; 2] {
+        match self {
+            Self::U16(vecdeque) => {
+                let (front, back) = vecdeque.as_slices();
+                [IndexSlice::U16(front), IndexSlice::U16(back)]
+            }
+            Self::U32(vecdeque) => {
+                let (front, back) = vecdeque.as_slices();
+                [IndexSlice::U32(front), IndexSlice::U32(back)]
+            }
+        }
     }
 }
 
@@ -681,6 +700,61 @@ impl IndexInt for u32 {
 }
 
 // -------------------------------------------------------------------------------------------------
+
+impl Eq for IndexSlice<'_> {}
+impl PartialEq for IndexSlice<'_> {
+    /// Compare the contents of two index slices numerically, ignoring the element type.
+    #[inline(never)]
+    fn eq(&self, other: &Self) -> bool {
+        match (*self, *other) {
+            (Self::U16(a), Self::U16(b)) => a == b,
+            (Self::U32(a), Self::U32(b)) => a == b,
+            (Self::U16(slice16), Self::U32(slice32)) | (Self::U32(slice32), Self::U16(slice16)) => {
+                let len = slice16.len();
+                if len != slice32.len() {
+                    return false;
+                }
+
+                // Perform the comparison in chunks to allow more SIMD/SWAR execution.
+                // Chunk size chosen empirically.
+                const CHUNK_SIZE: usize = 16;
+                let (chunks16, rem16) = slice16.as_chunks::<CHUNK_SIZE>();
+                let (chunks32, rem32) = slice32.as_chunks::<CHUNK_SIZE>();
+
+                for (&chunk16, &chunk32) in iter::zip(chunks16, chunks32) {
+                    if chunk16.map(u32::from) != chunk32 {
+                        return false;
+                    }
+                }
+                for (&value16, &value32) in iter::zip(rem16, rem32) {
+                    if u32::from(value16) != value32 {
+                        return false;
+                    }
+                }
+
+                // It is unlikely that two slices of different type will be equal.
+                core::hint::cold_path();
+                true
+            }
+        }
+    }
+}
+
+impl Eq for IndexVec {}
+impl PartialEq for IndexVec {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slice(..) == other.as_slice(..)
+    }
+}
+
+impl Eq for IndexVecDeque {}
+impl PartialEq for IndexVecDeque {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slices() == other.as_slices()
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 // Debug formatting.
 
 impl fmt::Debug for IndexSlice<'_> {
@@ -764,6 +838,59 @@ mod tests {
                 ]"
             }
         );
+    }
+
+    /// Comparison of [`IndexVec`] compares the numeric values only.
+    #[test]
+    fn eq_vec_ignores_type() {
+        // Equal, whether or not the element types match.
+        assert_eq!(IndexVec::U16(vec![1, 2, 3]), IndexVec::U16(vec![1, 2, 3]));
+        assert_eq!(IndexVec::U16(vec![1, 2, 3]), IndexVec::U32(vec![1, 2, 3]));
+        assert_eq!(IndexVec::U32(vec![1, 2, 3]), IndexVec::U16(vec![1, 2, 3]));
+        assert_eq!(IndexVec::U32(vec![1, 2, 3]), IndexVec::U32(vec![1, 2, 3]));
+
+        // Unequal, whether or not the element types match.
+        assert_ne!(IndexVec::U16(vec![1, 2, 3]), IndexVec::U16(vec![1, 2, 4]));
+        assert_ne!(IndexVec::U16(vec![1, 2, 3]), IndexVec::U32(vec![1, 2, 4]));
+        assert_ne!(IndexVec::U32(vec![1, 2, 3]), IndexVec::U16(vec![1, 2, 4]));
+        assert_ne!(IndexVec::U32(vec![1, 2, 3]), IndexVec::U32(vec![1, 2, 4]));
+    }
+
+    /// Comparison of [`IndexVecDeque`] compares the numeric values only.
+    #[test]
+    fn eq_deque_ignores_type() {
+        use IndexVec::{U16, U32};
+        fn df(v: IndexVec) -> IndexVecDeque {
+            v.into()
+        }
+
+        // Equal, whether or not the element types match.
+        assert_eq!(df(U16(vec![1, 2, 3])), df(U16(vec![1, 2, 3])));
+        assert_eq!(df(U16(vec![1, 2, 3])), df(U32(vec![1, 2, 3])));
+        assert_eq!(df(U32(vec![1, 2, 3])), df(U16(vec![1, 2, 3])));
+        assert_eq!(df(U32(vec![1, 2, 3])), df(U32(vec![1, 2, 3])));
+
+        // Unequal, whether or not the element types match.
+        assert_ne!(df(U16(vec![1, 2, 3])), df(U16(vec![1, 2, 4])));
+        assert_ne!(df(U16(vec![1, 2, 3])), df(U32(vec![1, 2, 4])));
+        assert_ne!(df(U32(vec![1, 2, 3])), df(U16(vec![1, 2, 4])));
+        assert_ne!(df(U32(vec![1, 2, 3])), df(U32(vec![1, 2, 4])));
+    }
+
+    /// Comparison of [`IndexSlice`] compares the numeric values only.
+    #[test]
+    fn eq_slice_ignores_type() {
+        // Equal, whether or not the element types match.
+        assert_eq!(IndexSlice::U16(&[1, 2, 3]), IndexSlice::U16(&[1, 2, 3]));
+        assert_eq!(IndexSlice::U16(&[1, 2, 3]), IndexSlice::U32(&[1, 2, 3]));
+        assert_eq!(IndexSlice::U32(&[1, 2, 3]), IndexSlice::U16(&[1, 2, 3]));
+        assert_eq!(IndexSlice::U32(&[1, 2, 3]), IndexSlice::U32(&[1, 2, 3]));
+
+        // Unequal, whether or not the element types match.
+        assert_ne!(IndexSlice::U16(&[1, 2, 3]), IndexSlice::U16(&[1, 2, 4]));
+        assert_ne!(IndexSlice::U16(&[1, 2, 3]), IndexSlice::U32(&[1, 2, 4]));
+        assert_ne!(IndexSlice::U32(&[1, 2, 3]), IndexSlice::U16(&[1, 2, 4]));
+        assert_ne!(IndexSlice::U32(&[1, 2, 3]), IndexSlice::U32(&[1, 2, 4]));
     }
 
     #[test]
