@@ -5,9 +5,11 @@ use pretty_assertions::assert_eq;
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::block::{self, Block, Primitive, Resolution, Text};
 use all_is_cubes::euclid::size2;
-use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridVector, u32size};
 use all_is_cubes::space::Space;
-use all_is_cubes::text::{FontDef, Positioning, PositioningX, PositioningY, PositioningZ};
+use all_is_cubes::text::{
+    FontDef, Positioning, PositioningX, PositioningY, PositioningZ, ReadGlyph,
+};
 use all_is_cubes::universe::{Builtin, ReadTicket, Universe};
 use all_is_cubes_render::raytracer::print_space;
 
@@ -347,6 +349,55 @@ fn overflowing_coordinates(
     })
     .evaluate(ReadTicket::stub())
     .unwrap();
+}
+
+#[test]
+fn read_glyphs() {
+    let font = Builtin::FontSystem16.read::<FontDef>();
+    let size = font.metrics().character_cell_size();
+
+    let glyphs: Vec<ReadGlyph<'_>> = font.iter_glyphs().collect();
+
+    // TODO: These assertions assume the current hardcoded ISO-8859-1 coverage and glyph indices.
+    // We will need to make further assertions about how glyph indices are mapped from characters.
+    assert_eq!(
+        glyphs.len(),
+        0x100 - 0x40,
+        "all of ISO-8859-1 except for C0 and C1, which are 40 in total"
+    );
+
+    assert_eq!(glyphs[0].pixels().collect::<Vec<_>>(), [], "space is empty");
+
+    // Read out one glyph fully.
+    let mut image = imgref::ImgVec::<u8>::new(
+        vec![0; u32size(size.area())],
+        size.width as usize,
+        size.height as usize,
+    );
+    for point in glyphs['!' as usize - ' ' as usize].pixels() {
+        image[(point.x as usize, point.y as usize)] = 1;
+    }
+    assert_eq!(
+        image.into_buf(),
+        vec![
+            0, 0, 0, 0, 0, 0, 0, //
+            0, 0, 0, 0, 0, 0, 0, //
+            0, 0, 0, 0, 0, 0, 0, //
+            0, 0, 1, 1, 0, 0, 0, //
+            0, 0, 1, 1, 0, 0, 0, //
+            0, 0, 1, 1, 0, 0, 0, //
+            0, 0, 1, 1, 0, 0, 0, //
+            0, 0, 1, 1, 0, 0, 0, //
+            0, 0, 1, 1, 0, 0, 0, //
+            0, 0, 0, 0, 0, 0, 0, //
+            0, 0, 0, 0, 0, 0, 0, //
+            0, 0, 1, 1, 0, 0, 0, //
+            0, 0, 1, 1, 0, 0, 0, //
+            0, 0, 0, 0, 0, 0, 0, //
+            0, 0, 0, 0, 0, 0, 0, //
+            0, 0, 0, 0, 0, 0, 0, //
+        ]
+    );
 }
 
 // TODO: test that Evoxel attributes are as expected

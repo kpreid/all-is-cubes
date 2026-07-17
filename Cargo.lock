@@ -6384,6 +6384,7 @@ version = "0.0.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-render",
+ "imgref",
  "macro_rules_attribute",
  "pretty_assertions",
  "rstest",

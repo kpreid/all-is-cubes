@@ -7,7 +7,7 @@
 mod font;
 pub(in crate::text) use font::GlyphIndex;
 pub(crate) use font::{FONT_BODY_TEXT, FONT_SYSTEM_16};
-pub use font::{Font, FontDef, InGlyph, Metrics, Value};
+pub use font::{Font, FontDef, InGlyph, Metrics, ReadGlyph, Value};
 
 mod layout;
 pub use layout::Measurement;

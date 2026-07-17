@@ -9,6 +9,7 @@ publish = false
 [dev-dependencies]
 all-is-cubes = { workspace = true }
 all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
+imgref = { workspace = true }
 macro_rules_attribute = { workspace = true }
 pretty_assertions = { workspace = true }
 rstest = { workspace = true }

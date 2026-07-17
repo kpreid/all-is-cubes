@@ -225,6 +225,20 @@ impl FontDef {
             _ => 0x1f, // unavailable glyphs become question marks -- TODO: dedicate a glyph
         }
     }
+
+    /// Returns an iterator over all glyphs in this font.
+    #[doc(hidden)] // cannot be used properly until it accompanies a character mapping table.
+    pub fn iter_glyphs(&self) -> impl ExactSizeIterator<Item = ReadGlyph<'_>> {
+        self.glyphs
+            .lookup
+            .iter()
+            .enumerate()
+            .map(move |(glyph_index, glyph_info)| ReadGlyph {
+                font: self,
+                glyph_index,
+                glyph_info,
+            })
+    }
 }
 
 impl universe::VisitHandles for FontDef {
@@ -316,7 +330,7 @@ pub(crate) struct Glyphs {
 
 /// Information for locating a packed glyph in [`Glyphs`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct GlyphInfo {
+struct GlyphInfo {
     /// Offset of the first byte of each glyph in `self.pixels`.
     data_offset: usize,
 
@@ -541,4 +555,55 @@ impl fmt::Debug for Glyphs {
 
 fn rgba_to_bit([r, _, _, a]: [u8; 4]) -> bool {
     r > 0 && a > 0
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Information about a single glyph in a [`FontDef`].
+///
+/// This type is used for manipulating the font rather than drawing text.
+#[doc(hidden)] // unsure if good public API; currently used experimentally only
+pub struct ReadGlyph<'font> {
+    font: &'font FontDef,
+    glyph_index: GlyphIndex,
+    glyph_info: &'font GlyphInfo,
+}
+
+impl ReadGlyph<'_> {
+    /// Returns an iterator over all pixels making up this glyph.
+    ///
+    /// Each pixel is given as its low corner in [`InGlyph`] space.
+    // TODO: If we get a unit-ful `Cube` type, use that instead.
+    pub fn pixels(&self) -> impl Iterator<Item = Point2D<i32, InGlyph>> + '_ {
+        self.font
+            .glyphs
+            .get(self.glyph_index)
+            .filter_map(|(position, value)| match value {
+                Value::Foreground => Some(position),
+                Value::Outline => None,
+            })
+    }
+
+    /// Returns the bounding box of the pixels [`ReadGlyph::pixels`] would return.
+    pub fn bounding_box(&self) -> Box2D<i32, InGlyph> {
+        self.font.glyphs.rendering_bounding_box(self.glyph_index, false)
+    }
+
+    pub fn advance_width(&self) -> u32 {
+        u32::from(self.font.metrics.character_size.width)
+    }
+}
+
+impl fmt::Debug for ReadGlyph<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            font: _,
+            glyph_index,
+            glyph_info,
+        } = self;
+        f.debug_struct("GlyphEntry")
+            .field("glyph_index", glyph_index)
+            .field("glyph_info", glyph_info)
+            .finish_non_exhaustive()
+    }
 }
