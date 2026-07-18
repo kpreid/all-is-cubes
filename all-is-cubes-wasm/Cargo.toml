@@ -46,7 +46,7 @@ futures-channel = { version = "0.3.32", default-features = false, features = ["a
 futures-core = { version = "0.3.32", default-features = false, features = ["alloc"] }
 itertools = { version = "0.15.0", default-features = false, features = ["use_alloc"] }
 js-sys = "0.3.94"
-log = { version = "0.4.29", default-features = false }
+log = { version = "0.4.33", default-features = false }
 rand = { version = "0.10.0", default-features = false }
 rand_xoshiro = { version = "0.8.0", default-features = false }
 send_wrapper = { version = "0.6.0", default-features = false }

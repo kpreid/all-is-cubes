@@ -89,7 +89,7 @@ async_fn_traits = { version = "0.1.1", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bevy_ecs = { version = "0.19.0", default-features = false }
 bevy_platform = { version = "0.19.0", default-features = false, features = ["alloc"] }
-bitflags = { version = "2.11.1", default-features = false }
+bitflags = { version = "2.13.1", default-features = false }
 bytemuck = { version = "1.25.0", default-features = false, features = ["derive", "must_cast"] }
 # When upgrading clap, beware text output changes causing integration tests to fail.
 clap = { version = "4.5", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
@@ -116,7 +116,7 @@ imgref = { version = "1.12.2", default-features = false }
 indoc = { version = "2.0.1", default-features = false }
 itertools = { version = "0.15.0", default-features = false, features = ["use_alloc"] }
 libm = { version = "0.2.8", default-features = false }
-log = { version = "0.4.29", default-features = false }
+log = { version = "0.4.33", default-features = false }
 macro_rules_attribute = { version = "0.2.0", default-features = false }
 manyfmt = { version = "0.1.0", default-features = false }
 mint = { version = "0.5.9", default-features = false }
@@ -137,9 +137,9 @@ rand = { version = "0.10.0", default-features = false }
 rand_distr = { version = "0.6.0", default-features = false }
 rand_xoshiro = { version = "0.8.0", default-features = false }
 rayon = { version = "1.11.0", default-features = false }
-re_log_types = { version = "0.33.0", default-features = false }
-re_sdk = { version = "0.33.0", default-features = false }
-re_sdk_types = { version = "0.33.0", default-features = false }
+re_log_types = { version = "0.34.0", default-features = false }
+re_sdk = { version = "0.34.0", default-features = false }
+re_sdk_types = { version = "0.34.0", default-features = false }
 rectangle-pack = { version = "0.4.2" } # currently only used in all-is-cubes-port which is currently std only
 rendiff = { version = "0.2.2", default-features = false }
 # We use rstest for parameterized tests where each case can fail or succeed independently.
@@ -168,7 +168,7 @@ time = { version = "0.3.37", default-features = false }
 tinytemplate = { version = "1.2.1" }
 # Tokio is used for certain binaries.
 # The library crates do not require Tokio.
-tokio = { version = "1.50.0", default-features = false }
+tokio = { version = "1.53.0", default-features = false }
 trycmd = "1.0.0" # keep in sync with `snapbox`
 unicode-segmentation = { version = "1.10.1", default-features = false }
 unicode-width = { version = "0.2", default-features = false }
