@@ -27,9 +27,10 @@ jobs:
     outputs:
       nextnamesjson: ${{ steps.list.outputs.nextnamesjson }} 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         fetch-depth: 0 # supposedly will fetch all branches. TODO: we really only need to list them, and this might be better as a GitHub API call?
+        persist-credentials: false
     - id: list
       # For each ref in refs/foo, put "foo" in a JSON array
       run: |
@@ -45,10 +46,11 @@ jobs:
       matrix:
         nextname: ${{ fromJson(needs.find-branches.outputs.nextnamesjson) }}
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         ref: "next/${{ matrix.nextname }}"
         fetch-depth: 0 # need branches to perform rebase
+        persist-credentials: false
     
     - name: Configure git
       run: |

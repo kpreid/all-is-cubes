@@ -73,12 +73,13 @@ jobs:
     runs-on: ${{ matrix.os }}-latest
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         ref: unstable-rust
+        persist-credentials: false
 
     # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.9.1
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
         # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
         prefix-key: "v1-rust-unstablefeatures-${{ matrix.os }}-${{ matrix.depversions }}"
@@ -131,7 +132,7 @@ jobs:
     # Save the test-renderers results so we can download and view them
     - name: Save test-renderers output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: test-renderers-output ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
@@ -141,7 +142,7 @@ jobs:
     # (for understanding build performance in CI)
     - name: Save cargo --timings output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: cargo-timings ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
@@ -161,9 +162,11 @@ jobs:
     continue-on-error: false
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
-    - uses: Swatinem/rust-cache@v2.9.1
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
         # We cannot reuse the cache from the `build` job, because `RUSTFLAGS=-Dwarnings`
         # would invalidate all cached artifacts anyway.
@@ -207,7 +210,7 @@ jobs:
 
     - name: Save cargo --timings output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: cargo-timings lint ${{ matrix.toolchain }}
         path: |
@@ -217,15 +220,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v7
-    - uses: Swatinem/rust-cache@v2.9.1
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
         # Don’t save caches specific to PR branches.
         # This will greatly reduce cache usage without significantly reducing the benefits, because
         # the default branch’s cache will be still be loaded.
         save-if: ${{ github.event_name != 'pull_request' }}
     - run: rustup toolchain install nightly --component miri
-    - uses: taiki-e/install-action@v2
+    - uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
       with:
         tool: nextest@0.9
 

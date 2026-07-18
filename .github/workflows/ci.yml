@@ -103,7 +103,7 @@ jobs:
 
     steps:
     # Free some disk space so our largest builds can complete reliably.
-    - uses: jlumbroso/free-disk-space@v1.3.1
+    - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
       if: ${{ matrix.os == 'ubuntu' }}
       with:
         large-packages: false # slow
@@ -111,12 +111,14 @@ jobs:
 
     - run: df -h .
 
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
     - run: df -h .
 
     # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.9.1
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
         # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
         prefix-key: "v1-rust-${{ matrix.os }}-${{ matrix.toolchain }}-${{ matrix.depversions }}"
@@ -188,7 +190,7 @@ jobs:
     # Save the test-renderers results so we can download and view them
     - name: Save test-renderers output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: test-renderers-output ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
@@ -200,7 +202,7 @@ jobs:
     # (for understanding build performance in CI)
     - name: Save cargo --timings output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: cargo-timings build ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
@@ -219,9 +221,11 @@ jobs:
 
     steps:
 
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
-    - uses: Swatinem/rust-cache@v2.9.1
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
         # Reuse the cache from the normal `build` job instead of creating an independent one,
         # to reduce redundant work and save disk space — but don't *write* to that cache, so
@@ -246,7 +250,7 @@ jobs:
 
     # Save wasm build so that we can optionally deploy it without rebuilding
     # (but only for the stablest matrix version)
-    - uses: actions/upload-pages-artifact@v5
+    - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
       with:
         path: all-is-cubes-wasm/target/web-app-release
 
@@ -273,7 +277,7 @@ jobs:
     # This action uses the artifact previously uploaded by actions/upload-pages-artifact
     - name: Deploy to GitHub Pages
       id: deployment
-      uses: actions/deploy-pages@v5
+      uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v3.0.2-node.24
 
   # Run `xtask lint`.
   #
@@ -289,9 +293,11 @@ jobs:
     continue-on-error: false
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
-    - uses: Swatinem/rust-cache@v2.9.1
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
         # We cannot reuse the cache from the `build` job, because `RUSTFLAGS=-Dwarnings`
         # would invalidate all cached artifacts anyway.
@@ -343,7 +349,7 @@ jobs:
 
     - name: Save cargo --timings output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: cargo-timings lint ${{ matrix.toolchain }}
         path: |
@@ -360,15 +366,17 @@ jobs:
 
     steps:
     # Free some disk space so our largest builds can complete reliably.
-    - uses: jlumbroso/free-disk-space@v1.3.1
+    - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
       with:
         large-packages: false # slow
         swap-storage: false
 
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
     # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.9.1
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
         # Reuse the cache from the normal `build` job instead of creating an independent one,
         # to reduce redundant work and save disk space — but don't *write* to that cache, so
@@ -405,7 +413,7 @@ jobs:
     # (for understanding build performance in CI)
     - name: Save cargo --timings output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: cargo-timings check-features
         path: |
@@ -422,15 +430,17 @@ jobs:
 
     steps:
     # Free some disk space so our largest builds can complete reliably.
-    - uses: jlumbroso/free-disk-space@v1.3.1
+    - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
       with:
         large-packages: false # slow
         swap-storage: false
 
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
     # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.9.1
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
         # Reuse the cache from the normal `build` job instead of creating an independent one,
         # to reduce redundant work and save disk space — but don't *write* to that cache, so
@@ -468,7 +478,7 @@ jobs:
     # (for understanding build performance in CI)
     - name: Save cargo --timings output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: cargo-timings test-more
         path: |
@@ -487,15 +497,17 @@ jobs:
     if: ${{ !startsWith(github.ref, 'refs/heads/next/') }}
     
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
     # Run once on each workspace (hence each lock file) of interest.
     # Our only other workspace is fuzz/, which we aren't interested in checking.
-    - uses: EmbarkStudios/cargo-deny-action@v2.1.1
+    - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
       with:
         # empty arguments disables default --all-features
         arguments:
-    - uses: EmbarkStudios/cargo-deny-action@v2.1.1
+    - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
       with:
         manifest-path: all-is-cubes-wasm/Cargo.toml
         arguments:
@@ -507,15 +519,16 @@ jobs:
     # Running on push would require more work to determine the base revision
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           # Needed to ensure `main` branch is needed
           fetch-depth: 0
+          persist-credentials: false
 
       # Load cache before doing any Rust builds
       # Note: we aren't depending on the build job so this cache might be stale, but the
       # shorter time-to-useful-results seems worth it.
-      - uses: Swatinem/rust-cache@v2.9.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           # Reuse the cache from the normal `build` job instead of creating an independent one,
           # to reduce redundant work and save disk space — but don't *write* to that cache, so
@@ -534,13 +547,13 @@ jobs:
       - name: Relative diff
         run: |
           git branch -av
-          git diff origin/${{ github.base_ref }}.. | tee git.diff
+          git diff origin/${GITHUB_BASE_REF}.. | tee git.diff
       
       - name: Mutants
         # See mutants.yml for notes on the package selection
         run: cargo mutants --in-diff git.diff --package=all-is-cubes --test-package=test-aic -- --all-features
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ always() }}
         with:
           name: mutants-incremental.out
@@ -550,15 +563,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v7
-    - uses: Swatinem/rust-cache@v2.9.1
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
         # Don’t save caches specific to PR branches.
         # This will greatly reduce cache usage without significantly reducing the benefits, because
         # the default branch’s cache will be still be loaded.
         save-if: ${{ github.event_name != 'pull_request' }}
     - run: rustup toolchain install nightly --component miri
-    - uses: taiki-e/install-action@v2
+    - uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
       with:
         tool: nextest@0.9
 
@@ -574,7 +589,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
     # The build is faster *without* this cache.
     # - uses: Swatinem/rust-cache@v2.7.8
@@ -602,9 +619,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        persist-credentials: false
 
-    - uses: Swatinem/rust-cache@v2.9.1
+    - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       with:
         # Don’t save caches specific to PR branches.
         # This will greatly reduce cache usage without significantly reducing the benefits, because
@@ -625,7 +644,7 @@ jobs:
 
     - name: Load fuzzer corpus
       id: fuzz-corpus-restore
-      uses: actions/cache/restore@v6
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         key: fuzz-corpus
         path: |
@@ -639,7 +658,7 @@ jobs:
     # Save the fuzz artifacts so we can repro elsewhere
     - name: Save fuzz artifacts
       if: ${{ failure() }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: fuzz-artifacts
         path: fuzz/artifacts
@@ -648,7 +667,7 @@ jobs:
     # restore steps per <https://github.com/actions/cache/tree/main/save#always-save-cache>
     - name: Save fuzzer corpus
       if: ${{ always() && github.event_name != 'pull_request' }}
-      uses: actions/cache/save@v6
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         key: fuzz-corpus
         path: |
