@@ -21,6 +21,7 @@ fn main() {
             .unwrap(),
         path: rg::entity_path![],
     };
+    destination.stream.set_log_tick_enabled(true);
 
     for ray in [
         Ray::new([0.0, 0.5, 0.5], [1.0, 1. / 16., 1. / 4.]),

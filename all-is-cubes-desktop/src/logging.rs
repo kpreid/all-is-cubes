@@ -85,6 +85,7 @@ pub fn install(
                 log::error!("failed to build Rerun stream; will not log: {e}");
                 rg::RecordingStream::disabled()
             });
+        stream.set_log_tick_enabled(true); // TODO: review whether we need this.
         let destination = rg::RootDestination::wrap_and_initialize(stream);
 
         // Hook up [`log`] logging if requested.
