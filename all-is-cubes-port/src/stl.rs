@@ -173,7 +173,7 @@ mod tests {
             universe.read_ticket(),
             crate::Format::Stl,
             &crate::ExportOptions::default(),
-            crate::ExportSet::from_block_defs(block_defs),
+            crate::ExportSet::from_iter(block_defs),
             destination,
         )
         .await

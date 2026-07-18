@@ -11,7 +11,7 @@ use all_is_cubes::character::Character;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe};
+use all_is_cubes::universe::{Name, ReadTicket, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_mesh::{MeshOptions, SpaceMesh, block_meshes_for_space};
 use all_is_cubes_render::camera::GraphicsOptions;
@@ -115,11 +115,8 @@ async fn export_block_defs() {
     let mut universe = Universe::new();
     let blocks1: [Block; 2] = make_some_blocks();
     let blocks2: [Block; 2] = make_some_voxel_blocks(&mut universe);
-    let block_defs: Vec<Handle<BlockDef>> = blocks1
-        .into_iter()
-        .chain(blocks2)
-        .enumerate()
-        .map(|(i, block)| {
+    let export_set = ExportSet::from_iter(blocks1.into_iter().chain(blocks2).enumerate().map(
+        |(i, block)| {
             // TODO: should be able to construct `Name` better here
             universe
                 .insert(
@@ -127,15 +124,10 @@ async fn export_block_defs() {
                     BlockDef::new(universe.read_ticket(), block),
                 )
                 .unwrap()
-        })
-        .collect();
+        },
+    ));
 
-    export_snapshot_test(
-        "export_block_defs",
-        universe.read_ticket(),
-        ExportSet::from_block_defs(block_defs),
-    )
-    .await;
+    export_snapshot_test("export_block_defs", universe.read_ticket(), export_set).await;
 }
 
 #[macro_rules_attribute::apply(smol_macros::test)]

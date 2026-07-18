@@ -135,7 +135,7 @@ async fn export_too_large_space() {
     let error = mv::export_to_dot_vox_data(
         yield_progress_for_testing(),
         universe.read_ticket(),
-        crate::ExportSet::from_spaces(vec![space]),
+        crate::ExportSet::from_iter([space]),
     )
     .await
     .unwrap_err();
@@ -159,7 +159,7 @@ async fn export_block_def() {
     let data = mv::export_to_dot_vox_data(
         yield_progress_for_testing(),
         universe.read_ticket(),
-        crate::ExportSet::from_block_defs(vec![block_def]),
+        crate::ExportSet::from_iter([block_def]),
     )
     .await
     .unwrap();

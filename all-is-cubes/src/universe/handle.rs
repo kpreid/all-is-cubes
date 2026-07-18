@@ -1247,7 +1247,8 @@ pub(in crate::universe) trait HandlePtr {
 //---
 // Note: In order for the `Any` supertrait to behave as expected, this trait must not be implemented
 // for any types other than `Handle<T>`. If we find a need for more implementations, the `Any`
-// supertrait must be replaced with an explicit conversion method to `&dyn Any`.
+// supertrait must be replaced with an explicit conversion method to `&dyn Any`, or with enum-based
+// type erasure.
 #[allow(
     private_bounds,
     reason = "trait not meant for implementation outside the crate"

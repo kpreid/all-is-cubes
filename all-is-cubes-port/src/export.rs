@@ -6,9 +6,8 @@ use std::{fs, io};
 
 use futures_core::future::BoxFuture;
 
-use all_is_cubes::block::{self, BlockDef};
-use all_is_cubes::space::Space;
-use all_is_cubes::universe::{self, Handle, HandleError, HandleSet, ReadTicket, Universe};
+use all_is_cubes::block;
+use all_is_cubes::universe::{self, HandleError, HandleSet, ReadTicket, Universe};
 use all_is_cubes::util::YieldProgress;
 
 use crate::Format;
@@ -146,16 +145,6 @@ impl ExportSet {
         Self::new(HandleSet::all_of(universe))
     }
 
-    /// Construct an [`ExportSet`] specifying exporting only the given [`BlockDef`]s.
-    pub fn from_block_defs(block_defs: Vec<Handle<BlockDef>>) -> Self {
-        Self::new(block_defs.into_iter().collect())
-    }
-
-    /// Construct an [`ExportSet`] specifying exporting only the given [`Space`]s.
-    pub fn from_spaces(spaces: Vec<Handle<Space>>) -> Self {
-        Self::new(spaces.into_iter().collect())
-    }
-
     /// Calculate the file path to use supposing that we want to export one member to one file
     /// (as opposed to all members into one file).
     ///
@@ -218,6 +207,18 @@ impl ExportSet {
         } else {
             Ok(())
         }
+    }
+}
+
+impl<H: Into<universe::AnyHandle>> FromIterator<H> for ExportSet {
+    /// Creates an [`ExportSet`] from handles to be exported.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the handles are not all from the same universe.
+    #[track_caller]
+    fn from_iter<T: IntoIterator<Item = H>>(iter: T) -> Self {
+        Self::new(HandleSet::from_iter(iter))
     }
 }
 
@@ -316,7 +317,7 @@ pub enum ExportError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::block::AIR;
+    use all_is_cubes::block::{AIR, BlockDef};
 
     #[test]
     fn error_is_send_sync() {
@@ -352,7 +353,7 @@ mod tests {
             PathBuf::from("/export/data-foo.ext"),
         );
         assert_eq!(
-            ExportSet::from_block_defs(vec![foo.clone()])
+            ExportSet::from_iter([foo.clone()])
                 .member_export_path(Path::new("/export/data.ext"), &foo),
             PathBuf::from("/export/data.ext"),
         );

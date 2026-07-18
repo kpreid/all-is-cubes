@@ -177,16 +177,16 @@ impl Recorder {
                 let export_set = if options.save_all || export_format == Format::AicJson {
                     ExportSet::all_of_universe(universe)
                 } else {
-                    ExportSet::from_spaces(vec![cameras.world_space().get().ok_or_else(|| {
-                        match universe.whence.document_name() {
+                    ExportSet::from_iter([cameras.world_space().get().ok_or_else(
+                        || match universe.whence.document_name() {
                             None => {
                                 anyhow::anyhow!("universe contains no default space to export")
                             }
                             Some(name) => anyhow::anyhow!(
                                 "universe {name:?} contains no default space to export",
                             ),
-                        }
-                    })?])
+                        },
+                    )?])
                 };
 
                 RecorderInner::Export {

@@ -45,7 +45,7 @@ impl HandleSet {
     }
 }
 
-impl<H: universe::ErasedHandle> FromIterator<H> for HandleSet {
+impl<H: Into<universe::AnyHandle>> FromIterator<H> for HandleSet {
     /// Creates a [`HandleSet`] from handles.
     ///
     /// # Panics
@@ -57,6 +57,7 @@ impl<H: universe::ErasedHandle> FromIterator<H> for HandleSet {
         let handles = iter
             .into_iter()
             .map(|handle| {
+                let handle = handle.into();
                 match (universe_id, handle.universe_id()) {
                     (Some(all), Some(this)) if all == this => {}
                     (Some(_), Some(_)) => {
@@ -66,7 +67,7 @@ impl<H: universe::ErasedHandle> FromIterator<H> for HandleSet {
                     (_, None) => panic!("handles in a HandleSet must be in a universe"),
                 }
 
-                (handle.name(), handle.to_any_handle())
+                (handle.name(), handle)
             })
             .collect();
         Self { handles }

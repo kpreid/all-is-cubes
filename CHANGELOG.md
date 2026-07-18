@@ -41,6 +41,7 @@
 * `all-is-cubes-port` library:
     * glTF exports now include textures.
     * `ExportOptions`, allows customizing export behavior.
+    * `ExportSet` now implements `FromIterator`.
 
 * `all-is-cubes-render` library:
     * `camera::Viewport::scale()`
@@ -93,6 +94,10 @@
     * `block::BlockDef` no longer implements `AsRef<Block>`.
     * `block::Modifier::Attributes` has been replaced by `SetAttribute`.
     * `space::PackedLight` no longer implements `From<Rgb>`. There is currently no replacement.
+
+* `all-is-cubes-port` library:
+    * `ExportSet::from_block_defs()` and `ExportSet::from_spaces()` have been removed.
+      Use `ExportSet::from_iter()` instead.
 
 ## 0.10.0 (2025-12-11)
 
