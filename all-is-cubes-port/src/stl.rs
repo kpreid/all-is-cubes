@@ -17,6 +17,10 @@ use all_is_cubes_mesh::{
 };
 use all_is_cubes_render::camera::GraphicsOptions;
 
+use crate::MultiFileData;
+
+// -------------------------------------------------------------------------------------------------
+
 // The funny return type is to work with [`crate::export_to_path`].
 #[cfg(feature = "export")]
 pub(crate) fn export_stl(
@@ -32,27 +36,27 @@ pub(crate) fn export_stl(
     let block_defs = source.contents.extract_type::<block::BlockDef>();
     source.reject_unsupported(crate::Format::Stl)?;
 
-    let mut items: BTreeMap<std::path::PathBuf, Vec<Triangle>> = BTreeMap::new();
+    let mut items: MultiFileData<Vec<Triangle>> = BTreeMap::new();
 
     for space in spaces {
         items.insert(
             source.member_export_path(destination, &space),
-            space_to_stl_triangles(&space.read(read_ticket)?),
+            (
+                space.name(),
+                space_to_stl_triangles(&space.read(read_ticket)?),
+            ),
         );
     }
 
     for block_def in block_defs {
-        let ev =
-            block_def
-                .read(read_ticket)?
-                .evaluate()
-                .map_err(|error| crate::ExportError::Eval {
-                    name: block_def.name(),
-                    error,
-                })?;
+        let ev = block_def.read(read_ticket)?.evaluate().map_err(|error| crate::ExportError {
+            source: Some(block_def.name()),
+            destination: None,
+            detail: crate::ExportErrorKind::Eval { error },
+        })?;
         items.insert(
             source.member_export_path(destination, &block_def),
-            block_to_stl_triangles(&ev),
+            (block_def.name(), block_to_stl_triangles(&ev)),
         );
     }
 
@@ -124,6 +128,8 @@ impl mesh::MeshTypes for StlMt {
     type Alloc = NoTextures;
     type Tile = NoTexture;
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

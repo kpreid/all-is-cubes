@@ -11,7 +11,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::time::Duration;
-use std::{fmt, fs, io, mem};
+use std::{fmt, io, mem};
 
 use futures_core::future::BoxFuture;
 pub use gltf_json as json;
@@ -26,7 +26,7 @@ use all_is_cubes_mesh::{BlockMesh, MeshOptions, MeshTypes, SpaceMesh, block_mesh
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform};
 
-use crate::{ExportError, ExportOptions, ExportSet, Format};
+use crate::{ExportError, ExportErrorKind, ExportOptions, ExportSet, Format};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -440,10 +440,13 @@ pub(crate) fn export_gltf(
         .map(|block_def_handle| -> Result<_, ExportError> {
             let block_def = block_def_handle.read(read_ticket)?;
             let name = block_def_handle.name();
-            let evaluation = block_def.evaluate().map_err(|eve| ExportError::NotRepresentable {
-                format: Format::Gltf,
-                name: Some(name.clone()),
-                reason: format!("block evaluation failed: {eve}"),
+            let evaluation = block_def.evaluate().map_err(|eve| ExportError {
+                source: Some(name.clone()),
+                destination: None,
+                detail: ExportErrorKind::NotRepresentable {
+                    format: Format::Gltf,
+                    reason: format!("block evaluation failed: {eve}"),
+                },
             })?;
             Ok((name, evaluation))
         })
@@ -540,12 +543,12 @@ pub(crate) fn export_gltf(
         }
 
         {
-            let mut file = io::BufWriter::new(fs::File::create(destination)?);
+            let mut file = crate::open_buffered_file(&destination)?;
             writer
                 .into_root(Duration::from_secs(1))?
                 .to_writer_pretty(&mut file) // TODO: non-pretty option
                 .map_err(|_| -> ExportError { todo!("serialization error conversion") })?;
-            crate::export::close_buffered_file(file)?;
+            crate::close_buffered_file(&destination, file)?;
         }
 
         Ok(())

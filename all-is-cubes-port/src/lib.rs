@@ -30,6 +30,10 @@
 
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
+#![expect(
+    clippy::result_large_err,
+    reason = "TODO: revise ExportError to be smaller without too much mess"
+)]
 
 use std::fmt;
 

@@ -76,10 +76,13 @@ impl CoordinateOverflow {
     #[cfg(feature = "export")]
     #[expect(clippy::unused_self)]
     pub(crate) fn to_export_error(self, name: all_is_cubes::universe::Name) -> crate::ExportError {
-        crate::ExportError::NotRepresentable {
-            format: crate::Format::DotVox,
-            name: Some(name),
-            reason: String::from("coordinates larger than supported"),
+        crate::ExportError {
+            source: Some(name),
+            destination: None,
+            detail: crate::ExportErrorKind::NotRepresentable {
+                format: crate::Format::DotVox,
+                reason: String::from("coordinates larger than supported"),
+            },
         }
     }
 }

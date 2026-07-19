@@ -139,7 +139,13 @@ async fn export_too_large_space() {
     )
     .await
     .unwrap_err();
-    assert_matches!(error, crate::ExportError::NotRepresentable { .. });
+    assert_matches!(
+        error,
+        crate::ExportError {
+            detail: crate::ExportErrorKind::NotRepresentable { .. },
+            ..
+        }
+    );
 }
 
 /// Test that `export_to_dot_vox_data` accepts BlockDefs.

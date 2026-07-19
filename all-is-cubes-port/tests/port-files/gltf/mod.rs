@@ -17,7 +17,7 @@ use all_is_cubes_mesh::{MeshOptions, SpaceMesh, block_meshes_for_space};
 use all_is_cubes_render::camera::GraphicsOptions;
 
 use port::gltf::{GltfDataDestination, GltfMt, GltfWriter, MeshInstance};
-use port::{ExportError, ExportSet, Format};
+use port::{ExportError, ExportErrorKind, ExportSet, Format};
 
 /// Test helper to insert one mesh
 fn gltf_mesh(
@@ -182,9 +182,12 @@ async fn export_character_not_supported() {
     .unwrap_err();
     assert_matches!(
         error,
-        ExportError::MemberTypeNotRepresentable {
-            name,
-            ..
+        ExportError{
+            source: Some(name),
+            detail: ExportErrorKind::MemberTypeNotRepresentable {
+                ..
+            },
+        ..
         } if name == "x".into()
     );
 }

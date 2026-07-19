@@ -46,7 +46,11 @@ pub(crate) fn export_native_json(
     )
     .map_err(|error| {
         // TODO: report non-IO errors distinctly
-        crate::ExportError::Write(io::Error::other(error))
+        crate::ExportError {
+            source: None,
+            destination: None,
+            detail: crate::ExportErrorKind::Write(io::Error::other(error)),
+        }
     })
 }
 

@@ -8,7 +8,7 @@ use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes::util::YieldProgress;
 
 use crate::mv::palette::ExportPalette;
-use crate::{ExportError, ExportSet, Format, mv};
+use crate::{ExportError, ExportErrorKind, ExportSet, Format, mv};
 
 /// Read the given [`ExportSet`] to produce in-memory [`DotVoxData`].
 ///
@@ -73,13 +73,11 @@ pub(crate) async fn export_to_dot_vox_data(
         progress.set_label(format!("Exporting block {}", block_def_handle.name()));
         models.push(mv::model::from_block(
             block_def_handle.name(),
-            &block_def_handle
-                .read(read_ticket)?
-                .evaluate()
-                .map_err(|error| ExportError::Eval {
-                    name: block_def_handle.name(),
-                    error,
-                })?,
+            &block_def_handle.read(read_ticket)?.evaluate().map_err(|error| ExportError {
+                source: Some(block_def_handle.name()),
+                destination: None,
+                detail: ExportErrorKind::Eval { error },
+            })?,
             &mut palette,
         )?);
         progress.finish().await

@@ -15,7 +15,7 @@ use all_is_cubes::util::{ConciseDebug, Refmt};
 use crate::mv;
 use crate::mv::coord::{aic_to_mv_coordinate_transform, mv_to_aic_coordinate_transform};
 #[cfg(feature = "export")]
-use crate::{ExportError, Format};
+use crate::{ExportError, ExportErrorKind, Format};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -91,13 +91,16 @@ pub(crate) fn from_space(
     let space = space_handle.read(read_ticket)?;
     let bounds = space.bounds();
     if bounds.size().width > 256 || bounds.size().height > 256 || bounds.size().depth > 256 {
-        return Err(ExportError::NotRepresentable {
-            format: Format::DotVox,
-            name: Some(space_handle.name()),
-            reason: format!(
-                "space of size {} is too large to export to .vox; must be 256 or less in each axis",
-                bounds.size().refmt(&ConciseDebug)
-            ),
+        return Err(ExportError {
+            source: Some(space_handle.name()),
+            destination: None,
+            detail: ExportErrorKind::NotRepresentable {
+                format: Format::DotVox,
+                reason: format!(
+                    "space of size {} is too large to export to .vox; must be 256 or less in each axis",
+                    bounds.size().refmt(&ConciseDebug)
+                ),
+            },
         });
     }
 

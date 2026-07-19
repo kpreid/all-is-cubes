@@ -275,9 +275,9 @@ impl io::Write for SwitchingWriter {
                         ))
                     })?;
                     // TODO: refuse to overwrite existing files unless we are also overwriting a corresponding .gltf
-                    let file = File::create(path)?;
+                    let file = crate::open_buffered_file(path).map_err(io::Error::other)?;
                     let mut new_writer = SwitchingWriter::File {
-                        file: io::BufWriter::new(file),
+                        file,
                         bytes_written: 0,
                         file_uri: future_file_uri.clone(),
                     };

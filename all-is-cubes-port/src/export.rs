@@ -11,7 +11,7 @@ use std::{fs, io};
 use futures_core::future::BoxFuture;
 
 use all_is_cubes::block;
-use all_is_cubes::universe::{self, HandleError, HandleSet, ReadTicket, Universe};
+use all_is_cubes::universe::{self, HandleError, HandleSet, Name, ReadTicket, Universe};
 use all_is_cubes::util::YieldProgress;
 
 use crate::Format;
@@ -66,10 +66,11 @@ pub fn export_to_path(
             Format::AicJson => {
                 // TODO: The file IO should be done in a separate thread, but currently, we can’t
                 // do that except by buffering the entire JSON in memory, which is also bad.
-                let mut writer = io::BufWriter::new(fs::File::create(destination)?);
-                crate::native::export_native_json(read_ticket, source, &mut writer)?;
-                Box::pin(async {
-                    close_buffered_file(writer)?;
+                let mut writer = open_buffered_file(&destination)?;
+                crate::native::export_native_json(read_ticket, source, &mut writer)
+                    .map_err(ee_add_destination(&destination))?;
+                Box::pin(async move {
+                    close_buffered_file(&destination, writer)?;
                     progress.finish().await;
                     Ok(())
                 })
@@ -84,9 +85,11 @@ pub fn export_to_path(
                 ))?;
                 export_one_file(
                     write_progress,
-                    destination,
+                    destination.clone(),
                     move |progress, buffered_file| {
-                        dot_vox_data.write_vox(buffered_file)?;
+                        dot_vox_data
+                            .write_vox(buffered_file)
+                            .map_err(write_add_context(&destination))?;
                         progress.progress_without_yield(1.0);
                         Ok(())
                     },
@@ -110,7 +113,11 @@ pub fn export_to_path(
                 _ = source;
                 _ = destination;
 
-                Box::pin(ready(Err(ExportError::FormatDisabled { format })))
+                Box::pin(ready(Err(ExportError {
+                    source: None,
+                    destination: Some(destination),
+                    detail: ExportErrorKind::FormatDisabled { format },
+                })))
             }
         })
     }
@@ -181,11 +188,11 @@ impl ExportSet {
             new_file_name.push("-");
             match member.name() {
                 // TODO: sanitize member name as a probably-legal filename fragment
-                universe::Name::Specific(s) => new_file_name.push(&*s),
-                universe::Name::Anonym(n) => new_file_name.push(n.to_string()),
-                universe::Name::Pending => todo!(),
+                Name::Specific(s) => new_file_name.push(&*s),
+                Name::Anonym(n) => new_file_name.push(n.to_string()),
+                Name::Pending => todo!(),
                 // TODO: it is possible that a `Builtin` will conflict with a `Specific`
-                universe::Name::Builtin(b) => new_file_name.push(b.to_string()),
+                Name::Builtin(b) => new_file_name.push(b.to_string()),
             }
             new_file_name.push(".");
             new_file_name.push(base_path.extension().expect("extension missing"));
@@ -210,10 +217,13 @@ impl ExportSet {
     )]
     pub(crate) fn reject_unsupported(&self, format: Format) -> Result<(), ExportError> {
         if let Some(handle) = self.contents.iter().next() {
-            Err(ExportError::MemberTypeNotRepresentable {
-                format,
-                name: handle.name(),
-                member_type: handle.handle_type(),
+            Err(ExportError {
+                source: Some(handle.name()),
+                destination: None,
+                detail: ExportErrorKind::MemberTypeNotRepresentable {
+                    format,
+                    member_type: handle.handle_type(),
+                },
             })
         } else {
             Ok(())
@@ -262,20 +272,34 @@ pub struct ExportOptions {
 /// Fatal errors that may be encountered during an export operation.
 //---
 // TODO: Define non-fatal export flaws reporting, and link to it here.
-// TODO: Make this something like a struct {
-//     source: Option<Name>,
-//     destination: Option<PathBuf>,
-//     kind: Kind,
-// }
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum ExportError {
+pub struct ExportError {
+    /// The name of the universe member being exported, if a specific one was involved in the error.
+    pub source: Option<Name>,
+
+    /// The path which was or would be written to, if known.
+    // TODO: Make this non-optional in the public version.
+    pub destination: Option<PathBuf>,
+
+    /// Further information about the failure.
+    pub detail: ExportErrorKind,
+}
+
+/// Enum carrying the details of [`ExportError`].
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ExportErrorKind {
     /// IO error while writing the data to a file or stream.
     ///
-    /// TODO: also represent file path if available
+    /// TODO: Also include what operation was being attempted
     Write(io::Error),
 
     /// [`HandleError`] while reading the data to be exported.
+    ///
+    /// Note that this handle’s name is not necessarily the same as the name of the universe member
+    /// being exported, because exports may need to recurse into other handles, depending on how
+    /// All is Cubes data is mapped to the export format.
     Read(HandleError),
 
     /// The data is in a format whose export support was disabled at compilation time.
@@ -287,9 +311,6 @@ pub enum ExportError {
 
     /// `EvalBlockError` while exporting a block definition.
     Eval {
-        /// Name of the item being exported.
-        name: universe::Name,
-
         /// Error that occurred.
         error: block::EvalBlockError,
     },
@@ -299,9 +320,6 @@ pub enum ExportError {
     NotRepresentable {
         /// Format that cannot represent it.
         format: Format,
-        /// Name of the item being exported.
-        // TODO: This has no reason to be optional, and is missing from the Display.
-        name: Option<universe::Name>,
         /// The reason why it cannot be represented.
         reason: String,
     },
@@ -311,8 +329,6 @@ pub enum ExportError {
     MemberTypeNotRepresentable {
         /// Format that cannot represent it.
         format: Format,
-        /// Name of the universe member of the unsupported type.
-        name: universe::Name,
         /// The unsupported type.
         member_type: universe::Type,
     },
@@ -320,31 +336,77 @@ pub enum ExportError {
 
 impl fmt::Display for ExportError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ExportError::Write(_) => write!(f, "could not write export data"),
-            ExportError::Read(_) => write!(f, "could not read universe to be exported"),
-            ExportError::FormatDisabled { format } => write!(
+        use ExportErrorKind as K;
+
+        let Self {
+            // TODO: consistently include source and destination in formatting
+            source,
+            destination,
+            detail,
+        } = self;
+
+        let maybe_of_source = fmt::from_fn(|f| {
+            if let Some(source) = source {
+                write!(f, " of {source}")
+            } else {
+                Ok(())
+            }
+        });
+
+        let maybe_space_source = fmt::from_fn(|f| {
+            if let Some(source) = source {
+                write!(f, " {source}")
+            } else {
+                Ok(())
+            }
+        });
+
+        let maybe_source_from = fmt::from_fn(|f| {
+            if let Some(source) = source {
+                write!(f, "{source} from ")
+            } else {
+                Ok(())
+            }
+        });
+
+        let maybe_to_file = fmt::from_fn(|f| {
+            if let Some(destination) = destination {
+                write!(f, " to file {}", destination.display())
+            } else {
+                Ok(())
+            }
+        });
+
+        match detail {
+            K::Write(_) => write!(
                 f,
-                "support for exporting {} was not compiled in",
-                format.descriptive_name()
+                "could not write export data{maybe_of_source}{maybe_to_file}"
             ),
-            ExportError::Eval { name, error: _ } => write!(f, "could not evaluate block {name}"),
-            ExportError::NotRepresentable {
-                format,
-                name: _, // TODO
-                reason,
-            } => write!(
+            K::Read(_) => write!(
                 f,
-                "could not convert data to {format}: {reason}",
+                "could not read {maybe_source_from}universe to be exported{maybe_to_file}"
+            ),
+            K::FormatDisabled { format } => write!(
+                f,
+                "support for exporting {format}{maybe_space_source} was not compiled in",
                 format = format.descriptive_name()
             ),
-            ExportError::MemberTypeNotRepresentable {
+            K::Eval { error: _ } => write!(f, "could not evaluate block{maybe_space_source}"),
+            K::NotRepresentable { format, reason } => write!(
+                f,
+                "could not convert data{maybe_of_source} to {format}: {reason}",
+                format = format.descriptive_name()
+            ),
+            K::MemberTypeNotRepresentable {
                 format,
-                name,
                 member_type,
             } => write!(
                 f,
-                "cannot export {member_type} such as {name} to {format}",
+                "cannot export {member_type}{source} to {format}",
+                source = fmt::from_fn(|f| match source {
+                    Some(source) => write!(f, " such as {source}"),
+                    None => Ok(()),
+                }),
                 format = format.descriptive_name()
             ),
         }
@@ -353,19 +415,18 @@ impl fmt::Display for ExportError {
 
 impl core::error::Error for ExportError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            ExportError::Write(error) => Some(error),
-            ExportError::Read(error) => Some(error),
-            ExportError::FormatDisabled { format: _ } => None,
-            ExportError::Eval { name: _, error } => Some(error),
-            ExportError::NotRepresentable {
+        use ExportErrorKind as K;
+        match &self.detail {
+            K::Write(error) => Some(error),
+            K::Read(error) => Some(error),
+            K::FormatDisabled { format: _ } => None,
+            K::Eval { error } => Some(error),
+            K::NotRepresentable {
                 format: _,
-                name: _,
                 reason: _,
             } => None,
-            ExportError::MemberTypeNotRepresentable {
+            K::MemberTypeNotRepresentable {
                 format: _,
-                name: _,
                 member_type: _,
             } => None,
         }
@@ -373,20 +434,61 @@ impl core::error::Error for ExportError {
 }
 
 impl From<HandleError> for ExportError {
-    fn from(value: HandleError) -> Self {
-        ExportError::Read(value)
+    fn from(error: HandleError) -> Self {
+        ExportError {
+            source: Some(error.name.clone()),
+            destination: None,
+            detail: ExportErrorKind::Read(error),
+        }
     }
 }
 
 impl From<io::Error> for ExportError {
-    fn from(value: io::Error) -> Self {
-        ExportError::Write(value)
+    /// Wrap an [`io::Error`] as an [`ExportError`] with unknown context, unless it contains
+    /// an [`ExportError`] inside.
+    fn from(error: io::Error) -> Self {
+        match error.downcast::<ExportError>() {
+            Ok(export_error) => export_error,
+            Err(other_error) => ExportError {
+                source: None,
+                destination: None,
+                detail: ExportErrorKind::Write(other_error),
+            },
+        }
+    }
+}
+
+/// For use in `map_err()` to add the destination path if not already present.
+pub(crate) fn ee_add_destination(path: &Path) -> impl Fn(ExportError) -> ExportError {
+    |error| ExportError {
+        destination: error.destination.or_else(|| Some(path.to_path_buf())),
+        ..error
+    }
+}
+
+/// For use in `map_err()` to add the source member name if not already present.
+pub(crate) fn ee_add_source(name: &Name) -> impl Fn(ExportError) -> ExportError {
+    |error| ExportError {
+        source: error.source.or_else(|| Some(name.clone())),
+        ..error
+    }
+}
+
+/// For use in `map_err()` to add the destination path.
+pub(crate) fn write_add_context(path: &Path) -> impl Fn(io::Error) -> ExportError {
+    |io_error| ExportError {
+        source: None, // TODO
+        destination: Some(path.to_path_buf()),
+        detail: ExportErrorKind::Write(io_error),
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 
-type FileWriter = io::BufWriter<fs::File>;
+pub(crate) type FileWriter = io::BufWriter<fs::File>;
+
+/// Intermediate data used by [`export_separate_files()`].
+pub(crate) type MultiFileData<D> = BTreeMap<PathBuf, (Name, D)>;
 
 /// Generic function for scheduling export operations which export one or more independent files.
 ///
@@ -396,7 +498,7 @@ type FileWriter = io::BufWriter<fs::File>;
 /// The returned future can then be returned from the format-specific code to [`export_to_path()`].
 pub(crate) fn export_separate_files<D>(
     progress: YieldProgress,
-    items: BTreeMap<PathBuf, D>,
+    items: MultiFileData<D>,
     writer: impl Fn(YieldProgress, &mut FileWriter, D) -> Result<(), ExportError>
     + Send
     + Sync
@@ -407,18 +509,20 @@ where
 {
     // TODO: do these writes in parallel in separate threads?
     Box::pin(spawn_blocking(move || {
-        for (progress, (path, data)) in progress.split_evenly(items.len()).zip(items) {
-            // TODO: include the file path in the error
-            let mut file = io::BufWriter::new(fs::File::create(path)?);
-            writer(progress, &mut file, data)?;
-            close_buffered_file(file)?;
+        for (progress, (path, (name, data))) in progress.split_evenly(items.len()).zip(items) {
+            let mut file = open_buffered_file(&path).map_err(ee_add_source(&name))?;
+            writer(progress, &mut file, data)
+                .map_err(ee_add_source(&name))
+                .map_err(ee_add_destination(&path))?;
+            close_buffered_file(&path, file).map_err(ee_add_source(&name))?;
         }
 
         Ok(())
     }))
 }
 
-/// Generic function for export operations which export exactly one file.
+/// Generic function for export operations which export exactly one file containing all exported
+/// data.
 ///
 /// We assume that the [`ReadTicket`] has already been used, producing intermediate data captured
 /// by `writer`.
@@ -434,17 +538,36 @@ pub(crate) fn export_one_file(
     + 'static,
 ) -> BoxFuture<'static, Result<(), ExportError>> {
     // TODO: do these writes in parallel in separate threads?
-    Box::pin(spawn_blocking(move || {
-        #[allow(clippy::shadow_unrelated)]
-        let mut file = io::BufWriter::new(fs::File::create(path)?);
-        writer(progress, &mut file)?;
-        close_buffered_file(file)
+    Box::pin(spawn_blocking(move || -> Result<(), ExportError> {
+        let mut file = open_buffered_file(&path)?;
+        writer(progress, &mut file).map_err(ee_add_destination(&path))?;
+        close_buffered_file(&path, file).map_err(ee_add_destination(&path))
     }))
 }
 
-/// Closes a file, taking care to detect errors as much as possible.
-pub(crate) fn close_buffered_file(fw: FileWriter) -> Result<(), ExportError> {
-    fw.into_inner().map_err(|e| e.into_error())?.sync_data()?;
+/// Open a file for writing, wrapping it in [`BufWriter`],
+/// and reporting errors using an [`ExportError`] including the path.
+pub(crate) fn open_buffered_file(path: &Path) -> Result<FileWriter, ExportError> {
+    Ok(io::BufWriter::new(
+        fs::File::create(path).map_err(write_add_context(path))?,
+    ))
+}
+
+/// Closes a file, taking care to detect errors as much as possible,
+/// and reporting errors using an [`ExportError`] including the path.
+pub(crate) fn close_buffered_file(path: &Path, fw: FileWriter) -> Result<(), ExportError> {
+    fw.into_inner()
+        .map_err(|e| ExportError {
+            source: None,
+            destination: Some(path.to_path_buf()),
+            detail: ExportErrorKind::Write(e.into_error()),
+        })?
+        .sync_data()
+        .map_err(|e| ExportError {
+            source: None,
+            destination: Some(path.to_path_buf()),
+            detail: ExportErrorKind::Write(e),
+        })?;
     Ok(())
 }
 
