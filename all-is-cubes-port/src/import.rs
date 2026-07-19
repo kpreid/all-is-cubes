@@ -1,3 +1,4 @@
+use core::fmt;
 use std::io;
 use std::sync::Arc;
 
@@ -168,10 +169,9 @@ impl all_is_cubes::save::WhenceUniverse for PortWhence {
 
 /// Fatal errors that may be encountered during an import operation.
 ///
-/// TODO: Define non-fatal export flaws reporting, and link to it here.
-#[derive(Debug, thiserror::Error)]
+/// TODO: Define non-fatal import flaws reporting, and link to it here.
+#[derive(Debug)]
 #[non_exhaustive]
-#[error("failed to import '{source_path}'")]
 pub struct ImportError {
     /// The path, as produced by [`file::Fileish::display_full_path()`] or similar,
     /// of the file being imported. Note that this is the originally specified path
@@ -179,18 +179,16 @@ pub struct ImportError {
     /// in case of multi-file data formats.
     pub source_path: String,
 
-    #[source]
     pub(crate) detail: ImportErrorKind,
 }
 
 /// Specific reason why an import operation failed.
 /// Always contained within an [`ImportError`].
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum ImportErrorKind {
     /// An IO error occurred while reading the data to import.
     #[non_exhaustive]
-    #[error("failed to read data from {path:?}")] // TODO: Better formatting
     Read {
         /// The path, as produced by [`file::Fileish::display_full_path()`] or similar,
         /// of the file which could not be read, if it is not identical to the
@@ -203,33 +201,72 @@ pub enum ImportErrorKind {
 
     /// The data did not match the expected format, or was invalid as defined by that format.
     #[non_exhaustive]
-    #[error("failed to parse the data")]
     Parse(
         /// Format-specific details of the parse error.
-        #[source]
         Box<dyn std::error::Error + Send + Sync>,
     ),
 
     /// The data is not in a supported format.
     #[non_exhaustive]
-    #[error("the data is not in a recognized format")]
     UnknownFormat {},
 
     /// The data is in a format whose import support was disabled at compilation time.
     #[non_exhaustive]
-    #[error("the data appears to be {}, but support for importing it was not compiled in", .format.descriptive_name())]
     FormatDisabled {
         /// Format that was detected.
         format: Format,
     },
 }
 
+impl core::error::Error for ImportError {}
+
+impl fmt::Display for ImportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            source_path,
+            detail,
+        } = self;
+        match detail {
+            ImportErrorKind::Read {
+                path: read_path,
+                error: _, // reported as source()
+            } => {
+                if let Some(read_path) = read_path
+                    && read_path != source_path
+                {
+                    write!(
+                        f,
+                        "while importing “{source_path}”, failed to read “{read_path}”"
+                    )
+                } else {
+                    // paths are equal or there is only one path
+                    write!(f, "failed to read “{source_path}” for import")
+                }
+            }
+            ImportErrorKind::Parse(_) => write!(f, "failed to parse “{source_path}”"),
+            ImportErrorKind::UnknownFormat {} => {
+                write!(
+                    f,
+                    "the data in “{source_path}” is not in a recognized format"
+                )
+            }
+            ImportErrorKind::FormatDisabled { format } => write!(
+                f,
+                "the data in “{source_path}” appears to be {}, \
+                    but support for importing it was not compiled in",
+                format.descriptive_name()
+            ),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::file::NonDiskFile;
     use all_is_cubes::util::yield_progress_for_testing;
-    use std::error::Error as _;
 
     #[test]
     fn error_is_send_sync() {
@@ -256,10 +293,9 @@ mod tests {
         .await
         .unwrap_err();
 
-        assert_eq!(error.to_string(), "failed to import 'foo'");
         assert_eq!(
-            error.source().unwrap().to_string(),
-            "the data is not in a recognized format"
+            error.to_string(),
+            "the data in “foo” is not in a recognized format"
         );
     }
 }

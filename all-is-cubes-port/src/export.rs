@@ -1,5 +1,6 @@
 #![allow(clippy::shadow_unrelated, reason = "false positives")]
 
+use core::fmt;
 use core::future::ready;
 use std::collections::BTreeMap;
 #[allow(unused_imports)]
@@ -259,43 +260,42 @@ pub struct ExportOptions {
 // -------------------------------------------------------------------------------------------------
 
 /// Fatal errors that may be encountered during an export operation.
-///
-/// TODO: Define non-fatal export flaws reporting, and link to it here.
-#[derive(Debug, thiserror::Error)]
+//---
+// TODO: Define non-fatal export flaws reporting, and link to it here.
+// TODO: Make this something like a struct {
+//     source: Option<Name>,
+//     destination: Option<PathBuf>,
+//     kind: Kind,
+// }
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum ExportError {
     /// IO error while writing the data to a file or stream.
     ///
     /// TODO: also represent file path if available
-    #[error("could not write export data")]
-    Write(#[from] io::Error),
+    Write(io::Error),
 
     /// [`HandleError`] while reading the data to be exported.
-    #[error("could not read universe to be exported")]
-    Read(#[from] HandleError),
+    Read(HandleError),
 
     /// The data is in a format whose export support was disabled at compilation time.
     #[non_exhaustive]
-    #[error("support for exporting {} was not compiled in", .format.descriptive_name())]
     FormatDisabled {
         /// Format that was requested.
         format: Format,
     },
 
     /// `EvalBlockError` while exporting a block definition.
-    #[error("could not evaluate block")]
     Eval {
         /// Name of the item being exported.
         name: universe::Name,
 
         /// Error that occurred.
-        #[source]
         error: block::EvalBlockError,
     },
 
     /// The requested [`ExportSet`] contained data that cannot be represented in the
     /// requested [`Format`].
-    #[error("could not convert data to {format}: {reason}", format = .format.descriptive_name())]
     NotRepresentable {
         /// Format that cannot represent it.
         format: Format,
@@ -308,10 +308,6 @@ pub enum ExportError {
 
     /// The requested [`ExportSet`] contained members of a type that cannot be represented in the
     /// requested [`Format`], regardless of their specific value.
-    #[error(
-        "cannot export {member_type} such as {name} to {format}",
-        format = .format.descriptive_name())
-    ]
     MemberTypeNotRepresentable {
         /// Format that cannot represent it.
         format: Format,
@@ -320,6 +316,72 @@ pub enum ExportError {
         /// The unsupported type.
         member_type: universe::Type,
     },
+}
+
+impl fmt::Display for ExportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExportError::Write(_) => write!(f, "could not write export data"),
+            ExportError::Read(_) => write!(f, "could not read universe to be exported"),
+            ExportError::FormatDisabled { format } => write!(
+                f,
+                "support for exporting {} was not compiled in",
+                format.descriptive_name()
+            ),
+            ExportError::Eval { name, error: _ } => write!(f, "could not evaluate block {name}"),
+            ExportError::NotRepresentable {
+                format,
+                name: _, // TODO
+                reason,
+            } => write!(
+                f,
+                "could not convert data to {format}: {reason}",
+                format = format.descriptive_name()
+            ),
+            ExportError::MemberTypeNotRepresentable {
+                format,
+                name,
+                member_type,
+            } => write!(
+                f,
+                "cannot export {member_type} such as {name} to {format}",
+                format = format.descriptive_name()
+            ),
+        }
+    }
+}
+
+impl core::error::Error for ExportError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ExportError::Write(error) => Some(error),
+            ExportError::Read(error) => Some(error),
+            ExportError::FormatDisabled { format: _ } => None,
+            ExportError::Eval { name: _, error } => Some(error),
+            ExportError::NotRepresentable {
+                format: _,
+                name: _,
+                reason: _,
+            } => None,
+            ExportError::MemberTypeNotRepresentable {
+                format: _,
+                name: _,
+                member_type: _,
+            } => None,
+        }
+    }
+}
+
+impl From<HandleError> for ExportError {
+    fn from(value: HandleError) -> Self {
+        ExportError::Read(value)
+    }
+}
+
+impl From<io::Error> for ExportError {
+    fn from(value: io::Error) -> Self {
+        ExportError::Write(value)
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

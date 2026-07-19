@@ -152,6 +152,7 @@ dependencies = [
  "all-is-cubes-render",
  "base64",
  "bytemuck",
+ "displaydoc",
  "dot_vox",
  "futures-channel",
  "futures-core",
@@ -163,7 +164,6 @@ dependencies = [
  "rectangle-pack",
  "serde_json",
  "stl_io",
- "thiserror",
  "yield-progress",
  "yoke",
 ]

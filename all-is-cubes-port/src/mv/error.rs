@@ -3,52 +3,88 @@ use all_is_cubes::math::GridAab;
 use all_is_cubes::space::SetCubeError;
 
 /// Errors that may occur while importing `.vox` data.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, displaydoc::Display)]
+#[allow(clippy::doc_markdown)]
 #[non_exhaustive]
 pub(crate) enum DotVoxConversionError {
-    #[error("{0}")]
+    /// {0}
     Parse(&'static str),
 
-    #[error("file contains no models or scenes to import")]
+    /// file contains no models or scenes to import
     FileEmpty,
 
-    #[error("file refers to scene node with ID {0} but does not define it")]
+    /// file refers to scene node with ID {0} but does not define it"
     MissingSceneNode(u32),
 
-    #[error("scene graph contains cycle (involving node with ID {0})")]
+    /// scene graph contains cycle (involving node with ID {0})
     SceneGraphCycle(u32),
 
-    #[error("scene graph is too complex")]
+    /// scene graph is too complex
     SceneGraphRecursion,
 
     // TODO: better error, include size
-    #[error("scene size would allocate too much space")]
+    /// scene size would allocate too much space
     SceneTooLarge(GridAab),
 
-    #[error("attribute “{attribute}” of scene node with ID {scene_index} is invalid")]
+    /// attribute “{attribute}” of scene node with ID {scene_index} is invalid
     SceneAttributeParse {
         scene_index: u32,
         attribute: &'static str,
     },
 
-    #[error("file refers to model with ID {0} but does not define it")]
+    /// file refers to model with ID {0} but does not define it
     MissingModel(u32),
 
     // TODO: don't use Debug formatting
-    #[error("model’s size is impossibly large: {0:?}")]
+    /// model’s size is impossibly large: {0:?}
     ModelSizeInvalid(dot_vox::Size),
 
-    #[error("palette of {len} colors too short to contain index {index}")]
+    /// palette of {len} colors too short to contain index {index}
     PaletteTooShort { len: usize, index: u8 },
 
-    #[error("position/transform too large")]
+    /// position/transform too large
     TransformOverflow,
 
-    #[error("failed to place block")]
-    SetCube(#[source] SetCubeError),
+    /// failed to place block
+    SetCube(SetCubeError),
 
-    #[error("unexpected error")]
-    Unexpected(#[source] InGenError),
+    /// unexpected error
+    Unexpected(InGenError),
+}
+
+impl core::error::Error for DotVoxConversionError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        use DotVoxConversionError as E;
+        match self {
+            E::Parse(_) => None,
+            E::FileEmpty => None,
+            E::MissingSceneNode(_) => None,
+            E::SceneGraphCycle(_) => None,
+            E::SceneGraphRecursion => None,
+            E::SceneTooLarge(_) => None,
+            E::SceneAttributeParse {
+                scene_index: _,
+                attribute: _,
+            } => None,
+            E::MissingModel(_) => None,
+            E::ModelSizeInvalid(_) => None,
+            E::PaletteTooShort { len: _, index: _ } => None,
+            E::TransformOverflow => None,
+            E::SetCube(error) => Some(error),
+            E::Unexpected(error) => Some(error),
+        }
+    }
+}
+
+impl From<SetCubeError> for DotVoxConversionError {
+    fn from(error: SetCubeError) -> Self {
+        DotVoxConversionError::SetCube(error)
+    }
+}
+impl From<InGenError> for DotVoxConversionError {
+    fn from(error: InGenError) -> Self {
+        DotVoxConversionError::Unexpected(error)
+    }
 }
 
 #[cfg(feature = "import")]

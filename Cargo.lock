@@ -273,6 +273,7 @@ dependencies = [
  "all-is-cubes-render",
  "base64 0.22.1",
  "bytemuck",
+ "displaydoc",
  "dot_vox",
  "either",
  "futures-channel",
@@ -291,7 +292,6 @@ dependencies = [
  "snapbox",
  "stl_io",
  "tempfile",
- "thiserror 2.0.18",
  "yield-progress",
  "yoke",
 ]

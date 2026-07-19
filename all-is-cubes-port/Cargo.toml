@@ -67,6 +67,7 @@ auto-threads = [
 # Non-optional generally required dependencies
 # need all-is-cubes/std because we have boxed Send futures and errors
 all-is-cubes = { workspace = true, features = ["std"] }
+displaydoc = { workspace = true }
 futures-channel = { workspace = true }
 futures-core = { workspace = true }
 itertools = { workspace = true }
@@ -75,7 +76,6 @@ log = { workspace = true }
 # Used for internal execution of not-publicly-async code
 pollster = { workspace = true }
 rayon = { workspace = true, optional = true }
-thiserror = { workspace = true }
 # Not used directly as an extern crate, but we need to enable features.
 yield-progress = { workspace = true }
 yoke = { workspace = true }
