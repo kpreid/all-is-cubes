@@ -1,7 +1,6 @@
 //! Export to the STL 3D model file format.
 
-use std::collections::HashMap;
-use std::fs;
+use std::collections::BTreeMap;
 
 use itertools::Itertools as _;
 use stl_io::Triangle;
@@ -33,7 +32,7 @@ pub(crate) fn export_stl(
     let block_defs = source.contents.extract_type::<block::BlockDef>();
     source.reject_unsupported(crate::Format::Stl)?;
 
-    let mut items: HashMap<std::path::PathBuf, Vec<Triangle>> = HashMap::new();
+    let mut items: BTreeMap<std::path::PathBuf, Vec<Triangle>> = BTreeMap::new();
 
     for space in spaces {
         items.insert(
@@ -57,15 +56,15 @@ pub(crate) fn export_stl(
         );
     }
 
-    Ok(Box::pin(async move {
-        #[allow(clippy::shadow_unrelated)]
-        for (progress, (path, triangles)) in progress.split_evenly(items.len()).zip(items) {
-            stl_io::write_stl(&mut fs::File::create(path)?, triangles.into_iter())?;
-            progress.finish().await;
-        }
-
-        Ok(())
-    }))
+    Ok(crate::export::export_separate_files(
+        progress,
+        items,
+        |progress, file, triangles: Vec<Triangle>| -> Result<(), crate::ExportError> {
+            stl_io::write_stl(file, triangles.into_iter())?;
+            progress.progress_without_yield(1.0);
+            Ok(())
+        },
+    ))
 }
 
 pub(crate) fn space_to_stl_triangles(space: &space::Read<'_>) -> Vec<Triangle> {
@@ -136,6 +135,7 @@ mod tests {
     use all_is_cubes::universe::{Handle, Name, Universe};
     use all_is_cubes::util::yield_progress_for_testing;
     use std::collections::BTreeSet;
+    use std::fs;
     use std::path::PathBuf;
 
     #[macro_rules_attribute::apply(smol_macros::test)]

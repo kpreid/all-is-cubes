@@ -1,4 +1,7 @@
+#![allow(clippy::shadow_unrelated, reason = "false positives")]
+
 use core::future::ready;
+use std::collections::BTreeMap;
 #[allow(unused_imports)]
 use std::path::{Path, PathBuf};
 #[allow(unused_imports)]
@@ -19,7 +22,7 @@ use crate::util::spawn_blocking;
 /// Export data specified by an [`ExportSet`] to a file or files on disk.
 ///
 /// If the format requires multiple files, then they will be named with hyphenated suffixes
-/// before the extension; i.e. "foo.gltf" becomes "foo-bar.gltf".
+/// before the extension; i.e. "foo.gltf" may also write "foo-bar.png".
 ///
 /// TODO: Generalize this or add a parallel function for non-filesystem destinations.
 ///
@@ -36,7 +39,7 @@ use crate::util::spawn_blocking;
 ///
 /// This allows exports to have the minimum possible interruption to further use of the universe.
 ///
-/// Cancelling (dropping) the future may or may not cause an incomplete set of files to be written.
+/// Cancelling (dropping) the future may cause an incomplete set of files to be written.
 //---
 // TODO: further refine this to "borrowing future" and "non-borrowing future" for cooperative MT
 // on the copying part too.
@@ -60,30 +63,37 @@ pub fn export_to_path(
         Ok(match format {
             #[cfg(feature = "native")]
             Format::AicJson => {
-                // TODO: the file IO should be done in a separate thread
+                // TODO: The file IO should be done in a separate thread, but currently, we can’t
+                // do that except by buffering the entire JSON in memory, which is also bad.
                 let mut writer = io::BufWriter::new(fs::File::create(destination)?);
                 crate::native::export_native_json(read_ticket, source, &mut writer)?;
                 Box::pin(async {
+                    close_buffered_file(writer)?;
                     progress.finish().await;
                     Ok(())
                 })
             }
             #[cfg(feature = "dot-vox")]
             Format::DotVox => {
-                // TODO: expose this async part too, in an *optional* way
-                // because callers may want to complete synchronously
+                let [compute_progress, write_progress] = progress.split(0.9);
                 let dot_vox_data = pollster::block_on(crate::mv::export_to_dot_vox_data(
-                    progress,
+                    compute_progress,
                     read_ticket,
                     source,
                 ))?;
-                Box::pin(spawn_blocking(move || {
-                    dot_vox_data.write_vox(&mut fs::File::create(destination)?)?;
-                    Ok(())
-                }))
+                export_one_file(
+                    write_progress,
+                    destination,
+                    move |progress, buffered_file| {
+                        dot_vox_data.write_vox(buffered_file)?;
+                        progress.progress_without_yield(1.0);
+                        Ok(())
+                    },
+                )
             }
             #[cfg(feature = "gltf")]
             Format::Gltf => {
+                // glTF writes multiple files under its own control.
                 crate::gltf::export_gltf(progress, read_ticket, options, source, destination)?
             }
             #[cfg(feature = "stl")]
@@ -310,6 +320,70 @@ pub enum ExportError {
         /// The unsupported type.
         member_type: universe::Type,
     },
+}
+
+// -------------------------------------------------------------------------------------------------
+
+type FileWriter = io::BufWriter<fs::File>;
+
+/// Generic function for scheduling export operations which export one or more independent files.
+///
+/// We assume that the [`ReadTicket`] has already been used, producing intermediate data `D`.
+/// `writer` should take `D` and write to the file, and may also perform lengthy computation.
+///
+/// The returned future can then be returned from the format-specific code to [`export_to_path()`].
+pub(crate) fn export_separate_files<D>(
+    progress: YieldProgress,
+    items: BTreeMap<PathBuf, D>,
+    writer: impl Fn(YieldProgress, &mut FileWriter, D) -> Result<(), ExportError>
+    + Send
+    + Sync
+    + 'static,
+) -> BoxFuture<'static, Result<(), ExportError>>
+where
+    D: Send + 'static,
+{
+    // TODO: do these writes in parallel in separate threads?
+    Box::pin(spawn_blocking(move || {
+        for (progress, (path, data)) in progress.split_evenly(items.len()).zip(items) {
+            // TODO: include the file path in the error
+            let mut file = io::BufWriter::new(fs::File::create(path)?);
+            writer(progress, &mut file, data)?;
+            close_buffered_file(file)?;
+        }
+
+        Ok(())
+    }))
+}
+
+/// Generic function for export operations which export exactly one file.
+///
+/// We assume that the [`ReadTicket`] has already been used, producing intermediate data captured
+/// by `writer`.
+/// `writer` should write to the provided file, and may also perform lengthy computation.
+///
+/// The returned future can then be returned from the format-specific code to [`export_to_path()`].
+pub(crate) fn export_one_file(
+    progress: YieldProgress,
+    path: PathBuf,
+    writer: impl FnOnce(YieldProgress, &mut FileWriter) -> Result<(), ExportError>
+    + Send
+    + Sync
+    + 'static,
+) -> BoxFuture<'static, Result<(), ExportError>> {
+    // TODO: do these writes in parallel in separate threads?
+    Box::pin(spawn_blocking(move || {
+        #[allow(clippy::shadow_unrelated)]
+        let mut file = io::BufWriter::new(fs::File::create(path)?);
+        writer(progress, &mut file)?;
+        close_buffered_file(file)
+    }))
+}
+
+/// Closes a file, taking care to detect errors as much as possible.
+pub(crate) fn close_buffered_file(fw: FileWriter) -> Result<(), ExportError> {
+    fw.into_inner().map_err(|e| e.into_error())?.sync_data()?;
+    Ok(())
 }
 
 // -------------------------------------------------------------------------------------------------

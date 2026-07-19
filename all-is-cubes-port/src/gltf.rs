@@ -540,12 +540,12 @@ pub(crate) fn export_gltf(
         }
 
         {
-            let file = fs::File::create(destination)?;
+            let mut file = io::BufWriter::new(fs::File::create(destination)?);
             writer
                 .into_root(Duration::from_secs(1))?
-                .to_writer_pretty(&file) // TODO: non-pretty option
+                .to_writer_pretty(&mut file) // TODO: non-pretty option
                 .map_err(|_| -> ExportError { todo!("serialization error conversion") })?;
-            file.sync_all()?;
+            crate::export::close_buffered_file(file)?;
         }
 
         Ok(())

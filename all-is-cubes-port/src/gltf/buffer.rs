@@ -240,8 +240,9 @@ impl SwitchingWriter {
                 file_uri,
                 ..
             } => {
+                // TODO: use crate::export::close_buffered_file() for consistency
                 let file = file.into_inner()?;
-                file.sync_all()?;
+                file.sync_data()?;
                 // clippy false positive when this code is compiled for wasm -- TODO: remove the file support when compiling for wasm
                 #[allow(clippy::drop_non_drop)]
                 drop(file);
