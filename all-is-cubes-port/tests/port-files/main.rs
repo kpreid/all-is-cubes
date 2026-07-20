@@ -15,6 +15,8 @@
 
 extern crate all_is_cubes_port as port;
 
+// -------------------------------------------------------------------------------------------------
+
 // glTF is export only
 #[cfg(all(feature = "gltf", feature = "export"))]
 mod gltf;
@@ -24,3 +26,27 @@ mod mv;
 
 #[cfg(feature = "native")]
 mod native;
+
+// -------------------------------------------------------------------------------------------------
+
+/// Runs an export operation to a temporary directory.
+#[cfg(feature = "export")]
+#[expect(clippy::result_large_err)]
+fn run_test_export(
+    universe: &all_is_cubes::universe::Universe,
+    format: port::Format,
+    file_name: &str,
+) -> Result<(tempfile::TempDir, std::path::PathBuf), port::ExportError> {
+    let destination_dir = tempfile::tempdir().unwrap();
+    let destination = destination_dir.path().join(file_name);
+
+    pollster::block_on(port::export_to_path(
+        all_is_cubes::util::yield_progress_for_testing(),
+        universe.read_ticket(),
+        format,
+        &port::ExportOptions::default(),
+        port::ExportSet::all_of_universe(universe),
+        destination.clone(),
+    ))?;
+    Ok((destination_dir, destination))
+}

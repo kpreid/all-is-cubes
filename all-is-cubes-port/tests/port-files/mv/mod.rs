@@ -1,3 +1,4 @@
+use std::assert_matches;
 use std::sync::Arc;
 
 use pretty_assertions::assert_eq;
@@ -5,7 +6,7 @@ use pretty_assertions::assert_eq;
 use all_is_cubes::block::Block;
 use all_is_cubes::math::{GridAab, Rgba, rgb_const, rgba_const};
 use all_is_cubes::space::{self, Space};
-use all_is_cubes::universe::Handle;
+use all_is_cubes::universe::{Handle, Name, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
 
 // -------------------------------------------------------------------------------------------------
@@ -70,5 +71,26 @@ async fn import_materials() {
                 .color(rgba_const!(1.0, 1.0, 0.0, 1.0))
                 .build(),
         ]
+    );
+}
+
+/// Note: This is more a test of our error reporting logic in general than the MagicaVoxel format
+/// in particular. Got to pick a particular format, though.
+#[cfg(feature = "export")]
+#[test]
+fn export_unsupported_member() {
+    let mut universe = Universe::new();
+    universe.insert("bad".into(), all_is_cubes::tag::TagDef).unwrap();
+
+    let error = crate::run_test_export(&universe, port::Format::DotVox, "foo.vox").unwrap_err();
+
+    assert_matches!(error, port::ExportError {
+        source: Some(ref name),
+        detail: port::ExportErrorKind::MemberTypeNotRepresentable { .. },
+        ..
+    } if *name == Name::from("bad"));
+    assert_eq!(
+        error.to_string(),
+        "cannot export TagDef such as 'bad' to MagicaVoxel .vox"
     );
 }

@@ -32,18 +32,8 @@ async fn import_export_native_format() {
     );
 
     // Export again.
-    let destination_dir = tempfile::tempdir().unwrap();
-    let destination: PathBuf = destination_dir.path().join("foo.alliscubesjson");
-    port::export_to_path(
-        yield_progress_for_testing(),
-        universe.read_ticket(),
-        port::Format::AicJson,
-        &port::ExportOptions::default(),
-        port::ExportSet::all_of_universe(&universe),
-        destination.clone(),
-    )
-    .await
-    .unwrap();
+    let (_temp_dir, destination) =
+        crate::run_test_export(&universe, port::Format::AicJson, "foo.alliscubesjson").unwrap();
 
     // Compare JSON structure (by value so that we don't have prettyprinting differences)
     let expected_value: serde_json::Value =
