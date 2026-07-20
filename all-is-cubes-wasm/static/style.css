@@ -76,56 +76,7 @@ body {
   display: none;
 }
 
-/* --- block menu --- */
-
-#menu-container { /* exists to support centering */
-  position: absolute;
-  pointer-events: none;
-  left: 0;
-  bottom: 0;
-  display: table;
-  width: 100%;
-}
-#menu {
-  pointer-events: auto;
-  margin: 2px auto;
-  background: #333;
-  background: rgba(0, 0, 0, 0.5);
-  color: white;
-  border-radius: 5px;
-  display: table;
-  text-align: center;
-  font-family: monospace;
-}
-.menu-item {
-  display: inline-block;
-  position: relative;
-  margin: 1px 1px;
-}
-.menu-item td {
-  margin: 0;
-  padding: 0;
-}
-.menu-item canvas {
-  vertical-align: middle; /* remove baseline gap */
-}
-.menu-shortcut-key {
-  position: absolute;
-  bottom: -1px;
-  left: 1px;
-}
-#menu .selected-tool {
-  border-radius: 5px;
-  margin: -1px -1px; /* outlines don't have radius */
-  border: 2px solid white;
-  background: gray;
-}
-
-.ui-mode-hidden #menu { visibility: hidden; }
-.ui-mode-hidden #quick-bar .menu-item { visibility: visible; }
-.ui-mode-hidden #quick-bar { opacity: 0.75; }
-
-/* ---  --- */
+/* --- miscellaneous --- */
 
 #error-notices {
   position: absolute;
