@@ -2,15 +2,76 @@
 //!
 //! Currently supported formats:
 //!
-//! | Format              | Extension          | Feature     | Import  | Export  | Caveats |
-//! |---------------------|--------------------|-------------|:-------:|:-------:|---------|
-//! | All is Cubes native | `.alliscubesjson`  | `"native"`  | **Yes** | **Yes** | Version compatibility not yet guaranteed. |
-//! | MagicaVoxel `.vox`  | `.vox`             | `"dot-vox"` | **Yes** | **Yes** | Scene import is buggy. Materials are not exported at all. |
-//! | [glTF 2.0]          | `.gltf`            | `"gltf"`    | No      | **Yes** | Has some bugs. Output is suitable for rendering but not necessarily editing due to combined meshes. |
-//! | [STL]               | `.stl`             | `"stl"`     | No      | **Yes** | Meshes are not necessarily “manifold”/“watertight”. |
-//!
-//! [glTF 2.0]: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
-//! [STL]: <https://en.wikipedia.org/wiki/STL_(file_format)>
+//! <table>
+//!     <thead>
+//!         <tr>
+//!             <th rowspan=2>Format</th>
+//!             <th>Feature</th>
+//!             <th rowspan=2>Imports</th>
+//!             <th rowspan=2>Exports</th>
+//!             <th rowspan=2>Caveats</th>
+//!         </tr>
+//!         <tr>
+//!             <th>File extension</th>
+//!         </tr>
+//!     </thead>
+//!     <tbody>
+//!         <tr>
+//!             <td rowspan=2>All is Cubes native</td>
+//!             <td><code>"native"</code></td>
+//!             <td rowspan=2><strong>All</strong></td>
+//!             <td rowspan=2><strong>All</strong></td>
+//!             <td rowspan=2>Version compatibility not yet guaranteed.</td>
+//!         </tr>
+//!         <tr>
+//!             <td><code>.alliscubesjson</code></td>
+//!         </tr>
+//!         <tr>
+//!             <td rowspan=2>MagicaVoxel <code>.vox</code></td>
+//!             <td><code style="text-wrap-mode:nowrap">"dot-vox"</code></td>
+//!             <td rowspan=2>
+//!                 <code>Block</code>&nbsp;from&nbsp;model,<br>
+//!                 <code>Block</code>&nbsp;from&nbsp;scene,<br>
+//!                 <code>Space</code>&nbsp;from&nbsp;scene
+//!             </td>
+//!             <td rowspan=2>
+//!                 <code>Block</code>&nbsp;to&nbsp;model,<br>
+//!                 <code>Space</code>&nbsp;to&nbsp;scene
+//!             </td>
+//!             <td rowspan=2>Scene import is buggy. Materials are not exported at all.</td>
+//!         </tr>
+//!         <tr>
+//!             <td><code>.vox</code></td>
+//!         </tr>
+//!         <tr>
+//!             <td rowspan=2><a href="https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html">glTF 2.0</a></td>
+//!             <td><code>"gltf"</code></td>
+//!             <td rowspan=2></td>
+//!             <td rowspan=2>
+//!                 <code>Block</code>&nbsp;to&nbsp;model,<br>
+//!                 <code>Block</code>s&nbsp;to&nbsp;scene,<br>
+//!                 <code>Space</code>&nbsp;to&nbsp;scene
+//!             </td>
+//!             <td rowspan=2>Has some bugs. Output is suitable for rendering but not necessarily editing due to combined meshes.</td>
+//!         </tr>
+//!         <tr>
+//!             <td><code>.gltf</code></td>
+//!         </tr>
+//!         <tr>
+//!             <td rowspan=2><a href="https://en.wikipedia.org/wiki/STL_(file_format)">STL</a></td>
+//!             <td><code>"stl"</code></td>
+//!             <td rowspan=2></td>
+//!             <td rowspan=2>
+//!                 <code>Block</code>&nbsp;to&nbsp;file,<br>
+//!                 <code>Space</code>&nbsp;to&nbsp;file
+//!             </td>
+//!             <td rowspan=2>Meshes are not necessarily "manifold"/"watertight".</td>
+//!         </tr>
+//!         <tr>
+//!             <td><code>.stl</code></td>
+//!         </tr>
+//!     </tbody>
+//! </table>
 //!
 //! ## Package features
 //!
@@ -18,8 +79,8 @@
 //!
 //! * `"import"`: importing/loading.
 //! * `"export"`: exporting/saving.
+//! * Features for each supported format, as listed in the above table.
 //! * `"all-formats"`: Enables all format features.
-//! * Features for each supported format as listed in the above table.
 //! * `"auto-threads"`:
 //!   Enables implicit use of threads for parallel processing,
 //!   including via [`rayon`]’s global thread pool.
