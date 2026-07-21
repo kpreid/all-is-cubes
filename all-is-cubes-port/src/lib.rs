@@ -70,6 +70,18 @@
 //!         <tr>
 //!             <td><code>.stl</code></td>
 //!         </tr>
+//!         <tr>
+//!             <td rowspan=2><a href="https://en.wikipedia.org/wiki/TrueType">TTF</a></td>
+//!             <td><code>"ttf"</code></td>
+//!             <td rowspan=2></td>
+//!             <td rowspan=2>
+//!                 <code>FontDef</code>
+//!             </td>
+//!             <td rowspan=2></td>
+//!         </tr>
+//!         <tr>
+//!             <td><code>.ttf</code></td>
+//!         </tr>
 //!     </tbody>
 //! </table>
 //!
@@ -126,6 +138,8 @@ mod mv;
 mod native;
 #[cfg(all(feature = "export", feature = "stl"))]
 mod stl;
+#[cfg(all(feature = "export", feature = "ttf"))]
+mod ttf;
 
 #[cfg(test)]
 mod tests;
@@ -167,6 +181,14 @@ pub enum Format {
     ///
     /// [STL]: <https://en.wikipedia.org/wiki/STL_(file_format)>
     Stl,
+
+    /// [TrueType] font format (`.ttf`).
+    ///
+    /// Supports exporting [`FontDef`] values as web-compatible fonts.
+    ///
+    /// [`FontDef`]: all_is_cubes::text::FontDef
+    /// [TrueType]: https://en.wikipedia.org/wiki/TrueType
+    Ttf,
 }
 
 impl Format {
@@ -177,6 +199,7 @@ impl Format {
             Format::DotVox => "MagicaVoxel .vox",
             Format::Gltf => "glTF",
             Format::Stl => "STL",
+            Format::Ttf => "TTF",
         }
     }
 
@@ -189,6 +212,7 @@ impl Format {
             Format::DotVox => false,
             Format::Gltf => false, // TODO: implement light
             Format::Stl => false,
+            Format::Ttf => false,
         }
     }
 }

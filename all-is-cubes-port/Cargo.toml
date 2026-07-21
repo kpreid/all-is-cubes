@@ -26,7 +26,7 @@ import = []
 # Exporting all selected formats
 export = []
 # Enable all supported formats
-all-formats = ["native", "gltf", "stl", "dot-vox"]
+all-formats = ["native", "gltf", "stl", "dot-vox", "ttf"]
 # Reading and writing native All is Cubes universe files.
 native = [
     "all-is-cubes/save",
@@ -54,6 +54,10 @@ dot-vox = [
     "dep:all-is-cubes-mesh",
     "dep:all-is-cubes-render",
     "dep:dot_vox",
+]
+# Writing TrueType font files.
+ttf = [
+    "dep:write-fonts",
 ]
 # Adds automatic parallelism to some algorithms (but not all possible uses of concurrency).
 # If disabled, `std::thread` is never used.
@@ -88,9 +92,12 @@ all-is-cubes-render = { workspace = true, optional = true }
 # `std` `HasHMap` instead, which is useful for web-wasm compatibility.
 # TODO: But in the long run we will want `no_std` compatibility.
 dot_vox = { version = "5.2.0", default-features = false, optional = true }
+imgref = { workspace = true } # not worth making optional
+kurbo = { version = "0.13.1" } # must match write-fonts
 stl_io = { version = "0.11.0", optional = true }
 # json is used for native and glTF
 serde_json = { workspace = true, optional = true }
+write-fonts = { version = "0.50.0", optional = true }
 
 # glTF related dependencies
 base64 = { workspace = true, optional = true, features = ["alloc"] }
@@ -105,7 +112,9 @@ rectangle-pack = { workspace = true, optional = true, features = ["std"] }
 
 [dev-dependencies]
 all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
+font-types = { version = "0.12.2" } # reading fonts
 macro_rules_attribute = { workspace = true }
+read-fonts = { version = "0.41.0" } # reading fonts
 snapbox = { workspace = true, features = ["path"] }
 either = { workspace = true }
 pretty_assertions = { workspace = true }

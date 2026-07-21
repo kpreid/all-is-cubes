@@ -28,6 +28,10 @@ mod mv;
 #[cfg(feature = "native")]
 mod native;
 
+// TTF is (for now) export only
+#[cfg(all(feature = "ttf", feature = "export"))]
+mod ttf;
+
 // -------------------------------------------------------------------------------------------------
 
 /// Runs an export operation to a temporary directory.
