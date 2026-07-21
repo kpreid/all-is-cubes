@@ -4,7 +4,7 @@ allow-unwrap-in-tests = true
 # so let’s hear about breaking changes.
 avoid-breaking-exported-api = false
 
-doc-valid-idents = ["glTF", "sRGB", "DirectX", "MagicaVoxel", "NaN", "OpenGL", "WebGL", "WebGPU"]
+doc-valid-idents = ["glTF", "sRGB", "DirectX", "MagicaVoxel", "NaN", "OpenGL", "PostScript", "TrueType", "WebGL", "WebGPU"]
 enforced-import-renames = [
     { path = "all_is_cubes::rerun_glue", rename = "rg" },
 ]

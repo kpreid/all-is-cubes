@@ -1,0 +1,34 @@
+<html>
+    <head>
+    <title>Exported Font Preview</title>
+        <style type="text/css">
+            @font-face {
+                font-family: 'System16';
+                src: url(expected/system16.ttf);
+            }
+            body {
+                font-size: px;
+            }
+            .p2 {
+                text-decoration: underline;
+            }
+            .p3 {
+                text-decoration: line-through;
+            }
+            p.p1::before, p.p2::before, p.p3::before {
+                font-family: "Times New Roman", serif;
+                content: "other-font ";
+            }
+        </style>
+    </head>
+    <body>
+        <p>Use this file to view the <em>expected</em> font exports, such as after an overwrite.</p>
+
+        <div style="font-family:'System16'">
+            <h2>System16</h2>
+            <p class="p1">The quick brown fox jumped over the lazy dog.</p>
+            <p class="p2">The quick brown fox jumped over the lazy dog.</p>
+            <p class="p3">The quick brown fox jumped over the lazy dog.</p>
+        </div>
+    </body>
+</html>

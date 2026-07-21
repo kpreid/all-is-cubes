@@ -102,6 +102,8 @@ pub fn export_to_path(
             }
             #[cfg(feature = "stl")]
             Format::Stl => crate::stl::export_stl(progress, read_ticket, source, &destination)?,
+            #[cfg(feature = "ttf")]
+            Format::Ttf => crate::ttf::export_ttf(progress, read_ticket, source, &destination)?,
             #[allow(unreachable_patterns)]
             // TODO: distinguish between disabled and unsupported
             // (not currently necessary because we have no import-only formats)
