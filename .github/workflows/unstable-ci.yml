@@ -92,12 +92,12 @@ jobs:
           ./
           all-is-cubes-wasm/
 
-    - name: Install tools
+    - name: Install tools for use
       # Note: we do this before setting the toolchain so that we still use stable for these tools.
       # Note: Swatinem/rust-cache will cache these installed binaries, so we don't have to worry
       # about caching the builds of them.
       run: |
-        cargo install --locked wasm-pack@0.14.0 cargo-about@0.8.2
+        cargo install --locked wasm-pack@0.14.0
 
     - name: Set Rust toolchain
       # The rust-toolchain.toml file specifies the targets and components we need,
@@ -112,16 +112,17 @@ jobs:
     - name: Compile xtask
       run: cargo build --package xtask
 
-    - name: Update dependencies
-      run: |
-        cargo xtask update "${{ matrix.depversions }}"
-        cargo tree --all-features
+    - parallel:
+      - name: Update dependencies
+        run: |
+          cargo xtask update "${{ matrix.depversions }}"
+          cargo tree --all-features
 
-    - name: Install Linux native dependencies
-      if: ${{ runner.os == 'Linux' }}
-      run: |
-          sudo apt update
-          cargo xtask system-packages sudo-install
+      - name: Install Linux native dependencies
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+            sudo apt update
+            cargo xtask system-packages sudo-install
 
     - name: Compile tests
       # compile is broken out so we have visibility into compile vs. run times
@@ -133,6 +134,7 @@ jobs:
     - name: Save test-renderers output
       if: ${{ always() }}
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      background: true
       with:
         name: test-renderers-output ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
@@ -143,6 +145,7 @@ jobs:
     - name: Save cargo --timings output
       if: ${{ always() }}
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      background: true
       with:
         name: cargo-timings ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |

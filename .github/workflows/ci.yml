@@ -104,18 +104,15 @@ jobs:
     steps:
     # Free some disk space so our largest builds can complete reliably.
     - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+      background: true # should outpace the rate at which we consume disk, so no need to wait
       if: ${{ matrix.os == 'ubuntu' }}
       with:
         large-packages: false # slow
         swap-storage: false
 
-    - run: df -h .
-
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
-
-    - run: df -h .
 
     # Load cache before doing any Rust builds
     - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -135,13 +132,20 @@ jobs:
 
     - run: df -h .
 
-    - name: Install tools
+    - name: Install tools for use
       # Note: we do this before setting the toolchain so that we still use stable for these tools.
       # Note: Swatinem/rust-cache will cache these installed binaries, so we don't have to worry
       # about caching the builds of them.
-      # cargo-mutants and cargo-about are not used in this step but will be cached for later use.
       run: |
-        cargo install --locked wasm-pack@0.14.0 cargo-about@0.8.2 cargo-mutants@27.0.0
+        cargo install --locked wasm-pack@0.14.0
+
+    - name: Install tools for cache
+      background: true # post-run cache save will automatically wait for this
+      # cargo-mutants and cargo-about are not used in this job but will be cached for later use.
+      # We build them in this step so we can write them into the cache, whereas the dependent jobs
+      # don’t write the cache at all.
+      run: |
+        cargo install --locked cargo-about@0.8.2 cargo-mutants@27.0.0
 
     - run: df -h .
 
@@ -164,18 +168,17 @@ jobs:
     - name: Compile xtask
       run: cargo build --package xtask
 
-    - name: Update dependencies
-      run: |
-        cargo xtask update "${{ matrix.depversions }}"
-        cargo tree --all-features
+    - parallel:
+      - name: Update dependencies
+        run: |
+          cargo xtask update "${{ matrix.depversions }}"
+          cargo tree --all-features
 
-    - run: df -h .
-
-    - name: Install Linux native dependencies
-      if: ${{ runner.os == 'Linux' }}
-      run: |
-          sudo apt update
-          cargo xtask system-packages sudo-install
+      - name: Install Linux native dependencies
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+            sudo apt update
+            cargo xtask system-packages sudo-install
 
     - run: df -h .
 
@@ -191,24 +194,22 @@ jobs:
     - name: Save test-renderers output
       if: ${{ always() }}
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      background: true
       with:
         name: test-renderers-output ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
           target/test-renderers-output/
-
-    - run: df -h .
 
     # Save timing reports so we can download and view them
     # (for understanding build performance in CI)
     - name: Save cargo --timings output
       if: ${{ always() }}
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      background: true
       with:
         name: cargo-timings build ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
           target/cargo-timings/cargo-timing-*.html
-
-    - run: df -h .
 
   # Build web version with release profile.
   build-web:
@@ -504,10 +505,12 @@ jobs:
     # Run once on each workspace (hence each lock file) of interest.
     # Our only other workspace is fuzz/, which we aren't interested in checking.
     - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+      background: true
       with:
         # empty arguments disables default --all-features
         arguments:
     - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+      background: true
       with:
         manifest-path: all-is-cubes-wasm/Cargo.toml
         arguments:
