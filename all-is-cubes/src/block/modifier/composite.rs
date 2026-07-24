@@ -59,7 +59,7 @@ impl Composite {
     /// Toggle the reversed flag, which swaps the roles of the two blocks in the operator.
     #[must_use]
     pub fn reversed(mut self) -> Self {
-        self.reverse = !self.reverse;
+        self.reverse.toggle();
         self
     }
 
