@@ -410,7 +410,7 @@ impl InputProcessor {
                 Key::Character('p') => {
                     // TODO: eliminate this weird binding once escape-based pausing is working well
                     if let Some(paused) = paused_opt {
-                        paused.update_mut(|p| *p = !*p);
+                        paused.update_mut(bool::toggle);
                     }
                 }
                 Key::Character('u') => {
