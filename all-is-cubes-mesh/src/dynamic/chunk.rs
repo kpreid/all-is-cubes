@@ -239,7 +239,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         }
 
         // TODO: figure out a way to distinguish mesh updates from instances updates in the debug visualization, and then give it enough info to do that
-        self.update_debug = !self.update_debug;
+        self.update_debug.toggle();
 
         // Record the block meshes we incorporated into the chunk mesh.
         self.block_dependencies.clear();
