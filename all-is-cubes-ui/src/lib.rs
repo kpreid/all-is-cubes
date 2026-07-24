@@ -1,3 +1,4 @@
+#![feature(bool_toggle)]
 #![feature(const_default)]
 #![feature(const_trait_impl)]
 #![feature(doc_cfg)]
