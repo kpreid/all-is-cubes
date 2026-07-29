@@ -95,6 +95,7 @@
     clippy::result_large_err,
     reason = "TODO: revise ExportError to be smaller without too much mess"
 )]
+#![cfg_attr(test, allow(dead_code_pub_in_binary, reason = "FP on test binaries"))]
 
 use std::fmt;
 
