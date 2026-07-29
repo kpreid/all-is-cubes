@@ -17,7 +17,7 @@ pub struct Config<'a> {
     pub cargo_quiet: bool,
     pub time_log_quiet: bool,
     /// Whether to use `RUSTFLAGS=-Dwarnings` instead of Cargo `build.warnings="deny"`.
-    pub use_d_warnings: bool,
+    pub use_rustflags_to_deny_warnings: bool,
     pub scope: Scope,
     pub main_metadata: cargo_metadata::Metadata,
     pub time_log_tx: std::sync::mpsc::Sender<Timing>,
@@ -99,18 +99,23 @@ pub(crate) enum TestOrCheck {
 
 impl TestOrCheck {
     pub fn cargo_cmd<'a>(self, config: &'a Config<'_>) -> Cmd<'a> {
+        let mut rustflags_deny_warnings = false;
+
         let mut cmd = config
             .cargo()
             .args(match self {
                 Self::Test => vec!["test"],
                 Self::BuildTests => vec!["test", "--no-run"],
-                Self::Lint if config.use_d_warnings => vec!["clippy"],
+                Self::Lint if config.use_rustflags_to_deny_warnings => {
+                    rustflags_deny_warnings = true;
+                    vec!["clippy"]
+                }
                 Self::Lint => vec!["clippy", "--config=build.warnings='deny'"],
                 Self::Check => vec!["check"],
             })
             .args(config.cargo_build_args());
 
-        if config.use_d_warnings {
+        if rustflags_deny_warnings {
             let new_rustflags = match std::env::var("RUSTFLAGS") {
                 Ok(old_rustflags) => format!("{old_rustflags} -Dwarnings"),
                 Err(_) => String::from("-Dwarnings"),

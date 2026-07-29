@@ -57,10 +57,10 @@ fn main() -> Result<(), ActionError> {
         .exec()?;
 
     // Can't use build.warnings when linting on unstable/future toolchains, because they might
-    // have new `renamed_and_removed_lints` that should be ignored:
+    // have new `renamed_and_removed_lints` that should be ignored, but build.warnings doesn’t
+    // implement ignoring them:
     //   <https://github.com/rust-lang/cargo/issues/17193>
-    // TODO
-    let use_d_warnings = CI && {
+    let use_rustflags_to_deny_warnings = CI && {
         let rustc_version_output = sh.cmd("rustc").arg("--version").output().unwrap().stdout;
         let rustc_version_output = str::from_utf8(&rustc_version_output).unwrap();
         rustc_version_output.contains("nightly") || rustc_version_output.contains("beta")
@@ -82,7 +82,7 @@ fn main() -> Result<(), ActionError> {
             cargo_timings: timings,
             cargo_quiet: quiet,
             time_log_quiet: quiet,
-            use_d_warnings,
+            use_rustflags_to_deny_warnings,
             scope,
             main_metadata,
             time_log_tx,
