@@ -1093,9 +1093,9 @@ dependencies = [
 
 [[package]]
 name = "naga-rust-back"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17df434b5faaa6590902bf193ad0c79b3241cec3ad77d16746d6250de9d5513c"
+checksum = "2180d138bf4bfc5d880fe2e666cc4ec76f188e8deba3af32d16f9188a27fee09"
 dependencies = [
  "arrayvec",
  "bitflags",
@@ -1108,9 +1108,9 @@ dependencies = [
 
 [[package]]
 name = "naga-rust-embed"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3633cc74f40cd1d78a8b4f6f1b1984dd49775840259335cb33e38695947517b2"
+checksum = "950f9d2eddc84a9916f58e59def51ad856cd5b626d1c28110429eb596e165d86"
 dependencies = [
  "naga-rust-macros",
  "naga-rust-rt",
@@ -1118,9 +1118,9 @@ dependencies = [
 
 [[package]]
 name = "naga-rust-macros"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46485380f5b1e387149bc6f0784c7dc123db71f770c62a49f73ae944fbb31060"
+checksum = "e54fe419526cf7947212bfbd956699654c30c5d24b534830aa76b5b8d5b807b7"
 dependencies = [
  "litrs",
  "naga",
@@ -1130,9 +1130,9 @@ dependencies = [
 
 [[package]]
 name = "naga-rust-rt"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12204286ea6fb2018756c0a458a4ec74c7418cc1a0742d3ac46bcb7cfdc55c7d"
+checksum = "a618df7e722592ba6e96191572df86ab1c7998e7e4e6592885f3960ad4ed13f0"
 dependencies = [
  "bytemuck",
  "mutants 0.0.4",

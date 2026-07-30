@@ -1,4 +1,5 @@
-//! Hot-reloadable shader loading.
+//! Hot-reloadable shader loading, and non-hot-reloadable uniform struct declarations extracted from
+//! the shaders.
 
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
@@ -13,6 +14,13 @@ use all_is_cubes::listen;
 
 use crate::Identified;
 use crate::reloadable::{Reloadable, reloadable_str};
+
+// -------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests;
+
+// -------------------------------------------------------------------------------------------------
 
 macro_rules! shaders {
     ($( $(#[cfg $cfg:tt])* $name:ident = $path:literal, )*) => {
@@ -173,12 +181,11 @@ impl ReloadableShader {
 //
 // This translation does not interact with the hot-reloading system: if the reloaded shader code
 // has a different struct layout, things will break.
-//
-// TODO: Under cfg(test), make this translation include the functions so we can test the functions.
-macro_rules! include_wgsl {
+macro_rules! include_wgsl_no_tests {
     ($mod_name:ident, $path:literal) => {
         pub(crate) mod $mod_name {
             naga_rust_embed::include_wgsl_mr!(
+                // When not testing, we only want to share structs.
                 include_functions = false,
                 public_items = true,
                 rule(derive(bytemuck::NoUninit)),
@@ -187,9 +194,32 @@ macro_rules! include_wgsl {
         }
     };
 }
+cfg_select! {
+    test => {
+        macro_rules! include_wgsl {
+            ($mod_name:ident, $path:literal) => {
+                pub(crate) mod $mod_name {
+                    naga_rust_embed::include_wgsl_mr!(
+                        // Include functions so we can test them.
+                        include_functions = true,
+                        resource_struct = Resources,
+                        allow_unimplemented = true,
+
+                        public_items = true,
+                        rule(derive(bytemuck::NoUninit)),
+                        $path
+                    );
+                }
+            };
+        }
+    }
+    _ => {
+        use include_wgsl_no_tests as include_wgsl;
+    }
+}
 include_wgsl!(blocks_and_lines, "src/shaders/blocks-and-lines.wgsl");
 include_wgsl!(postprocess, "src/shaders/postprocess.wgsl");
-include_wgsl!(rerun_copy, "src/shaders/rerun-copy.wgsl");
-// resampling.wgsl has no structs to share.
-include_wgsl!(rt_copy, "src/shaders/rt-copy.wgsl");
-// uniform-color.wgsl has no structs to share.
+include_wgsl_no_tests!(rerun_copy, "src/shaders/rerun-copy.wgsl");
+// resampling.wgsl has no structs to share or tests.
+include_wgsl_no_tests!(rt_copy, "src/shaders/rt-copy.wgsl");
+// uniform-color.wgsl has no structs to share or tests.

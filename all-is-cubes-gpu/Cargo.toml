@@ -22,11 +22,11 @@ bench = false
 doctest = false
 
 [[test]]
-name = "shaders"
+name = "gpu"
 required-features = []
 
 [[bench]]
-name = "wgpu"
+name = "gpu"
 harness = false
 required-features = ["_special_testing"]
 
