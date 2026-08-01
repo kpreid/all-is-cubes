@@ -37,6 +37,9 @@ pub type TilePoint = Point3D<TextureCoordinate, TexelUnit>;
 /// Allocations may be deallocated for reuse by dropping the returned [`Tile`]s.
 pub trait Allocator {
     /// Allocation handles produced by this allocator.
+    ///
+    /// If these handles implement [`PartialEq`], they must do so such that they compare by
+    /// allocation, not by current contents.
     //---
     // Design note: The bounds beyond `Tile` are not required for allocators to function, but
     // for how this type is used in the rest of the mesh library.

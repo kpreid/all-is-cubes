@@ -175,7 +175,7 @@ impl texture::Allocator for GltfTextureAllocator {
 // Implementation notes: Since glTF does not support 3D textures, we must slice the provided
 // texels into 2D sections. Therefore, this is just a container for the texels, not a handle
 // to the actual atlas.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct GltfTile {
     bounds: GridAab,
 
@@ -186,6 +186,22 @@ pub struct GltfTile {
     // Actual texel storage
     reflectance: TexelsCell,
     emission: Option<TexelsCell>,
+}
+
+/// Compared by reference, as is required by [`texture::Allocator`].
+impl PartialEq for GltfTile {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
+            reflectance,
+
+            // No need to check these because each distinct tile gets a distinct `reflectance`
+            // cell.
+            emission: _,
+            bounds: _,
+            gatherer: _,
+        } = self;
+        Arc::ptr_eq(reflectance, &other.reflectance)
+    }
 }
 
 impl GltfTile {
