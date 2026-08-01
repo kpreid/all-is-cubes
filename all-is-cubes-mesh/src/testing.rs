@@ -30,8 +30,10 @@ where
     type Tile = Alloc::Tile;
 }
 #[cfg(feature = "dynamic")]
-impl<Alloc: texture::Allocator + fmt::Debug + 'static, const MBM: usize>
-    crate::dynamic::DynamicMeshTypes for Mt<Alloc, MBM>
+impl<
+    Alloc: texture::Allocator<Tile: Send + Sync> + fmt::Debug + Send + Sync + 'static,
+    const MBM: usize,
+> crate::dynamic::DynamicMeshTypes for Mt<Alloc, MBM>
 where
     Alloc::Point: Fmt<ConciseDebug>, // TODO: clunky bound
 {

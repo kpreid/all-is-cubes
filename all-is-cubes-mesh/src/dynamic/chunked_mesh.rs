@@ -20,10 +20,14 @@ use all_is_cubes_render::{Flaws, camera::Camera};
 use crate::dynamic::blocks::InstanceMesh;
 use crate::dynamic::chunk::ChunkTodoState;
 use crate::dynamic::{self, ChunkMesh, ChunkTodo, DynamicMeshTypes};
-use crate::{DepthOrdering, DepthSortInfo, DepthSortResult, MeshOptions, Vertex, texture};
+use crate::{DepthOrdering, DepthSortInfo, DepthSortResult, MeshOptions};
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests;
+
+// -------------------------------------------------------------------------------------------------
 
 /// The large-scale and updatable form of [`SpaceMesh`]: subdivides a [`Space`] into
 /// [chunks](all_is_cubes::chunking) which are individually recomputed as the space changes or
@@ -94,10 +98,6 @@ where
 impl<M, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<M, CHUNK_SIZE>
 where
     M: DynamicMeshTypes,
-    // These bounds are redundant with `DynamicMeshTypes` but the compiler needs to see them
-    M::Vertex: Vertex<TexPoint = <M::Tile as texture::Tile>::Point> + PartialEq,
-    M::Alloc: Send + Sync,
-    M::Tile: texture::Tile + PartialEq + Send + Sync,
 {
     /// Constructs a new [`ChunkedSpaceMesh`] that will maintain a mesh representation of
     /// the contents of the given space, within a requested viewing distance (specified

@@ -664,11 +664,7 @@ pub fn block_meshes_for_space<M: MeshTypes>(
     space: &space::Read<'_>,
     texture_allocator: &M::Alloc,
     options: &MeshOptions<M>,
-) -> BlockMeshes<M>
-where
-    // These bounds are redundant with `MeshTypes` but the compiler needs to see them
-    M::Vertex: Vertex<TexPoint = <M::Tile as texture::Tile>::Point>,
-{
+) -> BlockMeshes<M> {
     space
         .block_data()
         .iter()
