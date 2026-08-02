@@ -109,7 +109,7 @@ impl Viz {
             let mut new_self = Self::Enabled(Inner {
                 timestamp: -1,
                 destination,
-                timeline_name: rg::TimelineName::new("block_mesh_step"),
+                timeline_name: rg::TimelineName::from_static_str("block_mesh_step"),
                 window_voxels_path: rg::entity_path!["progress", "analysis_window"],
                 layer_path: rg::entity_path!["progress", "mesh_plane"],
                 occupied_path: rg::entity_path!["occupied_planes"],
