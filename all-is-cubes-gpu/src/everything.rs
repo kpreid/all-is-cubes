@@ -209,7 +209,7 @@ impl EverythingRenderer {
             &fb,
             cameras.graphics_options_source(),
         );
-        let block_texture = AtlasAllocator::new("EverythingRenderer", &device.limits());
+        let block_texture = AtlasAllocator::new("EverythingRenderer", &device);
 
         let backdrop_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("EverythingRenderer::backdrop_uniform_buffer"),

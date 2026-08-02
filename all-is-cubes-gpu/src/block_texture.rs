@@ -128,8 +128,7 @@ struct AllocatorBacking {
     /// Tracks which regions of the texture are free or allocated.
     alloctree: Alloctree<AtlasTexel>,
 
-    /// log2 of the maximum texture size we may consider growing to.
-    maximum_texture_size_exponent: u8,
+    limits: TextureLimits,
 
     /// Whether flush needs to do anything.
     dirty: bool,
@@ -169,17 +168,39 @@ struct GpuTexture {
     texture_view: Arc<Identified<wgpu::TextureView>>,
 }
 
+/// Information collected from the GPU device about how we can use it.
+#[derive(Clone, Copy, Debug)]
+struct TextureLimits {
+    /// log2 of the maximum texture size we may consider growing to.
+    maximum_texture_size_exponent: u8,
+
+    /// Whether 3D texture copies are correctly implemented.
+    /// If not, we avoid using `copy_texture_to_texture()`.
+    use_3d_texture_copies: bool,
+}
+
 //------------------------------------------------------------------------------------------------//
 // Implementations
 
 impl AtlasAllocator {
-    pub fn new(label_prefix: &str, limits: &wgpu::Limits) -> Self {
+    /// Construct an allocator.
+    ///
+    /// `device` is used only to obtain limits; textures are not allocated until the next flush.
+    pub fn new(label_prefix: &str, device: &wgpu::Device) -> Self {
+        let texture_limits = TextureLimits::new(device);
+        if false {
+            log::trace!("AtlasAllocator::new({label_prefix:?}) found limits {texture_limits:?}");
+        }
         Self {
-            reflectance_backing: AllocatorBacking::new(label_prefix, Channels::Reflectance, limits),
+            reflectance_backing: AllocatorBacking::new(
+                label_prefix,
+                Channels::Reflectance,
+                texture_limits,
+            ),
             reflectance_and_emission_backing: AllocatorBacking::new(
                 label_prefix,
                 Channels::ReflectanceEmission,
-                limits,
+                texture_limits,
             ),
         }
     }
@@ -244,7 +265,7 @@ impl texture::Allocator for AtlasAllocator {
         // If alloctree grows, the next flush() will take care of reallocating the texture.
         let handle = backing_guard.alloctree.allocate_with_growth(
             requested_bounds,
-            backing_guard.maximum_texture_size_exponent,
+            backing_guard.limits.maximum_texture_size_exponent,
         )?;
         let allocated_bounds = handle.allocation;
 
@@ -417,21 +438,11 @@ impl texture::Tile for AtlasTile {
 }
 
 impl AllocatorBacking {
-    fn new(label_prefix: &str, channels: Channels, limits: &wgpu::Limits) -> Arc<Mutex<Self>> {
-        let maximum_texture_size_exponent = limits
-            .max_texture_dimension_3d
-            // Kludge: Chrome WebGPU fails if the buffer size is exceeded, as of 129.0.6668.101,
-            // even though we’re not making any such buffer, only a texture.
-            // Could not reproduce standalone.
-            .min(u32::try_from(cube_root_u64(limits.max_buffer_size / 4)).unwrap_or(u32::MAX))
-            .ilog2()
-            .try_into()
-            .unwrap_or(u8::MAX);
-
+    fn new(label_prefix: &str, channels: Channels, limits: TextureLimits) -> Arc<Mutex<Self>> {
         Arc::new(Mutex::new(AllocatorBacking {
             // Default size of 2⁵ = 32 holding up to 8 × 16³ block textures.
             alloctree: Alloctree::new(5),
-            maximum_texture_size_exponent,
+            limits,
             dirty: false,
             in_use: Vec::new(),
             channels,
@@ -461,20 +472,25 @@ impl AllocatorBacking {
         // using an error scope and being able to recover asynchronously from the failed attempt.
 
         // If we have textures already, check if they are the right size.
-        let old_textures: Option<Msw<Group<_>>> = if matches!(
+        let (rewrite_everything, old_textures): (bool, Option<Msw<Group<_>>>) = if matches!(
             backing.textures.as_deref(),
             Some(Group { reflectance: GpuTexture { texture, .. }, .. })
             if texture.size() != needed_texture_size
         ) {
-            backing.textures.take()
+            if backing.limits.use_3d_texture_copies {
+                // Take the current textures, making them the old textures and causing new current
+                // textures to be allocated.
+                (false, backing.textures.take())
+            } else {
+                // Bug workaround: Discard the old textures without reusing them, so that we
+                // use `write_texture()` and avoid `copy_texture_to_texture()`.
+                backing.textures = None;
+                (true, None)
+            }
         } else {
-            None
+            // Leave textures in place.
+            (false, None)
         };
-
-        // TODO: On WebGL, copying from the old texture silently does nothing. We should
-        // report a `wgpu` bug, but for now, avoid it by re-writing everything
-        // instead of copying. When the bug is fixed, delete this variable entirely.
-        let copy_everything_anyway = cfg!(target_family = "wasm") && old_textures.is_some();
 
         // Allocate a texture if needed.
         let textures: &mut Msw<Group<GpuTexture>> = backing.textures.get_or_insert_with(|| {
@@ -501,7 +517,7 @@ impl AllocatorBacking {
             // data is preserved. (Note that this assumes that the new texture is larger,
             // which is currently always true. Shrinking the texture would require also
             // defragmenting it.)
-            if let Some(old_textures) = old_textures.filter(|_| !copy_everything_anyway) {
+            if let Some(old_textures) = old_textures {
                 let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some(&format!(
                         "{} copy old to new texture",
@@ -542,7 +558,7 @@ impl AllocatorBacking {
                     Some(strong_ref) => {
                         {
                             let tile_backing: &mut TileBacking = &mut strong_ref.lock().unwrap();
-                            if tile_backing.dirty || copy_everything_anyway {
+                            if tile_backing.dirty || rewrite_everything {
                                 let region: Box3D<u32, AtlasTexel> = tile_backing
                                     .handle
                                     .as_ref()
@@ -717,6 +733,29 @@ impl Drop for TileBacking {
         };
 
         backing.alloctree.free(handle);
+    }
+}
+
+impl TextureLimits {
+    fn new(device: &wgpu::Device) -> Self {
+        let limits = device.limits();
+        let maximum_texture_size_exponent = limits
+            .max_texture_dimension_3d
+            // Kludge: Chrome WebGPU fails if the buffer size is exceeded, as of 129.0.6668.101,
+            // even though we’re not making any such buffer, only a texture.
+            // Could not reproduce standalone.
+            .min(u32::try_from(cube_root_u64(limits.max_buffer_size / 4)).unwrap_or(u32::MAX))
+            .ilog2()
+            .try_into()
+            .unwrap_or(u8::MAX);
+
+        // Detection for <https://github.com/kpreid/all-is-cubes/issues/391>
+        let use_3d_texture_copies = device.adapter_info().backend != wgpu::Backend::Gl;
+
+        Self {
+            maximum_texture_size_exponent,
+            use_3d_texture_copies,
+        }
     }
 }
 

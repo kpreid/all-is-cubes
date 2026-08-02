@@ -141,8 +141,7 @@ where
     });
 
     // Placeholder space data for the bind group
-    let texture_allocator =
-        crate::block_texture::AtlasAllocator::new("shader test space", &device.limits());
+    let texture_allocator = crate::block_texture::AtlasAllocator::new("shader test space", &device);
     let (texture_view, _) = texture_allocator.flush(&device, &queue);
     let space_bind_group = crate::space::create_space_bind_group(
         "shader test space",
