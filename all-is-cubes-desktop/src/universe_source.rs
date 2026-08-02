@@ -44,7 +44,11 @@ impl UniverseSource {
         let start_time = Instant::now();
 
         // TODO: figure out a cleaner way to wrangle this rx hookup
-        let notif_rx = Mutex::new(TryRecvKeep::Rx(notif_rx));
+        //
+        // This is shared rather than owned by the `yield_progress` callback because the
+        // notification must outlive universe construction: `--precompute-light` runs afterward
+        // and is also part of what the user is waiting for.
+        let notif_rx = Arc::new(Mutex::new(TryRecvKeep::Rx(notif_rx)));
         #[allow(clippy::literal_string_with_formatting_args)]
         let universe_progress_bar = logging::new_progress_bar(100)
             .with_style(
@@ -56,6 +60,7 @@ impl UniverseSource {
         universe_progress_bar.set_position(0);
         let yield_progress = {
             let universe_progress_bar = universe_progress_bar.clone();
+            let notif_rx = Arc::clone(&notif_rx);
             glue::make_yield_progress()
                 .progress_using(move |info| {
                     universe_progress_bar.set_position((info.fraction() * 100.0) as u64);
@@ -139,9 +144,17 @@ impl UniverseSource {
             if precompute_light {
                 let space_handle =
                     character_handle.read(universe.read_ticket()).unwrap().space().clone();
-                universe.mutate_space(&space_handle, evaluate_light_with_progress).unwrap();
+                universe
+                    .mutate_space(&space_handle, |m| {
+                        evaluate_light_with_progress(m, &notif_rx)
+                    })
+                    .unwrap();
             }
         }
+
+        // Everything the user was waiting for is done, so take down the notification.
+        // (Dropping the `Notification` is what removes it from the `notification::Hub`.)
+        drop(notif_rx);
 
         Ok(universe)
     }
@@ -197,20 +210,38 @@ impl std::str::FromStr for Teleport {
 
 // -------------------------------------------------------------------------------------------------
 
-fn evaluate_light_with_progress(m: &mut space::Mutation<'_, '_>) {
+fn evaluate_light_with_progress(m: &mut space::Mutation<'_, '_>, notif_rx: &Mutex<TryRecvKeep>) {
     let light_progress = logging::new_progress_bar(100).with_prefix("Lighting");
-    m.evaluate_light(1, lighting_progress_adapter(&light_progress));
+    m.evaluate_light(1, lighting_progress_adapter(&light_progress, notif_rx));
     light_progress.finish();
 }
 
-/// Convert `LightUpdatesInfo` data to an approximate completion progress.
+/// Convert `LightUpdatesInfo` data to an approximate completion progress,
+/// and report it to both the terminal progress bar and the notification.
 /// TODO: Improve this and put it in the light module (independent of indicatif).
-fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(space::LightUpdatesInfo) + '_ {
+fn lighting_progress_adapter<'a>(
+    progress: &'a ProgressBar,
+    notif_rx: &'a Mutex<TryRecvKeep>,
+) -> impl FnMut(space::LightUpdatesInfo) + 'a {
+    // The queue length is not known in advance and grows as work is discovered, so treat the
+    // largest length seen so far as the denominator. Progress therefore never runs backwards,
+    // but it may stall while the queue is still growing.
     let mut worst = 1;
     move |info| {
         worst = worst.max(info.queue_count);
+        let done = worst - info.queue_count;
+
         progress.set_length(worst as u64);
-        progress.set_position((worst - info.queue_count) as u64);
+        progress.set_position(done as u64);
+
+        if let Some(notification) = notif_rx.lock().unwrap().try_borrow() {
+            notification.set_content(notification::NotificationContent::Progress {
+                title: literal!("Loading..."),
+                // `worst` is nonzero, so this is never a division by zero.
+                progress: ProgressBarState::new(done as f64 / worst as f64),
+                part: literal!("Computing light"),
+            });
+        }
     }
 }
 
