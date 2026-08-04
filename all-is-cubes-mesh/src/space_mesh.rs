@@ -620,8 +620,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 |_| Ok(false),
             )?;
             space_mesh
-                .store_indices_and_finish_compute(opaque_indices_deque, transparent_indices)
-                .unwrap(); // TODO: allocation failure handling
+                .store_indices_and_finish_compute(opaque_indices_deque, transparent_indices)?;
 
             Ok(space_mesh)
         }
