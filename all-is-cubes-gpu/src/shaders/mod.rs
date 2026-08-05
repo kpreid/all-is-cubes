@@ -124,11 +124,6 @@ impl ReloadableShader {
         &self.current_module
     }
 
-    /// For shader testing.
-    pub(crate) fn get_source_text(&self) -> Arc<str> {
-        self.source.get()
-    }
-
     /// Returns `true` if the current module changed.
     fn update(&mut self, device: &wgpu::Device) -> bool {
         if self.dirty.get_and_clear() {

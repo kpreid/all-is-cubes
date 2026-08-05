@@ -48,8 +48,6 @@ mod queries;
 mod raytrace_to_texture;
 #[cfg(feature = "rerun")]
 mod rerun_image;
-#[doc(hidden)] // used by tests/shader_tests.rs
-pub mod shader_testing;
 mod shaders;
 mod skybox;
 #[doc(hidden)]

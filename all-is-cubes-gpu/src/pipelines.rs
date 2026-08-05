@@ -44,11 +44,6 @@ pub(crate) struct Pipelines {
     /// Bind group layout for `SpaceRenderer`'s space data and block textures.
     pub(crate) space_texture_bind_group_layout: wgpu::BindGroupLayout,
 
-    /// Pipeline layout for using the blocks-and-lines shader.
-    /// Saved for use by tests.
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) block_render_pipeline_layout: wgpu::PipelineLayout,
-
     /// Pipeline for drawing opaque blocks (alpha = 1, not in the sense of
     /// `BlockAttributes::opaque`).
     pub(crate) opaque_render_pipeline: wgpu::RenderPipeline,
@@ -858,7 +853,6 @@ impl Pipelines {
             camera_bind_group_layout,
             lines_render_pipeline,
             space_texture_bind_group_layout,
-            block_render_pipeline_layout,
             opaque_render_pipeline,
             transparent_render_pipeline,
             opaque_overdraw_render_pipeline,
