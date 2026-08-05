@@ -569,7 +569,10 @@ pub(in crate::raytracer) struct TracingCubeData {
 #[derive(Clone, Debug)]
 pub(in crate::raytracer) struct TracingBlock<D> {
     pub block_data: D,
-    // TODO: `Evoxels` carries more data than we actually need (color). Experiment with using a packed format.
+    // TODO: `Evoxels` carries more voxel palette data than we actually need (color + emission).
+    // In theory, using a packed format should provide better memory locality, but an initial
+    // experiment with that (and using a `SmallVec` for the palette) did not produce measurable
+    // improvement.
     pub voxels: Evoxels,
 }
 
