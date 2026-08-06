@@ -17,8 +17,8 @@ fn load_settings_from_local_storage() -> Option<Settings> {
     let storage: web_sys::Storage = window()?.local_storage().ok()??;
 
     let len = storage.length().unwrap();
-    let initial_data: Data =
-        Data::from_iter((0..len).filter_map(|i: u32| -> Option<(ArcStr, ArcStr)> {
+    let initial_data: Data = Data::from_iter((0..len).into_iter().filter_map(
+        |i: u32| -> Option<(ArcStr, ArcStr)> {
             let storage_key: String = storage.key(i).unwrap().unwrap();
             if let Some(settings_key) = storage_key.strip_prefix(PREFIX) {
                 let value = ArcStr::from(storage.get_item(&storage_key).unwrap().unwrap());
@@ -26,7 +26,8 @@ fn load_settings_from_local_storage() -> Option<Settings> {
             } else {
                 None
             }
-        }));
+        },
+    ));
 
     log::trace!("Loaded settings: {initial_data:?}");
 

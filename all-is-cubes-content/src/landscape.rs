@@ -233,19 +233,29 @@ pub async fn install_landscape_blocks(
         atom.collision = BlockCollision::None;
     }
 
-    let blade_color_noise = array_of_random(resolution, 0x2e240365, -1.0..=1.0, move |value| {
-        value * 0.12 + 1.0
-    });
-    let overhang_noise = array_of_random(resolution, 0x0, -1.0..=1.0, |value| {
-        value * 2.5 + f64::from(resolution) * 0.75
-    });
+    let blade_color_noise = array_of_random(
+        resolution,
+        0x2e240365,
+        core::ops::RangeInclusive::from(-1.0..=1.0),
+        move |value| value * 0.12 + 1.0,
+    );
+    let overhang_noise = array_of_random(
+        resolution,
+        0x0,
+        core::ops::RangeInclusive::from(-1.0..=1.0),
+        |value| value * 2.5 + f64::from(resolution) * 0.75,
+    );
     let blade_noise = noise_functions::OpenSimplex2.seed(0x7af8c181).mul(0.3);
 
     // boxed to avoid the async fn future being huge
     let stone_points: Box<[_; 240]> = Box::new(array::from_fn(|_| {
         (
             Cube::ORIGIN.aab().random_point(rng),
-            scale_color(colors[Stone].clone(), rng.random_range(0.9..1.1), 0.02),
+            scale_color(
+                colors[Stone].clone(),
+                rng.random_range(core::ops::Range::from(0.9..1.1)),
+                0.02,
+            ),
         )
     }));
     let stone_pattern =
@@ -255,7 +265,11 @@ pub async fn install_landscape_blocks(
     let dirt_points: Box<[_; 1024]> = Box::new(array::from_fn(|_| {
         (
             Cube::ORIGIN.aab().random_point(rng),
-            scale_color(colors[Dirt].clone(), rng.random_range(0.9..1.1), 0.02),
+            scale_color(
+                colors[Dirt].clone(),
+                rng.random_range(core::ops::Range::from(0.9..1.1)),
+                0.02,
+            ),
         )
     }));
     let dirt_pattern =
@@ -346,7 +360,11 @@ pub async fn install_landscape_blocks(
                 let bark_points: Box<[_; 480]> = Box::new(array::from_fn(|_| {
                     (
                         Cube::ORIGIN.aab().random_point(rng),
-                        scale_color(color_block.clone(), rng.random_range(0.6..1.5), 0.2),
+                        scale_color(
+                            color_block.clone(),
+                            rng.random_range(core::ops::Range::from(0.6..1.5)),
+                            0.2,
+                        ),
                     )
                 }));
                 let bark_pattern =
