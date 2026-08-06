@@ -113,7 +113,8 @@ impl Exhaust for Band {
     type Factory = u8;
 
     fn exhaust_factories() -> Self::Iter {
-        core::range::Range::from(Self::MIN.index..(Self::MAX.index + 1)).into_iter()
+        #![expect(clippy::range_plus_one, reason = "choice of iterator type")]
+        (Self::MIN.index..(Self::MAX.index + 1)).into_iter()
     }
 
     fn from_factory(index: Self::Factory) -> Self {
