@@ -103,22 +103,9 @@ impl<'a> From<&'a Rendering> for imgref::ImgRef<'a, [u8; 4]> {
 }
 
 /// `dyn`-compatible trait for [`Rendering::info`]’s requirements.
-#[expect(private_interfaces)]
-pub trait Info: Debug + Fmt<StatusText> + Any + Send + Sync {
-    #[doc(hidden)]
-    fn _info_trait_is_sealed(&self) -> InfoTraitIsSealed;
-}
+pub impl(crate) trait Info: Debug + Fmt<StatusText> + Any + Send + Sync {}
 
-#[expect(private_interfaces)]
-impl<T: Debug + Fmt<StatusText> + Any + Send + Sync> Info for T {
-    #[doc(hidden)]
-    fn _info_trait_is_sealed(&self) -> InfoTraitIsSealed {
-        InfoTraitIsSealed {}
-    }
-}
-
-#[non_exhaustive] // non-instantiable outside the crate
-struct InfoTraitIsSealed {}
+impl<T: Debug + Fmt<StatusText> + Any + Send + Sync> Info for T {}
 
 #[cfg(test)]
 mod tests {

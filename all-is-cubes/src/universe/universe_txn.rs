@@ -179,7 +179,7 @@ impl<T: Transaction> From<MismatchOrHandleError<T>> for ExecuteError<T> {
 /// Most code should be able to call [`Transaction::bind`] rather than mentioning this
 /// trait at all; it is an implementation detail of the conversion that unfortunately
 /// cannot be hidden.
-pub trait UTransactional: Transactional + 'static
+pub impl(crate) trait UTransactional: Transactional + 'static
 where
     Self: Sized,
 {
