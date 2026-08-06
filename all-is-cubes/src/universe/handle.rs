@@ -1253,7 +1253,9 @@ pub(in crate::universe) trait HandlePtr {
     private_bounds,
     reason = "trait not meant for implementation outside the crate"
 )]
-pub trait ErasedHandle: HandlePtr + Any + fmt::Debug + Send + Sync + 'static {
+pub impl(in universe) trait ErasedHandle:
+    HandlePtr + Any + fmt::Debug + Send + Sync + 'static
+{
     /// Same as [`Handle::name()`].
     fn name(&self) -> Name;
 
