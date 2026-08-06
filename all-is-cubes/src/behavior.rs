@@ -44,7 +44,9 @@ pub trait Behavior<H: Host>: fmt::Debug + Any + Send + Sync + VisitHandles + 'st
 }
 
 /// A type that can have attached behaviors.
-pub trait Host: universe::UniverseMember + transaction::Transactional + 'static {
+pub impl(crate) trait Host:
+    universe::UniverseMember + transaction::Transactional + 'static
+{
     /// Additional data about “where” the behavior is attached to the host; what part of
     /// the host should be affected by the behavior.
     type Attachment: fmt::Debug + Clone + Eq + 'static;

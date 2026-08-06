@@ -471,7 +471,7 @@ pub struct NeedsPrimitive;
 /// TODO: This is not currently necessary; we can replace the BuildPrimitive types with the
 /// primitive itself. (But will that remain true?)
 #[doc(hidden)]
-pub trait BuildPrimitive {
+pub impl(crate) trait BuildPrimitive {
     fn build_primitive(self) -> Primitive;
 }
 
