@@ -34,7 +34,6 @@ dependencies = [
  "log",
  "macro_rules_attribute",
  "manyfmt",
- "mutants 0.0.4",
  "nosy",
  "num-traits",
  "ordered-float",
@@ -63,7 +62,6 @@ dependencies = [
  "libm",
  "log",
  "manyfmt",
- "mutants 0.0.4",
  "num-traits",
  "ordered-float",
  "rand 0.10.2",
@@ -145,7 +143,6 @@ dependencies = [
  "indoc",
  "itertools",
  "log",
- "mutants 0.0.4",
  "num-traits",
  "ordered-float",
  "smallvec",
@@ -196,7 +193,6 @@ dependencies = [
  "indoc",
  "itertools",
  "manyfmt",
- "mutants 0.0.4",
  "num-traits",
  "rand 0.10.2",
  "rand_distr",
@@ -225,7 +221,6 @@ dependencies = [
  "itertools",
  "log",
  "macro_rules_attribute",
- "mutants 0.0.4",
  "num-traits",
  "paste",
  "scopeguard",
@@ -745,7 +740,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8502ca11bf13d10e518a180e12787b3630dcd75b3648251fdbe5e748cba28fa"
 dependencies = [
  "exhaust-macros",
- "mutants 0.0.4",
+ "mutants",
 ]
 
 [[package]]
@@ -1280,12 +1275,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc0287524726960e07b119cebd01678f852f147742ae0d925e6a520dca956126"
 
 [[package]]
-name = "mutants"
-version = "0.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "add0ac067452ff1aca8c5002111bd6b1c895baee6e45fcbc44e0193aea17be56"
-
-[[package]]
 name = "naga"
 version = "30.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1319,7 +1308,7 @@ dependencies = [
  "arrayvec",
  "bitflags",
  "half",
- "mutants 0.0.4",
+ "mutants",
  "naga",
  "once_cell",
  "proc-macro2",
@@ -1354,7 +1343,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a618df7e722592ba6e96191572df86ab1c7998e7e4e6592885f3960ad4ed13f0"
 dependencies = [
  "bytemuck",
- "mutants 0.0.4",
+ "mutants",
  "num-traits",
  "paste",
 ]
@@ -1414,7 +1403,7 @@ dependencies = [
  "cfg-if",
  "futures-core",
  "futures-util",
- "mutants 0.0.3",
+ "mutants",
  "spin 0.9.9",
 ]
 

@@ -5,6 +5,7 @@
 #![move_size_limit = "2500"] // TODO: look at `Session` size
 #![feature(macro_attr)]
 #![feature(new_range)]
+#![feature(register_tool)]
 
 //! User interface framework and screens for [`all_is_cubes`].
 //!
@@ -35,6 +36,7 @@
 //!   Not compatible with `no_std` platforms.
 
 #![no_std]
+#![register_tool(mutants)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 #![expect(clippy::unwrap_used, reason = "TODO")]

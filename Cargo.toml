@@ -122,7 +122,6 @@ log = { version = "0.4.34", default-features = false }
 macro_rules_attribute = { version = "0.2.3", default-features = false }
 manyfmt = { version = "0.1.0", default-features = false }
 mint = { version = "0.5.9", default-features = false }
-mutants = { version = "0.0.4", default-features = false }
 naga-rust-embed = { version = "0.3.1", features = ["bytemuck"] }
 noise-functions = { version = "0.8.5", default-features = false, features = ["libm"] }
 nosy = { version = "0.3.0", default-features = false }

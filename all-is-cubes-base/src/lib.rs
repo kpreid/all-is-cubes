@@ -10,6 +10,7 @@
 #![move_size_limit = "256"]
 #![feature(mut_restriction)]
 #![feature(new_range)]
+#![feature(register_tool)]
 #![feature(try_blocks)]
 
 //! This library is an internal component of [`all-is-cubes`],
@@ -19,6 +20,7 @@
 //! [`all-is-cubes`]: https://crates.io/crates/all-is-cubes/
 
 #![no_std]
+#![register_tool(mutants)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![cfg_attr(
     not(any(test, feature = "arbitrary")),
