@@ -205,7 +205,7 @@ pub(in crate::universe) fn validate_deserialized_members_system(
 ///
 /// `O` is the `UniverseMember` type of the entity the component is on.
 #[doc(hidden)] // not sure if good public API yet
-pub trait PubliclyMutableComponent<O> {}
+pub impl(crate) trait PubliclyMutableComponent<O> {}
 
 // -------------------------------------------------------------------------------------------------
 
