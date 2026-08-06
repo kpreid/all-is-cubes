@@ -566,6 +566,7 @@ fn rgba_to_bit([r, _, _, a]: [u8; 4]) -> bool {
 ///
 /// This type is used for manipulating the font rather than drawing text.
 #[doc(hidden)] // unsure if good public API; currently used experimentally only
+#[derive(Clone, Copy)]
 pub struct ReadGlyph<'font> {
     font: &'font FontDef,
     glyph_index: GlyphIndex,
