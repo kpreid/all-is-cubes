@@ -6,6 +6,7 @@
 #![cfg_attr(test, feature(fmt_debug))]
 #![feature(never_type)]
 #![feature(new_range)]
+#![feature(register_tool)]
 
 //! Data structures and algorithms for converting [`all_is_cubes`] voxel data to triangle
 //! meshes for rendering or export.
@@ -56,6 +57,7 @@
 //!   Incompatible with `no_std` platforms.
 
 #![no_std]
+#![register_tool(mutants)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![cfg_attr(test, allow(clippy::large_stack_arrays))]
 #![cfg_attr(
