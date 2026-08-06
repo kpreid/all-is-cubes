@@ -4,6 +4,7 @@
 #![cfg_attr(test, feature(fmt_debug))]
 #![feature(impl_restriction)]
 #![feature(new_range)]
+#![feature(register_tool)]
 
 //! Raytracer and rendering abstractions for the all-is-cubes engine.
 //!
@@ -24,6 +25,7 @@
 //!   * [`raytracer::print_space()`] is not available.
 
 #![no_std]
+#![register_tool(mutants)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(dead_code_pub_in_binary, reason = "FP on test binaries"))]
