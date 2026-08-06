@@ -1,5 +1,6 @@
 #![feature(doc_cfg)]
 #![feature(fmt_debug)]
+#![feature(impl_restriction)]
 
 //! This library is an internal component of [`all-is-cubes`],
 //! which defines some core mathematical types and functions.

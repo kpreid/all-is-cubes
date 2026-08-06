@@ -1,4 +1,5 @@
 #![feature(doc_cfg)]
+#![feature(impl_restriction)]
 
 //! Demo content for All is Cubes.
 //!
