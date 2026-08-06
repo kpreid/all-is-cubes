@@ -13,7 +13,7 @@ use crate::space::PackedLight;
 /// Trait used to encourage the generation of with-debug-info and without-info versions
 /// of the light propagation algorithm.
 #[expect(unnameable_types, reason = "sealed trait")]
-pub trait LightComputeOutput {
+pub impl(crate) trait LightComputeOutput {
     type RayInfoBuffer: Default;
     fn new(cube: Cube, result: PackedLight, rays: Self::RayInfoBuffer) -> Self;
     fn push_ray(buffer: &mut Self::RayInfoBuffer, ray_info: impl FnOnce() -> LightUpdateRayInfo);

@@ -34,7 +34,7 @@ where
 }
 
 /// Extension trait for [`noise_functions::Noise`] which makes it usable with our [`Cube`]s.
-pub(crate) trait NoiseExt: noise_functions::Noise {
+pub(crate) impl(crate) trait NoiseExt: noise_functions::Noise {
     /// Sample the noise at the center of the given cube. That is, convert the integer
     /// vector to `f64`, add 0.5 to all coordinates, and call [`NoiseFn::get`].
     ///
