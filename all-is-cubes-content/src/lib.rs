@@ -1,5 +1,6 @@
 #![feature(doc_cfg)]
 #![feature(macro_metavar_expr_concat)]
+#![feature(impl_restriction)]
 #![feature(large_assignments)]
 #![move_size_limit = "5000"]
 #![feature(macro_attr)]

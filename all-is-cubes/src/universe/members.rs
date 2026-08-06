@@ -28,9 +28,8 @@ use crate::universe::{
 // -------------------------------------------------------------------------------------------------
 // Traits
 
-/// Not-externally-implementable supertrait for [`UniverseMember`] to make it sealed and hide
-/// implementation details.
-pub(crate) trait SealedMember: Sized {
+/// Supertrait for [`UniverseMember`] to hide implementation details.
+pub(crate) impl(crate) trait SealedMember: Sized {
     /// Components to spawn when inserting a member of this type into a universe.
     type Bundle: ecs::Bundle;
 
@@ -77,7 +76,9 @@ pub(crate) trait SealedMember: Sized {
 // in a purely abstract architecture sense it’s a sort of “entity” but that conflicts with
 // “is a bevy_ecs entity”.
 #[expect(private_bounds)]
-pub trait UniverseMember: Sized + 'static + fmt::Debug + SealedMember + MemberBoilerplate {
+pub impl(crate) trait UniverseMember:
+    Sized + 'static + fmt::Debug + SealedMember + MemberBoilerplate
+{
     /// Type returned by [`Handle::<T>::read()`][Handle::read()] which is the way to read the
     /// `T` value after it has been inserted into the [`Universe`].
     //---

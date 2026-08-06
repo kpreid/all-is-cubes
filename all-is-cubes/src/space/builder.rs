@@ -320,8 +320,8 @@ impl Default for Builder<'_, ()> {
     }
 }
 
-/// Helper for [`Builder::bounds_if_not_set()`]. Do not call or implement this trait.
-pub trait Bounds: sealed::Sealed + Sized {
+/// Helper for [`Builder::bounds_if_not_set()`]. Do not call this trait.
+pub impl(crate) trait Bounds: Sized {
     /// Set the bounds unless they have already been set.
     ///
     /// This function is an implementation detail; call
@@ -349,16 +349,6 @@ impl Bounds for Vol<()> {
     ) -> Builder<'u, Vol<()>> {
         builder
     }
-}
-
-/// Module for [`Bounds`] sealed trait
-mod sealed {
-    use super::*;
-    #[doc(hidden)]
-    #[expect(unnameable_types)]
-    pub trait Sealed {}
-    impl Sealed for () {}
-    impl Sealed for Vol<()> {}
 }
 
 #[cfg(feature = "arbitrary")]
