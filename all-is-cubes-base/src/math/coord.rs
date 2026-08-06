@@ -36,7 +36,7 @@ pub type FreeVector = Vector3D<FreeCoordinate, Cube>;
 
 /// Additional element-wise operations on `euclid` types.
 // TODO: Contribute these to `euclid` itself
-pub trait VectorOps<O> {
+pub impl(crate) trait VectorOps<O> {
     /// Input vector element type.
     type Elem;
     /// Output vector type.
