@@ -604,8 +604,8 @@ impl Fmt<StatusText> for Info {
         write!(
             fmt,
             "{up:3}% used of {ap:3}% allocated of {total_volume}",
-            up = (used_volume as f32 / self.total_volume as f32 * 100.0).ceil() as usize,
-            ap = (allocated_volume as f32 / self.total_volume as f32 * 100.0).ceil() as usize,
+            up = (used_volume as f32 / self.total_volume as f32 * 100.0).ceil(),
+            ap = (allocated_volume as f32 / self.total_volume as f32 * 100.0).ceil(),
         )
     }
 }
