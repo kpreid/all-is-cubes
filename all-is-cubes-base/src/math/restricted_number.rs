@@ -787,6 +787,148 @@ impl<T: FloatCore> From<bool> for ZeroOne<T> {
     }
 }
 
+impl<T: num_traits::ToPrimitive> num_traits::ToPrimitive for PositiveSign<T> {
+    #[inline]
+    fn to_i64(&self) -> Option<i64> {
+        <T as num_traits::ToPrimitive>::to_i64(&self.0)
+    }
+    #[inline]
+    fn to_u64(&self) -> Option<u64> {
+        <T as num_traits::ToPrimitive>::to_u64(&self.0)
+    }
+    #[inline]
+    fn to_isize(&self) -> Option<isize> {
+        <T as num_traits::ToPrimitive>::to_isize(&self.0)
+    }
+    #[inline]
+    fn to_i8(&self) -> Option<i8> {
+        <T as num_traits::ToPrimitive>::to_i8(&self.0)
+    }
+    #[inline]
+    fn to_i16(&self) -> Option<i16> {
+        <T as num_traits::ToPrimitive>::to_i16(&self.0)
+    }
+    #[inline]
+    fn to_i32(&self) -> Option<i32> {
+        <T as num_traits::ToPrimitive>::to_i32(&self.0)
+    }
+    #[inline]
+    fn to_i128(&self) -> Option<i128> {
+        <T as num_traits::ToPrimitive>::to_i128(&self.0)
+    }
+    #[inline]
+    fn to_usize(&self) -> Option<usize> {
+        <T as num_traits::ToPrimitive>::to_usize(&self.0)
+    }
+    #[inline]
+    fn to_u8(&self) -> Option<u8> {
+        <T as num_traits::ToPrimitive>::to_u8(&self.0)
+    }
+    #[inline]
+    fn to_u16(&self) -> Option<u16> {
+        <T as num_traits::ToPrimitive>::to_u16(&self.0)
+    }
+    #[inline]
+    fn to_u32(&self) -> Option<u32> {
+        <T as num_traits::ToPrimitive>::to_u32(&self.0)
+    }
+    #[inline]
+    fn to_u128(&self) -> Option<u128> {
+        <T as num_traits::ToPrimitive>::to_u128(&self.0)
+    }
+    #[inline]
+    fn to_f32(&self) -> Option<f32> {
+        <T as num_traits::ToPrimitive>::to_f32(&self.0)
+    }
+    #[inline]
+    fn to_f64(&self) -> Option<f64> {
+        <T as num_traits::ToPrimitive>::to_f64(&self.0)
+    }
+}
+impl<T: num_traits::ToPrimitive> num_traits::ToPrimitive for ZeroOne<T> {
+    #[inline]
+    fn to_i64(&self) -> Option<i64> {
+        <T as num_traits::ToPrimitive>::to_i64(&self.0)
+    }
+    #[inline]
+    fn to_u64(&self) -> Option<u64> {
+        <T as num_traits::ToPrimitive>::to_u64(&self.0)
+    }
+    #[inline]
+    fn to_isize(&self) -> Option<isize> {
+        <T as num_traits::ToPrimitive>::to_isize(&self.0)
+    }
+    #[inline]
+    fn to_i8(&self) -> Option<i8> {
+        <T as num_traits::ToPrimitive>::to_i8(&self.0)
+    }
+    #[inline]
+    fn to_i16(&self) -> Option<i16> {
+        <T as num_traits::ToPrimitive>::to_i16(&self.0)
+    }
+    #[inline]
+    fn to_i32(&self) -> Option<i32> {
+        <T as num_traits::ToPrimitive>::to_i32(&self.0)
+    }
+    #[inline]
+    fn to_i128(&self) -> Option<i128> {
+        <T as num_traits::ToPrimitive>::to_i128(&self.0)
+    }
+    #[inline]
+    fn to_usize(&self) -> Option<usize> {
+        <T as num_traits::ToPrimitive>::to_usize(&self.0)
+    }
+    #[inline]
+    fn to_u8(&self) -> Option<u8> {
+        <T as num_traits::ToPrimitive>::to_u8(&self.0)
+    }
+    #[inline]
+    fn to_u16(&self) -> Option<u16> {
+        <T as num_traits::ToPrimitive>::to_u16(&self.0)
+    }
+    #[inline]
+    fn to_u32(&self) -> Option<u32> {
+        <T as num_traits::ToPrimitive>::to_u32(&self.0)
+    }
+    #[inline]
+    fn to_u128(&self) -> Option<u128> {
+        <T as num_traits::ToPrimitive>::to_u128(&self.0)
+    }
+    #[inline]
+    fn to_f32(&self) -> Option<f32> {
+        <T as num_traits::ToPrimitive>::to_f32(&self.0)
+    }
+    #[inline]
+    fn to_f64(&self) -> Option<f64> {
+        <T as num_traits::ToPrimitive>::to_f64(&self.0)
+    }
+}
+
+impl num_traits::NumCast for PositiveSign<f32> {
+    #[inline]
+    fn from<T: num_traits::ToPrimitive>(n: T) -> Option<Self> {
+        PositiveSign::try_from(num_traits::ToPrimitive::to_f32(&n)?).ok()
+    }
+}
+impl num_traits::NumCast for PositiveSign<f64> {
+    #[inline]
+    fn from<T: num_traits::ToPrimitive>(n: T) -> Option<Self> {
+        PositiveSign::try_from(num_traits::ToPrimitive::to_f64(&n)?).ok()
+    }
+}
+impl num_traits::NumCast for ZeroOne<f32> {
+    #[inline]
+    fn from<T: num_traits::ToPrimitive>(n: T) -> Option<Self> {
+        ZeroOne::try_from(num_traits::ToPrimitive::to_f32(&n)?).ok()
+    }
+}
+impl num_traits::NumCast for ZeroOne<f64> {
+    #[inline]
+    fn from<T: num_traits::ToPrimitive>(n: T) -> Option<Self> {
+        ZeroOne::try_from(num_traits::ToPrimitive::to_f64(&n)?).ok()
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 #[mutants::skip]
 #[allow(clippy::missing_inline_in_public_items)]
@@ -1238,6 +1380,82 @@ mod tests {
             "1.1".parse::<ZeroOne<f32>>(),
             Err(ParseOrRangeError::Range(NotZeroOne(1.1f32)))
         );
+    }
+
+    #[test]
+    fn num_cast_float_to_ps() {
+        assert_eq!(num_traits::cast(f32::NAN), None::<PositiveSign<f32>>);
+        assert_eq!(num_traits::cast(-f32::EPSILON), None::<PositiveSign<f32>>);
+        assert_eq!(num_traits::cast(-0.0f32), Some(ps32(0.0)));
+        assert_eq!(num_traits::cast(0.0f32), Some(ps32(0.0)));
+        assert_eq!(num_traits::cast(0.5f32), Some(ps32(0.5)));
+        assert_eq!(num_traits::cast(1.0f32), Some(ps32(1.0)));
+        assert_eq!(num_traits::cast(f32::INFINITY), Some(ps32(f32::INFINITY)));
+    }
+
+    #[test]
+    fn num_cast_float_to_zo() {
+        assert_eq!(num_traits::cast(f32::NAN), None::<ZeroOne<f32>>);
+        assert_eq!(num_traits::cast(-f32::EPSILON), None::<ZeroOne<f32>>);
+        assert_eq!(num_traits::cast(-0.0f32), Some(zo32(0.0)));
+        assert_eq!(num_traits::cast(0.0f32), Some(zo32(0.0)));
+        assert_eq!(num_traits::cast(0.5f32), Some(zo32(0.5)));
+        assert_eq!(num_traits::cast(1.0f32), Some(zo32(1.0)));
+        assert_eq!(num_traits::cast(1.5f32), None::<ZeroOne<f32>>);
+        assert_eq!(num_traits::cast(f32::INFINITY), None::<ZeroOne<f32>>);
+    }
+
+    #[test]
+    fn num_cast_int_to_ps() {
+        assert_eq!(num_traits::cast(-1i32), None::<PositiveSign<f32>>);
+        assert_eq!(num_traits::cast(0i32), Some(ps32(0.0)));
+        assert_eq!(num_traits::cast(1i32), Some(ps32(1.0)));
+        assert_eq!(num_traits::cast(i32::MAX), Some(ps32(i32::MAX as f32))); // lossy
+    }
+
+    #[test]
+    fn num_cast_int_to_zo() {
+        assert_eq!(num_traits::cast(-1i32), None::<ZeroOne<f32>>);
+        assert_eq!(num_traits::cast(0i32), Some(zo32(0.0)));
+        assert_eq!(num_traits::cast(1i32), Some(zo32(1.0)));
+        assert_eq!(num_traits::cast(2i32), None::<ZeroOne<f32>>);
+    }
+
+    #[test]
+    fn num_cast_ps_to_float() {
+        assert_eq!(num_traits::cast(ps32(0.0)), Some(0.0f32));
+        assert_eq!(num_traits::cast(ps32(1.0)), Some(1.0f32));
+        assert_eq!(num_traits::cast(ps32(2.0)), Some(2.0f32));
+        assert_eq!(num_traits::cast(ps32(f32::INFINITY)), Some(f32::INFINITY));
+    }
+
+    #[test]
+    fn num_cast_zo_to_float() {
+        assert_eq!(num_traits::cast(zo32(0.0)), Some(0.0f32));
+        assert_eq!(num_traits::cast(zo32(0.5)), Some(0.5f32));
+        assert_eq!(num_traits::cast(zo32(1.0)), Some(1.0f32));
+    }
+
+    #[test]
+    fn num_cast_ps_to_int() {
+        // Truncating, in accordance with the behavior of NumCast on plain floats.
+        assert_eq!(num_traits::cast(ps32(0.0)), Some(0i32));
+        assert_eq!(num_traits::cast(ps32(0.25)), Some(0i32));
+        assert_eq!(num_traits::cast(ps32(0.5)), Some(0i32));
+        assert_eq!(num_traits::cast(ps32(0.75)), Some(0i32));
+        assert_eq!(num_traits::cast(ps32(1.0)), Some(1i32));
+        assert_eq!(num_traits::cast(ps32(1.5)), Some(1i32));
+        assert_eq!(num_traits::cast(ps32(f32::INFINITY)), None::<i32>);
+    }
+
+    #[test]
+    fn num_cast_zo_to_int() {
+        // Truncating, in accordance with the behavior of NumCast on plain floats.
+        assert_eq!(num_traits::cast(zo32(0.0)), Some(0i32));
+        assert_eq!(num_traits::cast(zo32(0.25)), Some(0i32));
+        assert_eq!(num_traits::cast(zo32(0.5)), Some(0i32));
+        assert_eq!(num_traits::cast(zo32(0.75)), Some(0i32));
+        assert_eq!(num_traits::cast(zo32(1.0)), Some(1i32));
     }
 
     #[cfg(feature = "arbitrary")]
