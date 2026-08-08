@@ -62,7 +62,7 @@ impl Tick {
     pub fn from_seconds(dt: f64) -> Self {
         Self {
             schedule: TickSchedule {
-                base_duration: Duration::from_micros((dt * 1e6) as u64),
+                base_duration: Duration::from_secs_f64(dt),
                 divisor: NonZeroU16::MIN,
             },
             prev_phase: 0,

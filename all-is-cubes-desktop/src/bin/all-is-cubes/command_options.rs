@@ -189,7 +189,7 @@ impl AicDesktopArgs {
                     let frame_rate = 60.0;
                     Some(RecordAnimationOptions {
                         frame_count: ((duration * frame_rate).round() as usize).max(1),
-                        frame_period: Duration::from_nanos((1e9 / frame_rate) as u64),
+                        frame_period: Duration::from_secs_f64(frame_rate.recip()),
                     })
                 }
                 None => None,
@@ -434,7 +434,7 @@ mod tests {
                 image_size: Size2D::new(640, 480),
                 animation: Some(RecordAnimationOptions {
                     frame_count: 180,
-                    frame_period: Duration::from_nanos((1e9 / 60.0) as u64),
+                    frame_period: Duration::from_secs_f64(60f64.recip()),
                 }),
             },
         );
