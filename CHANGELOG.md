@@ -81,6 +81,7 @@
 
 * `all-is-cubes-render` library:
     * Split `camera::LightingOption::Smooth` to two variants `Linear` and `Smoothstep`, which precisely select the behaviors that used to vary depending on renderer.
+    * `camera::Viewport` now stores the `nominal_size` with `PositiveSign<f64>` instead of `f64`. This prohibits some invalid values and allows it to implement `Eq`.
 
 ### Removed
 

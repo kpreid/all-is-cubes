@@ -192,7 +192,7 @@ async fn bloom(mut context: RenderTestContext, bloom_intensity: f32) {
             // Taller viewport to give more pixels to see the bloom in.
             // TODO: We should have control over the distance scaling of the bloom effect,
             // instead of requiring the test to use many pixels.
-            nominal_size: size2(128., 256.),
+            nominal_size: size2(ps64(128.), ps64(256.)),
             framebuffer_size: size2(128, 256),
         },
         context.universe(),
@@ -702,7 +702,7 @@ async fn info_text(mut context: RenderTestContext, scale_factor: f64) {
                 // not the framebuffer size.
                 Viewport {
                     nominal_size: COMMON_VIEWPORT.nominal_size,
-                    framebuffer_size: (COMMON_VIEWPORT.nominal_size * scale_factor)
+                    framebuffer_size: (COMMON_VIEWPORT.nominal_size * ps64(scale_factor))
                         .to_u32()
                         .cast_unit(),
                 },

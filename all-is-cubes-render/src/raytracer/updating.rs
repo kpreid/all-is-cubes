@@ -226,6 +226,7 @@ mod tests {
     use all_is_cubes::camera::{Camera, Viewport, eye_for_look_at};
     use all_is_cubes::content::make_some_voxel_blocks;
     use all_is_cubes::euclid::{size2, vec3};
+    use all_is_cubes::math::ps64;
     use all_is_cubes::space::CubeTransaction;
     use all_is_cubes::universe::Universe;
     use alloc::string::ToString;
@@ -252,7 +253,7 @@ mod tests {
             let mut camera = Camera::new(
                 (*graphics_options.get()).clone(),
                 Viewport {
-                    nominal_size: size2(72., 72.),
+                    nominal_size: size2(ps64(72.), ps64(72.)),
                     framebuffer_size: size2(72, 36),
                 },
             );

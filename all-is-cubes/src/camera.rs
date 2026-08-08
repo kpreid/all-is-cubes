@@ -1,7 +1,7 @@
 //! Note: This module is hidden, and its contents re-exported as `all_is_cubes_render::camera`.
 
 use euclid::{
-    Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Size2D, Transform3D, point3, vec3,
+    Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Size2D, Transform3D, point3, size2, vec3,
 };
 use itertools::Itertools as _;
 use num_traits::ConstOne as _;
@@ -482,14 +482,19 @@ pub type ImageSize = Size2D<u32, ImagePixel>;
 /// Viewport dimensions for rendering and UI layout with the correct resolution and
 /// aspect ratio.
 #[expect(clippy::exhaustive_structs)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Viewport {
-    /// Viewport dimensions to use for determining aspect ratio and interpreting
-    /// pointer events.
-    pub nominal_size: Size2D<FreeCoordinate, NominalPixel>,
-    /// Viewport dimensions to use for framebuffer configuration.
-    /// This aspect ratio may differ to represent non-square pixels.
+    /// Dimensions in “nominal pixels” (like CSS `px`).
+    ///
+    /// May be used for interpreting pointer events, sizing text, and indicating the displayed
+    /// aspect ratio of the image in the case where that differs from `framebuffer_size`
+    /// (non-square pixels).
+    pub nominal_size: Size2D<PositiveSign<FreeCoordinate>, NominalPixel>,
+
+    /// Dimensions measured in the number of actual image pixels.
+    ///
+    /// This field’s aspect ratio may differ from `nominal_size` to represent non-square pixels.
     pub framebuffer_size: ImageSize,
 }
 
@@ -500,14 +505,24 @@ impl Viewport {
     ///
     /// The `nominal_size` will be the given `framebuffer_size` divided by the given
     /// `scale_factor`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `scale_factor` is not positive.
     pub fn with_scale(
         scale_factor: f64,
         framebuffer_size: impl Into<Size2D<u32, ImagePixel>>,
     ) -> Self {
         let framebuffer_size = framebuffer_size.into();
+
+        let scale = |length| PositiveSign::<f64>::new_strict(length as f64 / scale_factor);
+
         Self {
             framebuffer_size,
-            nominal_size: framebuffer_size.to_f64().cast_unit() / scale_factor,
+            nominal_size: size2(
+                scale(framebuffer_size.width),
+                scale(framebuffer_size.height),
+            ),
         }
     }
 
@@ -515,7 +530,7 @@ impl Viewport {
     /// but do not care about its effects.
     #[doc(hidden)]
     pub const ARBITRARY: Viewport = Viewport {
-        nominal_size: Size2D::new(2.0, 2.0),
+        nominal_size: Size2D::new(ps64(2.0), ps64(2.0)),
         framebuffer_size: Size2D::new(2, 2),
     };
 
@@ -527,7 +542,7 @@ impl Viewport {
     /// contain no pixels.
     #[inline]
     pub fn nominal_aspect_ratio(&self) -> FreeCoordinate {
-        let ratio = self.nominal_size.width / self.nominal_size.height;
+        let ratio = self.nominal_size.width.into_inner() / self.nominal_size.height.into_inner();
         if ratio.is_finite() { ratio } else { 1.0 }
     }
 
@@ -567,8 +582,8 @@ impl Viewport {
     #[inline]
     pub fn normalize_nominal_point(&self, nominal_point: Point2D<f64, NominalPixel>) -> NdcPoint2 {
         Point2D::new(
-            (nominal_point.x + 0.5) / self.nominal_size.width * 2.0 - 1.0,
-            -((nominal_point.y + 0.5) / self.nominal_size.height * 2.0 - 1.0),
+            (nominal_point.x + 0.5) / self.nominal_size.width.into_inner() * 2.0 - 1.0,
+            -((nominal_point.y + 0.5) / self.nominal_size.height.into_inner() * 2.0 - 1.0),
         )
     }
 
@@ -603,7 +618,7 @@ impl Viewport {
             .to_f64()
             .cast_unit()
             .to_vector()
-            .component_div(self.nominal_size.to_vector().cast_unit())
+            .component_div(self.nominal_size.to_vector().map(PositiveSign::into_inner).cast_unit())
     }
 
     // TODO: Maybe have a validate() that checks if the data is not fit for producing an

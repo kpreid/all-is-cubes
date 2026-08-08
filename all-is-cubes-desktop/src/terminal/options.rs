@@ -2,8 +2,8 @@ use std::ops;
 
 use ratatui::crossterm::style::Color;
 
-use all_is_cubes::euclid::{Size2D, Vector2D, Vector3D, size2};
-use all_is_cubes::math::Rgba;
+use all_is_cubes::euclid::{Size2D, Vector2D, Vector3D, size2, vec2};
+use all_is_cubes::math::{Rgba, ps64};
 use all_is_cubes_render::camera::{ImagePixel, Viewport};
 
 /// Options specific to the terminal UI.
@@ -33,7 +33,7 @@ impl TerminalOptions {
             ),
 
             // Assume that on the terminal, characters are twice as tall as they are wide.
-            nominal_size: nonuniform_scale(size, Vector2D::new(0.5, 1.0)),
+            nominal_size: nonuniform_scale(size, const { vec2(ps64(0.5), ps64(1.0)) }),
         }
     }
 }

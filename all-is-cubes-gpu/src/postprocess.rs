@@ -322,7 +322,7 @@ impl PostprocessUniforms {
         Self {
             info_text_coordinate_scale: info_text_coordinate_scale.to_array().into(),
             info_text_origin: vec2(5., 5.)
-                .component_div(viewport.nominal_size.to_vector())
+                .component_div(viewport.nominal_size.to_vector().map(PositiveSign::into_inner))
                 .to_f32()
                 .to_array()
                 .into(),

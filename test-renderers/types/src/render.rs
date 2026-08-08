@@ -5,6 +5,7 @@ use std::fmt::Debug;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::size2;
 use all_is_cubes::listen;
+use all_is_cubes::math::ps64;
 use all_is_cubes::universe::Universe;
 use all_is_cubes_render::HeadlessRenderer;
 use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
@@ -132,6 +133,6 @@ impl RendererFactory for RtFactory {
 /// time and output images are small, without being so small as to be unintelligible.
 /// It also needs to match `wgpu::COPY_BYTES_PER_ROW_ALIGNMENT`.
 pub const COMMON_VIEWPORT: Viewport = Viewport {
-    nominal_size: size2(128., 96.),
+    nominal_size: size2(ps64(128.), ps64(96.)),
     framebuffer_size: size2(128, 96),
 };

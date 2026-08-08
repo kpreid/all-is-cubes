@@ -15,8 +15,8 @@ fn camera_bad_viewport_doesnt_panic() {
     Camera::new(
         GraphicsOptions::default(),
         Viewport {
-            nominal_size: Size2D::new(0.0, 0.0),
-            framebuffer_size: Size2D::new(0, 0),
+            nominal_size: Size2D::zero(),
+            framebuffer_size: Size2D::zero(),
         },
     );
 }

@@ -10,7 +10,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use all_is_cubes::arcstr::{ArcStr, Substr, literal_substr};
 use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport, eye_for_look_at};
 use all_is_cubes::euclid::size2;
-use all_is_cubes::math::FreeVector;
+use all_is_cubes::math::{FreeVector, ps64};
 use all_is_cubes::space::{self, SpaceBlockData};
 
 use crate::raytracer::{Accumulate, Exception, RtBlockData, RtOptionsRef, SpaceRaytracer};
@@ -158,9 +158,11 @@ impl fmt::Display for PrintSpace<'_> {
 
         let mut camera = Camera::new(
             GraphicsOptions::default(),
-            Viewport {
-                nominal_size: size2(40., 40.),
-                framebuffer_size: size2(80, 40),
+            const {
+                Viewport {
+                    nominal_size: size2(ps64(40.), ps64(40.)),
+                    framebuffer_size: size2(80, 40),
+                }
             },
         );
         camera.look_at_y_up(

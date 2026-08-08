@@ -985,7 +985,8 @@ use crate::shaders::rt_copy::ReprojectionUniforms;
 
 fn raytracer_size_policy(mut viewport: Viewport) -> Viewport {
     // use 2x2 nominal pixels
-    viewport.framebuffer_size = viewport.nominal_size.map(|c| (c / 2.0).round() as u32).cast_unit();
+    viewport.framebuffer_size =
+        viewport.nominal_size.map(|c| (c.into_inner() / 2.0).round() as u32).cast_unit();
     viewport
 }
 
