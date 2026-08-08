@@ -102,6 +102,16 @@ impl Mask {
             _ => panic!("computed an invalid Mask value"),
         }
     }
+
+    /// Returns whether the vertex has an adjacent edge in the forward-of-sweep direction.
+    pub(crate) fn has_edge_fs(self) -> bool {
+        self.contains_any_of(Mask::Fsbp) ^ self.contains_any_of(Mask::Fsfp)
+    }
+
+    /// Returns whether the vertex has an adjacent edge in the backward-of-sweep direction.
+    pub(crate) fn has_edge_bs(self) -> bool {
+        self.contains_any_of(Mask::Bsbp) ^ self.contains_any_of(Mask::Bsfp)
+    }
 }
 
 /// When formatted, [`Mask`] is depicted as if the sweep direction is rightward

@@ -14,6 +14,9 @@ use all_is_cubes::util::Refmt;
 mod mask;
 pub use mask::Mask;
 
+mod outliner;
+pub use outliner::Outliner;
+
 #[cfg(test)]
 mod svg;
 

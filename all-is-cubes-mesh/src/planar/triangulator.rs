@@ -574,7 +574,7 @@ impl Triangulator {
 impl Basis {
     /// Value used as a placeholder in [`Triangulator`]s that are not currently in use.
     /// Its data is nonsense and it is never actually used.
-    const DUMMY: Self = Self {
+    pub(crate) const DUMMY: Self = Self {
         face: Face::PX,
         sweep_direction: Face::PX,
         perpendicular_direction: Face::PX,
@@ -637,13 +637,22 @@ impl Basis {
 
     /// Compare two vertices’ positions along the direction perpendicular to the sweep.
     #[inline(always)]
-    fn compare_perp(self, v1: &Vertex, v2: &Vertex) -> Ordering {
+    pub(crate) fn compare_perp(self, v1: &Vertex, v2: &Vertex) -> Ordering {
         // Wrapping arithmetic helps `compare_perp()` compile to simple code.
         // (We do not need to worry about actual wrapping because vertices are always in u8 range
         // anyway.)
         self.perpendicular_vector
             .dot(v1.position.to_vector().map(Wrapping))
             .cmp(&self.perpendicular_vector.dot(v2.position.to_vector().map(Wrapping)))
+    }
+
+    /// Returns the component of `vertex.position` on the `perpendicular_direction` axis.
+    ///
+    /// Note that this is not a dot product and never performs any arithmetic, unlike
+    /// [`Self::compare_perp()`].
+    #[inline(always)]
+    pub(crate) fn perpendicular_coordinate_of(&self, vertex: &Vertex) -> GridCoordinate {
+        vertex.position[self.perpendicular_direction.axis()]
     }
 
     /// Returns whether the winding order of the triangle is as it should be, *before* the
