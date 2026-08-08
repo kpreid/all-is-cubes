@@ -216,7 +216,7 @@ too_many_arguments = "allow" # not usefully actionable for the internal function
 
 # clippy::pedantic lints that are set to allow
 cast_possible_truncation = "allow" # we would need an alternative for intentional from-float saturation and to-float precision loss
-cast_precision_loss = "allow" # consider enabling
+cast_precision_loss = "allow" # too many FPs on `let ratio = num as f32 / denom as f32` and other obviously lossy cases
 cast_sign_loss = "allow" # we would need an alternative for various int→float→int calculations
 default_trait_access = "allow"
 empty_enums = "allow"
