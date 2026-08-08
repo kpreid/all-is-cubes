@@ -8,8 +8,7 @@ use itertools::Itertools as _;
 use all_is_cubes::block::{self, AnimationChange, EvaluatedBlock, Evoxel, Resolution};
 use all_is_cubes::euclid::Scale;
 use all_is_cubes::math::{
-    Cube, Face, GridAab, GridCoordinate, GridSizeCoord, OctantMask, OpacityCategory, Rgb, Rgba,
-    ZeroOne,
+    Cube, Face, GridAab, GridCoordinate, OctantMask, OpacityCategory, Rgb, Rgba, ZeroOne,
 };
 use all_is_cubes_render::Flaws;
 
@@ -67,7 +66,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             // it is trivial to compute there, but is it worth storing that value always?
             let voxels_surface_area =
                 block.voxels().bounds().abut(face, 1).err_is_unreachable().volume_f64() as f32;
-            let full_surface_area = GridSizeCoord::from(resolution).pow(2) as f32;
+            let full_surface_area = resolution.squared_f32();
             let partial_face_color =
                 full_face_color.to_rgb().with_alpha(ZeroOne::<f32>::new_clamped(
                     full_face_color.alpha().into_inner()
