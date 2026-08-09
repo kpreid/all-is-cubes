@@ -4,8 +4,8 @@ use core::ops;
 #[cfg(doc)]
 use crate::planar::Vertex;
 
-/// A bit-mask identifying which of the four quadrants around a [`Vertex`] should be covered by
-/// triangles.
+/// A bit-mask-like enum identifying which of the four quadrants around a [`Vertex`] should be
+/// covered by triangles.
 ///
 /// The orientation/identification of these quadrants is defined relative to
 /// [`Basis`][super::Basis], rather than in any fixed relationship to the vertex coordinates.
@@ -22,34 +22,85 @@ use crate::planar::Vertex;
 /// ┆
 /// └┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄→ sweep direction</pre>
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct Mask {
-    /// Bit values corresponding to quadrants:
-    /// * 1 = forward sweep & forward perpendicular
-    /// * 2 = forward sweep & backward perpendicular
-    /// * 4 = backward sweep & forward perpendicular
-    /// * 8 = backward sweep & backward perpendicular
-    flags: u8,
+#[repr(u8)]
+#[expect(clippy::exhaustive_enums)]
+pub enum Mask {
+    // Bit values corresponding to quadrants:
+    // * 0b0001 = 1 = forward sweep & forward perpendicular
+    // * 0b0010 = 2 = forward sweep & backward perpendicular
+    // * 0b0100 = 4 = backward sweep & forward perpendicular
+    // * 0b1000 = 8 = backward sweep & backward perpendicular
+    //
+    // Implementation note: If it were possible to have a “u4” type containing bitflags, that would
+    // be a much simpler definition. However, it is not, and we want the exhaustiveness we get from
+    // using an enum with 16 variants instead of a u8 with unused values.
+    //
+    /// No coverage.
+    Empty = 0b0000,
+    /// Coverage in the quadrant which is forward of the vertex in the sweep direction,
+    /// and forward of the vertex in the perpendicular direction; an outside corner.
+    Fsfp = 0b0001,
+    /// Coverage in the quadrant which is forward of the vertex in the sweep direction,
+    /// and backward of the vertex in the perpendicular direction; an outside corner.
+    Fsbp = 0b0010,
+    /// Coverage in the forward sweep half-plane; a mid-edge vertex.
+    Fs = 0b0011,
+    /// Coverage in the quadrant which is backward of the vertex in the sweep direction,
+    /// and forward of the vertex in the perpendicular direction; an outside corner.
+    Bsfp = 0b0100,
+    /// Coverage in the forward perpendicular half-plane; a mid-edge vertex.
+    Fp = 0b0101,
+    /// Coverage in the checkerboard pattern covering [`Fsbp`][Self::Fsbp] and [`Bsfp`][Self::Bsfp].
+    Fbbf = 0b0110,
+    /// Coverage of all quadrants except [`Bsbp`][Self::Bsbp]; an inside corner.
+    NotBsbp = 0b0111,
+    /// Coverage in the quadrant which is backward of the vertex in the sweep direction,
+    /// and backward of the vertex in the perpendicular direction; an outside corner.
+    Bsbp = 0b1000,
+    /// Coverage in the checkerboard pattern covering [`Fsfp`][Self::Fsfp] and [`Bsbp`][Self::Bsbp].
+    Ffbb = 0b1001,
+    /// Coverage in the backward perpendicular half-plane; a mid-edge vertex.
+    Bp = 0b1010,
+    /// Coverage of all quadrants except [`Bsfp`][Self::Bsfp]; an inside corner.
+    NotBsfp = 0b1011,
+    /// Coverage in the backward sweep half-plane; a mid-edge vertex.
+    Bs = 0b1100,
+    /// Coverage of all quadrants except [`Fsbp`][Self::Fsbp]; an inside corner.
+    NotFsbp = 0b1101,
+    /// Coverage of all quadrants except [`Fsfp`][Self::Fsfp]; an inside corner.
+    NotFsfp = 0b1110,
+    /// Coverage of all quadrants; a mid-face vertex.
+    All = 0b1111,
 }
 
 impl Mask {
-    /// No quadrants.
-    pub const EMPTY: Self = Self { flags: 0 };
-    /// The quadrant which is forward of the vertex in the sweep direction,
-    /// and forward of the vertex in the perpendicular direction.
-    pub const FSFP: Self = Self { flags: 1 };
-    /// The quadrant which is forward of the vertex in the sweep direction,
-    /// and backward of the vertex in the perpendicular direction.
-    pub const FSBP: Self = Self { flags: 2 };
-    /// The quadrant which is backward of the vertex in the sweep direction,
-    /// and forward of the vertex in the perpendicular direction.
-    pub const BSFP: Self = Self { flags: 4 };
-    /// The quadrant which is backward of the vertex in the sweep direction,
-    /// and backward of the vertex in the perpendicular direction.
-    pub const BSBP: Self = Self { flags: 8 };
-
     #[inline]
     pub(crate) fn contains_any_of(self, test: Mask) -> bool {
-        self & test != Self::EMPTY
+        self & test != Self::Empty
+    }
+
+    #[inline]
+    fn from_flags(flags: u8) -> Self {
+        // This match should compile down to at most a bounds check.
+        match flags {
+            0b0000 => Self::Empty,
+            0b0001 => Self::Fsfp,
+            0b0010 => Self::Fsbp,
+            0b0011 => Self::Fs,
+            0b0100 => Self::Bsfp,
+            0b0101 => Self::Fp,
+            0b0110 => Self::Fbbf,
+            0b0111 => Self::NotBsbp,
+            0b1000 => Self::Bsbp,
+            0b1001 => Self::Ffbb,
+            0b1010 => Self::Bp,
+            0b1011 => Self::NotBsfp,
+            0b1100 => Self::Bs,
+            0b1101 => Self::NotFsbp,
+            0b1110 => Self::NotFsfp,
+            0b1111 => Self::All,
+            _ => panic!("computed an invalid Mask value"),
+        }
     }
 }
 
@@ -62,43 +113,24 @@ impl Mask {
 // and visual information to work with (but also for fun).
 impl fmt::Debug for Mask {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self.flags {
-            0b0000 => "EMPTY",
-            0b0001 => "FSFP",
-            0b0010 => "FSBP",
-            0b0011 => "FSFP | FSBP",
-            0b0100 => "BSFP",
-            0b0101 => "FSFP | BSFP",
-            0b0110 => "FSBP | BSFP",
-            0b0111 => "FSFP | FSBP | BSFP",
-            0b1000 => "BSBP",
-            0b1001 => "FSFP | BSBP",
-            0b1010 => "FSBP | BSBP",
-            0b1011 => "FSFP | FSBP | BSBP",
-            0b1100 => "BSFP | BSBP",
-            0b1101 => "FSFP | BSFP | BSBP",
-            0b1110 => "FSBP | BSFP | BSBP",
-            0b1111 => "FSFP | FSBP | BSFP | BSBP",
-            _ => unreachable!(),
-        };
-        let graphic = match self.flags {
-            0b0000 => " ",
-            0b0001 => "▝",
-            0b0010 => "▗",
-            0b0011 => "▐",
-            0b0100 => "▘",
-            0b0101 => "▀",
-            0b0110 => "▚",
-            0b0111 => "▜",
-            0b1000 => "▖",
-            0b1001 => "▞",
-            0b1010 => "▄",
-            0b1011 => "▟",
-            0b1100 => "▌",
-            0b1101 => "▛",
-            0b1110 => "▙",
-            0b1111 => "█",
-            _ => unreachable!(),
+        #[rustfmt::skip]
+        let (graphic, name) = match self {
+            Self::Empty   => (" ", "EMPTY",                    ),
+            Self::Fsfp    => ("▝", "FSFP",                     ),
+            Self::Fsbp    => ("▗", "FSBP",                     ),
+            Self::Fs      => ("▐", "FSFP | FSBP",              ),
+            Self::Bsfp    => ("▘", "BSFP",                     ),
+            Self::Fp      => ("▀", "FSFP | BSFP",              ),
+            Self::Fbbf    => ("▚", "FSBP | BSFP",              ),
+            Self::NotBsbp => ("▜", "FSFP | FSBP | BSFP",       ),
+            Self::Bsbp    => ("▖", "BSBP",                     ),
+            Self::Ffbb    => ("▞", "FSFP | BSBP",              ),
+            Self::Bp      => ("▄", "FSBP | BSBP",              ),
+            Self::NotBsfp => ("▟", "FSFP | FSBP | BSBP",       ),
+            Self::Bs      => ("▌", "BSFP | BSBP",              ),
+            Self::NotFsbp => ("▛", "FSFP | BSFP | BSBP",       ),
+            Self::NotFsfp => ("▙", "FSBP | BSFP | BSBP",       ),
+            Self::All     => ("█", "FSFP | FSBP | BSFP | BSBP",),
         };
         match f.align() {
             Some(fmt::Alignment::Right) => {
@@ -119,27 +151,21 @@ impl ops::BitAnd for Mask {
     type Output = Self;
     #[inline]
     fn bitand(self, rhs: Self) -> Self::Output {
-        Self {
-            flags: self.flags & rhs.flags,
-        }
+        Self::from_flags(self as u8 & rhs as u8)
     }
 }
 impl ops::BitOr for Mask {
     type Output = Self;
     #[inline]
     fn bitor(self, rhs: Self) -> Self::Output {
-        Self {
-            flags: self.flags | rhs.flags,
-        }
+        Self::from_flags(self as u8 | rhs as u8)
     }
 }
 impl ops::BitXor for Mask {
     type Output = Self;
     #[inline]
     fn bitxor(self, rhs: Self) -> Self::Output {
-        Self {
-            flags: self.flags ^ rhs.flags,
-        }
+        Self::from_flags(self as u8 ^ rhs as u8)
     }
 }
 
@@ -147,26 +173,26 @@ impl ops::Not for Mask {
     type Output = Self;
     #[inline]
     fn not(self) -> Self::Output {
-        Self { flags: !self.flags }
+        Self::from_flags(self as u8 ^ 0b1111)
     }
 }
 
 impl ops::BitAndAssign for Mask {
     #[inline]
     fn bitand_assign(&mut self, rhs: Self) {
-        self.flags &= rhs.flags;
+        *self = *self & rhs;
     }
 }
 impl ops::BitOrAssign for Mask {
     #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
-        self.flags |= rhs.flags;
+        *self = *self | rhs;
     }
 }
 impl ops::BitXorAssign for Mask {
     #[inline]
     fn bitxor_assign(&mut self, rhs: Self) {
-        self.flags ^= rhs.flags;
+        *self = *self ^ rhs;
     }
 }
 
@@ -179,7 +205,7 @@ mod tests {
     fn all_masks() -> impl Iterator<Item = Mask> {
         // We could have `Mask` implement `Exhaust` instead, but I can’t think of a reason why
         // having that in the public API would ever be useful for anything.
-        (0..=0b1111).map(|flags| Mask { flags })
+        (0..=0b1111).map(Mask::from_flags)
     }
 
     #[test]
@@ -187,25 +213,22 @@ mod tests {
         fn f(mask: Mask) -> String {
             format!("{mask:>11?} {mask:<11?}")
         }
-        assert_eq!(f(Mask::EMPTY), "      EMPTY ( ) ( ) EMPTY      ");
-        assert_eq!(f(Mask::FSFP), "       FSFP (▝) (▝) FSFP       ");
-        assert_eq!(f(Mask::FSBP), "       FSBP (▗) (▗) FSBP       ");
-        assert_eq!(f(Mask::BSFP), "       BSFP (▘) (▘) BSFP       ");
-        assert_eq!(f(Mask::BSBP), "       BSBP (▖) (▖) BSBP       ");
-        assert_eq!(
-            f(Mask::FSFP | Mask::BSBP),
-            "FSFP | BSBP (▞) (▞) FSFP | BSBP"
-        );
+        assert_eq!(f(Mask::Empty), "      EMPTY ( ) ( ) EMPTY      ");
+        assert_eq!(f(Mask::Fsfp), "       FSFP (▝) (▝) FSFP       ");
+        assert_eq!(f(Mask::Fsbp), "       FSBP (▗) (▗) FSBP       ");
+        assert_eq!(f(Mask::Bsfp), "       BSFP (▘) (▘) BSFP       ");
+        assert_eq!(f(Mask::Bsbp), "       BSBP (▖) (▖) BSBP       ");
+        assert_eq!(f(Mask::Ffbb), "FSFP | BSBP (▞) (▞) FSFP | BSBP");
     }
 
     #[test]
     fn bitwise_ops_equivalence() {
         for a in all_masks() {
-            assert_eq!((!a).flags, (!a.flags));
+            assert_eq!((!a) as u8, a as u8 ^ 0b1111);
             for b in all_masks() {
-                assert_eq!((a & b).flags, (a.flags & b.flags));
-                assert_eq!((a | b).flags, (a.flags | b.flags));
-                assert_eq!((a ^ b).flags, (a.flags ^ b.flags));
+                assert_eq!((a & b) as u8, a as u8 & b as u8);
+                assert_eq!((a | b) as u8, a as u8 | b as u8);
+                assert_eq!((a ^ b) as u8, a as u8 ^ b as u8);
                 {
                     let mut mut_a = a;
                     mut_a &= b;
@@ -223,5 +246,22 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// Test that the variant names corresponding to multiple bits match the combinations of those
+    /// bits.
+    #[test]
+    fn combined_value_consistency() {
+        assert_eq!(Mask::Fs, Mask::Fsfp | Mask::Fsbp);
+        assert_eq!(Mask::Bs, Mask::Bsfp | Mask::Bsbp);
+        assert_eq!(Mask::Fp, Mask::Fsfp | Mask::Bsfp);
+        assert_eq!(Mask::Bp, Mask::Fsbp | Mask::Bsbp);
+        assert_eq!(Mask::Fbbf, Mask::Fsbp | Mask::Bsfp);
+        assert_eq!(Mask::Ffbb, Mask::Fsfp | Mask::Bsbp);
+        assert_eq!(Mask::NotBsbp, !Mask::Bsbp);
+        assert_eq!(Mask::NotBsfp, !Mask::Bsfp);
+        assert_eq!(Mask::NotFsbp, !Mask::Fsbp);
+        assert_eq!(Mask::NotFsfp, !Mask::Fsfp);
+        assert_eq!(Mask::All, !Mask::Empty);
     }
 }

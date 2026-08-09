@@ -274,9 +274,8 @@ impl Triangulator {
         // Discard all vertices that are connected only backward (to area that is behind the sweep).
         // We needed to remember these vertices because they might have been used by the
         // preceding ear-clipping step, but now they are irrelevant.
-        self.new_frontier.retain(|frontier_vertex| {
-            frontier_vertex.connectivity.contains_any_of(Mask::FSFP | Mask::FSBP)
-        });
+        self.new_frontier
+            .retain(|frontier_vertex| frontier_vertex.connectivity.contains_any_of(Mask::Fs));
 
         // Every frontier vertex created or kept is now “old” instead of “new”.
         mem::swap(&mut self.old_frontier, &mut self.new_frontier);
@@ -360,13 +359,13 @@ impl Triangulator {
             let mut previous_should_connect_forward = self
                 .new_frontier
                 .back()
-                .is_some_and(|v| v.connectivity.contains_any_of(Mask::BSFP));
+                .is_some_and(|v| v.connectivity.contains_any_of(Mask::Bsfp));
             while let Some(passed_over_vertex) = self
                 .old_frontier
                 .pop_front_if(|v| self.basis.compare_perp(v, &input_vertex).is_lt())
             {
                 if previous_should_connect_forward
-                    && passed_over_vertex.connectivity.contains_any_of(Mask::FSFP)
+                    && passed_over_vertex.connectivity.contains_any_of(Mask::Fsfp)
                     && let triangle = [
                         &passed_over_vertex,
                         self.new_frontier.back().expect("preceding vertex in new frontier missing"),
@@ -409,7 +408,7 @@ impl Triangulator {
             self.new_frontier.try_reserve(1)?;
             self.new_frontier.push_back(input_vertex);
 
-            if !(input_vertex.connectivity.contains_any_of(Mask::BSFP | Mask::BSBP)) {
+            if !(input_vertex.connectivity.contains_any_of(Mask::Bs)) {
                 // The new vertex is not connected backwards, so it is
                 // a corner or middle of a region we are just starting to cover.
                 // In this case, all we need to do is add it to the new frontier;
@@ -424,9 +423,9 @@ impl Triangulator {
                 {
                     // We must emit one or two triangles that cover the area bounded by the old
                     // vertex, the new vertex, and its neighbors in the frontier.
-                    if predecessor_vertex.connectivity.contains_any_of(Mask::FSBP) {
+                    if predecessor_vertex.connectivity.contains_any_of(Mask::Fsbp) {
                         assert!(
-                            input_vertex.connectivity.contains_any_of(Mask::BSBP),
+                            input_vertex.connectivity.contains_any_of(Mask::Bsbp),
                             "inconsistent"
                         );
                         self.basis.emit(
@@ -443,9 +442,9 @@ impl Triangulator {
                             ],
                         )?;
                     }
-                    if predecessor_vertex.connectivity.contains_any_of(Mask::FSFP) {
+                    if predecessor_vertex.connectivity.contains_any_of(Mask::Fsfp) {
                         assert!(
-                            input_vertex.connectivity.contains_any_of(Mask::BSFP),
+                            input_vertex.connectivity.contains_any_of(Mask::Bsfp),
                             "input vertices erroneous or triangulator has a bug; \
                             inconsistent connectivity of {input_vertex:?}"
                         );
@@ -467,8 +466,8 @@ impl Triangulator {
                     // Consistency means it must be connected to the both of them.
                     assert_eq!(
                         (
-                            input_vertex.connectivity.contains_any_of(Mask::BSFP),
-                            input_vertex.connectivity.contains_any_of(Mask::BSBP),
+                            input_vertex.connectivity.contains_any_of(Mask::Bsfp),
+                            input_vertex.connectivity.contains_any_of(Mask::Bsbp),
                         ),
                         (true, true),
                         "input vertices erroneous or triangulator has a bug; \
@@ -545,8 +544,8 @@ impl Triangulator {
                 let last = &self.new_frontier[i + 2];
                 let candidate_triangle: [&Vertex; 3] = [last, middle, first];
 
-                let connected_back = middle.connectivity.contains_any_of(Mask::FSBP);
-                let connected_fwd = middle.connectivity.contains_any_of(Mask::FSFP);
+                let connected_back = middle.connectivity.contains_any_of(Mask::Fsbp);
+                let connected_fwd = middle.connectivity.contains_any_of(Mask::Fsfp);
                 let is_convex = self.basis.is_correct_winding(candidate_triangle);
 
                 viz.set_current_triangulation_vertex(

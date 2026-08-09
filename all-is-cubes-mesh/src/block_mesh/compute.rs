@@ -533,19 +533,19 @@ fn analysis_vertex_to_planar_vertex(
             .any()
     }
 
-    let mut connectivity = Mask::EMPTY;
+    let mut connectivity = Mask::Empty;
 
     if av_connectivity(true, true, basis, should_render) {
-        connectivity |= Mask::FSFP;
+        connectivity |= Mask::Fsfp;
     }
     if av_connectivity(true, false, basis, should_render) {
-        connectivity |= Mask::FSBP;
+        connectivity |= Mask::Fsbp;
     }
     if av_connectivity(false, true, basis, should_render) {
-        connectivity |= Mask::BSFP;
+        connectivity |= Mask::Bsfp;
     }
     if av_connectivity(false, false, basis, should_render) {
-        connectivity |= Mask::BSBP;
+        connectivity |= Mask::Bsbp;
     }
 
     planar::Vertex {

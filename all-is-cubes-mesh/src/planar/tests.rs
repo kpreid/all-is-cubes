@@ -148,19 +148,19 @@ fn vertices_from_ascii_art<const W: usize, const H: usize>(
                         index: u32::from(ch),
                         position: point3(x as i32, (H - y - 1) as i32, 0),
                         connectivity: {
-                            let mut mask = Mask::EMPTY;
+                            let mut mask = Mask::Empty;
                             // note Y flip
                             if is_interior(1, -1) {
-                                mask |= Mask::FSFP;
+                                mask |= Mask::Fsfp;
                             }
                             if is_interior(1, 1) {
-                                mask |= Mask::FSBP;
+                                mask |= Mask::Fsbp;
                             }
                             if is_interior(-1, -1) {
-                                mask |= Mask::BSFP;
+                                mask |= Mask::Bsfp;
                             }
                             if is_interior(-1, 1) {
-                                mask |= Mask::BSBP;
+                                mask |= Mask::Bsbp;
                             }
                             mask
                         },
@@ -213,10 +213,10 @@ fn one_quad() {
     assert_eq!(
         vertices,
         [
-            vert(0, 0, 0, Mask::FSFP, b'A'),
-            vert(0, 2, 0, Mask::FSBP, b'B'),
-            vert(3, 0, 0, Mask::BSFP, b'C'),
-            vert(3, 2, 0, Mask::BSBP, b'D'),
+            vert(0, 0, 0, Mask::Fsfp, b'A'),
+            vert(0, 2, 0, Mask::Fsbp, b'B'),
+            vert(3, 0, 0, Mask::Bsfp, b'C'),
+            vert(3, 2, 0, Mask::Bsbp, b'D'),
         ]
     );
 
@@ -369,11 +369,11 @@ fn hole_requiring_ear_clipping() {
 #[should_panic = "input vertices erroneous or triangulator has a bug;"]
 fn duplicate_vertices_0() {
     run(&[
-        vert(0, 0, 0, Mask::FSFP, b'A'),
-        vert(0, 0, 0, Mask::FSFP, b'X'), // spurious
-        vert(0, 2, 0, Mask::FSBP, b'B'),
-        vert(3, 0, 0, Mask::BSFP, b'C'),
-        vert(3, 2, 0, Mask::BSBP, b'D'),
+        vert(0, 0, 0, Mask::Fsfp, b'A'),
+        vert(0, 0, 0, Mask::Fsfp, b'X'), // spurious
+        vert(0, 2, 0, Mask::Fsbp, b'B'),
+        vert(3, 0, 0, Mask::Bsfp, b'C'),
+        vert(3, 2, 0, Mask::Bsbp, b'D'),
     ]);
 }
 
@@ -381,11 +381,11 @@ fn duplicate_vertices_0() {
 #[should_panic = "input vertices erroneous or triangulator has a bug;"]
 fn duplicate_vertices_1() {
     run(&[
-        vert(0, 0, 0, Mask::FSFP, b'A'),
-        vert(0, 2, 0, Mask::FSBP, b'B'),
-        vert(0, 2, 0, Mask::FSFP, b'X'), // spurious
-        vert(3, 0, 0, Mask::BSFP, b'C'),
-        vert(3, 2, 0, Mask::BSBP, b'D'),
+        vert(0, 0, 0, Mask::Fsfp, b'A'),
+        vert(0, 2, 0, Mask::Fsbp, b'B'),
+        vert(0, 2, 0, Mask::Fsfp, b'X'), // spurious
+        vert(3, 0, 0, Mask::Bsfp, b'C'),
+        vert(3, 2, 0, Mask::Bsbp, b'D'),
     ]);
 }
 
@@ -393,11 +393,11 @@ fn duplicate_vertices_1() {
 #[should_panic = "input vertices erroneous or triangulator has a bug;"]
 fn duplicate_vertices_2() {
     run(&[
-        vert(0, 0, 0, Mask::FSFP, b'A'),
-        vert(0, 2, 0, Mask::FSBP, b'B'),
-        vert(3, 0, 0, Mask::BSFP, b'C'),
-        vert(3, 0, 0, Mask::FSFP, b'X'), // spurious
-        vert(3, 2, 0, Mask::BSBP, b'D'),
+        vert(0, 0, 0, Mask::Fsfp, b'A'),
+        vert(0, 2, 0, Mask::Fsbp, b'B'),
+        vert(3, 0, 0, Mask::Bsfp, b'C'),
+        vert(3, 0, 0, Mask::Fsfp, b'X'), // spurious
+        vert(3, 2, 0, Mask::Bsbp, b'D'),
     ]);
 }
 
@@ -405,11 +405,11 @@ fn duplicate_vertices_2() {
 #[should_panic = "input vertices erroneous or triangulator has a bug;"]
 fn duplicate_vertices_3() {
     run(&[
-        vert(0, 0, 0, Mask::FSFP, b'A'),
-        vert(0, 2, 0, Mask::FSBP, b'B'),
-        vert(3, 0, 0, Mask::BSFP, b'C'),
-        vert(3, 2, 0, Mask::BSBP, b'D'),
-        vert(3, 2, 0, Mask::FSFP, b'X'), // spurious
+        vert(0, 0, 0, Mask::Fsfp, b'A'),
+        vert(0, 2, 0, Mask::Fsbp, b'B'),
+        vert(3, 0, 0, Mask::Bsfp, b'C'),
+        vert(3, 2, 0, Mask::Bsbp, b'D'),
+        vert(3, 2, 0, Mask::Fsfp, b'X'), // spurious
     ]);
 }
 
@@ -417,9 +417,9 @@ fn duplicate_vertices_3() {
 #[should_panic = "input vertices erroneous or triangulator has a bug;"]
 fn missing_vertices_0() {
     run(&[
-        vert(0, 2, 0, Mask::FSBP, b'B'),
-        vert(3, 0, 0, Mask::BSFP, b'C'),
-        vert(3, 2, 0, Mask::BSBP, b'D'),
+        vert(0, 2, 0, Mask::Fsbp, b'B'),
+        vert(3, 0, 0, Mask::Bsfp, b'C'),
+        vert(3, 2, 0, Mask::Bsbp, b'D'),
     ]);
 }
 
@@ -427,9 +427,9 @@ fn missing_vertices_0() {
 #[should_panic = "input vertices erroneous or triangulator has a bug;"]
 fn missing_vertices_1() {
     run(&[
-        vert(0, 0, 0, Mask::FSFP, b'A'),
-        vert(3, 0, 0, Mask::BSFP, b'C'),
-        vert(3, 2, 0, Mask::BSBP, b'D'),
+        vert(0, 0, 0, Mask::Fsfp, b'A'),
+        vert(3, 0, 0, Mask::Bsfp, b'C'),
+        vert(3, 2, 0, Mask::Bsbp, b'D'),
     ]);
 }
 
@@ -437,9 +437,9 @@ fn missing_vertices_1() {
 #[should_panic = "input vertices erroneous or triangulator has a bug;"]
 fn missing_vertices_2() {
     run(&[
-        vert(0, 0, 0, Mask::FSFP, b'A'),
-        vert(0, 2, 0, Mask::FSBP, b'B'),
-        vert(3, 2, 0, Mask::BSBP, b'D'),
+        vert(0, 0, 0, Mask::Fsfp, b'A'),
+        vert(0, 2, 0, Mask::Fsbp, b'B'),
+        vert(3, 2, 0, Mask::Bsbp, b'D'),
     ]);
 }
 
@@ -447,9 +447,9 @@ fn missing_vertices_2() {
 #[should_panic = "input vertices erroneous or triangulator has a bug;"]
 fn missing_vertices_3() {
     run(&[
-        vert(0, 0, 0, Mask::FSFP, b'A'),
-        vert(0, 2, 0, Mask::FSBP, b'B'),
-        vert(3, 0, 0, Mask::BSFP, b'C'),
+        vert(0, 0, 0, Mask::Fsfp, b'A'),
+        vert(0, 2, 0, Mask::Fsbp, b'B'),
+        vert(3, 0, 0, Mask::Bsfp, b'C'),
     ]);
 }
 

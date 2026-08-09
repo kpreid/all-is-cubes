@@ -496,8 +496,7 @@ fn planar_benches(c: &mut Criterion) {
         let basis = planar::Basis::new(Face::PZ, Face::PX, Face::PY);
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3887829);
         let rectangle_size = 1000;
-        let full_connectivity =
-            planar::Mask::FSBP | planar::Mask::FSFP | planar::Mask::BSFP | planar::Mask::BSBP;
+        let full_connectivity = planar::Mask::All;
 
         b.iter_batched_ref(
             || {
@@ -505,22 +504,22 @@ fn planar_benches(c: &mut Criterion) {
                 vertices.extend([
                     planar::Vertex {
                         position: point3(0, 0, 0),
-                        connectivity: planar::Mask::FSFP,
+                        connectivity: planar::Mask::Fsfp,
                         index: 0,
                     },
                     planar::Vertex {
                         position: point3(0, rectangle_size, 0),
-                        connectivity: planar::Mask::FSBP,
+                        connectivity: planar::Mask::Fsbp,
                         index: 1,
                     },
                     planar::Vertex {
                         position: point3(rectangle_size, 0, 0),
-                        connectivity: planar::Mask::BSFP,
+                        connectivity: planar::Mask::Bsfp,
                         index: 2,
                     },
                     planar::Vertex {
                         position: point3(rectangle_size, rectangle_size, 0),
-                        connectivity: planar::Mask::BSBP,
+                        connectivity: planar::Mask::Bsbp,
                         index: 3,
                     },
                 ]);
