@@ -215,7 +215,7 @@ impl WidgetBlocks {
                         GridRotation::IDENTITY,
                         &default_srgb,
                     )?
-                    .display_name(format! {"Progress Bar {}", if full {"Full"} else {"Empty"}})
+                    .display_name(format!("Progress Bar {}", if full {"Full"} else {"Empty"}))
                     .build_txn(txn)
                 }
 
