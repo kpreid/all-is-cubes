@@ -289,7 +289,7 @@ impl LogExecution<'_> {
 
     #[must_use = "you must assign the result to a variable"]
     pub fn name(mut self, name: &'static str, initial_state: &'static str) -> LogExecutionActive {
-        assert!(!initial_state.is_empty());
+        assert_ne!(initial_state, "");
         let active = match self.stl_res.take().map(|stl_res| stl_res.into_inner()) {
             Some(SystemTimingLogger(destination)) if destination.stream.is_enabled() => {
                 let inner_destination = destination.child(&entity_path![name]);
@@ -311,7 +311,7 @@ impl LogExecution<'_> {
 
 impl LogExecutionActive {
     pub fn set_state(&self, state: &'static str) {
-        assert!(!state.is_empty());
+        assert_ne!(state, "");
 
         self.destination.log(
             &entity_path![],

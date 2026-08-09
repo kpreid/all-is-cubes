@@ -30,7 +30,7 @@ fn default_is_empty() {
     assert_eq!(mesh, BlockMesh::EMPTY);
     assert!(mesh.is_empty());
     assert_eq!(mesh.voxel_opacity_mask, None);
-    assert!(mesh.textures().is_empty());
+    assert_eq!(mesh.textures(), []);
     assert_eq!(mesh.count_indices(), 0);
     assert_eq!(mesh.bounding_box(), Aabbs::EMPTY);
     assert_eq!(mesh.flaws(), Flaws::empty());

@@ -59,7 +59,7 @@ impl LogExecution<'_> {
 
     #[must_use = "you must assign the result to a variable"]
     pub fn name(self, name: &'static str, initial_state: &'static str) -> LogExecutionActive {
-        assert!(!initial_state.is_empty());
+        assert_ne!(initial_state, "");
         _ = name;
         mem::forget(self); // disarm Drop panic
         LogExecutionActive {
@@ -70,7 +70,7 @@ impl LogExecution<'_> {
 
 impl LogExecutionActive {
     pub fn set_state(&self, state: &'static str) {
-        assert!(!state.is_empty());
+        assert_ne!(state, "");
         _ = self;
     }
 }
