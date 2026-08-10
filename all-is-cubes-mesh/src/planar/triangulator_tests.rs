@@ -52,7 +52,7 @@ fn run(vertices: &[planar::Vertex]) -> Vec<[u8; 3]> {
         "\n{}\n",
         planar::svg::WriteSvg {
             vertices,
-            triangles: &actual_triangles
+            loops: &actual_triangles
                 .iter()
                 .map(|byte_arr| byte_arr.map(u32::from))
                 .collect::<Vec<[u32; 3]>>(),
@@ -373,7 +373,7 @@ fn doc_example_svg_test() {
         "{}",
         planar::svg::WriteSvg {
             vertices,
-            triangles: &triangles,
+            loops: &triangles,
             scale: 30.0,
             show_vertices: true,
             standalone_xml: false,

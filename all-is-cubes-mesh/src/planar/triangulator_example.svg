@@ -1,31 +1,33 @@
 <svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' xmlns:h='http://www.w3.org/1999/xhtml' width='600px' height='360px' viewBox='-1 -11 20 12'>
-<style type='text/css'>#vertex, .triangle {}#vertex {fill: yellow;stroke: #770;stroke-width: 0.03;}.vertex text {text-anchor: middle;dominant-baseline: central;font-size: 0.45px;}.triangle {fill: #AAF;stroke: #55F;stroke-width: 0.05;stroke-linejoin: round;}svg:hover .vertex {visibility:hidden;}</style>
+<style type='text/css'>#vertex, .triangle {}#vertex {fill: yellow;stroke: #770;stroke-width: 0.03;}.vertex text {text-anchor: middle;dominant-baseline: central;font-size: 0.45px;}.polygon {fill: #AAF;stroke: #55F;stroke-width: 0.05;stroke-linejoin: round;}svg:hover .vertex {visibility:hidden;}</style>
 <defs><circle id='vertex' r='0.27'/></defs>
-<polygon class='triangle' points='0,0 2,0 0,-8'/>
-<polygon class='triangle' points='2,0 2,-4 0,-8'/>
-<polygon class='triangle' points='2,-4 2,-6 0,-8'/>
-<polygon class='triangle' points='2,-8 0,-8 2,-6'/>
-<polygon class='triangle' points='2,-4 4,-4 2,-6'/>
-<polygon class='triangle' points='4,-6 2,-6 4,-4'/>
-<polygon class='triangle' points='2,-8 4,-8 2,-10'/>
-<polygon class='triangle' points='4,-10 2,-10 4,-8'/>
-<polygon class='triangle' points='4,0 6,0 4,-4'/>
-<polygon class='triangle' points='4,-4 6,0 4,-6'/>
-<polygon class='triangle' points='4,-6 6,0 4,-8'/>
-<polygon class='triangle' points='6,-8 4,-8 6,0'/>
-<polygon class='triangle' points='8,0 10,0 8,-10'/>
-<polygon class='triangle' points='10,-10 8,-10 10,0'/>
-<polygon class='triangle' points='12,0 14,-2 12,-6'/>
-<polygon class='triangle' points='12,-6 14,-2 12,-10'/>
-<polygon class='triangle' points='14,-2 14,-8 12,-10'/>
-<polygon class='triangle' points='12,0 16,0 14,-2'/>
-<polygon class='triangle' points='16,-2 14,-2 16,0'/>
-<polygon class='triangle' points='14,-8 16,-8 12,-10'/>
-<polygon class='triangle' points='16,-10 12,-10 16,-8'/>
-<polygon class='triangle' points='16,-2 18,-2 16,-4'/>
-<polygon class='triangle' points='18,-4 16,-4 18,-2'/>
-<polygon class='triangle' points='16,-6 18,-6 16,-8'/>
-<polygon class='triangle' points='18,-8 16,-8 18,-6'/>
+<path class='polygon' d='
+M0 0h2l-2 -8Z
+M2 0v-4l-2 -4Z
+M2 -4v-2l-2 -2Z
+M2 -8h-2l2 2Z
+M2 -4h2l-2 -2Z
+M4 -6h-2l2 2Z
+M2 -8h2l-2 -2Z
+M4 -10h-2l2 2Z
+M4 0h2l-2 -4Z
+M4 -4l2 4l-2 -6Z
+M4 -6l2 6l-2 -8Z
+M6 -8h-2l2 8Z
+M8 0h2l-2 -10Z
+M10 -10h-2l2 10Z
+M12 0l2 -2l-2 -4Z
+M12 -6l2 4l-2 -8Z
+M14 -2v-6l-2 -2Z
+M12 0h4l-2 -2Z
+M16 -2h-2l2 2Z
+M14 -8h2l-4 -2Z
+M16 -10h-4l4 2Z
+M16 -2h2l-2 -2Z
+M18 -4h-2l2 2Z
+M16 -6h2l-2 -2Z
+M18 -8h-2l2 2Z
+'/>
 <g class='vertex' transform='translate(0,0)'><use xlink:href='#vertex'/><text>0</text></g>
 <g class='vertex' transform='translate(0,-8)'><use xlink:href='#vertex'/><text>1</text></g>
 <g class='vertex' transform='translate(2,0)'><use xlink:href='#vertex'/><text>2</text></g>
