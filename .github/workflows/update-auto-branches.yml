@@ -50,7 +50,7 @@ jobs:
       with:
         ref: "next/${{ matrix.nextname }}"
         fetch-depth: 0 # need branches to perform rebase
-        persist-credentials: false
+        persist-credentials: true # need credentials to push
     
     - name: Configure git
       run: |
