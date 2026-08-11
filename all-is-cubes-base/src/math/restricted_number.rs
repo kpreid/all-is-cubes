@@ -32,7 +32,9 @@ use ordered_float::NotNan;
 /// and do not arise as the reciprocal of zero, and thus we can treat “zero times anything
 /// is zero” as being a more important property than “infinity times anything is infinity”.
 #[derive(Clone, Copy, PartialEq)]
-pub struct PositiveSign<T>(T);
+#[expect(clippy::exhaustive_structs)]
+#[repr(transparent)]
+pub struct PositiveSign<T>(pub mut(self) T);
 
 /// A floating-point number which is within the range +0 to +1 (inclusive).
 ///
@@ -42,7 +44,9 @@ pub struct PositiveSign<T>(T);
 /// Because NaN and negative zero are excluded, this type implements [`Eq`] straightforwardly,
 /// and can reliably be used as a map key for caching, interning, etc.
 #[derive(Clone, Copy, PartialEq)]
-pub struct ZeroOne<T>(T);
+#[expect(clippy::exhaustive_structs)]
+#[repr(transparent)]
+pub struct ZeroOne<T>(pub mut(self) T);
 
 // --- Inherent implementations --------------------------------------------------------------------
 
