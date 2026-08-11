@@ -100,8 +100,9 @@ impl Fluff {
             Fluff::Beep => Some((Builtin::beep(), 1.0)),
             Fluff::Happened | Fluff::PlaceBlockGeneric => Some((Builtin::happened(), 1.0)),
             Fluff::BlockFault(_) => None,
-            Fluff::BlockImpact { velocity } => {
-                let velocity: f32 = velocity.into_inner();
+            Fluff::BlockImpact {
+                velocity: PositiveSign(velocity),
+            } => {
                 // TODO: Use the correct scaling here.
                 // The amplitude of the sound should be proportional to the initial displacement
                 // of the vibrating surfaces, but how does that initial displacement scale?

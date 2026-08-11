@@ -388,8 +388,8 @@ impl Camera {
         let fov_cot = (self.fov_y() / 2.).to_radians().tan().recip();
         let aspect = self.viewport.nominal_aspect_ratio();
 
-        let near = self.near_plane_distance().into_inner();
-        let far = self.view_distance().into_inner();
+        let PositiveSign(near) = self.near_plane_distance();
+        let PositiveSign(far) = self.view_distance();
 
         // Rationale for this particular matrix formula: "that's what `cgmath` does",
         // and we used to use `cgmath`.
