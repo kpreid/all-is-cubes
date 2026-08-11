@@ -623,6 +623,7 @@ impl<T: FloatCore + num_traits::ConstOne> num_traits::ConstOne for ZeroOne<T> {
     const ONE: Self = Self(T::ONE);
 }
 
+// Same-type addition.
 impl<T: FloatCore + ops::Add<Output = T>> ops::Add for PositiveSign<T> {
     type Output = Self;
     #[inline]
@@ -637,6 +638,115 @@ impl<T: FloatCore + ops::Add<Output = T>> ops::AddAssign for PositiveSign<T> {
     #[inline]
     fn add_assign(&mut self, rhs: Self) {
         *self = *self + rhs;
+    }
+}
+
+// Mixed-type addition to the unrestricted type with unrestricted output.
+impl<T: FloatCore + ops::Add> ops::Add<T> for PositiveSign<T> {
+    type Output = <T as ops::Add>::Output;
+    #[inline]
+    fn add(self, rhs: T) -> Self::Output {
+        self.0 + rhs
+    }
+}
+impl<T: FloatCore + ops::Add> ops::Add<T> for ZeroOne<T> {
+    type Output = <T as ops::Add>::Output;
+    #[inline]
+    fn add(self, rhs: T) -> Self::Output {
+        self.0 + rhs
+    }
+}
+impl ops::Add<PositiveSign<f32>> for f32 {
+    type Output = f32;
+    #[inline]
+    fn add(self, rhs: PositiveSign<f32>) -> Self::Output {
+        self + rhs.0
+    }
+}
+impl ops::AddAssign<PositiveSign<f32>> for f32 {
+    #[inline]
+    fn add_assign(&mut self, rhs: PositiveSign<f32>) {
+        *self = *self + rhs.0;
+    }
+}
+impl ops::Add<PositiveSign<f64>> for f64 {
+    type Output = f64;
+    #[inline]
+    fn add(self, rhs: PositiveSign<f64>) -> Self::Output {
+        self + rhs.0
+    }
+}
+impl ops::AddAssign<PositiveSign<f64>> for f64 {
+    #[inline]
+    fn add_assign(&mut self, rhs: PositiveSign<f64>) {
+        *self = *self + rhs.0;
+    }
+}
+
+// Same-type subtraction (with unrestricted output).
+impl<T: FloatCore> ops::Sub for PositiveSign<T> {
+    type Output = T;
+    #[inline]
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.0 - rhs.0
+    }
+}
+
+// Mixed-type subtraction with the unrestricted type with unrestricted output.
+impl<T: FloatCore> ops::Sub<T> for PositiveSign<T> {
+    type Output = <T as ops::Sub>::Output;
+    #[inline]
+    fn sub(self, rhs: T) -> Self::Output {
+        self.0 - rhs
+    }
+}
+impl<T: FloatCore> ops::Sub<T> for ZeroOne<T> {
+    type Output = <T as ops::Sub>::Output;
+    #[inline]
+    fn sub(self, rhs: T) -> Self::Output {
+        self.0 - rhs
+    }
+}
+impl ops::Sub<PositiveSign<f32>> for f32 {
+    type Output = f32;
+    #[inline]
+    fn sub(self, rhs: PositiveSign<f32>) -> Self::Output {
+        self - rhs.0
+    }
+}
+impl ops::SubAssign<PositiveSign<f32>> for f32 {
+    #[inline]
+    fn sub_assign(&mut self, rhs: PositiveSign<f32>) {
+        *self = *self - rhs.0;
+    }
+}
+impl ops::Sub<PositiveSign<f64>> for f64 {
+    type Output = f64;
+    #[inline]
+    fn sub(self, rhs: PositiveSign<f64>) -> Self::Output {
+        self - rhs.0
+    }
+}
+impl ops::SubAssign<PositiveSign<f64>> for f64 {
+    #[inline]
+    fn sub_assign(&mut self, rhs: PositiveSign<f64>) {
+        *self = *self - rhs.0;
+    }
+}
+
+// Negation (with unrestricted output)
+impl<T: FloatCore> ops::Neg for PositiveSign<T> {
+    type Output = T;
+    #[inline]
+    fn neg(self) -> Self::Output {
+        -self.0
+    }
+}
+impl<T: FloatCore> ops::Neg for ZeroOne<T> {
+    type Output = T;
+    #[inline]
+    fn neg(self) -> Self::Output {
+        -self.0
     }
 }
 
@@ -685,7 +795,7 @@ impl<T: FloatCore + ops::Mul<Output = T>> ops::MulAssign for ZeroOne<T> {
     }
 }
 
-// Mixed-type multiplications
+// Mixed restricted type multiplications
 impl<T: FloatCore> ops::Mul<ZeroOne<T>> for PositiveSign<T>
 where
     PositiveSign<T>: From<ZeroOne<T>>,
@@ -704,6 +814,113 @@ where
     #[inline]
     fn mul(self, rhs: PositiveSign<T>) -> Self::Output {
         PositiveSign::from(self) * rhs
+    }
+}
+
+// Mixed-type multiplication by the unrestricted type with unrestricted output.
+impl<T: FloatCore + ops::Mul> ops::Mul<T> for PositiveSign<T> {
+    type Output = <T as ops::Mul>::Output;
+    #[inline]
+    fn mul(self, rhs: T) -> Self::Output {
+        self.0 * rhs
+    }
+}
+impl<T: FloatCore + ops::Mul> ops::Mul<T> for ZeroOne<T> {
+    type Output = <T as ops::Mul>::Output;
+    #[inline]
+    fn mul(self, rhs: T) -> Self::Output {
+        self.0 * rhs
+    }
+}
+impl ops::Mul<PositiveSign<f32>> for f32 {
+    type Output = f32;
+    #[inline]
+    fn mul(self, rhs: PositiveSign<f32>) -> Self::Output {
+        self * rhs.0
+    }
+}
+impl ops::MulAssign<PositiveSign<f32>> for f32 {
+    #[inline]
+    fn mul_assign(&mut self, rhs: PositiveSign<f32>) {
+        *self = *self * rhs.0;
+    }
+}
+impl ops::Mul<PositiveSign<f64>> for f64 {
+    type Output = f64;
+    #[inline]
+    fn mul(self, rhs: PositiveSign<f64>) -> Self::Output {
+        self * rhs.0
+    }
+}
+impl ops::MulAssign<PositiveSign<f64>> for f64 {
+    #[inline]
+    fn mul_assign(&mut self, rhs: PositiveSign<f64>) {
+        *self = *self * rhs.0;
+    }
+}
+
+// Same-type division operators.
+impl<T: FloatCore> ops::Div for PositiveSign<T> {
+    type Output = T;
+
+    /// This division operation returns `T`, because while dividing two [`PositiveSign`]s
+    /// cannot result in a negative number, it can result in NaN.
+    #[inline]
+    fn div(self, rhs: Self) -> Self::Output {
+        self.0 / rhs.0
+    }
+}
+impl<T: FloatCore> ops::Div for ZeroOne<T> {
+    type Output = T;
+
+    /// This division operation returns `T`, because dividing two [`ZeroOne`]s can result in
+    /// a number out of that range, or NaN.
+    #[inline]
+    fn div(self, rhs: Self) -> Self::Output {
+        self.0 / rhs.0
+    }
+}
+
+// Mixed-type division by the unrestricted type with unrestricted output.
+impl<T: FloatCore> ops::Div<T> for PositiveSign<T> {
+    type Output = T;
+
+    #[inline]
+    fn div(self, rhs: T) -> Self::Output {
+        self.0 / rhs
+    }
+}
+impl<T: FloatCore> ops::Div<T> for ZeroOne<T> {
+    type Output = T;
+    #[inline]
+    fn div(self, rhs: T) -> Self::Output {
+        self.0 / rhs
+    }
+}
+impl ops::Div<PositiveSign<f32>> for f32 {
+    type Output = f32;
+    #[inline]
+    fn div(self, rhs: PositiveSign<f32>) -> Self::Output {
+        self / rhs.0
+    }
+}
+impl ops::DivAssign<PositiveSign<f32>> for f32 {
+    #[inline]
+    fn div_assign(&mut self, rhs: PositiveSign<f32>) {
+        *self = *self / rhs.0;
+    }
+}
+impl ops::Div<PositiveSign<f64>> for f64 {
+    type Output = f64;
+    #[inline]
+    fn div(self, rhs: PositiveSign<f64>) -> Self::Output {
+        self / rhs.0
+    }
+}
+impl ops::DivAssign<PositiveSign<f64>> for f64 {
+    #[inline]
+    fn div_assign(&mut self, rhs: PositiveSign<f64>) {
+        *self = *self / rhs.0;
     }
 }
 

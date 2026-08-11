@@ -21,7 +21,7 @@
     * `math::GridAab::clamp_cube()`.
     * `math::Octant::cube_adjacent_to()`
     * `math::OctantMask::{any, count, from_face, from_octant, into_iter, is_uniform_on, shift_copy}()`
-    * `math::PositiveSign::mul()`
+    * `math::PositiveSign` and `math::ZeroOne` have many more arithmetic overloads, many of which return the corresponding unrestricted numeric type instead of the restricted type. This will reduce the need to call `.into_inner()` to obtain a `f32` or `f64` value before doing arithmetic.
     * `math::Rgb::scale()`
     * `math::Vol::origin_empty()`, infallible construction of empty volume.
     * `physics::Contact::aab()`
