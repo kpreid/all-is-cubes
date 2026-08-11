@@ -610,9 +610,8 @@ impl Inner {
         // Note that this depends on the ray lengths that `RtScene`, and thus
         // `Camera::project_ndc_into_world()`, use.
         //
-        let depth_scale =
-            -(camera.view_distance().into_inner() - camera.near_plane_distance().into_inner());
-        let depth_bias = -camera.near_plane_distance().into_inner();
+        let depth_scale = -(camera.view_distance() - camera.near_plane_distance());
+        let depth_bias = -camera.near_plane_distance();
         let depth_transform = camera
             .projection_matrix()
             .pre_translate(vec3(0., 0., depth_bias))

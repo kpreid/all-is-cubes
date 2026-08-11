@@ -60,7 +60,7 @@ impl Band {
     /// Converts a frequency in Hz to the nearest band.
     pub fn from_frequency(frequency: PositiveSign<f32>) -> Self {
         Self {
-            index: (((frequency.into_inner() / FIRST_BAND).log2() / BAND_STEP_OCT).round() as u8)
+            index: (((frequency / FIRST_BAND).log2() / BAND_STEP_OCT).round() as u8)
                 .min(Band::MAX.index),
         }
     }

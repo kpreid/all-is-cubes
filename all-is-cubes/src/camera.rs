@@ -542,7 +542,7 @@ impl Viewport {
     /// contain no pixels.
     #[inline]
     pub fn nominal_aspect_ratio(&self) -> FreeCoordinate {
-        let ratio = self.nominal_size.width.into_inner() / self.nominal_size.height.into_inner();
+        let ratio = self.nominal_size.width / self.nominal_size.height;
         if ratio.is_finite() { ratio } else { 1.0 }
     }
 
@@ -582,8 +582,8 @@ impl Viewport {
     #[inline]
     pub fn normalize_nominal_point(&self, nominal_point: Point2D<f64, NominalPixel>) -> NdcPoint2 {
         Point2D::new(
-            (nominal_point.x + 0.5) / self.nominal_size.width.into_inner() * 2.0 - 1.0,
-            -((nominal_point.y + 0.5) / self.nominal_size.height.into_inner() * 2.0 - 1.0),
+            (nominal_point.x + 0.5) / self.nominal_size.width * 2.0 - 1.0,
+            -((nominal_point.y + 0.5) / self.nominal_size.height * 2.0 - 1.0),
         )
     }
 

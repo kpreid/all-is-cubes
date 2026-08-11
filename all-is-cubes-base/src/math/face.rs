@@ -1356,10 +1356,9 @@ impl lines::Wireframe for CubeFace {
             output.extend(X_POINTS.into_iter().map(|line| {
                 line.map(|point| {
                     lines::Vertex::from(
-                        (face_transform.transform_point(point)).map(|c| {
-                            (FreeCoordinate::from(c) - 0.5) * (1. + EXPANSION.into_inner() * 2.)
-                                + 0.5
-                        }) + self.cube.aab().lower_bounds_v(),
+                        (face_transform.transform_point(point))
+                            .map(|c| (FreeCoordinate::from(c) - 0.5) * (1. + EXPANSION * 2.) + 0.5)
+                            + self.cube.aab().lower_bounds_v(),
                     )
                 })
             }));

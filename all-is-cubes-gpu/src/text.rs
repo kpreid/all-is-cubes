@@ -28,10 +28,8 @@ pub(crate) fn character_texture_size(
     // any characters early. This uses the viewport nominal size so that the font size is in
     // nominal pixels
     let text_size_in_characters: ImageSize = size2(
-        f64::ceil(viewport.nominal_size.width.into_inner() / f64::from(font_cell_size.width))
-            as u32,
-        f64::ceil(viewport.nominal_size.height.into_inner() / f64::from(font_cell_size.height))
-            as u32,
+        f64::ceil(viewport.nominal_size.width / f64::from(font_cell_size.width)) as u32,
+        f64::ceil(viewport.nominal_size.height / f64::from(font_cell_size.height)) as u32,
     )
     .max(size2(1, 1));
 

@@ -409,10 +409,8 @@ fn demo_blocks_generator(
                         if r < body_radius {
                             // Shade the body with an axis-indicating color.
                             Some(Block::from(Rgb01::new(
-                                base_body_color.red().into_inner()
-                                    + (p2.x as f32 / resolution_g as f32),
-                                base_body_color.green().into_inner()
-                                    + (p2.y as f32 / resolution_g as f32),
+                                base_body_color.red() + (p2.x as f32 / resolution_g as f32),
+                                base_body_color.green() + (p2.y as f32 / resolution_g as f32),
                                 base_body_color.red().into_inner(),
                             )))
                         } else {

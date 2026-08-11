@@ -200,11 +200,7 @@ fn project_ndc_into_world() {
     {
         let ray = dbg!(camera.project_ndc_into_world(point2(0.0, 0.0)));
         assert_eq!(ray.origin, point3(0., 0., -near));
-        assert!(ray.direction.approx_eq(&vec3(
-            0.,
-            0.,
-            -(camera.view_distance().into_inner() - near),
-        )));
+        assert!(ray.direction.approx_eq(&vec3(0., 0., -(camera.view_distance() - near),)));
     }
 
     // Test with non-identity view transform
@@ -216,11 +212,7 @@ fn project_ndc_into_world() {
 
         let ray = dbg!(camera.project_ndc_into_world(point2(0.0, 0.0)));
         assert!(ray.origin.approx_eq(&point3(-near, 100., 0.)));
-        assert!(ray.direction.approx_eq(&vec3(
-            -(camera.view_distance().into_inner() - near),
-            0.,
-            0.,
-        )));
+        assert!(ray.direction.approx_eq(&vec3(-(camera.view_distance() - near), 0., 0.,)));
     }
 }
 

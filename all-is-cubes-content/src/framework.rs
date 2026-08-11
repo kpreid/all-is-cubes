@@ -121,10 +121,9 @@ impl Queue {
             self.tasks.push_front(task);
         }
 
-        let time_scale = PositiveSign::<f32>::try_from(
-            replacing_time_estimate.into_inner() / total_time_estimate.into_inner(),
-        )
-        .unwrap_or(ps32(1.0));
+        let time_scale =
+            PositiveSign::<f32>::try_from(replacing_time_estimate / total_time_estimate)
+                .unwrap_or(ps32(1.0));
         for task in self.tasks.iter_mut().take(count) {
             task.time_estimate *= time_scale;
         }
@@ -160,8 +159,8 @@ impl Queue {
     }
 
     fn progress_fraction(&self) -> f32 {
-        let fraction = self.past_time_estimate.into_inner()
-            / (self.past_time_estimate + self.future_time_estimate).into_inner();
+        let fraction: f32 =
+            self.past_time_estimate / (self.past_time_estimate + self.future_time_estimate);
         if !fraction.is_finite() {
             // guard against getting given all-zero estimates and dividing by zero
             0.0

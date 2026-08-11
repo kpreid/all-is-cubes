@@ -56,8 +56,7 @@ impl SoundDef {
     #[doc(hidden)] // API design still experimental
     pub fn synthesize(&self, sample_rate: f32) -> impl Iterator<Item = [f32; 2]> {
         let sample_count = (self.duration.into_inner() * sample_rate).round() as usize;
-        let sample_index_to_radians =
-            self.frequency.into_inner() * core::f32::consts::TAU / sample_rate;
+        let sample_index_to_radians = self.frequency * core::f32::consts::TAU / sample_rate;
         let amplitude = self.amplitude.into_inner();
 
         (0..sample_count).map(move |sample_index| {

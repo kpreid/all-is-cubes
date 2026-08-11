@@ -39,8 +39,7 @@ const CAMERA_MARGIN_RADIUS: f64 = crate::space::CHUNK_SIZE as f64 * 1.75;
 /// This region is bounded by view distance and by `Space` bounds.
 fn visible_light_volume(space_bounds: GridAab, camera: &Camera) -> GridAab {
     // TODO: handle NaN and overflow cases, and the texture not being big enough, for robustness.
-    let effective_view_radius =
-        Vector3D::splat(camera.view_distance().into_inner() + CAMERA_MARGIN_RADIUS);
+    let effective_view_radius = Vector3D::splat(camera.view_distance() + CAMERA_MARGIN_RADIUS);
     let visible_bounds = Aab::from_lower_upper(
         camera.view_position() - effective_view_radius,
         camera.view_position() + effective_view_radius,
