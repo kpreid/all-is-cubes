@@ -4,7 +4,10 @@
 //! and you do not need to use any items in this module to build block meshes.
 //! However, they have been made available for separate use if desired.
 
+use core::fmt;
+
 use all_is_cubes::math::GridPoint;
+use all_is_cubes::util::Refmt;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -34,7 +37,7 @@ type Index = u32;
 /// A vertex in the form processed by [`Triangulator`] to produce triangles.
 ///
 /// (Refer to this type as `planar::Vertex` to avoid ambiguity.)
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[allow(
     clippy::exhaustive_structs,
     reason = "each field is required input data"
@@ -49,4 +52,20 @@ pub struct Vertex {
 
     /// Value used to refer to this vertex in the output of triangulation.
     pub index: Index,
+}
+
+impl fmt::Debug for Vertex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            position,
+            connectivity,
+            index,
+        } = self;
+        // Always single-line formatting.
+        write!(
+            f,
+            "Vertex(#{index} at {position} connected {connectivity:?})",
+            position = position.refmt(&all_is_cubes::util::ConciseDebug)
+        )
+    }
 }

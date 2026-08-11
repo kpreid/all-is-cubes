@@ -1,8 +1,8 @@
 use alloc::collections::VecDeque;
 use core::cmp::Ordering;
-use core::format_args;
 use core::mem;
 use core::num::Wrapping;
+use core::{fmt, format_args};
 
 use all_is_cubes::math::{Cube, Face, GridCoordinate, GridRotation, rgba_const, u32size};
 
@@ -139,7 +139,7 @@ pub struct Triangulator {
 }
 
 /// Defines the coordinate system of the input to a [`Triangulator`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Basis {
     /// Orientation of the face/plane being processed.
     pub(in crate::planar) face: Face,
@@ -166,6 +166,24 @@ pub struct Basis {
     /// If the coordinate system established by the sweep is mirrored (which it is, half the time),
     /// then this is true to tell us to flip the winding order.
     pub(in crate::planar) left_handed: bool,
+}
+
+impl fmt::Debug for Basis {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            face,
+            sweep_direction,
+            perpendicular_direction,
+            perpendicular_vector: _, // redundant with perpendicular_direction
+            left_handed,
+        } = self;
+        f.debug_struct("Basis")
+            .field("face", &face)
+            .field("sweep_direction", &sweep_direction)
+            .field("perpendicular_direction", &perpendicular_direction)
+            .field("left_handed", &left_handed)
+            .finish()
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
