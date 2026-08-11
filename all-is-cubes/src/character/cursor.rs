@@ -221,8 +221,8 @@ impl lines::Wireframe for Cursor {
         let evaluated = &self.hit().evaluated;
 
         // Compute an approximate offset that will prevent Z-fighting.
-        let offset_from_surface_ps64 = ps64(0.001) * self.distance_to_point;
-        let offset_from_surface_f64 = offset_from_surface_ps64.into_inner();
+        let offset_from_surface_ps64 @ PositiveSign(offset_from_surface_f64) =
+            ps64(0.001) * self.distance_to_point;
 
         // AABB of the block's actual content. We use this rather than the full extent of
         // the cube so that it feels more accurate.
