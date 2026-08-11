@@ -406,7 +406,7 @@ pub enum ExposureOption {
 impl fmt::Debug for ExposureOption {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Fixed(value) => write!(f, "Fixed({})", value.into_inner()),
+            Self::Fixed(PositiveSign(value)) => write!(f, "Fixed({value})"),
             Self::Automatic => write!(f, "Automatic"),
         }
     }
