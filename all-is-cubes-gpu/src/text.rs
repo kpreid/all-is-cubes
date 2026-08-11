@@ -6,6 +6,7 @@ use descriptive_unwrap::OptionExt as _;
 use itertools::iproduct;
 
 use all_is_cubes::euclid::{self, Size2D, Vector2D, point2, size2};
+use all_is_cubes::math::PositiveSign;
 use all_is_cubes::text;
 use all_is_cubes_render::camera::{ImageSize, Viewport};
 
@@ -45,7 +46,7 @@ pub(crate) fn character_texture_size(
         .nominal_size
         .to_vector()
         .cast_unit::<()>()
-        .map(|c| c.into_inner() as f32)
+        .map(|PositiveSign(c)| c as f32)
         .component_div(desired_text_size_in_nominal_pixels.to_f32().cast_unit::<()>());
 
     (text_size_in_characters, texture_coordinate_scale)
