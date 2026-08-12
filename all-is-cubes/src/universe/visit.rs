@@ -39,6 +39,12 @@ where
     }
 }
 
+impl HandleVisitor for ! {
+    fn visit(&mut self, _: &dyn ErasedHandle) {
+        match *self {}
+    }
+}
+
 impl<T: universe::UniverseMember> VisitHandles for Handle<T> {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         visitor.visit(self)
@@ -90,6 +96,9 @@ impl<K: VisitHandles, V: VisitHandles> VisitHandles for alloc::collections::BTre
 }
 
 // Implementations for types that contain no handles
+impl VisitHandles for ! {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
+}
 impl VisitHandles for u8 {
     fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
 }

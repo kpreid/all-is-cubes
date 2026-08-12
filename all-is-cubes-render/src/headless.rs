@@ -43,6 +43,23 @@ pub trait HeadlessRenderer {
     ) -> futures_core::future::BoxFuture<'a, Result<Rendering, RenderError>>;
 }
 
+impl HeadlessRenderer for ! {
+    fn update(
+        &mut self,
+        _: Layers<all_is_cubes::universe::ReadTicket<'_>>,
+        _: Option<&Cursor>,
+    ) -> Result<(), RenderError> {
+        match *self {}
+    }
+
+    fn draw<'a>(
+        &'a mut self,
+        _: &'a str,
+    ) -> futures_core::future::BoxFuture<'a, Result<Rendering, RenderError>> {
+        match *self {}
+    }
+}
+
 /// Image container produced by a [`HeadlessRenderer`].
 // ---
 // TODO: This is not very compatible with future changes, but it's not clear how to

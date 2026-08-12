@@ -92,11 +92,40 @@ impl WhenceUniverse for () {
 
     fn save(
         &self,
-        _universe: &Universe,
-        _progress: YieldProgress,
+        _: &Universe,
+        _: YieldProgress,
     ) -> BoxFuture<'static, Result<(), Box<dyn Error + Send + Sync>>> {
         Box::pin(core::future::ready(Err(
             "this universe cannot be saved because a destination has not been specified".into(),
         )))
+    }
+}
+
+impl WhenceUniverse for ! {
+    fn document_name(&self) -> Option<String> {
+        match *self {}
+    }
+
+    fn can_load(&self) -> bool {
+        match *self {}
+    }
+
+    fn can_save(&self) -> bool {
+        match *self {}
+    }
+
+    fn load(
+        &self,
+        _: YieldProgress,
+    ) -> BoxFuture<'static, Result<Box<Universe>, Box<dyn Error + Send + Sync>>> {
+        match *self {}
+    }
+
+    fn save(
+        &self,
+        _: &Universe,
+        _: YieldProgress,
+    ) -> BoxFuture<'static, Result<(), Box<dyn Error + Send + Sync>>> {
+        match *self {}
     }
 }
