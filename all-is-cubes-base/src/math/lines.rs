@@ -23,6 +23,13 @@ pub trait Wireframe {
     fn wireframe_points<E: Extend<[Vertex; 2]>>(&self, output: &mut E);
 }
 
+#[allow(clippy::missing_inline_in_public_items)]
+impl Wireframe for ! {
+    fn wireframe_points<E: Extend<[Vertex; 2]>>(&self, _: &mut E) {
+        match *self {}
+    }
+}
+
 impl<T: Wireframe> Wireframe for Option<T> {
     #[allow(clippy::missing_inline_in_public_items)]
     fn wireframe_points<E: Extend<[Vertex; 2]>>(&self, output: &mut E) {
