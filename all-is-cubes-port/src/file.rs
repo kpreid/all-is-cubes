@@ -103,3 +103,21 @@ where
         ))
     }
 }
+
+impl Fileish for ! {
+    fn document_name(&self) -> String {
+        match *self {}
+    }
+
+    fn display_full_path(&self) -> String {
+        match *self {}
+    }
+
+    fn read(&self) -> Result<Vec<u8>, io::Error> {
+        match *self {}
+    }
+
+    fn write(&self, _: &[u8]) -> Result<(), io::Error> {
+        match *self {}
+    }
+}
