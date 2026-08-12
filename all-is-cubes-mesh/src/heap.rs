@@ -27,6 +27,12 @@ pub(crate) trait HeapUsage {
 //     }
 // but that implementation conflicts with other generic implementations.
 
+impl HeapUsage for ! {
+    fn heap_bytes_owned(&self) -> usize {
+        match *self {}
+    }
+}
+
 impl<T: HeapUsage> HeapUsage for Option<T> {
     fn heap_bytes_owned(&self) -> usize {
         match self {
