@@ -35,6 +35,12 @@ impl Scene for &Universe {
     }
 }
 
+impl Scene for ! {
+    fn into_cameras(self) -> StandardCameras {
+        match self {}
+    }
+}
+
 /// Dynamic overlay content passed to the [`HeadlessRenderer`] per-frame.
 /// This is a combination of the parameters of `update()` and `draw()`.
 #[derive(Clone, Debug)]
@@ -78,6 +84,20 @@ pub trait RendererFactory: Send + Sync + Debug {
     /// `Flaws::OTHER` (TODO: assign a dedicated flag bit?).
     fn known_incorrect(&self) -> KnownIncorrectness {
         KnownIncorrectness::NONE
+    }
+}
+
+impl RendererFactory for ! {
+    fn renderer_from_cameras(&self, _: StandardCameras) -> Box<dyn HeadlessRenderer + Send> {
+        match *self {}
+    }
+
+    fn id(&self) -> RendererId {
+        match *self {}
+    }
+
+    fn info(&self) -> String {
+        match *self {}
     }
 }
 
