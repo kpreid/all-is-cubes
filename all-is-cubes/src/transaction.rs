@@ -454,3 +454,16 @@ pub trait Transactional {
 /// Output callback function for committing a [`Transaction`] whose `Output` type is
 /// [`!`] and therefore cannot produce any outputs.
 pub fn no_outputs(_: !) {}
+
+impl Merge for ! {
+    type MergeCheck = !;
+    type Conflict = !;
+
+    fn check_merge(&self, _: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
+        match *self {}
+    }
+
+    fn commit_merge(&mut self, _: Self, _: Self::MergeCheck) {
+        match *self {}
+    }
+}

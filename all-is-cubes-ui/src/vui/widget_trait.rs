@@ -179,6 +179,15 @@ pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     }
 }
 
+impl Widget for ! {
+    fn controller(
+        self: Arc<Self>,
+        _: &WidgetContext<'_, '_>,
+    ) -> Result<Box<dyn WidgetController>, InWidgetError> {
+        match *self {}
+    }
+}
+
 /// Successful return of [`WidgetController::step()`].
 ///
 /// The [`Then`] determines when `step()` is called again, if it is.

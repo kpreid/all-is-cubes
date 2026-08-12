@@ -44,6 +44,12 @@ pub trait DefaultProvision<T> {
     fn module_default(self) -> T;
 }
 
+impl<T> DefaultProvision<T> for ! {
+    fn module_default(self) -> T {
+        match self {}
+    }
+}
+
 /// Types whose values identify blocks in a set of related blocks, which may be
 /// stored in a [`BlockProvider`] or under specific names in a [`Universe`].
 ///
