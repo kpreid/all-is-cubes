@@ -86,6 +86,17 @@ impl Executor for () {
     }
 }
 
+#[allow(clippy::missing_inline_in_public_items)]
+impl Executor for ! {
+    fn spawn_background(&self, _: &mut dyn FnMut() -> BoxFuture<'static, ()>) {
+        match *self {}
+    }
+
+    fn yield_now(&self) -> BoxFuture<'static, ()> {
+        match *self {}
+    }
+}
+
 #[doc(hidden)]
 pub use error_chain::ErrorChain;
 mod error_chain {

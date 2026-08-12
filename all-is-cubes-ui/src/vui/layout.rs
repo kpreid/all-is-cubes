@@ -197,6 +197,11 @@ impl<T: ?Sized + Layoutable> Layoutable for Arc<T> {
         (**self).requirements()
     }
 }
+impl Layoutable for ! {
+    fn requirements(&self) -> LayoutRequest {
+        match *self {}
+    }
+}
 
 /// A user interface laid out in 3-dimensional space.
 ///

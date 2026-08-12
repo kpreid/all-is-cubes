@@ -77,6 +77,17 @@ impl RtBlockData for () {
     fn exception(_: Exception, _: RtOptionsRef<'_, Self::Options>) -> Self {}
 }
 
+impl RtBlockData for ! {
+    type Options = !;
+    fn from_block(options: RtOptionsRef<'_, Self::Options>, _: &SpaceBlockData) -> Self {
+        match *options.custom_options {}
+    }
+
+    fn exception(_: Exception, options: RtOptionsRef<'_, Self::Options>) -> Self {
+        match *options.custom_options {}
+    }
+}
+
 /// Stores the block's resolution.
 impl RtBlockData for Resolution {
     type Options = ();
@@ -168,6 +179,19 @@ impl Accumulate for () {
     fn add(&mut self, _: Hit<'_, Self::BlockData>) {}
 
     fn mean<const N: usize>(_: [Self; N]) -> Self {}
+}
+
+impl Accumulate for ! {
+    type BlockData = !;
+
+    fn opaque(&self) -> bool {
+        match *self {}
+    }
+
+    fn add(&mut self, _: Hit<'_, Self::BlockData>) {}
+    fn mean<const N: usize>(items: [Self; N]) -> Self {
+        match items[0] {}
+    }
 }
 
 impl<A> Accumulate for (A,)

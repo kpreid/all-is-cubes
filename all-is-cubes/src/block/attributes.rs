@@ -842,6 +842,15 @@ pub(crate) trait BlRotate {
 mod impl_rotate {
     use super::*;
 
+    impl BlRotate for ! {
+        fn rotate(self, _: GridRotation) -> Self {
+            match self {}
+        }
+        fn rotationally_symmetric(&self) -> bool {
+            match *self {}
+        }
+    }
+
     macro_rules! impl_rotate_always_symmetric {
         ($type:ty) => {
             impl BlRotate for $type {
