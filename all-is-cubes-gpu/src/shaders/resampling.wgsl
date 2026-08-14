@@ -61,7 +61,7 @@ fn full_image_vertex(
 
     // instance index is used to signal the output mip level,
     // which corresponds to the stage of processing we are at.
-    return VertexOutput(position, texcoord, texcoord_output_step, in_instance_index);
+    return VertexOutput(position, texcoord, texcoord_output_step, output_stage);
 }
 
 // --- General fragment shading helpers ------------------------------------------------------------
