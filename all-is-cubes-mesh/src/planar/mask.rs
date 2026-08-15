@@ -112,6 +112,40 @@ impl Mask {
     pub(crate) fn has_edge_bs(self) -> bool {
         self.contains_any_of(Mask::Bsbp) ^ self.contains_any_of(Mask::Bsfp)
     }
+
+    /// Returns whether this vertex is a corner (or two corners touching), thus forming a
+    /// significant part of the shape.
+    //---
+    // TODO: make this public but only after adding some tests.
+    pub(crate) fn is_corner(self) -> bool {
+        match self {
+            // No edges
+            Mask::Empty => false,
+            Mask::All => false,
+
+            // Straight lines
+            Mask::Fs => false,
+            Mask::Fp => false,
+            Mask::Bp => false,
+            Mask::Bs => false,
+
+            // Inside corners
+            Mask::Fsfp => true,
+            Mask::Fsbp => true,
+            Mask::Bsfp => true,
+            Mask::Bsbp => true,
+
+            // Outside corners
+            Mask::NotBsbp => true,
+            Mask::NotBsfp => true,
+            Mask::NotFsbp => true,
+            Mask::NotFsfp => true,
+
+            // Checkerboards
+            Mask::Fbbf => true,
+            Mask::Ffbb => true,
+        }
+    }
 }
 
 /// When formatted, [`Mask`] is depicted as if the sweep direction is rightward

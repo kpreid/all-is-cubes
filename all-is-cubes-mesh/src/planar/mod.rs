@@ -16,8 +16,12 @@
 
 use core::fmt;
 
-use all_is_cubes::math::GridPoint;
+use all_is_cubes::euclid::{Box2D, Point2D, vec2};
+use all_is_cubes::math::{Face, GridPoint};
 use all_is_cubes::util::Refmt;
+
+#[cfg(doc)]
+use crate::planar;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -84,4 +88,87 @@ impl fmt::Debug for Vertex {
             position = position.refmt(&all_is_cubes::util::ConciseDebug)
         )
     }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Given access to a two-dimensional binary image, find its [`planar::Vertex`]es.
+///
+/// This function is analogous to [`Analysis::analyze()`][crate::Analysis::analyze],
+/// but for 2D situations rather than 3D, and without consideration of texturing.
+///
+/// `get_pixel` should return the value of the pixel whose center is at `point + vec2(0.5, 0.5)`.
+/// It will be called four times per pixel.
+///
+/// The returned [`Basis`] specifies the ordering of the returned vertices, as is needed in order to
+/// pass them to [`Triangulator`] or [`Outliner`].
+///
+/// # Example
+///
+/// ```
+/// use all_is_cubes::euclid::{point2, size2, default::{Box2D, Point2D}};
+/// use all_is_cubes_mesh::planar;
+///
+/// let image: &[&[u8]] = &[
+///     b".......",
+///     b"#####..",
+///     b"..###..",
+/// ];
+///
+/// let (basis, vertices) = planar::analyze_2d(
+///     Box2D::from_size(size2(image[0].len() as i32, image.len() as i32)),
+///     |point| image[point.y as usize][point.x as usize] != b'.'
+/// );
+///
+/// assert_eq!(
+///     Vec::from_iter(vertices.map(|vertex| vertex.position.xy())),
+///     [
+///         point2(0, 1), // top left
+///         point2(5, 1), // top right
+///         point2(0, 2),
+///         point2(2, 2),
+///         point2(2, 3),
+///         point2(5, 3), // bottom right
+///     ]
+/// );
+/// ```
+//---
+// TODO: Consider making this able to proceed in different orderings.
+pub fn analyze_2d<U>(
+    bounds: Box2D<i32, U>,
+    get_pixel: impl Fn(Point2D<i32, U>) -> bool,
+) -> (Basis, impl Iterator<Item = Vertex>) {
+    let mut index_counter = 0;
+
+    let vertices = itertools::iproduct!(bounds.min.y..=bounds.max.y, bounds.min.x..=bounds.max.x)
+        .filter_map(move |(y, x)| {
+            let vertex_position = Point2D::new(x, y);
+
+            let mut connectivity = Mask::Empty;
+            for (dx, dy, mask) in [
+                (-1, -1, Mask::Bsbp),
+                (0, -1, Mask::Bsfp),
+                (-1, 0, Mask::Fsbp),
+                (0, 0, Mask::Fsfp),
+            ] {
+                let pixel = vertex_position + vec2(dx, dy);
+                if bounds.contains(pixel) && get_pixel(pixel) {
+                    connectivity |= mask;
+                }
+            }
+            if connectivity.is_corner() {
+                let index = index_counter;
+                index_counter += 1;
+
+                Some(Vertex {
+                    position: vertex_position.extend(0).cast_unit(),
+                    connectivity,
+                    index,
+                })
+            } else {
+                None
+            }
+        });
+
+    (Basis::new(Face::PZ, Face::PY, Face::PX), vertices)
 }
