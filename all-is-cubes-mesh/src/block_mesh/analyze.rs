@@ -191,11 +191,7 @@ impl Analysis {
     /// The analysis contains no information about edges; edges must be derived from
     /// the connectivity information included in these vertices.
     ///
-    /// The vertices are ordered such that for any edge, its vertices will be encountered in
-    /// increasing order of their coordinates; e.g. `[4, 0, 4]` will always appear before
-    /// `[4, 2, 4]`.
-    ///
-    // Non-public guarantee: More specifically, the vertices are sorted in [`ZMaj`] order.
+    /// The vertices are sorted according to [`Analysis::vertex_ordering()`].
     ///
     /// [vertices]: https://en.wikipedia.org/wiki/Vertex_(geometry)
     /// [orthogonal polyhedron]: https://en.wikipedia.org/wiki/Orthogonal_polyhedron
@@ -203,6 +199,14 @@ impl Analysis {
     #[inline]
     pub fn vertices(&self) -> &[AnalysisVertex] {
         &self.vertices
+    }
+
+    /// Returns the ordering in which the vertices in [`Analysis::vertices()`] are stored.
+    ///
+    /// This is a constant, but it may be changed in future versions of All is Cubes.
+    pub fn vertex_ordering(&self) -> all_is_cubes::math::ZMaj {
+        #![expect(clippy::unused_self)]
+        all_is_cubes::math::ZMaj
     }
 
     /// For each face normal, which depths will need any triangles generated.
@@ -502,7 +506,7 @@ fn uncovered(mask: OctantMask, face: Face) -> bool {
 /// of implementing caching across steps.
 ///
 /// Note: Changing the iteration order will change the ordering of the [`Analysis::vertices`]
-/// vector, which must be taken into account.
+/// vector, which must be taken into account by changing [`Analysis::vertex_ordering`].
 fn for_each_window<'a>(
     voxels: block::EvoxelsRef<'a>,
     mut f: impl FnMut((Point3D<u8, Cube>, OctantMap<&'a Evoxel>)) -> Result<(), OutOfMemory>,

@@ -7,7 +7,10 @@ use all_is_cubes::math::{Cube, Face, GridCoordinate, GridRotation};
 use crate::planar::Vertex;
 
 #[cfg(doc)]
-use crate::planar::{Outliner, Triangulator};
+use crate::{
+    Analysis,
+    planar::{Outliner, Triangulator},
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -107,6 +110,26 @@ impl Basis {
             ),
             left_handed,
         }
+    }
+
+    /// Constructs a [`Basis`] from the ordering of vertex data.
+    ///
+    /// If using filtered vertex data from an [`Analysis`], pass [`Analysis::vertex_ordering()`]
+    /// to this function to get the appropriate basis.
+    ///
+    /// (Currently, only one ordering of voxel data is supported across All is Cubes, and this
+    /// function’s signature serves more to formally document that fact than to provide
+    /// flexibility.)
+    pub const fn from_ordering(face: Face, _ordering: all_is_cubes::math::ZMaj) -> Self {
+        let (sweep_direction, perpendicular_direction) = match face {
+            Face::NX => (Face::PY, Face::PZ),
+            Face::NY => (Face::PX, Face::PZ),
+            Face::NZ => (Face::PX, Face::PY),
+            Face::PX => (Face::PY, Face::PZ),
+            Face::PY => (Face::PX, Face::PZ),
+            Face::PZ => (Face::PX, Face::PY),
+        };
+        Basis::new(face, sweep_direction, perpendicular_direction)
     }
 
     /// Returns the `face` direction this was constructed with.

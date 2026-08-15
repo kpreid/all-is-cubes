@@ -221,27 +221,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
         let interior_mesh = &mut output.interior_vertices[face];
         let interior_side_octant_mask = OctantMask::from_face(-face);
 
-        let triangulator_basis = planar::Basis::new(
-            face,
-            /* sweep_direction: */
-            match face {
-                Face::NX => Face::PY,
-                Face::NY => Face::PX,
-                Face::NZ => Face::PX,
-                Face::PX => Face::PY,
-                Face::PY => Face::PX,
-                Face::PZ => Face::PX,
-            },
-            /* perpendicular_direction: */
-            match face {
-                Face::NX => Face::PZ,
-                Face::NY => Face::PZ,
-                Face::NZ => Face::PY,
-                Face::PX => Face::PZ,
-                Face::PY => Face::PZ,
-                Face::PZ => Face::PY,
-            },
-        );
+        let triangulator_basis = planar::Basis::from_ordering(face, analysis.vertex_ordering());
 
         // Check the case where the block's voxels don't meet its front face.
         // If they do, then we'll take care of `fully_opaque` later, but if we don't even
