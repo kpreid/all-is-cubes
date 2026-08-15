@@ -1,8 +1,18 @@
-//! Construction of 2D planar triangles from the surfaces of voxel shapes.
+//! Construction of 2D planar triangles and polygons from the surfaces of voxel shapes.
 //!
 //! The algorithms in this module are primarily for internal use by [`BlockMesh`][crate::BlockMesh],
 //! and you do not need to use any items in this module to build block meshes.
 //! However, they have been made available for separate use if desired.
+//!
+//! Each of the main algorithms accepts an ordered list of [`Vertex`]es, which contain local
+//! vertex/edge/face connectivity but not global connectivity. They produce:
+//!
+//! * [`Triangulator`] produces a [triangulation] of the shape.
+//!   This output is suitable for triangle meshes.
+//! * [`Outliner`] produces the boundary of the shape, organized into closed loops.
+//!   This output is suitable for translation into vector graphics paths, such as in SVG.
+//!
+//! [triangulation]: https://en.wikipedia.org/wiki/Polygon_triangulation
 
 use core::fmt;
 
@@ -10,6 +20,9 @@ use all_is_cubes::math::GridPoint;
 use all_is_cubes::util::Refmt;
 
 // -------------------------------------------------------------------------------------------------
+
+mod basis;
+pub use basis::Basis;
 
 mod mask;
 pub use mask::Mask;
@@ -24,7 +37,7 @@ mod svg;
 mod testing;
 
 mod triangulator;
-pub use triangulator::{Basis, Triangulator};
+pub use triangulator::Triangulator;
 
 #[cfg(test)]
 mod triangulator_tests;
@@ -37,7 +50,7 @@ mod triangulator_tests;
 /// integer width we allow?
 type Index = u32;
 
-/// A vertex in the form processed by [`Triangulator`] to produce triangles.
+/// A vertex in the form required by [`Triangulator`] or [`Outliner`].
 ///
 /// (Refer to this type as `planar::Vertex` to avoid ambiguity.)
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]

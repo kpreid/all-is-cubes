@@ -1,8 +1,8 @@
 use alloc::format;
 use alloc::vec::Vec;
-use std::{dbg, println};
+use std::println;
 
-use all_is_cubes::math::{Face, GridPoint};
+use all_is_cubes::math::GridPoint;
 
 use crate::planar::testing::{test_basis, vert, vertices_from_ascii_art};
 use crate::planar::{self, Mask};
@@ -384,58 +384,4 @@ fn doc_example_svg_test() {
     println!("{svg}");
 
     pretty_assertions::assert_eq!(svg, include_str!("triangulator_example.svg"));
-}
-
-// -------------------------------------------------------------------------------------------------
-// Tests of internals that are harder to test as part of the larger algorithm.
-
-#[test]
-fn winding() {
-    // See the doc comment on `is_correct_winding()` for details on what makes these LH and RH
-    let xy_rh_basis = planar::Basis::new(Face::PZ, Face::PX, Face::PY);
-    let xy_lh_basis = planar::Basis::new(Face::NZ, Face::PX, Face::PY);
-    let yx_rh_basis = planar::Basis::new(Face::NZ, Face::PY, Face::PX);
-    let yx_lh_basis = planar::Basis::new(Face::PZ, Face::PY, Face::PX);
-    assert_eq!(xy_rh_basis.left_handed, false, "xy_rh_basis");
-    assert_eq!(xy_lh_basis.left_handed, true, "xy_lh_basis");
-    assert_eq!(yx_rh_basis.left_handed, false, "yx_rh_basis");
-    assert_eq!(yx_lh_basis.left_handed, true, "yx_lh_basis");
-
-    let try_all = |triangle: [&planar::Vertex; 3]| -> [bool; 4] {
-        [
-            xy_rh_basis.is_correct_winding(triangle),
-            xy_lh_basis.is_correct_winding(triangle),
-            yx_rh_basis.is_correct_winding(triangle),
-            yx_lh_basis.is_correct_winding(triangle),
-        ]
-    };
-
-    // Some vertices to make both degenerate and non-degenerate triangles
-    let vertices = vertices_from_ascii_art([
-        b"b  ", //
-        b"   ", //
-        b" c ", //
-        b"   ", //
-        b"a d", //
-    ]);
-    dbg!(&vertices);
-    let [a, b, c, d] = &*vertices else {
-        unreachable!()
-    };
-
-    assert_eq!(
-        try_all([a, b, c]),
-        [false, false, true, true],
-        "clockwise in +x+y"
-    );
-    assert_eq!(
-        try_all([a, c, b]),
-        [true, true, false, false],
-        "counterclockwise in +x+y"
-    );
-    assert_eq!(
-        try_all([b, c, d]),
-        [false, false, false, false],
-        "degenerate"
-    );
 }

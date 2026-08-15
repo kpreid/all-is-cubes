@@ -1,22 +1,16 @@
 use alloc::collections::VecDeque;
-use core::cmp::Ordering;
 use core::mem;
-use core::num::Wrapping;
-use core::{fmt, format_args};
 
-use all_is_cubes::math::{Cube, Face, GridCoordinate, GridRotation, rgba_const, u32size};
+use all_is_cubes::math::{GridCoordinate, rgba_const, u32size};
 
 use crate::OutOfMemory;
 use crate::Viz;
-use crate::planar::{Index, Mask, Vertex};
+use crate::planar::{Basis, Index, Mask, Vertex};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Wrapping arithmetic helps `compare_perp()` be simple
-type WrappingVector3D = all_is_cubes::euclid::Vector3D<Wrapping<GridCoordinate>, Cube>;
-
 /// Takes arbitrary [orthogonal polygons] that form the surfaces of voxel shapes
-/// and triangulates them.
+/// and [triangulates] them.
 ///
 /// This type constitutes temporary storage for the state of the algorithm.
 /// It is used by calling [`Triangulator::triangulate()`],
@@ -87,6 +81,7 @@ type WrappingVector3D = all_is_cubes::euclid::Vector3D<Wrapping<GridCoordinate>,
 ///
 /// [sweep line algorithm]: https://en.wikipedia.org/wiki/Sweep_line_algorithm
 /// [orthogonal polygons]: https://en.wikipedia.org/wiki/Rectilinear_polygon
+/// [triangulates]: https://en.wikipedia.org/wiki/Polygon_triangulation
 #[derive(Debug)]
 pub struct Triangulator {
     basis: Basis,
@@ -136,54 +131,6 @@ pub struct Triangulator {
     /// to fill in as many triangles as possible, which will include the skipped region,
     /// before continuing with the main algorithm that processes new vertices.
     needs_ears_fixed: bool,
-}
-
-/// Defines the coordinate system of the input to a [`Triangulator`].
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct Basis {
-    /// Orientation of the face/plane being processed.
-    pub(in crate::planar) face: Face,
-
-    /// Direction along the plane in which we are receiving input vertices.
-    /// Input vertices must be sorted by `sweep_direction.dot(vertex.position)`.
-    pub(in crate::planar) sweep_direction: Face,
-
-    /// A direction perpendicular to `self.face` and `self.sweep_direction`.
-    ///
-    /// Input vertices must be sorted by `perpendicular_direction.dot(vertex.position)`
-    /// as a secondary key after `sweep_direction`.
-    pub(in crate::planar) perpendicular_direction: Face,
-
-    /// `perpendicular_direction` as a unit vector.
-    /// Wrapping arithmetic helps `compare_perp()` compile to simple code.
-    /// (We do not need to worry about actual wrapping because vertices are always in u8 range
-    /// anyway.)
-    pub(in crate::planar) perpendicular_vector: WrappingVector3D,
-
-    /// Our normal coordinate system is understood as right-handed and in that system we build
-    /// meshes that have counterclockwise triangle winding.
-    ///
-    /// If the coordinate system established by the sweep is mirrored (which it is, half the time),
-    /// then this is true to tell us to flip the winding order.
-    pub(in crate::planar) left_handed: bool,
-}
-
-impl fmt::Debug for Basis {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            face,
-            sweep_direction,
-            perpendicular_direction,
-            perpendicular_vector: _, // redundant with perpendicular_direction
-            left_handed,
-        } = self;
-        f.debug_struct("Basis")
-            .field("face", &face)
-            .field("sweep_direction", &sweep_direction)
-            .field("perpendicular_direction", &perpendicular_direction)
-            .field("left_handed", &left_handed)
-            .finish()
-    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -359,7 +306,7 @@ impl Triangulator {
                     }
                 {
                     // connect old vertex forward because it is possible
-                    self.basis.emit(viz, &mut triangle_callback, triangle)?;
+                    emit(&self.basis, viz, &mut triangle_callback, triangle)?;
                     viz.completed_step();
                 } else {
                     // if this was true, then we've now hit a gap and should stop connecting
@@ -403,7 +350,8 @@ impl Triangulator {
                             input_vertex.connectivity.contains_any_of(Mask::Bsbp),
                             "inconsistent"
                         );
-                        self.basis.emit(
+                        emit(
+                            &self.basis,
                             viz,
                             &mut triangle_callback,
                             [
@@ -423,7 +371,8 @@ impl Triangulator {
                             "input vertices erroneous or triangulator has a bug; \
                             inconsistent connectivity of {input_vertex:?}"
                         );
-                        self.basis.emit(
+                        emit(
+                            &self.basis,
                             viz,
                             &mut triangle_callback,
                             [
@@ -449,7 +398,8 @@ impl Triangulator {
                         mid-span vertex must be connected backwards both ways"
                     );
 
-                    self.basis.emit(
+                    emit(
+                        &self.basis,
                         viz,
                         &mut triangle_callback,
                         [
@@ -536,7 +486,7 @@ impl Triangulator {
 
                 if connected_fwd && connected_back && is_convex {
                     // Emit the ear triangle.
-                    self.basis.emit(viz, triangle_callback, candidate_triangle)?;
+                    emit(&self.basis, viz, triangle_callback, candidate_triangle)?;
                     // Clip the ear: delete its middle vertex, so as to remove that triangle from
                     // the frontier.
                     self.new_frontier.remove(i + 1);
@@ -571,173 +521,42 @@ impl Triangulator {
     }
 }
 
-impl Basis {
-    /// Value used as a placeholder in [`Triangulator`]s that are not currently in use.
-    /// Its data is nonsense and it is never actually used.
-    pub(crate) const DUMMY: Self = Self {
-        face: Face::PX,
-        sweep_direction: Face::PX,
-        perpendicular_direction: Face::PX,
-        perpendicular_vector: WrappingVector3D::new(Wrapping(0), Wrapping(0), Wrapping(0)),
-        left_handed: false,
-    };
+/// Emit triangle to both the callback and viz.
+///
+/// The triangle should be counterclockwise wound in the coordinate frame where
+/// `self.sweep_direction` is right and `self.perpendicular_direction` is up.
+#[cfg_attr(debug_assertions, track_caller)]
+#[inline(always)]
+fn emit(
+    basis: &Basis,
+    viz: &mut Viz,
+    triangle_callback: &mut impl FnMut([Index; 3]) -> Result<(), OutOfMemory>,
+    mut triangle: [&Vertex; 3],
+) -> Result<(), OutOfMemory> {
+    debug_assert!(
+        basis.is_correct_winding(triangle),
+        "input vertices erroneous or triangulator has a bug; \
+        incorrect winding order passed to emit(): {triangle:?}"
+    );
 
-    /// Constructs a [`Basis`].
-    ///
-    /// * `face` is the normal of the plane in which the polygon to be triangulated lies.
-    /// * `sweep_direction` is a direction which must be the primary sort key of
-    ///   the input vertices, and must be perpendicular to `face`.
-    /// * `perpendicular_direction` is a direction which must be the secondary sort key of
-    ///   the input vertices, and must be perpendicular to both `face` and `sweep_direction`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the three provided directions are not perpendicular.
-    #[track_caller]
-    pub const fn new(face: Face, sweep_direction: Face, perpendicular_direction: Face) -> Self {
-        let left_handed = match GridRotation::try_from_basis_const([
-            face,
-            sweep_direction,
-            perpendicular_direction,
-        ]) {
-            Some(rot) => rot.is_reflection(),
-            None => panic!("directions provided to Basis must be orthogonal"),
-        };
-
-        Self {
-            face,
-            sweep_direction,
-            perpendicular_direction,
-            perpendicular_vector: perpendicular_direction.vector_const(
-                Wrapping(-1),
-                Wrapping(0),
-                Wrapping(1),
-            ),
-            left_handed,
-        }
+    // Flip the triangle based on our basis's handedness, so that the final output is always
+    // counterclockwise wound when understood in the right-handed output coordinate system.
+    if basis.left_handed {
+        triangle.reverse();
     }
 
-    /// Returns the `face` direction this was constructed with.
-    #[inline(always)]
-    pub fn face(&self) -> Face {
-        self.face
-    }
-
-    /// Returns the `sweep_direction` this was constructed with.
-    #[inline(always)]
-    pub fn sweep_direction(&self) -> Face {
-        self.sweep_direction
-    }
-
-    /// Returns the `perpendicular_direction` this was constructed with.
-    #[inline(always)]
-    pub fn perpendicular_direction(&self) -> Face {
-        self.perpendicular_direction
-    }
-
-    /// Compare two vertices’ positions along the direction perpendicular to the sweep.
-    #[inline(always)]
-    pub(crate) fn compare_perp(self, v1: &Vertex, v2: &Vertex) -> Ordering {
-        // Wrapping arithmetic helps `compare_perp()` compile to simple code.
-        // (We do not need to worry about actual wrapping because vertices are always in u8 range
-        // anyway.)
-        self.perpendicular_vector
-            .dot(v1.position.to_vector().map(Wrapping))
-            .cmp(&self.perpendicular_vector.dot(v2.position.to_vector().map(Wrapping)))
-    }
-
-    /// Returns the component of `vertex.position` on the `perpendicular_direction` axis.
-    ///
-    /// Note that this is not a dot product and never performs any arithmetic, unlike
-    /// [`Self::compare_perp()`].
-    #[inline(always)]
-    pub(crate) fn perpendicular_coordinate_of(&self, vertex: &Vertex) -> GridCoordinate {
-        vertex.position[self.perpendicular_direction.axis()]
-    }
-
-    /// Returns whether the winding order of the triangle is as it should be, *before* the
-    /// [`Basis::emit()`] stage.
-    ///
-    /// Always returns `false` for degenerate triangles (ones where all vertices lie on one line
-    /// and thus cover no area).
-    ///
-    /// # Explanation
-    ///
-    /// “Correct” always means counterclockwise wound in the (sweep right, perpendicular up)
-    /// right-handed 2D coordinate system, regardless of the 3D handedness that results when the
-    /// third `face` axis is included.
-    /// For example, the triangle ABC in this diagram is correctly wound:
-    ///
-    /// ```text
-    /// C
-    /// |\     ↑ perpendicular ↑
-    /// | \
-    /// A--B   → sweep →
-    /// ```
-    ///
-    /// Doing things this way allows us to avoid making each case of triangle emission in the
-    /// algorithm handedness-aware; instead, if the desired output is left-handed, [`Basis::emit()`]
-    /// reverses *all* triangles.
-    ///
-    /// Within the algorithm, `is_correct_winding()` is not used to make windings consistent, but
-    /// rather to test for triangles that are inside-out because they are covering areas they should
-    /// be avoiding.
-    #[inline(always)]
-    pub(super) fn is_correct_winding(self, triangle: [&Vertex; 3]) -> bool {
-        // depending on handedness this might be negated
-        let triangle_normal_by_cross_product = (triangle[1].position - triangle[0].position)
-            .cross(triangle[2].position - triangle[0].position);
-
-        let normal_dot_face = self.face.dot(triangle_normal_by_cross_product);
-
-        // This is not a single case because we want to always return false for degenerate
-        // triangles.
-        //
-        // (Note that because our coordinates are integers, there will be no rounding error.)
-        if self.left_handed {
-            normal_dot_face < 0
-        } else {
-            normal_dot_face > 0
-        }
-    }
-
-    /// Emit triangle to both the callback and viz.
-    ///
-    /// The triangle should be counterclockwise wound in the coordinate frame where
-    /// `self.sweep_direction` is right and `self.perpendicular_direction` is up.
-    #[cfg_attr(debug_assertions, track_caller)]
-    #[inline(always)]
-    fn emit(
-        self,
-        viz: &mut Viz,
-        triangle_callback: &mut impl FnMut([Index; 3]) -> Result<(), OutOfMemory>,
-        mut triangle: [&Vertex; 3],
-    ) -> Result<(), OutOfMemory> {
-        debug_assert!(
-            self.is_correct_winding(triangle),
-            "input vertices erroneous or triangulator has a bug; \
-            incorrect winding order passed to emit(): {triangle:?}"
-        );
-
-        // Flip the triangle based on our basis's handedness, so that the final output is always
-        // counterclockwise wound when understood in the right-handed output coordinate system.
-        if self.left_handed {
-            triangle.reverse();
-        }
-
-        viz.extend_vertices(
-            triangle
-                .iter()
-                // TODO(planar_new): unit accepted by extend_vertices (MeshRel) is wrong and we shouldn't need to cast here -- MeshRel implies vertices have been scaled to fraction-of-unit-cube coordinates but they have not and should not be
-                .map(|vertex| vertex.position.to_f32().cast_unit()),
-            [0, 1, 2].into_iter(),
-            // TODO(planar_new): replace this placeholder color with the same coloring logic we use
-            // for actually building the mesh (currently in compute.rs)
-            || rgba_const!(0.5, 0.5, 0.5, 1.0),
-            self.face,
-        );
-        triangle_callback(triangle.map(|v| v.index))
-    }
+    viz.extend_vertices(
+        triangle
+            .iter()
+            // TODO(planar_new): unit accepted by extend_vertices (MeshRel) is wrong and we shouldn't need to cast here -- MeshRel implies vertices have been scaled to fraction-of-unit-cube coordinates but they have not and should not be
+            .map(|vertex| vertex.position.to_f32().cast_unit()),
+        [0, 1, 2].into_iter(),
+        // TODO(planar_new): replace this placeholder color with the same coloring logic we use
+        // for actually building the mesh (currently in compute.rs)
+        || rgba_const!(0.5, 0.5, 0.5, 1.0),
+        basis.face,
+    );
+    triangle_callback(triangle.map(|v| v.index))
 }
 
 impl Default for Triangulator {
