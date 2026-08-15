@@ -422,7 +422,14 @@ impl Outliner {
                     if let Some(mut loop_) = self.close_frontier_bsbp(input_vertex, false)? {
                         loop_callback(loop_.make_contiguous())?;
                     }
-                    self.begin_frontier(input_vertex, true)?;
+
+                    // Kludge: We must not treat the frontier in the future as if it has an edge
+                    // pointing backwards, because that loop has already been dealt with.
+                    // Therefore, delete its Bsbp connectivity so that we proceed as if it is Fsfp.
+                    let mut tweaked_vertex = input_vertex;
+                    tweaked_vertex.connectivity &= !Mask::Bsbp;
+
+                    self.begin_frontier(tweaked_vertex, true)?;
                 }
             }
         }
@@ -1107,6 +1114,24 @@ mod tests {
                 b"  C---G", //
             ]),
             &[b"GHBAFEDC"],
+        );
+    }
+
+    /// Case that needs special handling: The `Mask::Ffbb` vertex F must not be treated as
+    /// backwards connected.
+    #[test]
+    fn regression_test_ffbb_then_elbow_bsbp() {
+        check(
+            &vertices_from_ascii_art([
+                b"D---I", //
+                b"|...|", //
+                b"C-G-|", //
+                b"  |.|", //
+                b"B-F-H", //
+                b"|.|  ", //
+                b"A-E  ", //
+            ]),
+            &[b"EFBA", b"HIDCGF"],
         );
     }
 
