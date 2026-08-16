@@ -386,24 +386,6 @@ impl Outliner {
                     }
                 }
 
-                // This vertex is treated as the combination of `Mask::Fsbp` and `Mask::Bsfp`,
-                // so it moves the previous frontier into storage and starts a new frontier.
-                //
-                // ↑ perpendicular
-                // ┆
-                // ┆    ↖ ↑ ┆
-                // ┆    ←   ┃
-                // ┆   •━━━━•━━━━···
-                // ┆        ┃   →
-                // ┆        ┃ ↓ ↘
-                // ┆        •
-                // ┆
-                // └┄┄┄┄┄┄┄┄┄┄┄→ sweep
-                Mask::Fbbf => {
-                    self.close_frontier_fsbp(input_vertex, true)?;
-                    self.begin_frontier(input_vertex, false)?;
-                }
-
                 // This vertex is treated as the combination of `Mask::Fsfp` and `Mask::Bsbp`,
                 // so it closes the previous loop like `Mask::Bsbp`, then opens a fresh one like
                 // `Mask::Fsfp`.
@@ -431,6 +413,78 @@ impl Outliner {
 
                     self.begin_frontier(tweaked_vertex, true)?;
                 }
+
+                // We’d like to treat this vertex as the combination of `Mask::Fsbp` and
+                // `Mask::Bsfp`, but the actual implementation is not as simple as composing those,
+                // because the sweep-backward and perpendicular-backward edges might turn out to
+                // form a closed loop themselves, so we have dedicated logic for this case.
+                //
+                // ↑ perpendicular
+                // ┆
+                // ┆    ↖ ↑ ┆
+                // ┆    ←   ┃
+                // ┆   •━━━━•━━━━···
+                // ┆        ┃   →
+                // ┆        ┃ ↓ ↘
+                // ┆        •
+                // ┆
+                // └┄┄┄┄┄┄┄┄┄┄┄→ sweep
+                Mask::Fbbf => {
+                    let Some(Frontier {
+                        loop_: mut frontier_loop,
+                        is_forward_of_sweep: true,
+                    }) = mem::take(&mut self.frontier)
+                    else {
+                        panic!("invalid frontier state for vertex {input_vertex:?}");
+                    };
+
+                    // The just-encountered vertex becomes the final vertex of this frontier loop.
+                    frontier_loop.push_back(input_vertex)?;
+
+                    let frontier_front_vertex = frontier_loop.front();
+
+                    let mut new_fsbp_loop = if frontier_front_vertex.connectivity.has_edge_fs() {
+                        // This is a new loop fragment not connected to any existing loops. Insert it.
+                        frontier_loop
+                    } else if frontier_front_vertex.connectivity.has_edge_bs() {
+                        // The first vertex of the frontier has an edge sweep-backwards, so we need to join
+                        // the beginning of the frontier to the existing loop at that position.
+
+                        let (existing_loop_end, mut existing_loop) = self.remove_existing_loop(
+                            self.basis.perpendicular_coordinate_of(frontier_front_vertex),
+                        );
+                        match existing_loop_end {
+                            End::Front => existing_loop.extend_front(frontier_loop)?,
+                            End::Back => existing_loop.extend_back(frontier_loop)?,
+                        }
+                        existing_loop
+                    } else {
+                        unreachable!(
+                            "frontier front vertex connectivity doesn’t make sense: {frontier_front_vertex:?}"
+                        );
+                    };
+
+                    // This will be the "half" of this vertex not already processed.
+                    let mut residual_vertex = input_vertex;
+
+                    if new_fsbp_loop.is_closed(&self.basis) {
+                        // If we’ve constructed a new closed loop, then we cannot insert it and
+                        // must emit it, but we also need to put a connectable vertex in the
+                        // frontier. Since this loop is a Bsfb corner, the new frontier
+                        // vertex must be a Fsfp corner, even though that's not what we usually
+                        // tie-break with.
+
+                        residual_vertex.connectivity = Mask::NotFsfp;
+
+                        // TODO: confirm winding order is correct
+                        loop_callback(new_fsbp_loop.0.make_contiguous())?;
+                    } else {
+                        residual_vertex.connectivity = Mask::Bsfp;
+                        self.insert_loop(new_fsbp_loop)?;
+                    }
+
+                    self.begin_frontier(residual_vertex, false)?;
+                }
             }
         }
 
@@ -443,6 +497,14 @@ impl Outliner {
         input_vertex: Vertex,
         is_forward_of_sweep: bool,
     ) -> Result<(), OutOfMemory> {
+        // This permits only cases where the way the frontier should be connected when it is
+        // finished is unambiguous.
+        // TODO: Maybe we should have a dedicated field on the `Frontier` for this info?
+        debug_assert_matches!(
+            input_vertex.connectivity,
+            Mask::Fsfp | Mask::NotFsfp | Mask::Bsfp | Mask::NotBsfp
+        );
+
         let loop_ = IncompleteLoop::new(input_vertex)?;
 
         debug_assert_matches!(self.frontier, None);
@@ -485,10 +547,7 @@ impl Outliner {
 
         let frontier_front_vertex = frontier_loop.front();
 
-        if frontier_front_vertex.connectivity.has_edge_fs()
-            // Kludge to avoid checkerboard confusion. TODO: The right solution will be asking a different question than has_edge_fs().
-            && frontier_front_vertex.connectivity != Mask::Fbbf
-        {
+        if frontier_front_vertex.connectivity.has_edge_fs() {
             // This is a new loop fragment not connected to any existing loops. Insert it.
             self.insert_loop(frontier_loop)?;
         } else if frontier_front_vertex.connectivity.has_edge_bs() {
@@ -1117,6 +1176,40 @@ mod tests {
         );
     }
 
+    /// When processing the `Mask::Fbbf` vertex F, we end up constructing a closed loop,
+    /// which must be emitted immediately.
+    #[test]
+    fn regression_test_fbbf_closes_loop() {
+        check(
+            &vertices_from_ascii_art([
+                b"B---G  ", //
+                b"|...|  ", //
+                b"|.D-F-I", //
+                b"|.| |.|", //
+                b"|.C-E.|", //
+                b"|.....|", //
+                b"A-----H", //
+            ]),
+            &[b"FECD", b"HIFGBA"],
+        );
+    }
+
+    #[test]
+    fn regression_test_fbbf_then_sweep_forward() {
+        check(
+            &vertices_from_ascii_art([
+                b"B---I", //
+                b"|...|", //
+                b"|.E-H", //
+                b"|.|  ", //
+                b"A-D-G", //
+                b"  |.|", //
+                b"  C-F", //
+            ]),
+            &[b"FGDC", b"HIBADE"],
+        );
+    }
+
     /// Case that needs special handling: The `Mask::Ffbb` vertex F must not be treated as
     /// backwards connected.
     #[test]
@@ -1132,22 +1225,6 @@ mod tests {
                 b"A-E  ", //
             ]),
             &[b"EFBA", b"HIDCGF"],
-        );
-    }
-
-    #[test]
-    fn regression_test_glider() {
-        check(
-            &vertices_from_ascii_art([
-                b"B---I", //
-                b"|...|", //
-                b"|.E-H", //
-                b"|.|  ", //
-                b"A-D-G", //
-                b"  |.|", //
-                b"  C-F", //
-            ]),
-            &[b"FGDC", b"HIBADE"],
         );
     }
 
