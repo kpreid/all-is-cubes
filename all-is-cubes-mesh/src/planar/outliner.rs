@@ -839,9 +839,10 @@ mod tests {
     use super::*;
     use crate::planar;
     use crate::planar::testing::{test_basis, vertices_from_ascii_art};
+    use all_is_cubes::euclid::{Box2D, Point2D, point2, size2};
     use alloc::format;
     use alloc::vec::Vec;
-    use std::println;
+    use std::{print, println};
 
     #[inline(never)]
     #[track_caller]
@@ -1230,5 +1231,31 @@ mod tests {
         println!("{svg}");
 
         pretty_assertions::assert_eq!(svg, include_str!("outliner_example.svg"));
+    }
+
+    #[test]
+    fn exhaustive() {
+        let bounds = Box2D::<i32, ()>::from_size(size2(4, 4));
+
+        for case in 0..=u16::MAX {
+            let get_pixel = move |p: Point2D<i32, ()>| {
+                let bit = p.x + p.y * 4;
+                case & (1 << bit) != 0
+            };
+
+            println!();
+            for y in 0..4 {
+                for x in 0..4 {
+                    print!("{}", if get_pixel(point2(x, y)) { "▧" } else { "·" });
+                }
+                println!();
+            }
+
+            let (basis, vertices) = planar::analyze_2d(bounds, get_pixel);
+
+            // Test that the outliner doesn’t panic, though we don’t know what its correct
+            // output for this case is.
+            Outliner::new().outline(basis, vertices, |_| Ok(())).unwrap();
+        }
     }
 }
