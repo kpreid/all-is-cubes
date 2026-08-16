@@ -485,7 +485,10 @@ impl Outliner {
 
         let frontier_front_vertex = frontier_loop.front();
 
-        if frontier_front_vertex.connectivity.has_edge_fs() {
+        if frontier_front_vertex.connectivity.has_edge_fs()
+            // Kludge to avoid checkerboard confusion. TODO: The right solution will be asking a different question than has_edge_fs().
+            && frontier_front_vertex.connectivity != Mask::Fbbf
+        {
             // This is a new loop fragment not connected to any existing loops. Insert it.
             self.insert_loop(frontier_loop)?;
         } else if frontier_front_vertex.connectivity.has_edge_bs() {
@@ -1129,6 +1132,22 @@ mod tests {
                 b"A-E  ", //
             ]),
             &[b"EFBA", b"HIDCGF"],
+        );
+    }
+
+    #[test]
+    fn regression_test_glider() {
+        check(
+            &vertices_from_ascii_art([
+                b"B---I", //
+                b"|...|", //
+                b"|.E-H", //
+                b"|.|  ", //
+                b"A-D-G", //
+                b"  |.|", //
+                b"  C-F", //
+            ]),
+            &[b"FGDC", b"HIBADE"],
         );
     }
 
