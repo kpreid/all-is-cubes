@@ -466,9 +466,6 @@ impl Outliner {
     /// └┄┄┄┄┄┄┄┄┄┄┄→ sweep</pre>
     ///
     /// and this method moves the frontier ended by that corner into the general loop storage.
-    ///
-    /// TODO: The beginning of the frontier might join to an existing loop, so we shouldn’t
-    /// always store a new loop.
     fn close_frontier_fsbp(
         &mut self,
         input_vertex: Vertex,
