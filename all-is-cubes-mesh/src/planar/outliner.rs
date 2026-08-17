@@ -1,4 +1,5 @@
 use alloc::collections::VecDeque;
+use alloc::vec::Vec;
 use core::debug_assert_matches;
 use core::fmt;
 use core::mem;
@@ -362,8 +363,8 @@ impl Outliner {
                 // ┆
                 // └┄┄┄┄┄┄┄┄┄┄┄→ sweep
                 Mask::Bsbp => {
-                    if let Some(mut loop_) = self.close_frontier_bsbp(input_vertex, false)? {
-                        loop_callback(loop_.make_contiguous())?;
+                    if let Some(loop_) = self.close_frontier_bsbp(input_vertex, false)? {
+                        loop_callback(&loop_)?;
                     }
                 }
 
@@ -381,8 +382,8 @@ impl Outliner {
                 // ┆
                 // └┄┄┄┄┄┄┄┄┄┄┄→ sweep
                 Mask::NotBsbp => {
-                    if let Some(mut loop_) = self.close_frontier_bsbp(input_vertex, true)? {
-                        loop_callback(loop_.make_contiguous())?;
+                    if let Some(loop_) = self.close_frontier_bsbp(input_vertex, true)? {
+                        loop_callback(&loop_)?;
                     }
                 }
 
@@ -401,8 +402,8 @@ impl Outliner {
                 // ┆
                 // └┄┄┄┄┄┄┄┄┄┄┄→ sweep
                 Mask::Ffbb => {
-                    if let Some(mut loop_) = self.close_frontier_bsbp(input_vertex, false)? {
-                        loop_callback(loop_.make_contiguous())?;
+                    if let Some(loop_) = self.close_frontier_bsbp(input_vertex, false)? {
+                        loop_callback(&loop_)?;
                     }
 
                     // Kludge: We must not treat the frontier in the future as if it has an edge
@@ -443,7 +444,7 @@ impl Outliner {
 
                     let frontier_front_vertex = frontier_loop.front();
 
-                    let mut new_fsbp_loop = if frontier_front_vertex.connectivity.has_edge_fs() {
+                    let new_fsbp_loop = if frontier_front_vertex.connectivity.has_edge_fs() {
                         // This is a new loop fragment not connected to any existing loops. Insert it.
                         frontier_loop
                     } else if frontier_front_vertex.connectivity.has_edge_bs() {
@@ -476,8 +477,7 @@ impl Outliner {
 
                         residual_vertex.connectivity = Mask::NotFsfp;
 
-                        // TODO: confirm winding order is correct
-                        loop_callback(new_fsbp_loop.0.make_contiguous())?;
+                        loop_callback(&new_fsbp_loop.prepare_to_emit(self.basis.left_handed))?;
                     } else {
                         residual_vertex.connectivity = Mask::Bsfp;
                         self.insert_loop(new_fsbp_loop)?;
@@ -590,7 +590,7 @@ impl Outliner {
         &mut self,
         input_vertex: Vertex,
         expect_is_forward_of_sweep: bool,
-    ) -> Result<Option<VecDeque<Vertex>>, OutOfMemory> {
+    ) -> Result<Option<Vec<Vertex>>, OutOfMemory> {
         let frontier_back_perp = self.basis.perpendicular_coordinate_of(&input_vertex);
         let frontier = mem::take(&mut self.frontier);
         let Some(Frontier {
@@ -645,12 +645,9 @@ impl Outliner {
             }
 
             if combined_loop.is_closed(&self.basis) {
-                // Reverse the loop if necessary to produce the intended winding order.
-                if !is_forward_of_sweep ^ self.basis.left_handed {
-                    combined_loop.0.make_contiguous().reverse();
-                }
-
-                Ok(Some(combined_loop.0))
+                Ok(Some(combined_loop.prepare_to_emit(
+                    !is_forward_of_sweep ^ self.basis.left_handed,
+                )))
             } else {
                 // The loop is still not closed, so reinsert it to wait for more vertices.
                 self.insert_loop(combined_loop)?;
@@ -842,6 +839,15 @@ impl IncompleteLoop {
     /// Returns whether this loop is complete and ready to be emitted.
     fn is_closed(&self, basis: &Basis) -> bool {
         self.front_coord(basis) == self.back_coord(basis)
+    }
+
+    fn prepare_to_emit(self, reverse: bool) -> Vec<Vertex> {
+        let mut v = Vec::from(self.0);
+        // Reverse the loop if necessary to produce the intended winding order.
+        if reverse {
+            v.reverse();
+        }
+        v
     }
 }
 
