@@ -1234,6 +1234,25 @@ mod tests {
         );
     }
 
+    #[test]
+    #[ignore = "TODO"]
+    fn regression_test_ffbb_not_closing_loop() {
+        check(
+            &vertices_from_ascii_art([
+                b"B---G  ", //
+                b"|...|  ", //
+                b"|.D-F-J", //
+                b"|.| |.|", //
+                b"|.| E-I", //
+                b"|.|    ", //
+                b"|.C---E", //
+                b"|.....|", //
+                b"A-----H", //
+            ]),
+            &[],
+        );
+    }
+
     /// Regenerates the image embedded in the [`Outliner`] documentation.
     #[test]
     fn doc_example_svg_test() {
