@@ -58,16 +58,23 @@ pub struct Outliner {
 
     /// Maps a partial loop’s first vertex’s perpendicular coordinate to its elements.
     ///
-    /// The first vertex is always the vertex encountered earlier along the perpendicular direction.
+    /// The first vertex is always the vertex encountered earlier along the perpendicular direction;
+    /// it is called “front” after the terminology of [`VecDeque`].
     /// The final winding order of the loop is fixed up when it is output.
+    ///
+    /// The partial loop whose *back* is along the current sweep line is not stored here, but in
+    /// `self.frontier`.
     loop_fronts: HashMap<GridCoordinate, IncompleteLoop>,
 
     /// Maps a partial loop’s last vertex’s perpendicular coordinate to its first vertex’s.
+    /// The last vertex is called “front” after the terminology of [`VecDeque`].
     loop_backs: HashMap<GridCoordinate, GridCoordinate>,
 
-    /// If present, these are a sequence of connected vertices that lie on the current sweep line.
-    /// They will be moved to `loop_fronts`/`loop_backs` once the last connected vertex on this line
-    /// has been found.
+    /// If present, this is the incomplete loop whose “back” lies on the current sweep line and
+    /// will be extended by the next vertex encountered.
+    ///
+    /// Once the last such vertex on this line has been found, the loop will be emitted or moved
+    /// to `self.loop_fronts`.
     frontier: Option<Frontier>,
 }
 
@@ -75,10 +82,12 @@ pub struct Outliner {
 struct Frontier {
     /// The vertices making up this loop segment.
     ///
-    /// Their ordering is always increasing in `basis.perpendicular_direction`.
+    /// The “back” of this loop is always a vertex with connectivity extending along
+    /// `basis.perpendicular_direction`, such that it will be connected to the next vertex
+    /// encountered.
     loop_: IncompleteLoop,
 
-    /// `true` if the interior side of these edges is sweep-forward:
+    /// `true` if the interior side of the “back” incomplete edge is sweep-forward:
     ///
     /// <pre>↑ perpendicular
     /// ┆
@@ -102,7 +111,7 @@ struct Frontier {
     /// ┆
     /// └┄┄┄┄┄┄┄┄┄┄┄→ sweep</pre>
     ///
-    /// This is possible to derive from the vertices, but we are keeping it around in a
+    /// This is possible to derive from the back vertex, but we are keeping it around in a
     /// pattern-matchable state.
     is_forward_of_sweep: bool,
 }
@@ -159,8 +168,8 @@ impl Outliner {
                 // This vertex does not lie on any loop, and therefore can be discarded.
                 Mask::Empty | Mask::All => {}
 
-                // This vertex starts a new path, which we record in `frontier` as long as
-                // it lies along the current sweep position.
+                // This vertex starts a new loop, which we record in `frontier` as long as
+                // it lies along the current sweep line.
                 //
                 // ↑ perpendicular
                 // ┆
@@ -170,7 +179,7 @@ impl Outliner {
                 // ┆
                 // └┄┄┄┄┄┄┄┄┄┄┄→ sweep
                 Mask::Fsfp => {
-                    self.begin_frontier(input_vertex, true)?;
+                    self.begin_frontier_fsfp(input_vertex, true)?;
                 }
 
                 // This vertex is an inside corner which connects a sweep-forward edge (not yet
@@ -187,12 +196,10 @@ impl Outliner {
                 // ┆
                 // └┄┄┄┄┄┄┄┄┄┄┄→ sweep
                 Mask::NotFsfp => {
-                    self.begin_frontier(input_vertex, false)?;
+                    self.begin_frontier_fsfp(input_vertex, false)?;
                 }
 
-                // This vertex connects to an existing loop and starts extending it along the
-                // `frontier`. (We don’t actually modify the existing loop until we’ve collected
-                // all the frontier vertices.)
+                // This vertex connects to an existing loop, which becomes the frontier loop.
                 //
                 // ↑ perpendicular
                 // ┆
@@ -202,12 +209,10 @@ impl Outliner {
                 // ┆
                 // └┄┄┄┄┄┄┄┄┄┄┄→ sweep
                 Mask::Bsfp => {
-                    self.begin_frontier(input_vertex, false)?;
+                    self.begin_frontier_bsfp(input_vertex, false)?;
                 }
 
-                // This vertex is an inside corner which connects a sweep-backward edge (already
-                // stored) to a perpendicular-forward edge (which we will start recording in
-                // `frontier`).
+                // This vertex connects to an existing loop, which becomes the frontier loop.
                 //
                 // ↑ perpendicular
                 // ┆
@@ -219,10 +224,10 @@ impl Outliner {
                 // ┆
                 // └┄┄┄┄┄┄┄┄┄┄┄→ sweep
                 Mask::NotBsfp => {
-                    self.begin_frontier(input_vertex, true)?;
+                    self.begin_frontier_bsfp(input_vertex, true)?;
                 }
 
-                // This vertex continues the `frontier` path with forward connectivity.
+                // This vertex continues the `frontier` loop with forward connectivity.
                 //
                 // ↑ perpendicular
                 // ┆
@@ -236,7 +241,7 @@ impl Outliner {
                 // └┄┄┄┄┄┄┄┄┄┄┄→ sweep
                 Mask::Fs => {
                     let Some(Frontier {
-                        loop_: path,
+                        loop_,
                         is_forward_of_sweep: true,
                     }) = &mut self.frontier
                     else {
@@ -245,10 +250,10 @@ impl Outliner {
                             f = self.frontier
                         );
                     };
-                    path.push_back(input_vertex)?;
+                    loop_.push_back(input_vertex)?;
                 }
 
-                // This vertex continues the `frontier` path with backward connectivity.
+                // This vertex continues the `frontier` loop with backward connectivity.
                 //
                 // ↑ perpendicular
                 // ┆
@@ -262,7 +267,7 @@ impl Outliner {
                 // └┄┄┄┄┄┄┄┄┄┄┄→ sweep
                 Mask::Bs => {
                     let Some(Frontier {
-                        loop_: path,
+                        loop_,
                         is_forward_of_sweep: false,
                     }) = &mut self.frontier
                     else {
@@ -271,11 +276,11 @@ impl Outliner {
                             f = self.frontier
                         );
                     };
-                    path.push_back(input_vertex)?;
+                    loop_.push_back(input_vertex)?;
                 }
 
                 // This vertex ends the sweep-forward-facing `frontier` path,
-                // which gets moved into the main storage, `path_starts`.
+                // which gets moved into the main storage, `loop_starts`.
                 //
                 // ↑ perpendicular
                 // ┆
@@ -412,7 +417,7 @@ impl Outliner {
                     let mut tweaked_vertex = input_vertex;
                     tweaked_vertex.connectivity &= !Mask::Bsbp;
 
-                    self.begin_frontier(tweaked_vertex, true)?;
+                    self.begin_frontier_fsfp(tweaked_vertex, true)?;
                 }
 
                 // We’d like to treat this vertex as the combination of `Mask::Fsbp` and
@@ -442,48 +447,31 @@ impl Outliner {
                     // The just-encountered vertex becomes the final vertex of this frontier loop.
                     frontier_loop.push_back(input_vertex)?;
 
-                    let frontier_front_vertex = frontier_loop.front();
+                    // let frontier_front_vertex = frontier_loop.front();
 
-                    let new_fsbp_loop = if frontier_front_vertex.connectivity.has_edge_fs() {
-                        // This is a new loop fragment not connected to any existing loops. Insert it.
-                        frontier_loop
-                    } else if frontier_front_vertex.connectivity.has_edge_bs() {
-                        // The first vertex of the frontier has an edge sweep-backwards, so we need to join
-                        // the beginning of the frontier to the existing loop at that position.
+                    if frontier_loop.is_closed(&self.basis) {
+                        // If the frontier loop is now closed (because its front is this vertex’s
+                        // sweep-backward edge and its back is this vertex’s perpendicular-backward
+                        // edge), then we can emit it now.
+                        loop_callback(&frontier_loop.prepare_to_emit(!self.basis.left_handed))?;
 
-                        let (existing_loop_end, mut existing_loop) = self.remove_existing_loop(
-                            self.basis.perpendicular_coordinate_of(frontier_front_vertex),
-                        );
-                        match existing_loop_end {
-                            End::Front => existing_loop.extend_front(frontier_loop)?,
-                            End::Back => existing_loop.extend_back(frontier_loop)?,
-                        }
-                        existing_loop
-                    } else {
-                        unreachable!(
-                            "frontier front vertex connectivity doesn’t make sense: {frontier_front_vertex:?}"
-                        );
-                    };
-
-                    // This will be the "half" of this vertex not already processed.
-                    let mut residual_vertex = input_vertex;
-
-                    if new_fsbp_loop.is_closed(&self.basis) {
-                        // If we’ve constructed a new closed loop, then we cannot insert it and
-                        // must emit it, but we also need to put a connectable vertex in the
-                        // frontier. Since this loop is a Bsfb corner, the new frontier
-                        // vertex must be a Fsfp corner, even though that's not what we usually
-                        // tie-break with.
-
+                        // Begin handling the vertex’s other role as part of the loop enclosing
+                        // the just-emitted loop.
+                        let mut residual_vertex = input_vertex;
                         residual_vertex.connectivity = Mask::NotFsfp;
-
-                        loop_callback(&new_fsbp_loop.prepare_to_emit(self.basis.left_handed))?;
+                        self.begin_frontier_fsfp(residual_vertex, false)?;
                     } else {
+                        // *First*, start the frontier from the `Bsfp` aspect of this vertex.
+                        // This removes an existing loop.
+                        let mut residual_vertex = input_vertex;
                         residual_vertex.connectivity = Mask::Bsfp;
-                        self.insert_loop(new_fsbp_loop)?;
-                    }
+                        self.begin_frontier_bsfp(residual_vertex, false)?;
 
-                    self.begin_frontier(residual_vertex, false)?;
+                        // Second, store the loop that contains the `Fsbp` aspect of this vertex.
+                        // This must be done second because it would otherwise collide with the loop
+                        // we just removed.
+                        self.insert_loop(frontier_loop)?;
+                    }
                 }
             }
         }
@@ -492,20 +480,45 @@ impl Outliner {
     }
 
     /// Insert the first vertex of a new loop section into [`self.frontier`], which must be empty.
-    fn begin_frontier(
+    /// The vertex must be a `Fsfp` or `NotFsfp` vertex, i.e. one with a sweep-forward edge
+    /// (leading to a vertex we have not encountered yet).
+    fn begin_frontier_fsfp(
         &mut self,
         input_vertex: Vertex,
         is_forward_of_sweep: bool,
     ) -> Result<(), OutOfMemory> {
-        // This permits only cases where the way the frontier should be connected when it is
-        // finished is unambiguous.
-        // TODO: Maybe we should have a dedicated field on the `Frontier` for this info?
-        debug_assert_matches!(
-            input_vertex.connectivity,
-            Mask::Fsfp | Mask::NotFsfp | Mask::Bsfp | Mask::NotBsfp
-        );
+        debug_assert_matches!(input_vertex.connectivity, Mask::Fsfp | Mask::NotFsfp);
 
         let loop_ = IncompleteLoop::new(input_vertex)?;
+
+        debug_assert_matches!(self.frontier, None);
+        self.frontier = Some(Frontier {
+            loop_,
+            is_forward_of_sweep,
+        });
+        Ok(())
+    }
+
+    /// The vertex must be a `Bsfp` or `NotBsfp` vertex, i.e. one with a sweep-backward edge that
+    /// will therefore connect to a vertex we already have in some loop.
+    /// We remove that loop and make it into the frontier loop.
+    fn begin_frontier_bsfp(
+        &mut self,
+        input_vertex: Vertex,
+        is_forward_of_sweep: bool,
+    ) -> Result<(), OutOfMemory> {
+        debug_assert_matches!(input_vertex.connectivity, Mask::Bsfp | Mask::NotBsfp);
+
+        let (end, mut loop_) =
+            self.remove_existing_loop(self.basis.perpendicular_coordinate_of(&input_vertex));
+
+        // The other end of the loop could be anywhere, so we need to reverse it so that its
+        // “back” is what we should be appending to.
+        match end {
+            End::Front => loop_.reverse(),
+            End::Back => {}
+        }
+        loop_.push_back(input_vertex)?;
 
         debug_assert_matches!(self.frontier, None);
         self.frontier = Some(Frontier {
@@ -545,34 +558,13 @@ impl Outliner {
         // Add the just-encountered vertex to the loop.
         frontier_loop.push_back(input_vertex)?;
 
-        let frontier_front_vertex = frontier_loop.front();
-
-        if frontier_front_vertex.connectivity.has_edge_fs() {
-            // This is a new loop fragment not connected to any existing loops. Insert it.
-            self.insert_loop(frontier_loop)?;
-        } else if frontier_front_vertex.connectivity.has_edge_bs() {
-            // The first vertex of the frontier has an edge sweep-backwards, so we need to join
-            // the beginning of the frontier to the existing loop at that position.
-
-            let (existing_loop_end, mut existing_loop) = self.remove_existing_loop(
-                self.basis.perpendicular_coordinate_of(frontier_front_vertex),
-            );
-            match existing_loop_end {
-                End::Front => existing_loop.extend_front(frontier_loop)?,
-                End::Back => existing_loop.extend_back(frontier_loop)?,
-            }
-            self.insert_loop(existing_loop)?;
-        } else {
-            unreachable!(
-                "frontier front vertex connectivity doesn’t make sense: {frontier_front_vertex:?}"
-            );
-        }
+        self.insert_loop(frontier_loop)?;
 
         Ok(())
     }
 
     /// Add `input_vertex` to the frontier as its final vertex, then join the frontier to the
-    /// existing loop(s) and return the resulting closed loop, if there is one.
+    /// existing loop and return the resulting closed loop, if there is one.
     ///
     /// This method is used on corners of the orientation
     ///
@@ -601,68 +593,39 @@ impl Outliner {
             panic!("invalid frontier state {frontier:?} for vertex {input_vertex:?}");
         };
         debug_assert_eq!(is_forward_of_sweep, expect_is_forward_of_sweep);
-        let frontier_front_vertex = *frontier_loop.front();
 
         frontier_loop.push_back(input_vertex)?;
 
-        // Retrieve the existing loop connected sweep-backwards to the frontier.
-        // We're going to either return this loop, or reinsert it with some appended elements
-        // (thus under different keys).
-        //
-        // existing_loop.? → •━━━━• ← frontier.back
-        //                        ┃
-        //                        ┆
-        //                        ┃
-        //                        • ← frontier.front
-        //
-        let (_existing_loop_end, existing_loop) = self.remove_existing_loop(frontier_back_perp);
-
-        if frontier_front_vertex.connectivity.has_edge_bs() {
-            // Both ends of the frontier point sweep-backwards, so we have this shape:
+        if frontier_loop.is_closed(&self.basis) {
+            Ok(Some(frontier_loop.prepare_to_emit(
+                is_forward_of_sweep ^ self.basis.left_handed,
+            )))
+        } else {
+            // Retrieve the existing loop now connected sweep-backwards to the frontier.
+            // We're going to either return this loop, or reinsert it with some appended elements
+            // (thus under different keys).
             //
-            //    existing_loop.? → •━━━━• ← frontier.back
-            //                           ┃
-            //                           ┆
-            //                           ┃
-            //            unknown → •━━━━• ← frontier.front
+            // existing_loop.? → •━━━━• ← frontier.back
+            //                        ┃
+            //                        ┆
+            //                        ┃
+            //                        • ← frontier.front
             //
-            // Join existing_loop and frontier_including_new_vertex, without yet considering the
-            // part marked "unknown" above.
-            let mut combined_loop = existing_loop.join(frontier_loop, &self.basis)?;
-
-            if !combined_loop.is_closed(&self.basis) {
-                // If the loop is not already closed (which happens if and only if the "unknown"
-                // point was in fact part of the existing_loop), then there must be a second loop
-                // to join to, at the "unknown" point above.
-                combined_loop = combined_loop.join(
-                    self.remove_existing_loop(
-                        self.basis.perpendicular_coordinate_of(&frontier_front_vertex),
-                    )
-                    .1,
-                    &self.basis,
-                )?;
-                // Now, the loop may or may not be newly closed.
+            let (existing_loop_end, existing_loop) = self.remove_existing_loop(frontier_back_perp);
+            match existing_loop_end {
+                End::Front => frontier_loop.extend_back(existing_loop)?,
+                End::Back => frontier_loop.extend_back(existing_loop.into_iter().rev())?,
             }
 
-            if combined_loop.is_closed(&self.basis) {
-                Ok(Some(combined_loop.prepare_to_emit(
+            if frontier_loop.is_closed(&self.basis) {
+                Ok(Some(frontier_loop.prepare_to_emit(
                     !is_forward_of_sweep ^ self.basis.left_handed,
                 )))
             } else {
                 // The loop is still not closed, so reinsert it to wait for more vertices.
-                self.insert_loop(combined_loop)?;
+                self.insert_loop(frontier_loop)?;
                 Ok(None)
             }
-        } else if frontier_front_vertex.connectivity.has_edge_fs() {
-            // We now know that the front of the frontier is connected sweep-forward, and the
-            // back of the frontier is connected sweep-backward, so we add the frontier to the
-            // existing loop and wait to find out what it connects to sweep-forward.
-            self.insert_loop(existing_loop.join(frontier_loop, &self.basis)?)?;
-            Ok(None)
-        } else {
-            unreachable!(
-                "frontier front vertex connectivity doesn’t make sense: {frontier_front_vertex:?}"
-            );
         }
     }
 
@@ -784,6 +747,7 @@ impl IncompleteLoop {
     /// loop.
     ///
     /// Note that this implicitly reverses the order of `vertices`.
+    #[cfg(false)] // unused
     fn extend_front(
         &mut self,
         vertices: impl IntoIterator<Item = Vertex>,
@@ -806,36 +770,6 @@ impl IncompleteLoop {
         Ok(())
     }
 
-    /// Concatenate these two paths, which must share at least one perpendicular coordinate.
-    ///
-    /// This is, in a sense, a brute force solution: we could do fewer lookups and calculations
-    /// by keeping precise track of everything we know already.
-    /// But, this is much more straightforward than writing out all of the conditionals and getting
-    /// the orderings right in all of those cases.
-    fn join(mut self, other: Self, basis: &Basis) -> Result<Self, OutOfMemory> {
-        if other.front_coord(basis) == self.back_coord(basis) {
-            self.extend_back(other)?;
-        } else if other.back_coord(basis) == self.back_coord(basis) {
-            self.extend_back(other.into_iter().rev())?;
-        } else if self.front_coord(basis) == other.back_coord(basis) {
-            self.extend_front(other.into_iter().rev())?;
-        } else if self.front_coord(basis) == other.front_coord(basis) {
-            self.extend_front(other)?;
-        } else {
-            unreachable!(
-                "loops do not share any vertices and cannot be joined:\n\
-                {self:#?}\nother: {other:#?}",
-            );
-        }
-
-        if self.front_coord(basis) > self.back_coord(basis) {
-            // TODO: Is this actually necessary?
-            self.0.make_contiguous().reverse();
-        }
-
-        Ok(self)
-    }
-
     /// Returns whether this loop is complete and ready to be emitted.
     fn is_closed(&self, basis: &Basis) -> bool {
         self.front_coord(basis) == self.back_coord(basis)
@@ -848,6 +782,10 @@ impl IncompleteLoop {
             v.reverse();
         }
         v
+    }
+
+    fn reverse(&mut self) {
+        self.0.make_contiguous().reverse();
     }
 }
 
@@ -946,7 +884,7 @@ mod tests {
                 b"|..|", //
                 b"A--C", //
             ]),
-            &[b"CDBA"],
+            &[b"BACD"],
         );
     }
 
@@ -958,7 +896,7 @@ mod tests {
                 b"|.| |.|", //
                 b"A-C a-c", //
             ]),
-            &[b"CDBA", b"cdba"],
+            &[b"BACD", b"bacd"],
         );
     }
 
@@ -972,7 +910,7 @@ mod tests {
                 b"|.|", //
                 b"A-C", //
             ]),
-            &[b"CDBXA"],
+            &[b"BXACD"],
         );
     }
 
@@ -986,7 +924,7 @@ mod tests {
                 b"|.|", //
                 b"A-C", //
             ]),
-            &[b"CXDBA"],
+            &[b"BACXD"],
         );
     }
 
@@ -998,7 +936,7 @@ mod tests {
                 b"|...|", //
                 b"A---C", //
             ]),
-            &[b"CDXBA"],
+            &[b"XBACD"],
         );
     }
 
@@ -1010,7 +948,7 @@ mod tests {
                 b"|...|", //
                 b"A-X-C", //
             ]),
-            &[b"CDBAX"],
+            &[b"BAXCD"],
         );
     }
 
@@ -1026,7 +964,7 @@ mod tests {
                 b"|.....|", //
                 b"A-----C", //
             ]),
-            &[b"abdc", b"CDBA"],
+            &[b"dcab", b"BACD"],
         );
     }
 
@@ -1040,7 +978,7 @@ mod tests {
                 b"  |.|", //
                 b"  C-F", //
             ]),
-            &[b"DEBA", b"FGDC"],
+            &[b"BADE", b"DCFG"],
         );
     }
 
@@ -1054,7 +992,7 @@ mod tests {
                 b"|.|  ", //
                 b"A-C  ", //
             ]),
-            &[b"CDBA", b"FGED"],
+            &[b"BACD", b"EDFG"],
         );
     }
 
@@ -1068,7 +1006,7 @@ mod tests {
                 b"|...|", //
                 b"A---E", //
             ]),
-            &[b"EFCDBA"],
+            &[b"CDBAEF"],
         );
     }
 
@@ -1082,7 +1020,7 @@ mod tests {
                 b"|.|  ", //
                 b"A-C  ", //
             ]),
-            &[b"EFBACD"],
+            &[b"BACDEF"],
         );
     }
 
@@ -1096,7 +1034,7 @@ mod tests {
                 b"|...|", //
                 b"A---E", //
             ]),
-            &[b"EFDCBA"],
+            &[b"DCBAEF"],
         );
     }
 
@@ -1110,7 +1048,7 @@ mod tests {
                 b"  |.|", //
                 b"  C-E", //
             ]),
-            &[b"EFBADC"],
+            &[b"BADCEF"],
         );
     }
 
@@ -1129,7 +1067,7 @@ mod tests {
                 b"|...|  ", //
                 b"A---E  ", //
             ]),
-            &[b"GHBAEFCD"],
+            &[b"BAEFCDGH"],
         );
     }
 
@@ -1146,7 +1084,7 @@ mod tests {
                 b"|.....|", //
                 b"A-----E", //
             ]),
-            &[b"EFCDGHBA"],
+            &[b"CDGHBAEF"],
         );
     }
 
@@ -1162,7 +1100,7 @@ mod tests {
                 b"|.....|", //
                 b"A-----G", //
             ]),
-            &[b"GHDCFEBA"],
+            &[b"DCFEBAGH"],
         );
     }
 
@@ -1178,7 +1116,7 @@ mod tests {
                 b"  |...|", //
                 b"  C---G", //
             ]),
-            &[b"GHBAFEDC"],
+            &[b"BAFEDCGH"],
         );
     }
 
@@ -1196,7 +1134,7 @@ mod tests {
                 b"|.....|", //
                 b"A-----H", //
             ]),
-            &[b"FECD", b"HIFGBA"],
+            &[b"FECD", b"FGBAHI"],
         );
     }
 
@@ -1212,7 +1150,7 @@ mod tests {
                 b"  |.|", //
                 b"  C-F", //
             ]),
-            &[b"FGDC", b"HIBADE"],
+            &[b"DCFG", b"BADEHI"],
         );
     }
 
@@ -1230,12 +1168,11 @@ mod tests {
                 b"|.|  ", //
                 b"A-E  ", //
             ]),
-            &[b"EFBA", b"HIDCGF"],
+            &[b"BAEF", b"DCGFHI"],
         );
     }
 
     #[test]
-    #[ignore = "TODO"]
     fn regression_test_ffbb_not_closing_loop() {
         check(
             &vertices_from_ascii_art([
@@ -1249,7 +1186,7 @@ mod tests {
                 b"|.....|", //
                 b"A-----H", //
             ]),
-            &[],
+            &[b"CDFGBAHE", b"FEIJ"],
         );
     }
 
