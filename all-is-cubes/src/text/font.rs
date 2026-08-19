@@ -222,7 +222,7 @@ impl FontDef {
         };
         match c {
             '\u{20}'..='\u{7F}' => (c as GlyphIndex) - 0x20,
-            '\u{80}'..='\u{FF}' => (c as GlyphIndex) - 0x40,
+            '\u{A0}'..='\u{FF}' => (c as GlyphIndex) - 0x40,
             _ => 0x1f, // unavailable glyphs become question marks -- TODO: dedicate a glyph
         }
     }
