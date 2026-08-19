@@ -114,7 +114,7 @@ rectangle-pack = { workspace = true, optional = true, features = ["std"] }
 all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
 font-types = { version = "0.12.2" } # reading fonts
 macro_rules_attribute = { workspace = true }
-read-fonts = { version = "0.41.0" } # reading fonts
+read-fonts = { version = "0.43.0" } # reading fonts
 snapbox = { workspace = true, features = ["path"] }
 either = { workspace = true }
 pretty_assertions = { workspace = true }
