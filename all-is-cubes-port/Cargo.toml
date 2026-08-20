@@ -57,6 +57,7 @@ dot-vox = [
 ]
 # Writing TrueType font files.
 ttf = [
+    "dep:all-is-cubes-mesh",
     "dep:write-fonts",
 ]
 # Adds automatic parallelism to some algorithms (but not all possible uses of concurrency).
