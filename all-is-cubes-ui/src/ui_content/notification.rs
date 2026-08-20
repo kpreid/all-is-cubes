@@ -17,7 +17,6 @@ use crate::vui::widgets::ProgressBarState;
 ///
 /// This value type is cheap to clone and comparing it compares the entire content.
 // TODO: don't expose this enum directly, for future-proofing
-#[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 #[expect(clippy::module_name_repetitions)] // TODO: rename?
@@ -25,8 +24,10 @@ pub enum NotificationContent {
     // TODO: Not implemented:
     // /// The message may be multi-line.
     // Message(ArcStr),
+    /// A progress bar.
     Progress {
-        /// The activity this is the progress of.
+        /// The overall activity this is the progress of.
+        /// Should be a short string which does not change with progress.
         title: ArcStr,
 
         /// The amount of progress.
@@ -44,14 +45,18 @@ pub enum NotificationContent {
 //     }
 // }
 
-/// A piece of information for the user's attention.
+/// A container of information to be brought to the user's attention.
 ///
-/// The carried message is displayed until the user dismisses it,
+/// The carried [`NotificationContent`] is displayed until the user dismisses it,
 /// or this [`Notification`] value is dropped.
+/// The message may be updated at any time ([`Notification`] is interior-mutable).
 ///
-/// To create and display a notification, call [`Session::show_notification()`] or
-/// [`MainTaskContext::show_notification()`].
-#[derive(Debug)]
+/// To display a notification, call [`Notification::new()`], then call
+/// [`Session::show_notification()`] or [`MainTaskContext::show_notification()`] to add it to
+/// a user session.
+///
+/// Cloning a [`Notification`] produces another handle to the same notification.
+#[derive(Clone, Debug)]
 pub struct Notification {
     shared: Arc<Shared>,
 }
@@ -70,6 +75,7 @@ pub enum Error {
 #[derive(Debug)]
 struct Shared {
     content: Mutex<NotificationContent>,
+
     notifier: listen::Notifier<()>,
 }
 
@@ -94,23 +100,39 @@ pub(crate) struct Hub {
 // --- Implementations -----------------------------------------------------------------------------
 
 impl Notification {
-    pub(crate) fn new(content: NotificationContent) -> (Self, Receiver) {
+    /// Create a new notification.
+    ///
+    /// This notification does not yet display its contents anywhere.
+    /// Call [`Session::show_notification()`] or [`MainTaskContext::show_notification()`] to add it
+    /// to a user session.
+    pub fn new(content: NotificationContent) -> Self {
         let shared = Arc::new(Shared {
             content: Mutex::new(content),
             notifier: listen::Notifier::new(),
         });
 
-        let receiver = Receiver {
-            shared: Arc::downgrade(&shared),
-        };
-        let notif = Notification { shared };
-        (notif, receiver)
+        Notification { shared }
     }
 
     /// Replace the existing content of the notification.
     pub fn set_content(&self, content: NotificationContent) {
         *self.shared.content.lock().unwrap_or_else(|poison| poison.into_inner()) = content;
         self.shared.notifier.notify(&());
+    }
+
+    pub(crate) fn attach(&self) -> Receiver {
+        Receiver {
+            shared: Arc::downgrade(&self.shared),
+        }
+    }
+}
+
+impl NotificationContent {
+    /// Create a new [`Notification`] with `self` as its initial content.
+    ///
+    /// This is equivalent to [`Notification::new()`].
+    pub fn into_notification(self) -> Notification {
+        Notification::new(self)
     }
 }
 
@@ -149,11 +171,12 @@ impl Hub {
         self.primary_content.set_if_unequal(primary);
     }
 
-    pub(crate) fn insert(&mut self, content: NotificationContent) -> Notification {
-        let (notification, nrec) = Notification::new(content);
-        // TODO: limit maximum number of notifications
-        self.notifications.push(nrec);
-        notification
+    pub(crate) fn insert(&mut self, notification: &Notification) -> Result<(), Error> {
+        // TODO: limit maximum number of notifications that can be present at once.
+        #![expect(clippy::unnecessary_wraps)]
+
+        self.notifications.push(notification.attach());
+        Ok(())
     }
 
     pub(crate) fn primary_content(&self) -> listen::DynSource<Option<NotificationContent>> {
@@ -164,12 +187,3 @@ impl Hub {
         self.has_interrupt
     }
 }
-
-// fn dummy_content() -> NotificationContent {
-//     // TODO: should be not Progress but that is all we have right now
-//     NotificationContent::Progress {
-//         title: ArcStr::new(),
-//         progress: ProgressBarState::new(0.0),
-//         part: ArcStr::new(),
-//     }
-// }

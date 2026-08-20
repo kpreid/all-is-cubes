@@ -1,9 +1,8 @@
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::Context as _;
-use futures_channel::oneshot;
 use indicatif::ProgressBar;
 use rand::RngExt as _;
 
@@ -38,13 +37,11 @@ impl UniverseSource {
         self,
         precompute_light: bool,
         teleport: Option<Teleport>,
-        notif_rx: oneshot::Receiver<Notification>,
+        progress_notification: Notification,
         replace_universe_callback: Arc<dyn Fn(&UniverseTemplate) + Send + Sync>,
     ) -> Result<Box<Universe>, anyhow::Error> {
         let start_time = Instant::now();
 
-        // TODO: figure out a cleaner way to wrangle this rx hookup
-        let notif_rx = Mutex::new(TryRecvKeep::Rx(notif_rx));
         #[allow(clippy::literal_string_with_formatting_args)]
         let universe_progress_bar = logging::new_progress_bar(100)
             .with_style(
@@ -61,13 +58,13 @@ impl UniverseSource {
                     universe_progress_bar.set_position((info.fraction() * 100.0) as u64);
                     universe_progress_bar.set_message(String::from(info.label_str()));
 
-                    if let Some(notification) = notif_rx.lock().unwrap().try_borrow() {
-                        notification.set_content(notification::NotificationContent::Progress {
+                    progress_notification.set_content(
+                        notification::NotificationContent::Progress {
                             title: literal!("Loading..."),
                             progress: ProgressBarState::new(info.fraction().into()),
                             part: info.label_str().into(),
-                        });
-                    }
+                        },
+                    );
                 })
                 .build()
         };
@@ -211,25 +208,5 @@ fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(space::LightU
         worst = worst.max(info.queue_count);
         progress.set_length(worst as u64);
         progress.set_position((worst - info.queue_count) as u64);
-    }
-}
-
-enum TryRecvKeep {
-    Rx(oneshot::Receiver<Notification>),
-    Have(Notification),
-}
-impl TryRecvKeep {
-    fn try_borrow(&mut self) -> Option<&Notification> {
-        if let Self::Rx(rx) = self {
-            *self = Self::Have(match rx.try_recv() {
-                Ok(Some(n)) => n,
-                Ok(None) | Err(oneshot::Canceled) => return None,
-            })
-        }
-        if let Self::Have(value) = self {
-            Some(value)
-        } else {
-            None
-        }
     }
 }

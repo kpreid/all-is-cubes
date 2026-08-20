@@ -409,9 +409,9 @@ impl Vui {
 
     pub fn show_notification(
         &mut self,
-        content: impl Into<notification::NotificationContent>,
-    ) -> notification::Notification {
-        self.notif_hub.insert(content.into())
+        notification: &notification::Notification,
+    ) -> Result<(), notification::Error> {
+        self.notif_hub.insert(notification)
     }
 
     /// Enter some kind of debug view. Not yet defined for the long run exactly what that is.

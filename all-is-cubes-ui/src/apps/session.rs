@@ -36,8 +36,10 @@ use all_is_cubes_render::camera::{
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
 use crate::settings::Settings;
 use crate::ui_content::Vui;
-use crate::ui_content::notification::{self, Notification};
+use crate::ui_content::notification::{self, /* used in docs */ Notification};
 use crate::vui::widgets::ProgressBarState;
+
+// -------------------------------------------------------------------------------------------------
 
 const LOG_FIRST_FRAMES: bool = false;
 
@@ -597,19 +599,20 @@ impl Session {
         }
     }
 
-    /// Display a notification to the user. Notifications persist until dismissed or the returned
-    /// [`Notification`] handle is dropped, and their content may be updated through that handle.
+    /// Display a notification to the user. Notifications persist until dismissed or the
+    /// [`Notification`] is dropped, and their content may be updated at any time.
     ///
     /// # Errors
     ///
-    /// Returns an error if there is no UI to display notifications or if there are too many.
+    /// Returns an error if there is no UI to display notifications or if there are already
+    /// too many notifications.
     pub fn show_notification(
         &mut self,
-        content: impl Into<notification::NotificationContent>,
-    ) -> Result<Notification, notification::Error> {
-        // TODO: stop requiring mut by using a dedicated channel...?
+        notification: &Notification,
+    ) -> Result<(), notification::Error> {
+        // TODO: stop requiring mut access by using a dedicated channel...?
         match &mut self.shuttle_mut().ui {
-            Some(ui) => Ok(ui.show_notification(content)),
+            Some(ui) => ui.show_notification(notification),
             None => Err(notification::Error::NoUi),
         }
     }
@@ -1336,23 +1339,22 @@ impl MainTaskContext {
             > + Send
             + 'static,
     {
-        let notification = self
-            .show_notification(notification::NotificationContent::Progress {
-                title: literal!("Loading..."),
-                progress: ProgressBarState::new(0.0),
-                part: literal!(""),
-            })
-            .ok();
+        let notification = notification::NotificationContent::Progress {
+            title: literal!("Loading..."),
+            progress: ProgressBarState::new(0.0),
+            part: literal!(""),
+        }
+        .into_notification();
+
+        let (Ok(()) | Err(_)) = self.show_notification(&notification);
 
         let progress = YieldProgressBuilder::new()
             .progress_using(move |info| {
-                if let Some(notification) = &notification {
-                    notification.set_content(notification::NotificationContent::Progress {
-                        title: literal!("Loading..."),
-                        progress: ProgressBarState::new(info.fraction().into()),
-                        part: info.label_str().into(),
-                    });
-                }
+                notification.set_content(notification::NotificationContent::Progress {
+                    title: literal!("Loading..."),
+                    progress: ProgressBarState::new(info.fraction().into()),
+                    part: info.label_str().into(),
+                });
             })
             .build();
 
@@ -1432,8 +1434,8 @@ impl MainTaskContext {
         })
     }
 
-    /// Display a notification to the user. Notifications persist until dismissed or the returned
-    /// [`Notification`] handle is dropped, and their content may be updated through that handle.
+    /// Display a notification to the user. Notifications persist until dismissed or the
+    /// [`Notification`] is dropped, and their content may be updated at any time.
     ///
     /// # Errors
     ///
@@ -1441,11 +1443,11 @@ impl MainTaskContext {
     /// too many notifications.
     pub fn show_notification(
         &mut self,
-        content: impl Into<notification::NotificationContent>,
-    ) -> Result<Notification, notification::Error> {
+        notification: &Notification,
+    ) -> Result<(), notification::Error> {
         // TODO: stop requiring mut by using a dedicated channel...?
         self.with_mut(|shuttle| match &mut shuttle.ui {
-            Some(ui) => Ok(ui.show_notification(content)),
+            Some(ui) => ui.show_notification(notification),
             None => Err(notification::Error::NoUi),
         })
     }

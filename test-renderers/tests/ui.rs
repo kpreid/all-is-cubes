@@ -93,13 +93,13 @@ async fn session_page_pause(mut context: RenderTestContext) {
 async fn session_page_progress(mut context: RenderTestContext) {
     let mut session = create_session().await;
 
-    let n = session
-        .show_notification(NotificationContent::Progress {
-            title: literal!("A Progress Notification"),
-            progress: widgets::ProgressBarState::new(0.25),
-            part: literal!("A Progress Part 1/2"),
-        })
-        .unwrap();
+    let n = NotificationContent::Progress {
+        title: literal!("A Progress Notification"),
+        progress: widgets::ProgressBarState::new(0.25),
+        part: literal!("A Progress Part 1/2"),
+    }
+    .into_notification();
+    session.show_notification(&n).unwrap();
     advance_time(&mut session);
     // exercise updates not just initial state
     n.set_content(NotificationContent::Progress {

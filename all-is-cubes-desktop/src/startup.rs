@@ -39,7 +39,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
         universe_task:
             UniverseTask {
                 future: universe_task_future,
-                progress_notification_handoff_tx: _,
+                progress_notification: _,
                 replace_universe_command_rx,
                 replace_universe_command_tx,
             },
@@ -268,7 +268,7 @@ pub struct InnerMainParams {
 #[derive(Debug)]
 pub struct UniverseTask {
     future: async_executor::Task<Result<Box<Universe>, anyhow::Error>>,
-    progress_notification_handoff_tx: Option<oneshot::Sender<notification::Notification>>,
+    progress_notification: notification::Notification,
     replace_universe_command_rx: async_channel::Receiver<ReplaceUniverseCommand>,
 
     /// This is not used by the future itself (it has its own clone)
@@ -290,13 +290,19 @@ impl UniverseTask {
         precompute_light: bool,
         teleport: Option<crate::universe_source::Teleport>,
     ) -> Self {
+        let progress_notification = notification::NotificationContent::Progress {
+            title: literal!("Loading..."),
+            progress: ProgressBarState::new(0.0),
+            part: literal!(""),
+        }
+        .into_notification();
+
         // Kick off constructing the universe in the background.
-        let (n_tx, n_rx) = oneshot::channel();
         let (r_tx, r_rx) = async_channel::bounded(1);
         let future = executor.inner().spawn(source.create_universe(
             precompute_light,
             teleport,
-            n_rx,
+            progress_notification.clone(),
             Arc::new({
                 let r_tx = r_tx.clone();
                 move |template| {
@@ -315,42 +321,18 @@ impl UniverseTask {
         ));
         Self {
             future,
-            progress_notification_handoff_tx: Some(n_tx),
+            progress_notification,
             replace_universe_command_rx: r_rx,
             replace_universe_command_tx: r_tx,
         }
     }
 
-    #[allow(clippy::unused_self)]
-    fn initial_notification(&self) -> notification::NotificationContent {
-        notification::NotificationContent::Progress {
-            title: literal!("Loading..."),
-            progress: ProgressBarState::new(0.0),
-            part: literal!(""),
-        }
-    }
-
-    fn attach_notification(&mut self, n: notification::Notification) {
-        // Ignore send error because the process might have finished and dropped the receiver.
-        _ = self
-            .progress_notification_handoff_tx
-            .take()
-            .expect("attach_to_session() must be called only once")
-            .send(n);
-    }
-
-    // TODO: figure out a way the below code doesn't need to be duplicated
-
     pub fn attach_to_session(&mut self, session: &mut crate::Session) {
-        if let Ok(n) = session.show_notification(self.initial_notification()) {
-            self.attach_notification(n);
-        }
+        _ = session.show_notification(&self.progress_notification);
     }
 
     pub fn attach_to_main_task(&mut self, ctx: &mut MainTaskContext) {
-        if let Ok(n) = ctx.show_notification(self.initial_notification()) {
-            self.attach_notification(n);
-        }
+        _ = ctx.show_notification(&self.progress_notification);
     }
 }
 
