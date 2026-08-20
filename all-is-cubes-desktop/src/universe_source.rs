@@ -18,6 +18,10 @@ use all_is_cubes_ui::vui::widgets::ProgressBarState;
 
 use crate::{glue, logging};
 
+// -------------------------------------------------------------------------------------------------
+
+const SPLIT_CREATION_AND_LIGHTING: f64 = 0.5;
+
 /// Source of the universe to create/load.
 ///
 /// This enum lives here in `all_is_cubes_desktop` because up until now, in the dependency graph,
@@ -42,6 +46,9 @@ impl UniverseSource {
     ) -> Result<Box<Universe>, anyhow::Error> {
         let start_time = Instant::now();
 
+        // Note: The progress bar logic is complicated because we use one `Notification` overall,
+        // but we use separate `indicatif` progress bars for construction and lighting.
+
         #[allow(clippy::literal_string_with_formatting_args)]
         let universe_progress_bar = logging::new_progress_bar(100)
             .with_style(
@@ -51,8 +58,9 @@ impl UniverseSource {
             )
             .with_prefix("Building");
         universe_progress_bar.set_position(0);
-        let yield_progress = {
+        let universe_yield_progress = {
             let universe_progress_bar = universe_progress_bar.clone();
+            let progress_notification = progress_notification.clone();
             glue::make_yield_progress()
                 .progress_using(move |info| {
                     universe_progress_bar.set_position((info.fraction() * 100.0) as u64);
@@ -61,7 +69,14 @@ impl UniverseSource {
                     progress_notification.set_content(
                         notification::NotificationContent::Progress {
                             title: literal!("Loading..."),
-                            progress: ProgressBarState::new(info.fraction().into()),
+                            progress: ProgressBarState::new(
+                                f64::from(info.fraction())
+                                    * if precompute_light {
+                                        SPLIT_CREATION_AND_LIGHTING
+                                    } else {
+                                        1.0
+                                    },
+                            ),
                             part: info.label_str().into(),
                         },
                     );
@@ -77,7 +92,7 @@ impl UniverseSource {
 
                 let space = all_is_cubes_content::template_menu_space(
                     &mut universe,
-                    yield_progress,
+                    universe_yield_progress,
                     replace_universe_callback,
                 )
                 .await?;
@@ -100,7 +115,7 @@ impl UniverseSource {
                 template
                     .clone()
                     .build(
-                        yield_progress,
+                        universe_yield_progress,
                         TemplateParameters {
                             seed: Some(seed),
                             size,
@@ -113,7 +128,7 @@ impl UniverseSource {
             }
             UniverseSource::File(path) => {
                 let path = Arc::new(path);
-                all_is_cubes_port::load_universe_from_file(yield_progress, path.clone())
+                all_is_cubes_port::load_universe_from_file(universe_yield_progress, path.clone())
                     .await
                     .with_context(|| format!("could not load universe from file {path:?}"))?
             }
@@ -136,7 +151,11 @@ impl UniverseSource {
             if precompute_light {
                 let space_handle =
                     character_handle.read(universe.read_ticket()).unwrap().space().clone();
-                universe.mutate_space(&space_handle, evaluate_light_with_progress).unwrap();
+                universe
+                    .mutate_space(&space_handle, |m| {
+                        evaluate_light_with_progress(m, &progress_notification)
+                    })
+                    .unwrap();
             }
         }
 
@@ -194,19 +213,38 @@ impl std::str::FromStr for Teleport {
 
 // -------------------------------------------------------------------------------------------------
 
-fn evaluate_light_with_progress(m: &mut space::Mutation<'_, '_>) {
+fn evaluate_light_with_progress(
+    m: &mut space::Mutation<'_, '_>,
+    progress_notification: &Notification,
+) {
     let light_progress = logging::new_progress_bar(100).with_prefix("Lighting");
-    m.evaluate_light(1, lighting_progress_adapter(&light_progress));
+    m.evaluate_light(
+        1,
+        lighting_progress_adapter(&light_progress, progress_notification),
+    );
     light_progress.finish();
 }
 
 /// Convert `LightUpdatesInfo` data to an approximate completion progress.
 /// TODO: Improve this and put it in the light module (independent of indicatif).
-fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(space::LightUpdatesInfo) + '_ {
+fn lighting_progress_adapter<'a>(
+    progress_indicatif: &'a ProgressBar,
+    progress_notification: &'a Notification,
+) -> impl FnMut(space::LightUpdatesInfo) + use<'a> {
     let mut worst = 1;
     move |info| {
         worst = worst.max(info.queue_count);
-        progress.set_length(worst as u64);
-        progress.set_position((worst - info.queue_count) as u64);
+        progress_indicatif.set_length(worst as u64);
+        progress_indicatif.set_position((worst - info.queue_count) as u64);
+
+        progress_notification.set_content(notification::NotificationContent::Progress {
+            title: literal!("Lighting..."),
+            progress: ProgressBarState::new(
+                SPLIT_CREATION_AND_LIGHTING
+                    + (1.0 - SPLIT_CREATION_AND_LIGHTING) * (worst - info.queue_count) as f64
+                        / worst as f64,
+            ),
+            part: Default::default(),
+        });
     }
 }
