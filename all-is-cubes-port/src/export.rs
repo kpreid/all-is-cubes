@@ -137,7 +137,7 @@ pub fn export_to_path(
 pub struct ExportSet {
     pub(crate) contents: HandleSet,
     #[cfg_attr(
-        not(feature = "stl"),
+        not(any(feature = "stl", feature = "ttf")),
         allow(dead_code, reason = "stl is the only exporter that does multi-file")
     )]
     multiple: bool,
@@ -177,7 +177,7 @@ impl ExportSet {
     /// that need suffixing.
     ///
     /// TODO: Needs to sanitize names and ensure there are no overlaps.
-    #[cfg_attr(not(feature = "stl"), allow(dead_code))]
+    #[cfg_attr(not(any(feature = "stl", feature = "ttf")), allow(dead_code))]
     pub(crate) fn member_export_path(
         &self,
         base_path: &Path,
@@ -531,6 +531,7 @@ where
 /// `writer` should write to the provided file, and may also perform lengthy computation.
 ///
 /// The returned future can then be returned from the format-specific code to [`export_to_path()`].
+#[cfg_attr(not(feature = "dot-vox"), allow(dead_code))]
 pub(crate) fn export_one_file(
     progress: YieldProgress,
     path: PathBuf,

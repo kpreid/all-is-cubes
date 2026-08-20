@@ -36,6 +36,7 @@ mod ttf;
 
 /// Runs an export operation to a temporary directory.
 #[cfg(feature = "export")]
+#[cfg_attr(not(feature = "dot-vox"), allow(dead_code))]
 #[expect(clippy::result_large_err)]
 fn run_test_export(
     universe: &all_is_cubes::universe::Universe,
