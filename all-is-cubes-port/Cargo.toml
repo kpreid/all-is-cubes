@@ -97,7 +97,7 @@ kurbo = { version = "0.13.1" } # must match write-fonts
 stl_io = { version = "0.11.0", optional = true }
 # json is used for native and glTF
 serde_json = { workspace = true, optional = true }
-write-fonts = { version = "0.50.0", optional = true }
+write-fonts = { version = "0.52.0", optional = true }
 
 # glTF related dependencies
 base64 = { workspace = true, optional = true, features = ["alloc"] }
@@ -112,9 +112,9 @@ rectangle-pack = { workspace = true, optional = true, features = ["std"] }
 
 [dev-dependencies]
 all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
-font-types = { version = "0.12.2" } # reading fonts
+font-types = { version = "0.12.3" } # reading fonts; version must match read-fonts
 macro_rules_attribute = { workspace = true }
-read-fonts = { version = "0.41.0" } # reading fonts
+read-fonts = { version = "0.43.0" } # reading fonts
 snapbox = { workspace = true, features = ["path"] }
 either = { workspace = true }
 pretty_assertions = { workspace = true }
