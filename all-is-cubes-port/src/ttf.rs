@@ -180,162 +180,174 @@ fn build_ttf(font: &FontDef, font_name: &str) -> Result<Vec<u8>, ExportError> {
     let (glyf_table, loca_table, loca_format) = build_glyf_loca(&glyph_contours);
     let (hmtx_table, min_left_side_bearing, min_right_side_bearing) =
         build_hmtx(&glyph_contours, advance_width);
-    builder.add_table(&loca_table)?;
-    builder.add_table(&glyf_table)?;
-    builder.add_table(&hmtx_table)?;
+    builder.add_table(&loca_table).map_err(builder_error_to_export_error)?;
+    builder.add_table(&glyf_table).map_err(builder_error_to_export_error)?;
+    builder.add_table(&hmtx_table).map_err(builder_error_to_export_error)?;
 
     // TODO: We should generate bitmap glyphs, but `write-fonts` doesn’t offer assistance with
     // constructing it.
 
     // Character map (currently fixed, but this will change when `FontDef` goes proper Unicode).
-    builder.add_table(&build_cmap())?;
+    builder.add_table(&build_cmap()).map_err(builder_error_to_export_error)?;
 
     // Font metadata tables.
-    builder.add_table(&tables::head::Head {
-        // Facts about the font we’re generating.
-        flags: Flags::BASELINE_AT_Y_0 | Flags::LSB_AT_X_0 | Flags::FORCE_INTEGER_PPEM,
-        units_per_em,
-        x_min: max_glyph_bounding_box.x0.round() as i16,
-        x_max: max_glyph_bounding_box.x1.round() as i16,
-        y_min: max_glyph_bounding_box.y0.round() as i16,
-        y_max: max_glyph_bounding_box.y1.round() as i16,
-        lowest_rec_ppem: metrics.character_cell_size().height.try_into().err_is_unreachable(),
-        index_to_loc_format: loca_format as i16,
+    builder
+        .add_table(&tables::head::Head {
+            // Facts about the font we’re generating.
+            flags: Flags::BASELINE_AT_Y_0 | Flags::LSB_AT_X_0 | Flags::FORCE_INTEGER_PPEM,
+            units_per_em,
+            x_min: max_glyph_bounding_box.x0.round() as i16,
+            x_max: max_glyph_bounding_box.x1.round() as i16,
+            y_min: max_glyph_bounding_box.y0.round() as i16,
+            y_max: max_glyph_bounding_box.y1.round() as i16,
+            lowest_rec_ppem: metrics.character_cell_size().height.try_into().err_is_unreachable(),
+            index_to_loc_format: loca_format as i16,
 
-        // Dummy values for metadata we do not have available.
-        font_revision: Fixed::ONE,
-        mac_style: tables::head::MacStyle::empty(), // TODO: add bold/italic metadata to FontDef
-        created: write_fonts::types::LongDateTime::new(0),
-        modified: write_fonts::types::LongDateTime::new(0),
+            // Dummy values for metadata we do not have available.
+            font_revision: Fixed::ONE,
+            mac_style: tables::head::MacStyle::empty(), // TODO: add bold/italic metadata to FontDef
+            created: write_fonts::types::LongDateTime::new(0),
+            modified: write_fonts::types::LongDateTime::new(0),
 
-        // Fields that are required to have specific values.
-        checksum_adjustment: 0,
-        magic_number: 0x5F0F3CF5,
-        font_direction_hint: 2, // "deprecated"
-    })?;
-    builder.add_table(&tables::hhea::Hhea {
-        // Facts derived from the input font.
-        ascender,
-        descender,
-        advance_width_max: advance_width,
-        x_max_extent: FWord::new(max_glyph_bounding_box.x1.round() as i16),
+            // Fields that are required to have specific values.
+            checksum_adjustment: 0,
+            magic_number: 0x5F0F3CF5,
+            font_direction_hint: 2, // "deprecated"
+        })
+        .map_err(builder_error_to_export_error)?;
+    builder
+        .add_table(&tables::hhea::Hhea {
+            // Facts derived from the input font.
+            ascender,
+            descender,
+            advance_width_max: advance_width,
+            x_max_extent: FWord::new(max_glyph_bounding_box.x1.round() as i16),
 
-        min_left_side_bearing,
-        min_right_side_bearing,
+            min_left_side_bearing,
+            min_right_side_bearing,
 
-        // Facts that are true for all fonts currently supported.
-        caret_slope_rise: 1,
-        caret_slope_run: 0,
-        caret_offset: 0,
-        number_of_h_metrics: num_glyphs,
+            // Facts that are true for all fonts currently supported.
+            caret_slope_rise: 1,
+            caret_slope_run: 0,
+            caret_offset: 0,
+            number_of_h_metrics: num_glyphs,
 
-        // Additional space between lines. We do not use this.
-        // If we ever decide to, it must also be set in the `OS/2` table.
-        line_gap: FWord::new(0),
-    })?;
-    builder.add_table(&tables::os2::Os2 {
-        // Facts derived from the input font.
-        x_avg_char_width: fword_cast_signed(advance_width).to_i16(),
-        s_cap_height: Some(ascender.to_i16()),
-        s_typo_ascender: ascender.to_i16(),
-        s_typo_descender: descender.to_i16(),
-        us_win_ascent: fword_cast_unsigned(ascender).to_u16(),
-        us_win_descent: (-descender.to_i16()).cast_unsigned(),
+            // Additional space between lines. We do not use this.
+            // If we ever decide to, it must also be set in the `OS/2` table.
+            line_gap: FWord::new(0),
+        })
+        .map_err(builder_error_to_export_error)?;
+    builder
+        .add_table(&tables::os2::Os2 {
+            // Facts derived from the input font.
+            x_avg_char_width: fword_cast_signed(advance_width).to_i16(),
+            s_cap_height: Some(ascender.to_i16()),
+            s_typo_ascender: ascender.to_i16(),
+            s_typo_descender: descender.to_i16(),
+            us_win_ascent: fword_cast_unsigned(ascender).to_u16(),
+            us_win_descent: (-descender.to_i16()).cast_unsigned(),
 
-        // TODO: FontDef metrics should include these.
-        y_subscript_x_size: 0,
-        y_subscript_y_size: 0,
-        y_subscript_x_offset: 0,
-        y_subscript_y_offset: 0,
-        y_superscript_x_size: 0,
-        y_superscript_y_size: 0,
-        y_superscript_x_offset: 0,
-        y_superscript_y_offset: 0,
-        y_strikeout_size: 0,
-        y_strikeout_position: 0,
+            // TODO: FontDef metrics should include these.
+            y_subscript_x_size: 0,
+            y_subscript_y_size: 0,
+            y_subscript_x_offset: 0,
+            y_subscript_y_offset: 0,
+            y_superscript_x_size: 0,
+            y_superscript_y_size: 0,
+            y_superscript_x_offset: 0,
+            y_superscript_y_offset: 0,
+            y_strikeout_size: 0,
+            y_strikeout_position: 0,
 
-        // Facts that are true for all fonts currently supported, or unused.
-        us_default_char: Some(0),
-        us_break_char: Some(0x0020),
-        us_max_context: Some(0),
-        us_lower_optical_point_size: None,
-        us_upper_optical_point_size: None,
-        ul_unicode_range_1: 0x00000003,
-        ul_unicode_range_2: 0,
-        ul_unicode_range_3: 0,
-        ul_unicode_range_4: 0,
-        us_first_char_index: 0x0020,
-        us_last_char_index: 0x00FF,
-        ul_code_page_range_1: Some(0x00000001), // Latin-1
-        ul_code_page_range_2: Some(0),
+            // Facts that are true for all fonts currently supported, or unused.
+            us_default_char: Some(0),
+            us_break_char: Some(0x0020),
+            us_max_context: Some(0),
+            us_lower_optical_point_size: None,
+            us_upper_optical_point_size: None,
+            ul_unicode_range_1: 0x00000003,
+            ul_unicode_range_2: 0,
+            ul_unicode_range_3: 0,
+            ul_unicode_range_4: 0,
+            us_first_char_index: 0x0020,
+            us_last_char_index: 0x00FF,
+            ul_code_page_range_1: Some(0x00000001), // Latin-1
+            ul_code_page_range_2: Some(0),
 
-        // Dummy values for metadata or metrics we do not have available.
-        panose_10: [0; 10],
-        s_family_class: 0,
-        // TODO: FontDef metrics should include x-height, weight, and width.
-        sx_height: Some((baseline_px * 5 / 8) * SCALE),
-        us_weight_class: 400, // medium/normal weight
-        us_width_class: 5,    // medium/normal width
-        fs_type: 0,
-        ach_vend_id: Tag::new(b"    "),
-        fs_selection: tables::os2::SelectionFlags::REGULAR,
+            // Dummy values for metadata or metrics we do not have available.
+            panose_10: [0; 10],
+            s_family_class: 0,
+            // TODO: FontDef metrics should include x-height, weight, and width.
+            sx_height: Some((baseline_px * 5 / 8) * SCALE),
+            us_weight_class: 400, // medium/normal weight
+            us_width_class: 5,    // medium/normal width
+            fs_type: 0,
+            ach_vend_id: Tag::new(b"    "),
+            fs_selection: tables::os2::SelectionFlags::REGULAR,
 
-        // Additional space between lines. We do not use this.
-        // If we ever decide to, it must also be set in the `OS/2` table.
-        s_typo_line_gap: 0,
-    })?;
-    builder.add_table(&tables::maxp::Maxp {
-        num_glyphs,
-        max_points: Some(max_points),
-        max_contours: Some(max_contours),
-        max_composite_points: Some(0),
-        max_composite_contours: Some(0),
-        max_zones: Some(1),
-        max_twilight_points: Some(0),
-        max_storage: Some(0),
-        max_function_defs: Some(0),
-        max_instruction_defs: Some(0),
-        max_stack_elements: Some(0),
-        max_size_of_instructions: Some(0),
-        max_component_elements: Some(0),
-        max_component_depth: Some(0),
-    })?;
-    builder.add_table(&{
-        fn name_record(name_id: NameId, string: impl Into<String>) -> tables::name::NameRecord {
-            tables::name::NameRecord {
-                platform_id: 0, // Unicode
-                encoding_id: 4, // full Unicode
-                language_id: 0, // no specific language
-                name_id,
-                string: write_fonts::OffsetMarker::new(string.into()),
+            // Additional space between lines. We do not use this.
+            // If we ever decide to, it must also be set in the `OS/2` table.
+            s_typo_line_gap: 0,
+        })
+        .map_err(builder_error_to_export_error)?;
+    builder
+        .add_table(&tables::maxp::Maxp {
+            num_glyphs,
+            max_points: Some(max_points),
+            max_contours: Some(max_contours),
+            max_composite_points: Some(0),
+            max_composite_contours: Some(0),
+            max_zones: Some(1),
+            max_twilight_points: Some(0),
+            max_storage: Some(0),
+            max_function_defs: Some(0),
+            max_instruction_defs: Some(0),
+            max_stack_elements: Some(0),
+            max_size_of_instructions: Some(0),
+            max_component_elements: Some(0),
+            max_component_depth: Some(0),
+        })
+        .map_err(builder_error_to_export_error)?;
+    builder
+        .add_table(&{
+            fn name_record(name_id: NameId, string: impl Into<String>) -> tables::name::NameRecord {
+                tables::name::NameRecord {
+                    platform_id: 0, // Unicode
+                    encoding_id: 4, // full Unicode
+                    language_id: 0, // no specific language
+                    name_id,
+                    string: write_fonts::OffsetMarker::new(string.into()),
+                }
             }
-        }
-        tables::name::Name::new(vec![
-            name_record(NameId::FAMILY_NAME, font_name),
-            // TODO: FontDef metrics should include subfamily.
-            name_record(NameId::SUBFAMILY_NAME, "Regular"),
-            name_record(NameId::FULL_NAME, format!("{font_name} Regular")),
-            name_record(NameId::POSTSCRIPT_NAME, format!("{font_name}-Regular")),
-        ])
-    })?;
-    builder.add_table(&tables::post::Post {
-        version: write_fonts::types::Version16Dot16::new(3, 0),
+            tables::name::Name::new(vec![
+                name_record(NameId::FAMILY_NAME, font_name),
+                // TODO: FontDef metrics should include subfamily.
+                name_record(NameId::SUBFAMILY_NAME, "Regular"),
+                name_record(NameId::FULL_NAME, format!("{font_name} Regular")),
+                name_record(NameId::POSTSCRIPT_NAME, format!("{font_name}-Regular")),
+            ])
+        })
+        .map_err(builder_error_to_export_error)?;
+    builder
+        .add_table(&tables::post::Post {
+            version: write_fonts::types::Version16Dot16::new(3, 0),
 
-        // Facts that are true for all fonts currently supported.
-        is_fixed_pitch: 1,
+            // Facts that are true for all fonts currently supported.
+            is_fixed_pitch: 1,
 
-        // Dummy values for metadata or metrics we do not have available.
-        italic_angle: Fixed::ZERO,
-        underline_position: FWord::new(-SCALE * 2), // below baseline, not touching it
-        underline_thickness: FWord::new(SCALE),
-        min_mem_type42: 0, // zero = unknown
-        max_mem_type42: 0, // zero = unknown
-        min_mem_type1: 0,  // zero = unknown
-        max_mem_type1: 0,  // zero = unknown
-        num_glyphs: None,
-        glyph_name_index: None,
-        string_data: None,
-    })?;
+            // Dummy values for metadata or metrics we do not have available.
+            italic_angle: Fixed::ZERO,
+            underline_position: FWord::new(-SCALE * 2), // below baseline, not touching it
+            underline_thickness: FWord::new(SCALE),
+            min_mem_type42: 0, // zero = unknown
+            max_mem_type42: 0, // zero = unknown
+            min_mem_type1: 0,  // zero = unknown
+            max_mem_type1: 0,  // zero = unknown
+            num_glyphs: None,
+            glyph_name_index: None,
+            string_data: None,
+        })
+        .map_err(builder_error_to_export_error)?;
 
     Ok(builder.build())
 }
@@ -485,19 +497,18 @@ fn fword_cast_signed(value: UfWord) -> FWord {
     FWord::new(value.to_u16().try_into().expect("all coordinates should fit in u16/i16"))
 }
 
-impl From<write_fonts::BuilderError> for ExportError {
-    fn from(error: write_fonts::BuilderError) -> Self {
-        ExportError {
-            source: None,      // will be filled in later
-            destination: None, // will be filled in later
+#[expect(clippy::needless_pass_by_value)]
+fn builder_error_to_export_error(error: write_fonts::BuilderError) -> ExportError {
+    ExportError {
+        source: None,      // will be filled in later
+        destination: None, // will be filled in later
 
-            // This error may be a logic error in the exporter, or may be due to the font not
-            // being validly representable in TrueType. Assume the latter.
-            detail: crate::ExportErrorKind::NotRepresentable {
-                format: crate::Format::Ttf,
-                reason: format!("font export produced invalid table: {error}"),
-            },
-        }
+        // This error may be a logic error in the exporter, or may be due to the font not
+        // being validly representable in TrueType. Assume the latter.
+        detail: crate::ExportErrorKind::NotRepresentable {
+            format: crate::Format::Ttf,
+            reason: format!("font export produced invalid table: {error}"),
+        },
     }
 }
 
