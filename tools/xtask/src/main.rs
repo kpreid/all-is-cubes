@@ -140,6 +140,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
                         }
                     }
                     args::SystemPackagesCommand::SudoInstall => {
+                        cmd!(config.sh, "sudo apt-get update").run()?;
                         cmd!(config.sh, "sudo apt-get -y install").args(SYS_PACKAGES).run()?;
                     }
                 }

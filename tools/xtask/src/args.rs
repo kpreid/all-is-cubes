@@ -152,7 +152,7 @@ pub enum SystemPackagesCommand {
     /// Print the list of packages, one per line.
     Print,
 
-    /// Run `sudo apt-get -y install` to install packages.
+    /// Run `sudo apt-get update` followed by `sudo apt-get -y install ...` to install packages.
     ///
     /// This option is intended for non-interactive use in CI and VMs which offer
     /// passwordless sudo.
