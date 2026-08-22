@@ -1024,10 +1024,6 @@ criteria = "safe-to-deploy"
 version = "3.7.4"
 criteria = "safe-to-deploy"
 
-[[exemptions.pollster]]
-version = "0.4.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.portable-atomic]]
 version = "1.11.0"
 criteria = "safe-to-deploy"
