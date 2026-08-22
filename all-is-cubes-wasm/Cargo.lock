@@ -189,6 +189,7 @@ dependencies = [
  "derive_more",
  "descriptive-unwrap",
  "displaydoc",
+ "exhaust",
  "futures-core",
  "hashbrown 0.17.0",
  "imgref",
@@ -199,6 +200,7 @@ dependencies = [
  "num-traits",
  "rand 0.10.1",
  "rand_distr",
+ "serde",
  "unicode-segmentation",
 ]
 

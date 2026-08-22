@@ -23,10 +23,6 @@ name = "block"
 harness = false
 
 [[bench]]
-name = "chunk"
-harness = false
-
-[[bench]]
 name = "light"
 harness = false
 required-features = ["_special_testing"]
@@ -104,8 +100,8 @@ auto-threads = [
     "bevy_ecs/async_executor", # shouldn't be necessary
 ]
 # Not for external use.
-# Enables serialization of `GraphicsOptions`, its components, and `math` types.
-_serde_math_and_graphics_options = [
+# Enables serialization of `math` types.
+_serde_math = [
     "dep:serde",
     "all-is-cubes-base/serde", # serde for math
     "bitflags/serde", # serde for util::ShowStatus

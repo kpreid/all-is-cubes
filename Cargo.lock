@@ -314,12 +314,14 @@ name = "all-is-cubes-render"
 version = "0.10.0"
 dependencies = [
  "all-is-cubes",
+ "arbitrary",
  "async-io",
  "bitflags 2.13.1",
  "criterion",
  "derive_more",
  "descriptive-unwrap",
  "displaydoc",
+ "exhaust",
  "futures-core",
  "hashbrown 0.17.0",
  "imgref",
@@ -331,7 +333,9 @@ dependencies = [
  "pretty_assertions",
  "rand 0.10.1",
  "rand_distr",
+ "rand_xoshiro",
  "rayon",
+ "serde",
  "unicode-segmentation",
 ]
 
@@ -6614,9 +6618,11 @@ version = "0.0.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-render",
+ "criterion",
  "imgref",
  "macro_rules_attribute",
  "pretty_assertions",
+ "re_sdk",
  "rstest",
  "smol-macros",
 ]

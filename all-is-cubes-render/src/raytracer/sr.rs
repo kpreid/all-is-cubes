@@ -23,8 +23,6 @@ use rand::SeedableRng;
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use all_is_cubes::block::{AIR, Evoxels};
-use all_is_cubes::camera::{Camera, GraphicsOptions, TransparencyOption};
-use all_is_cubes::camera::{FogOption, NdcPoint2};
 use all_is_cubes::euclid::{Vector3D, vec3};
 use all_is_cubes::math::{
     Cube, Face, Face7, FreeCoordinate, FreePoint, FreeVector, GridRotation, Rgb, Rgba, Vol,
@@ -38,6 +36,7 @@ use all_is_cubes::util::StatusText;
 #[cfg(doc)]
 use all_is_cubes::space::Space;
 
+use crate::camera::{Camera, FogOption, GraphicsOptions, NdcPoint2, TransparencyOption};
 use crate::raytracer::raycast_traits::RayIsh;
 use crate::raytracer::surface::{DepthIter, DepthStep, Span, Surface, SurfaceIter, TraceStep};
 use crate::raytracer::{

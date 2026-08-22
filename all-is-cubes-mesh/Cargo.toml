@@ -32,7 +32,12 @@ dynamic = [
 # Adds support for mesh generation performance logging to Rerun.
 rerun = ["all-is-cubes/rerun"]
 # Adds `impl arbitrary::Arbitrary for ...`
-arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary", "ordered-float/arbitrary"]
+arbitrary = [
+    "dep:arbitrary",
+    "all-is-cubes/arbitrary",
+    "all-is-cubes-render/arbitrary",
+    "ordered-float/arbitrary",
+]
 # Adds automatic parallelism to some algorithms (but not all possible uses of concurrency).
 # If disabled, `std::thread` is never used.
 # If enabled, threads may be created and the active `rayon` thread pool may be used.

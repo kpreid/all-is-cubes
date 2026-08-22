@@ -1,14 +1,16 @@
-use euclid::approxeq::ApproxEq;
-use euclid::{Point3D, Rotation3D, Size2D, point2, point3, vec2, vec3};
-use pretty_assertions::assert_eq;
-use rand::SeedableRng;
 use std::dbg;
 
+use pretty_assertions::assert_eq;
+use rand::SeedableRng;
+
+use all_is_cubes::euclid::approxeq::ApproxEq;
+use all_is_cubes::euclid::{Angle, Point3D, Rotation3D, Size2D, point2, point3, vec2, vec3};
+use all_is_cubes::math::{Aab, ps32, ps64, rgba_const};
+
 use crate::camera::{
-    Camera, ExposureOption, FrustumPoints, GraphicsOptions, LightingOption, ViewTransform,
-    Viewport, look_at_y_up,
+    Camera, ExposureOption, GraphicsOptions, LightingOption, ViewTransform, Viewport,
+    camera_struct::{FrustumPoints, look_at_y_up},
 };
-use crate::math::{Aab, ps32, ps64, rgba_const};
 
 #[test]
 fn camera_bad_viewport_doesnt_panic() {
@@ -206,7 +208,7 @@ fn project_ndc_into_world() {
     // Test with non-identity view transform
     {
         camera.set_view_transform(ViewTransform {
-            rotation: Rotation3D::around_y(euclid::Angle::frac_pi_2()),
+            rotation: Rotation3D::around_y(Angle::frac_pi_2()),
             translation: vec3(0.0, 100.0, 0.0),
         });
 

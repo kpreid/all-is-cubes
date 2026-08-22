@@ -6,9 +6,22 @@ rust-version.workspace = true
 description = "Tests for the all-is-cubes package that use other packages as test helpers."
 publish = false
 
+
+[[bench]]
+name = "chunk"
+harness = false
+
+[features]
+rerun = ["all-is-cubes/rerun"]
+
+# These are not dev-dependencies so that they are allowed to be optional.
+[dependencies]
+re_sdk = { workspace = true, optional = true }
+
 [dev-dependencies]
 all-is-cubes = { workspace = true }
 all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
+criterion = { workspace = true }
 imgref = { workspace = true }
 macro_rules_attribute = { workspace = true }
 pretty_assertions = { workspace = true }

@@ -268,7 +268,7 @@ fn perform_image_copy(
     // Ideally, we should specify the camera projection so as to undistort the pixels,
     // which will require `convert_camera_to_pinhole` to use the nominal size, which it
     // currently doesn't.
-    let (pinhole, transform) = rg::convert_camera_to_pinhole(camera);
+    let (pinhole, transform) = convert_camera_to_pinhole(camera);
 
     let depth_range = rg::datatypes::Range1D([
         camera.near_plane_distance().into_inner(),
@@ -308,4 +308,31 @@ fn logged_image_size_policy(size: ImageSize) -> ImageSize {
         let ratio = (max_area / pixel_area).sqrt();
         (size.to_f64() * ratio).ceil().to_u32()
     }
+}
+
+// TODO: move this to all-is-cubes-render if it ever gets a second use
+fn convert_camera_to_pinhole(
+    camera: &Camera,
+) -> (rg::archetypes::Pinhole, rg::archetypes::Transform3D) {
+    let size = camera.viewport().framebuffer_size.to_f32();
+    let half = size * 0.5;
+    let aspect = size.width / size.height;
+    // tangent of the half-field of view, which is the ratio of the image half-size to the focal length
+    let tan_fov_y = (camera.fov_y() * 0.5).to_radians().tan() as f32;
+    let tan_fov_x = tan_fov_y * aspect;
+    #[rustfmt::skip]
+    let pinhole_matrix = rg::datatypes::Mat3x3([
+        // column major matrix (i.e. transposed in this textual display)
+        half.width / tan_fov_x, 0.,                       0.,
+        0.,                     half.height / tan_fov_y,  0.,
+        half.width,             half.height,              1.,
+    ]);
+    (
+        rg::archetypes::Pinhole::new(rg::components::PinholeProjection(pinhole_matrix))
+            .with_camera_xyz(rg::OUR_VIEW_COORDINATES)
+            .with_image_plane_distance(2.0f32)
+            .with_resolution(<[f32; 2]>::from(size)),
+        rg::convert_transform(camera.view_transform())
+            .with_relation(rg::components::TransformRelation::ParentFromChild),
+    )
 }

@@ -1,11 +1,12 @@
-#![allow(missing_docs)]
+//! Benchmark of [`ChunkChart`] functions.
+
 #![expect(clippy::unwrap_used, reason = "test")]
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 
-use all_is_cubes::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 use all_is_cubes::chunking::{ChunkChart, ChunkPos, reset_chunk_chart_cache};
 use all_is_cubes::math::{Cube, FreeVector, GridAab, OctantMask};
+use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 
 fn chunk_chart_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("ChunkChart");
@@ -49,7 +50,7 @@ fn cull_bench(c: &mut Criterion) {
     // This would make more sense as an ignored #[test], but we can't do that
     // while we use harness=false.
     #[cfg(feature = "rerun")]
-    if true {
+    if false {
         dump_frustum_culling();
     }
 
@@ -133,7 +134,7 @@ fn dump_frustum_culling() {
 
     let (chart, camera, chunked_bounds) = config();
 
-    let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes/benches/chunk")
+    let stream = rg::RecordingStreamBuilder::new("all-is-cubes/benches/chunk")
         .default_enabled(true)
         .connect_grpc()
         .unwrap();
