@@ -182,10 +182,12 @@ name = "all-is-cubes-render"
 version = "0.10.0"
 dependencies = [
  "all-is-cubes",
+ "arbitrary",
  "bitflags",
  "derive_more",
  "descriptive-unwrap",
  "displaydoc",
+ "exhaust",
  "futures-core",
  "hashbrown 0.17.0",
  "imgref",

@@ -41,15 +41,26 @@ raytracer = [
     "dep:rand_distr", # random bounce rays
     "dep:unicode-segmentation", # text-output raytracer -- TODO: consider giving it its own feature
 ]
+# Adds `impl arbitrary::Arbitrary for ...`
+arbitrary = [
+    "std", # TODO: remove this when <https://github.com/rust-fuzz/arbitrary/issues/208> is fixed
+    "dep:arbitrary",
+    "all-is-cubes/arbitrary",
+]
 # Enables `serde` serialization for `GraphicsOptions` and its component types.
-serde = ["all-is-cubes/_serde_math_and_graphics_options"]
+serde = [
+    "dep:serde",
+    "all-is-cubes/_serde_math"
+]
 
 [dependencies]
 all-is-cubes = { workspace = true }
+arbitrary = { workspace = true, optional = true }
 bitflags = { workspace = true }
 derive_more = { workspace = true } # features specified in workspace
 displaydoc = { workspace = true }
 descriptive-unwrap = { workspace = true }
+exhaust = { workspace = true }
 futures-core = { workspace = true }
 hashbrown = { workspace = true, optional = true }
 imgref = { workspace = true }
@@ -61,12 +72,15 @@ num-traits = { workspace = true }
 rand = { workspace = true, optional = true }
 rand_distr = { workspace = true, optional = true }
 rayon = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 unicode-segmentation = { workspace = true, optional = true }
 
 [dev-dependencies]
 async-io = { workspace = true }
 criterion = { workspace = true }
 pretty_assertions = { workspace = true }
+rand = { workspace = true }
+rand_xoshiro = { workspace = true }
 
 [lints]
 workspace = true

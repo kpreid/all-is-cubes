@@ -8,12 +8,15 @@ use core::fmt;
 use unicode_segmentation::UnicodeSegmentation;
 
 use all_is_cubes::arcstr::{ArcStr, Substr, literal_substr};
-use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport, eye_for_look_at};
 use all_is_cubes::euclid::size2;
 use all_is_cubes::math::{FreeVector, ps64};
 use all_is_cubes::space::{self, SpaceBlockData};
 
+use crate::camera::{Camera, GraphicsOptions, Viewport, eye_for_look_at};
 use crate::raytracer::{Accumulate, Exception, RtBlockData, RtOptionsRef, SpaceRaytracer};
+
+// -------------------------------------------------------------------------------------------------
+
 /// If you are using [`CharacterBuf`], use this [`RtBlockData`] implementation.
 // TODO: better name
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -8,13 +8,13 @@ use core::mem;
 use hashbrown::HashSet as HbHashSet;
 
 use all_is_cubes::block::AIR;
-use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::Cube;
 use all_is_cubes::space::{self, BlockIndex, Space, SpaceChange};
 use all_is_cubes::universe::{Handle, HandleError, ReadTicket};
 
+use crate::camera::GraphicsOptions;
 use crate::raytracer::{RtBlockData, RtOptionsRef, SpaceRaytracer, TracingBlock, TracingCubeData};
 
 /// Manages a [`SpaceRaytracer`] so that it can be cheaply updated when the [`Space`] is
@@ -222,8 +222,8 @@ impl listen::Store<SpaceChange> for SrtTodo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::camera::{Camera, Viewport, eye_for_look_at};
     use crate::raytracer::{CharacterBuf, CharacterRtData};
-    use all_is_cubes::camera::{Camera, Viewport, eye_for_look_at};
     use all_is_cubes::content::make_some_voxel_blocks;
     use all_is_cubes::euclid::{size2, vec3};
     use all_is_cubes::math::ps64;

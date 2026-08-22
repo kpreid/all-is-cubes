@@ -202,10 +202,6 @@ impl<D: RtBlockData> Surface<'_, D> {
                 );
                 (light, RaytraceInfo::default())
             }
-
-            (lighting_option, _) => {
-                unimplemented!("missing implementation for lighting option {lighting_option:?}")
-            }
         }
     }
 }
@@ -528,9 +524,9 @@ fn smoothstep(x: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::camera::GraphicsOptions;
     use TraceStep::{EnterBlock, EnterSurface, Invisible};
     use all_is_cubes::block::{AIR, Block, Resolution::*};
-    use all_is_cubes::camera::GraphicsOptions;
     use all_is_cubes::content;
     use all_is_cubes::euclid::point3;
     use all_is_cubes::math::{GridAab, rgba_const};

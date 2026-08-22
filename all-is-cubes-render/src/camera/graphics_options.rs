@@ -2,11 +2,16 @@ use core::fmt;
 
 use num_traits::ConstOne as _;
 
-use crate::math::{FreeCoordinate, PositiveSign, Rgb, Rgba, ZeroOne, ps64, zo32};
-use crate::util::ShowStatus;
+use all_is_cubes::math::{FreeCoordinate, PositiveSign, Rgb, Rgba, ZeroOne, ps64, zo32};
+use all_is_cubes::util::ShowStatus;
 
 #[cfg(doc)]
-use crate::{block::Block, camera::Camera, space::Space};
+use {
+    crate::camera::Camera,
+    all_is_cubes::{block::Block, space::Space},
+};
+
+// -------------------------------------------------------------------------------------------------
 
 /// Options for controlling rendering (not affecting gameplay except informationally).
 ///
@@ -15,13 +20,10 @@ use crate::{block::Block, camera::Camera, space::Space};
 /// report such failings, such as via the `all_is_cubes_render::Flaws` type.
 //---
 // (Due to crate splitting that can't be a doc-link.)
-#[doc = include_str!("../save/serde-warning.md")]
+#[doc = include_str!("serde-warning.md")]
 #[derive(Clone, Eq, PartialEq)]
-#[cfg_attr(
-    feature = "_serde_math_and_graphics_options",
-    derive(serde::Serialize, serde::Deserialize)
-)]
-#[cfg_attr(feature = "_serde_math_and_graphics_options", serde(default))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
 #[non_exhaustive]
 pub struct GraphicsOptions {
     /// Overall rendering technique to use.
@@ -62,10 +64,7 @@ pub struct GraphicsOptions {
     /// available range.
     ///
     /// The default value is ∞.
-    #[cfg_attr(
-        feature = "_serde_math_and_graphics_options",
-        serde(with = "serialize_infinity_as_none")
-    )]
+    #[cfg_attr(feature = "serde", serde(with = "serialize_infinity_as_none"))]
     pub maximum_intensity: PositiveSign<f32>,
 
     /// “Camera exposure” value: a scaling factor from scene luminance to displayed
@@ -83,7 +82,7 @@ pub struct GraphicsOptions {
     /// TODO: make deserialization not break on infinity
     pub view_distance: PositiveSign<FreeCoordinate>,
 
-    /// Style in which to apply the light field of a [`Space`](crate::space::Space)s to its blocks.
+    /// Style in which to apply the light field of a [`Space`]s to its blocks.
     /// This does not affect the *computation* of light.
     pub lighting_display: LightingOption,
 
@@ -116,8 +115,8 @@ pub struct GraphicsOptions {
     /// Draw boxes around [`Behavior`]s attached to parts of [`Space`]s.
     /// This may also eventually include further in-world diagnostic information.
     ///
-    /// [`Behavior`]: crate::behavior::Behavior
-    /// [`Space`]: crate::space::Space
+    /// [`Behavior`]: all_is_cubes::behavior::Behavior
+    /// [`Space`]: all_is_cubes::space::Space
     pub debug_behaviors: bool,
 
     /// Draw boxes around chunk borders and some debug info.
@@ -157,7 +156,7 @@ impl GraphicsOptions {
     /// that it disables all operations which change colors away from their obvious
     /// values; that is, the [`Rgba`] colors you get from a rendering will be identical
     /// (except for quantization error and background colors) to the [`Rgba`] colors
-    /// in the depicted [`Atom`](crate::block::Primitive::Atom)s.
+    /// in the depicted [`Atom`](all_is_cubes::block::Primitive::Atom)s.
     ///
     /// * [`Self::bloom_intensity`] = `0`
     /// * [`Self::fog`] = [`FogOption::None`]
@@ -283,10 +282,7 @@ impl Default for GraphicsOptions {
 
 /// Choices for [`GraphicsOptions::render_method`].
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(
-    feature = "_serde_math_and_graphics_options",
-    derive(serde::Serialize, serde::Deserialize)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum RenderMethod {
     /// Use whichever method is presumed to be better for the current situation.
@@ -316,12 +312,9 @@ pub enum RenderMethod {
 
 /// Choices for [`GraphicsOptions::fog`].
 ///
-#[doc = include_str!("../save/serde-warning.md")]
+#[doc = include_str!("serde-warning.md")]
 #[derive(Clone, Debug, Eq, PartialEq, exhaust::Exhaust)]
-#[cfg_attr(
-    feature = "_serde_math_and_graphics_options",
-    derive(serde::Serialize, serde::Deserialize)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum FogOption {
     /// No fog: objects will maintain their color and disappear raggedly.
@@ -336,12 +329,9 @@ pub enum FogOption {
 
 /// Choices for [`GraphicsOptions::tone_mapping`].
 ///
-#[doc = include_str!("../save/serde-warning.md")]
+#[doc = include_str!("serde-warning.md")]
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(
-    feature = "_serde_math_and_graphics_options",
-    derive(serde::Serialize, serde::Deserialize)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum ToneMappingOperator {
     /// Limit values above the maximum (or below zero) to lie within that range.
@@ -384,12 +374,9 @@ impl ToneMappingOperator {
 /// Note that the exact interpretation of this value also depends on on the chosen
 /// [`ToneMappingOperator`].
 ///
-#[doc = include_str!("../save/serde-warning.md")]
+#[doc = include_str!("serde-warning.md")]
 #[derive(Clone, Eq, PartialEq)]
-#[cfg_attr(
-    feature = "_serde_math_and_graphics_options",
-    derive(serde::Serialize, serde::Deserialize)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum ExposureOption {
     /// Constant exposure; light values in the scene are multiplied by this value
@@ -412,7 +399,7 @@ impl fmt::Debug for ExposureOption {
 }
 
 impl ExposureOption {
-    pub(crate) fn initial(&self) -> PositiveSign<f32> {
+    pub(in crate::camera) fn initial(&self) -> PositiveSign<f32> {
         match *self {
             ExposureOption::Fixed(value) => value,
             ExposureOption::Automatic => PositiveSign::<f32>::ONE,
@@ -428,14 +415,9 @@ impl Default for ExposureOption {
 
 /// How to display light in a [`Space`]; part of a [`GraphicsOptions`].
 ///
-#[doc = include_str!("../save/serde-warning.md")]
-///
-/// [`Space`]: crate::space::Space
+#[doc = include_str!("serde-warning.md")]
 #[derive(Clone, Debug, Eq, PartialEq, exhaust::Exhaust)]
-#[cfg_attr(
-    feature = "_serde_math_and_graphics_options",
-    derive(serde::Serialize, serde::Deserialize)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum LightingOption {
     /// No lighting: objects will be displayed with their intrinsically defined surface color,
@@ -491,13 +473,10 @@ pub enum LightingOption {
 /// and `Volumetric` options; this will probably be changed in the future in favor
 /// of the volumetric interpretation.
 ///
-#[doc = include_str!("../save/serde-warning.md")]
+#[doc = include_str!("serde-warning.md")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(
-    feature = "_serde_math_and_graphics_options",
-    derive(serde::Serialize, serde::Deserialize)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum TransparencyOption {
     /// Conventional transparent surfaces.
@@ -536,13 +515,10 @@ impl TransparencyOption {
 
 /// Choices for [`GraphicsOptions::antialiasing`].
 ///
-#[doc = include_str!("../save/serde-warning.md")]
+#[doc = include_str!("serde-warning.md")]
 #[derive(Clone, Debug, Default, Eq, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(
-    feature = "_serde_math_and_graphics_options",
-    derive(serde::Serialize, serde::Deserialize)
-)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum AntialiasingOption {
     /// Do not apply antialiasing. Every pixel of the rendered image will be the exact
@@ -589,9 +565,9 @@ impl AntialiasingOption {
 /// does not accept it in deserialization. Work around this by adding an `Option`.
 /// Arguably this should be done in `PositiveSign` itself, but I don’t want to do this to more
 /// general types.
-#[cfg(feature = "_serde_math_and_graphics_options")]
+#[cfg(feature = "serde")]
 mod serialize_infinity_as_none {
-    use crate::math::PositiveSign;
+    use all_is_cubes::math::PositiveSign;
     use serde::{Deserialize, Serialize};
 
     #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -616,7 +592,7 @@ mod serialize_infinity_as_none {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::{OpacityCategory, rgba_const, zo32};
+    use all_is_cubes::math::{OpacityCategory, rgba_const, zo32};
     use alloc::format;
     use pretty_assertions::assert_eq;
 

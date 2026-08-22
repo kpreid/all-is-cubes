@@ -329,7 +329,7 @@ impl Drop for LogExecutionActive {
 // -------------------------------------------------------------------------------------------------
 // Timeless configuration
 
-const OUR_VIEW_COORDINATES: components::ViewCoordinates = components::ViewCoordinates::RUB;
+pub const OUR_VIEW_COORDINATES: components::ViewCoordinates = components::ViewCoordinates::RUB;
 
 pub fn our_view_coordinates() -> archetypes::ViewCoordinates {
     archetypes::ViewCoordinates::new(OUR_VIEW_COORDINATES)
@@ -491,32 +491,6 @@ pub fn convert_lines(
             }))
     }
     entity
-}
-
-pub fn convert_camera_to_pinhole(
-    camera: &crate::camera::Camera,
-) -> (archetypes::Pinhole, archetypes::Transform3D) {
-    let size = camera.viewport().framebuffer_size.to_f32();
-    let half = size * 0.5;
-    let aspect = size.width / size.height;
-    // tangent of the half-field of view, which is the ratio of the image half-size to the focal length
-    let tan_fov_y = (camera.fov_y() * 0.5).to_radians().tan() as f32;
-    let tan_fov_x = tan_fov_y * aspect;
-    #[rustfmt::skip]
-    let pinhole_matrix = datatypes::Mat3x3([
-        // column major matrix (i.e. transposed in this textual display)
-        half.width / tan_fov_x, 0.,                       0.,
-        0.,                     half.height / tan_fov_y,  0.,
-        half.width,             half.height,              1.,
-    ]);
-    (
-        archetypes::Pinhole::new(components::PinholeProjection(pinhole_matrix))
-            .with_camera_xyz(OUR_VIEW_COORDINATES)
-            .with_image_plane_distance(2.0f32)
-            .with_resolution(<[f32; 2]>::from(size)),
-        convert_transform(camera.view_transform())
-            .with_relation(components::TransformRelation::ParentFromChild),
-    )
 }
 
 pub fn milliseconds(d: core::time::Duration) -> archetypes::Scalars {
