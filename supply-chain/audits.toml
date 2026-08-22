@@ -257,6 +257,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "4.2.0 -> 5.0.0"
 
+[[audits.ordered-float]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "5.3.0 -> 5.5.0"
+
 [[audits.oxipng]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
