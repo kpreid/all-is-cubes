@@ -46,6 +46,16 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "0.21.2"
 
+[[audits.bevy_ecs]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.19.0 -> 0.19.1"
+
+[[audits.bevy_platform]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.19.0 -> 0.19.1"
+
 [[audits.bytes]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
