@@ -216,6 +216,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
 delta = "0.12.0 -> 0.12.1"
 
+[[audits.macro_rules_attribute]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.2.2 -> 0.2.3"
+
 [[audits.mint]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
