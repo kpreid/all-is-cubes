@@ -277,6 +277,18 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
 version = "0.6.0"
 
+[[audits.pastey]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.2.3"
+notes = """
+Minor concerns: new functionality over `paste` is poorly documented:
+
+* New case conversions `:lower_camel` and `:camel_edge` are documented
+  only by reference to GitHub issues.
+* `env!()` is shown in an example but has no reference documentation.
+"""
+
 [[audits.png-decoder]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
