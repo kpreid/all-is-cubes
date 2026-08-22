@@ -16,6 +16,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "1.0.102 -> 1.0.103"
 
+[[audits.anyhow]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "1.0.103 -> 1.0.104"
+
 [[audits.arcstr]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
