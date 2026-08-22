@@ -399,6 +399,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
 delta = "0.25.0 -> 0.26.1"
 
+[[audits.rustc-hash]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "2.1.3"
+
 [[audits.rustls-webpki]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
