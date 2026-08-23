@@ -211,6 +211,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.4.26 -> 0.4.27"
 
+[[audits.log]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.4.33 -> 0.4.34"
+
 [[audits.lz4_flex]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
