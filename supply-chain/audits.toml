@@ -354,6 +354,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
 version = "2.5.0"
 
+[[audits.rand_xoshiro]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.8.0 -> 0.8.1"
+
 [[audits.ratatui]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
