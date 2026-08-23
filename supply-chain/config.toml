@@ -180,10 +180,6 @@ criteria = "safe-to-deploy"
 version = "1.2.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.bitvec]]
-version = "1.0.1"
-criteria = "safe-to-run"
-
 [[exemptions.block-buffer]]
 version = "0.10.4"
 criteria = "safe-to-deploy"
@@ -391,10 +387,6 @@ criteria = "safe-to-deploy"
 [[exemptions.flume]]
 version = "0.11.1"
 criteria = "safe-to-deploy"
-
-[[exemptions.funty]]
-version = "2.0.0"
-criteria = "safe-to-run"
 
 [[exemptions.futures-task]]
 version = "0.3.31"
@@ -896,10 +888,6 @@ criteria = "safe-to-deploy"
 version = "0.19.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.radium]]
-version = "0.7.0"
-criteria = "safe-to-run"
-
 [[exemptions.rand_xoshiro]]
 version = "0.7.0"
 criteria = "safe-to-deploy"
@@ -1351,10 +1339,6 @@ criteria = "safe-to-deploy"
 [[exemptions.winit]]
 version = "0.30.9"
 criteria = "safe-to-deploy"
-
-[[exemptions.wyz]]
-version = "0.5.1"
-criteria = "safe-to-run"
 
 [[exemptions.x11-dl]]
 version = "2.21.0"
