@@ -29,7 +29,7 @@ dependencies = [
  "exhaust",
  "flate2",
  "futures-core",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "itertools",
  "libm",
  "log",
@@ -103,7 +103,7 @@ dependencies = [
  "futures-util",
  "gloo-timers",
  "half",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "itertools",
  "log",
  "naga-rust-embed",
@@ -137,7 +137,7 @@ dependencies = [
  "flume",
  "futures-channel",
  "futures-util",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "indoc",
  "itertools",
  "log",
@@ -189,7 +189,7 @@ dependencies = [
  "displaydoc",
  "exhaust",
  "futures-core",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "imgref",
  "indoc",
  "itertools",
@@ -859,9 +859,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f467dd6dccf739c208452f8014c75c18bb8301b050ad1cfb27153803edb0f51"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
  "foldhash",
 ]
@@ -909,7 +909,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
 ]
 
 [[package]]
@@ -1116,7 +1116,7 @@ dependencies = [
  "cfg_aliases",
  "codespan-reporting",
  "half",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "indexmap",
  "libm",
  "log",
@@ -1183,7 +1183,7 @@ version = "30.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "658200ddc25c6c7b860747516d132d1b284c0fafb7a380233acee9a72fb30e11"
 dependencies = [
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "indexmap",
  "rustc-hash 1.1.0",
  "thiserror",
@@ -1940,7 +1940,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "document-features",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "js-sys",
  "log",
  "portable-atomic",
@@ -1969,7 +1969,7 @@ dependencies = [
  "bytemuck",
  "cfg_aliases",
  "document-features",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "indexmap",
  "log",
  "naga",
@@ -2006,7 +2006,7 @@ dependencies = [
  "bitflags",
  "cfg-if",
  "cfg_aliases",
- "hashbrown 0.17.0",
+ "hashbrown 0.17.1",
  "libloading",
  "log",
  "naga",
