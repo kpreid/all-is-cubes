@@ -172,7 +172,7 @@ tinytemplate = { version = "1.2.1" }
 # The library crates do not require Tokio.
 tokio = { version = "1.53.0", default-features = false }
 trycmd = "1.0.0" # keep in sync with `snapbox`
-unicode-segmentation = { version = "1.10.1", default-features = false }
+unicode-segmentation = { version = "1.13.3", default-features = false }
 unicode-width = { version = "0.2", default-features = false }
 visibility = { version = "0.1.1", default-features = false }
 wasm-bindgen-futures = { version = "0.4.77", default-features = false }

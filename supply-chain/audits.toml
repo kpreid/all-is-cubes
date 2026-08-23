@@ -489,6 +489,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.15.4 -> 1.0.0"
 
+[[audits.unicode-segmentation]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "1.13.2 -> 1.13.3"
+
 [[audits.visibility]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
