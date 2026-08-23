@@ -529,6 +529,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.2.0 -> 0.2.1"
 
+[[audits.yoke]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.8.2 -> 0.8.3"
+
 [[trusted.anstream]]
 criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
