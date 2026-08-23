@@ -116,6 +116,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "0.2.5"
 
+[[audits.displaydoc]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.2.7"
+
 [[audits.dot_vox]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
