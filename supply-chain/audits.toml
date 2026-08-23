@@ -439,6 +439,21 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
 delta = "0.103.12 -> 0.103.13"
 
+[[audits.serde]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "1.0.228 -> 1.0.229"
+
+[[audits.serde_core]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "1.0.228 -> 1.0.229"
+
+[[audits.serde_derive]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "1.0.228 -> 1.0.229"
+
 [[audits.similar]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
