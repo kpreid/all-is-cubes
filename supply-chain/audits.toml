@@ -434,6 +434,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
 delta = "0.103.12 -> 0.103.13"
 
+[[audits.similar]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "2.7.0 -> 3.0.0"
+
 [[audits.smallvec]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
@@ -443,6 +448,11 @@ delta = "1.15.1 -> 1.15.2"
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.6.24 -> 1.0.0"
+
+[[audits.snapbox]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-run"
+delta = "1.2.1 -> 1.2.2"
 
 [[audits.spin]]
 who = "Kevin Reid <kpreid@switchb.org>"
@@ -513,6 +523,11 @@ delta = "0.24.1+spec-1.1.0 -> 0.25.2+spec-1.1.0"
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.15.4 -> 1.0.0"
+
+[[audits.trycmd]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "1.2.0 -> 1.2.1"
 
 [[audits.unicode-segmentation]]
 who = "Kevin Reid <kpreid@switchb.org>"
