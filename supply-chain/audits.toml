@@ -171,6 +171,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.1.5 -> 0.2.0"
 
+[[audits.font-types]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.12.3 -> 0.12.4"
+
 [[audits.futures-io]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
