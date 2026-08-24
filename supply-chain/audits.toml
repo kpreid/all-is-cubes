@@ -186,6 +186,16 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.3.31 -> 0.3.32"
 
+[[audits.gilrs]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.11.1 -> 0.11.2"
+
+[[audits.gilrs-core]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.6.8"
+
 [[audits.gloo-timers]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
