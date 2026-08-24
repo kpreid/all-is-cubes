@@ -564,6 +564,16 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
 delta = "0.24.1+spec-1.1.0 -> 0.25.2+spec-1.1.0"
 
+[[audits.toml_edit]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.25.11+spec-1.1.0 -> 0.25.13+spec-1.1.0"
+
+[[audits.toml_writer]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "1.1.1+spec-1.1.0 -> 1.1.2+spec-1.1.0"
+
 [[audits.trycmd]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
