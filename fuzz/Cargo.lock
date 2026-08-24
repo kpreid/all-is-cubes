@@ -1469,9 +1469,9 @@ checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
 name = "read-fonts"
-version = "0.43.0"
+version = "0.43.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6b5cae85882cfb0167038e7726a426f47ebd808e67af78c2d6bcbb02acbf3ce"
+checksum = "315132758c032b03a4d3a3ada9289d5608f2ff16c91157888afc8c8e8e9bb209"
 dependencies = [
  "bytemuck",
  "font-types",
