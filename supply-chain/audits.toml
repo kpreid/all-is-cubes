@@ -499,6 +499,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "1.0.228 -> 1.0.229"
 
+[[audits.serde_json]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "1.0.149 -> 1.0.151"
+
 [[audits.similar]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
