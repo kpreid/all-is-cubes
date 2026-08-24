@@ -70,7 +70,7 @@ dependencies = [
  "paste",
  "png-decoder",
  "pretty_assertions",
- "rand 0.10.1",
+ "rand 0.10.2",
  "rand_distr",
  "rand_xoshiro",
  "rayon",
@@ -108,7 +108,7 @@ dependencies = [
  "num-traits",
  "ordered-float",
  "pretty_assertions",
- "rand 0.10.1",
+ "rand 0.10.2",
  "rand_xoshiro",
  "re_sdk_types",
  "rstest",
@@ -138,7 +138,7 @@ dependencies = [
  "paste",
  "petgraph",
  "pretty_assertions",
- "rand 0.10.1",
+ "rand 0.10.2",
  "rand_xoshiro",
  "rstest",
  "smol-macros",
@@ -180,7 +180,7 @@ dependencies = [
  "mint",
  "png",
  "pretty_assertions",
- "rand 0.10.1",
+ "rand 0.10.2",
  "ratatui",
  "re_sdk",
  "re_sdk_types",
@@ -225,7 +225,7 @@ dependencies = [
  "num-traits",
  "pollster",
  "pretty_assertions",
- "rand 0.10.1",
+ "rand 0.10.2",
  "rand_xoshiro",
  "rayon",
  "resource",
@@ -331,7 +331,7 @@ dependencies = [
  "mutants 0.0.4",
  "num-traits",
  "pretty_assertions",
- "rand 0.10.1",
+ "rand 0.10.2",
  "rand_distr",
  "rand_xoshiro",
  "rayon",
@@ -5263,9 +5263,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.10.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2e8e8bcc7961af1fdac401278c6a831614941f6164ee3bf4ce61b7edb162207"
+checksum = "c7f5fa3a058cd35567ef9bfa5e75732bee0f9e4c55fa90477bef2dfcdbc4be80"
 dependencies = [
  "chacha20",
  "getrandom 0.4.2",
@@ -5313,7 +5313,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d431c2703ccf129de4d45253c03f49ebb22b97d6ad79ee3ecfc7e3f4862c1d8"
 dependencies = [
  "num-traits",
- "rand 0.10.1",
+ "rand 0.10.2",
 ]
 
 [[package]]
@@ -7121,7 +7121,7 @@ dependencies = [
  "all-is-cubes-render",
  "criterion",
  "pollster",
- "rand 0.10.1",
+ "rand 0.10.2",
  "rand_xoshiro",
 ]
 
