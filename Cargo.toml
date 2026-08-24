@@ -93,7 +93,7 @@ bevy_platform = { version = "0.19.1", default-features = false, features = ["all
 bitflags = { version = "2.13.1", default-features = false }
 bytemuck = { version = "1.25.2", default-features = false, features = ["derive", "must_cast"] }
 # When upgrading clap, beware text output changes causing integration tests to fail.
-clap = { version = "4.5", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
+clap = { version = "4.6.6", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
 criterion = { version = "0.8.0", features = ["async", "cargo_bench_support", "html_reports"] }
 derive_more = { version = "2.1.1", default-features = false, features = ["add", "add_assign", "sum"] }
 descriptive-unwrap = { version = "0.1.0", default-features = false }

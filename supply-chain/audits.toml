@@ -76,6 +76,21 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.2.1 -> 0.2.2"
 
+[[audits.clap]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "4.6.1 -> 4.6.6"
+
+[[audits.clap_builder]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "4.6.0 -> 4.6.6"
+
+[[audits.clap_derive]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "4.6.1 -> 4.6.4"
+
 [[audits.compact_str]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
