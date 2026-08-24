@@ -21,6 +21,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "1.0.103 -> 1.0.104"
 
+[[audits.approx]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.5.1"
+
 [[audits.arcstr]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
@@ -55,6 +60,11 @@ delta = "0.19.0 -> 0.19.1"
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.19.0 -> 0.19.1"
+
+[[audits.by_address]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "1.2.1"
 
 [[audits.bytemuck]]
 who = "Kevin Reid <kpreid@switchb.org>"
@@ -422,12 +432,37 @@ version = "0.26.1"
 [[audits.ratatui]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
+delta = "0.24.0 -> 0.30.0"
+
+[[audits.ratatui]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
 delta = "0.29.0 -> 0.30.0"
+
+[[audits.ratatui]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.30.0 -> 0.30.2"
 
 [[audits.ratatui-core]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "0.1.0"
+
+[[audits.ratatui-core]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.1.0 -> 0.1.2"
+
+[[audits.ratatui-crossterm]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.1.0 -> 0.1.2"
+
+[[audits.ratatui-widgets]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.3.2"
 
 [[audits.rataui-crossterm]]
 who = "Kevin Reid <kpreid@switchb.org>"
