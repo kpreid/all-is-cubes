@@ -429,6 +429,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "0.4.2"
 
+[[audits.reqwest]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.13.2 -> 0.13.4"
+
 [[audits.resource]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
