@@ -1,6 +1,8 @@
 //! Tests that require a GPU device, but are not rendering tests
 //! (those are found in the `test-renderers` package).
 
+#![recursion_limit = "256"] // TODO: remove after <https://github.com/gfx-rs/wgpu/pull/9953>
+
 use std::sync::Arc;
 
 use all_is_cubes::math::{GridAab, GridSize, Rgb, Vol, ps64};
