@@ -158,13 +158,13 @@ impl Vui {
         let cue_channel: CueNotifier = Arc::new(Notifier::new());
         let notif_hub = notification::Hub::new();
 
-        let changed_graphics_options = listen::Flag::listening(false, &params.settings.as_source());
+        let changed_graphics_options = listen::Flag::listening(false, params.settings.as_source());
         let ui_graphics_options = listen::Cell::new(Arc::new(Self::graphics_options(
             GraphicsOptions::clone(&params.settings.get().to_graphics_options()),
         )));
 
         let changed_custom_commands = listen::Flag::listening(false, &params.custom_commands);
-        let changed_viewport = listen::Flag::listening(false, &viewport_source);
+        let changed_viewport = listen::Flag::listening(false, viewport_source);
         let ui_size = UiSize::new(viewport_source.get());
         let hud_inputs = HudInputs {
             base: params.clone(),

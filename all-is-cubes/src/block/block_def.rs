@@ -986,7 +986,7 @@ mod tests {
     ) {
         let change_flag = listen::Flag::listening(
             false,
-            &block_def_handle.read(universe.read_ticket()).unwrap(),
+            block_def_handle.read(universe.read_ticket()).unwrap(),
         );
 
         let mut previous_block: Option<Block> = None;
