@@ -1,5 +1,6 @@
 //! Runs [`test_renderers_runner::harness_main`] against [`all_is_cubes_gpu`].
 
+#![recursion_limit = "256"] // TODO: remove after <https://github.com/gfx-rs/wgpu/pull/9953>
 #![expect(clippy::unwrap_used, reason = "test")]
 
 use clap::Parser as _;
