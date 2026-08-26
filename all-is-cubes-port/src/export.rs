@@ -1,4 +1,13 @@
 #![allow(clippy::shadow_unrelated, reason = "false positives")]
+#![cfg_attr(
+    not(all(feature = "native", feature = "stl", feature = "dot-vox")),
+    allow(
+        dead_code,
+        unused_imports,
+        reason = "utilities in this file are only used by some features; \
+                 expand the cfg condition as needed to avoid warnings"
+    )
+)]
 
 use core::fmt;
 use core::future::ready;

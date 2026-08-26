@@ -135,7 +135,7 @@ impl From<CharacterBuf> for String {
 /// the center of the space. The text output will be 80 columns wide.
 ///
 /// This function is only available with the features `"raytracer"` **and** `"std"` enabled.
-#[cfg(any(feature = "std", test))]
+#[cfg(feature = "std")]
 pub fn print_space(space: &space::Read<'_>, direction: impl Into<FreeVector>) {
     std::print!(
         "{}",

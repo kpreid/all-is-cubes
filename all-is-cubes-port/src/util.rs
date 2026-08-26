@@ -4,7 +4,7 @@
         dead_code,
         unused_imports,
         reason = "these utilities are only used by some features; \
-                expand the cfg condition as needed to avoid warnings"
+                 expand the cfg condition as needed to avoid warnings"
     )
 )]
 

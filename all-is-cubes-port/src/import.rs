@@ -23,6 +23,7 @@ use crate::file;
     not(any(feature = "native", feature = "dot-vox")),
     allow(unreachable_code, unused_variables)
 )]
+#[allow(clippy::unused_async)]
 pub async fn load_universe_from_file(
     progress: YieldProgress,
     file: Arc<dyn file::Fileish>,
