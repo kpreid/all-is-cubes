@@ -137,6 +137,7 @@ fn exhaustive_geometry() {
         transparency: TransparencyOption::Volumetric,
         transparency_format: crate::TransparencyFormat::BoundingBox,
         ignore_voxels: false,
+        limit_indices_per_mesh: 3000,
         _mt: PhantomData,
     };
 

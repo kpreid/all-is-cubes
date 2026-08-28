@@ -88,6 +88,9 @@ pub mod dynamic;
 mod heap;
 pub use heap::OutOfMemory;
 
+mod index_range;
+pub(crate) use index_range::*;
+
 mod index_vec;
 pub use index_vec::*;
 

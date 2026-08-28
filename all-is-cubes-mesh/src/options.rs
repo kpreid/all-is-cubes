@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
-use crate::{Vertex, texture};
+use crate::{IndexBound, MAX_LIMIT_INDICES_PER_MESH, Vertex, texture};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -28,6 +28,10 @@ pub struct MeshOptions<M: MeshTypes> {
     ///
     /// [`voxels`]: all_is_cubes::block::EvaluatedBlock::voxels
     pub(crate) ignore_voxels: bool,
+
+    /// Number of indices (3 times the number of triangles) which may not be exceeded.
+    /// If a mesh would have more triangles, it is truncated.
+    pub(crate) limit_indices_per_mesh: IndexBound,
 
     /// Does not own an M but depends on it.
     pub(crate) _mt: PhantomData<fn(&M)>,
@@ -61,6 +65,8 @@ impl<M: MeshTypes> MeshOptions<M> {
             transparency,
             transparency_format,
             ignore_voxels: false,
+            // TODO: allow configuring this
+            limit_indices_per_mesh: MAX_LIMIT_INDICES_PER_MESH,
             _mt: PhantomData,
         }
     }
@@ -68,11 +74,12 @@ impl<M: MeshTypes> MeshOptions<M> {
     /// Placeholder for use in tests which do not care about any of the
     /// characteristics that are affected by options (yet).
     #[doc(hidden)]
-    pub fn dont_care_for_test() -> Self {
+    pub const fn dont_care_for_test() -> Self {
         Self {
             transparency: TransparencyOption::Volumetric,
             transparency_format: TransparencyFormat::BoundingBox,
             ignore_voxels: false,
+            limit_indices_per_mesh: MAX_LIMIT_INDICES_PER_MESH,
             _mt: PhantomData,
         }
     }
@@ -85,11 +92,13 @@ impl<M: MeshTypes> PartialEq for MeshOptions<M> {
             transparency,
             transparency_format,
             ignore_voxels,
+            limit_indices_per_mesh,
             _mt: _,
         } = self;
         *transparency == other.transparency
             && *transparency_format == other.transparency_format
             && *ignore_voxels == other.ignore_voxels
+            && *limit_indices_per_mesh == other.limit_indices_per_mesh
     }
 }
 
@@ -99,6 +108,7 @@ impl<M: MeshTypes> Clone for MeshOptions<M> {
             transparency: self.transparency.clone(),
             transparency_format: self.transparency_format,
             ignore_voxels: self.ignore_voxels,
+            limit_indices_per_mesh: self.limit_indices_per_mesh,
             _mt: PhantomData,
         }
     }
@@ -118,6 +128,7 @@ impl<'a, M: MeshTypes> arbitrary::Arbitrary<'a> for MeshOptions<M> {
                 TransparencyFormat::Surfaces
             },
             ignore_voxels: u.arbitrary()?,
+            limit_indices_per_mesh: u.arbitrary()?,
             _mt: PhantomData,
         })
     }

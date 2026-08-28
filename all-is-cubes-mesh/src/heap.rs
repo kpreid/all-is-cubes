@@ -63,8 +63,7 @@ pub(crate) fn capacity_bytes<T>(v: &alloc::vec::Vec<T>) -> usize {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Error type returned from certain functions when memory allocation fails, or when a mesh
-/// would reach hard numeric limits.
+/// Error type returned from certain functions when memory allocation fails.
 ///
 /// This error is not produced by [`BlockMesh`][crate::BlockMesh] and
 /// [`SpaceMesh`][crate::SpaceMesh] operations; they mark the mesh with
@@ -95,5 +94,12 @@ impl From<alloc::collections::TryReserveError> for OutOfMemory {
     #[inline(always)]
     fn from(_: alloc::collections::TryReserveError) -> Self {
         Self::new()
+    }
+}
+
+impl From<OutOfMemory> for crate::TooComplex {
+    fn from(value: OutOfMemory) -> Self {
+        let OutOfMemory { _private: () } = value;
+        crate::TooComplex::OutOfMemory
     }
 }

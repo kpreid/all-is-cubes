@@ -16,7 +16,7 @@ use all_is_cubes::euclid::{Point3D, Size3D, point3};
 use all_is_cubes::math::{
     Aab, Cube,
     Face::{self, *},
-    FaceMap, GridAab, Rgb, Rgba, range_len, zo32,
+    FaceMap, GridAab, Rgb, Rgba, range_len, u32size, zo32,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::ReadTicket;
@@ -670,7 +670,7 @@ fn transparency_split() {
 }
 
 #[test]
-fn handling_allocation_failure() {
+fn texture_allocation_failure() {
     let resolution = R8;
     let mut u = Universe::new();
     let [atom1, atom2] = make_some_blocks();
@@ -815,5 +815,92 @@ fn assert_is_using_volumetric_texturing_properly(
                 }
             }
         }
+    }
+}
+
+mod complexity_limit {
+    use super::{assert_eq, *};
+
+    const INDICES_PER_CUBE: u32 = 6 * 2 * 3; // 6 faces, 2 triangles per face, 3 indices per triangle
+    const ONE_AND_A_HALF_CUBES: u32 = INDICES_PER_CUBE * 3 / 2;
+    const LIMITED_OPTIONS: &MeshOptions<TextureMt> = &MeshOptions {
+        limit_indices_per_mesh: ONE_AND_A_HALF_CUBES,
+        ..MeshOptions::dont_care_for_test()
+    };
+
+    #[test]
+    fn block_mesh() {
+        let mut universe = Universe::new();
+        let block = Block::builder()
+            .voxels_fn(R4, |cube| {
+                // two separated voxels, making two cube shapes in the mesh.
+                // We need two cubes because we don’t currently support limiting to less than one cube.
+                if cube == Cube::new(0, 0, 0) || cube == Cube::new(2, 0, 0) {
+                    block::from_color!(Rgba::BLACK)
+                } else {
+                    AIR
+                }
+            })
+            .unwrap()
+            .build_into(&mut universe);
+
+        let mesh = BlockMesh::new(
+            &block.evaluate(universe.read_ticket()).unwrap(),
+            &Allocator::new(),
+            LIMITED_OPTIONS,
+        );
+
+        assert_eq!(mesh.count_indices(), ONE_AND_A_HALF_CUBES);
+        assert_eq!(mesh.flaws(), Flaws::TOO_COMPLEX);
+    }
+
+    #[test]
+    fn space_mesh_opaque() {
+        let [block] = make_some_blocks();
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 1, 1]))
+            .build_and_mutate(|m| {
+                m.set([0, 0, 0], &block)?;
+                m.set([2, 0, 0], &block)?;
+                Ok(())
+            })
+            .unwrap();
+
+        let block_meshes: BlockMeshes<TextureMt> =
+            block_meshes_for_space(&space.read(), &Allocator::new(), LIMITED_OPTIONS);
+        let space_mesh = SpaceMesh::new(
+            &space.read(),
+            space.bounds(),
+            LIMITED_OPTIONS,
+            &*block_meshes,
+        );
+
+        // We choose to stop at whole block meshes rather than appending a portion,
+        // so the number of indices is the number of indices of only one of the two cubes.
+        assert_eq!(space_mesh.indices().len(), u32size(INDICES_PER_CUBE));
+        assert_eq!(space_mesh.flaws(), Flaws::TOO_COMPLEX);
+    }
+
+    #[test]
+    fn space_mesh_transparent() {
+        let block = block::from_color!(1.0, 0.0, 0.0, 0.5);
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 1, 1]))
+            .build_and_mutate(|m| {
+                m.set([0, 0, 0], &block)?;
+                m.set([2, 0, 0], &block)?;
+                Ok(())
+            })
+            .unwrap();
+
+        let block_meshes: BlockMeshes<TextureMt> =
+            block_meshes_for_space(&space.read(), &Allocator::new(), LIMITED_OPTIONS);
+        let space_mesh = SpaceMesh::new(
+            &space.read(),
+            space.bounds(),
+            LIMITED_OPTIONS,
+            &*block_meshes,
+        );
+
+        assert!(space_mesh.indices().len() <= u32size(ONE_AND_A_HALF_CUBES));
+        assert_eq!(space_mesh.flaws(), Flaws::TOO_COMPLEX);
     }
 }

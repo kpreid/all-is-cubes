@@ -8,7 +8,7 @@ use core::time::Duration;
 use futures_channel::oneshot::Canceled;
 
 use all_is_cubes::block::{self, EvaluatedBlock, Resolution};
-use all_is_cubes::math::Cube;
+use all_is_cubes::math::{Cube, u32size};
 use all_is_cubes::space::{self, BlockIndex};
 use all_is_cubes::time::{self, TimeStats};
 use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText};
@@ -462,7 +462,7 @@ fn should_use_instances<M: DynamicMeshTypes>(
 ) -> bool {
     // TODO(instancing): we either need an explicit “allow instances” configuration, or to demand
     // that all clients support instances (probably the latter?)
-    if M::MAXIMUM_MERGED_BLOCK_MESH_SIZE == usize::MAX {
+    if M::MAXIMUM_MERGED_BLOCK_MESH_SIZE >= u32size(crate::IndexBound::MAX) {
         return false;
     }
 
@@ -472,8 +472,9 @@ fn should_use_instances<M: DynamicMeshTypes>(
     }
 
     // TODO(instancing): if the animation hint is colors-in-definition-only then we don't want instancing
+    // TODO: change the type of MAXIMUM_MERGED_BLOCK_MESH_SIZE to IndexBound.
     ev.attributes().animation_hint != block::AnimationHint::UNCHANGING
-        || block_mesh.count_indices() > M::MAXIMUM_MERGED_BLOCK_MESH_SIZE
+        || u32size(block_mesh.count_indices()) > M::MAXIMUM_MERGED_BLOCK_MESH_SIZE
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, derive_more::AddAssign)]

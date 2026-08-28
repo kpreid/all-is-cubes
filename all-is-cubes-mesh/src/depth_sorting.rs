@@ -3,19 +3,21 @@
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
+use core::iter;
 use core::range::Range;
 
+use descriptive_unwrap::ResultExt as _;
 use exhaust::Exhaust as _;
 use ordered_float::OrderedFloat;
 use smallvec::SmallVec;
 
 use all_is_cubes::euclid::{self, Vector3D, vec3};
 use all_is_cubes::math::lines::Wireframe as _;
-use all_is_cubes::math::{Axis, Face, FaceMap, GridRotation, lines, range_len};
+use all_is_cubes::math::{Axis, Face, FaceMap, GridRotation, lines, range_len, u32size};
 
 use crate::{
-    Aabb, IndexInt, IndexSliceMut, IndexVec, Ixtend, MeshRel, MeshTypes, OutOfMemory, PosCoord,
-    Position, TransparentMeta, Vertex,
+    Aabb, IndexBound, IndexInt, IndexSliceMut, IndexVec, Ixtend, MeshRel, MeshTypes, PosCoord,
+    Position, TooComplex, TransparentMeta, Vertex, index_range_len, index_range_to_usize,
 };
 #[cfg(doc)]
 use crate::{MeshMeta, SpaceMesh};
@@ -310,7 +312,7 @@ impl Default for DepthSortInfo {
 /// (This is not literally a GPU drawing primitive, but for our purposes it might as well be.)
 trait Primitive: Copy + Sized {
     type Item: IndexInt;
-    const LEN: usize;
+    const LEN: IndexBound;
     /// Divide the slice reference into chunks. Panics if the slice is not divisible.
     fn as_chunks(slice: &[Self::Item]) -> &[Self];
     /// Divide the exclusive slice reference into chunks. Panics if the slice is not divisible.
@@ -323,7 +325,7 @@ trait Primitive: Copy + Sized {
 /// the full bounding box would not be considered.
 impl<Ix: IndexInt> Primitive for [Ix; 6] {
     type Item = Ix;
-    const LEN: usize = 6;
+    const LEN: IndexBound = 6;
     fn as_chunks(slice: &[Self::Item]) -> &[Self] {
         let (rects, rest) = slice.as_chunks();
         assert_eq!(
@@ -350,7 +352,7 @@ impl<Ix: IndexInt> Primitive for [Ix; 6] {
 /// Triangles.
 impl<Ix: IndexInt> Primitive for [Ix; 3] {
     type Item = Ix;
-    const LEN: usize = 3;
+    const LEN: IndexBound = 3;
     fn as_chunks(slice: &[Self::Item]) -> &[Self] {
         let (tris, rest) = slice.as_chunks();
         assert_eq!(
@@ -382,12 +384,18 @@ impl<Ix: IndexInt> Primitive for [Ix; 3] {
 ///
 /// Reads the contents of `transparent_indices`, apppends culled copies to `indices`, and updates
 /// `transparent_meta` to specify where the copies are located.
+///
+/// If `indices_out.len()` would exceed `limit_indices`, stops copying and returns
+/// [`TooComplex::TooManyIndices`].
 #[allow(clippy::needless_pass_by_value, reason = "used exactly once anyway")]
 pub(crate) fn store_transparent_indices<M: MeshTypes>(
     indices_out: &mut IndexVec,
     transparent_meta_out: &mut [TransparentMeta; DepthOrdering::COUNT],
     transparent_indices_in: FaceMap<IndexVec>,
-) -> Result<(), OutOfMemory> {
+    limit_indices: IndexBound,
+) -> Result<(), TooComplex> {
+    let input_index_count = transparent_indices_in.map_ref(|_, iv| iv.len()).sum();
+
     if !M::Vertex::WANTS_DEPTH_SORTING || transparent_indices_in.values().all(|v| v.is_empty()) {
         // Either there is nothing to sort (and all ranges will be length 0),
         // or the destination doesn't want sorting anyway. In either case, write the
@@ -395,6 +403,11 @@ pub(crate) fn store_transparent_indices<M: MeshTypes>(
         //
         // TODO: There is inadequate testing for this case (only the glTF export test catches if
         // these indices are missing or extra).
+
+        if indices_out.len().saturating_add(input_index_count) > u32size(limit_indices) {
+            return Err(TooComplex::TooManyIndices);
+        }
+
         let index_range = ixtend_giving_range(indices_out, transparent_indices_in.values())?;
         transparent_meta_out.fill(TransparentMeta {
             index_range,
@@ -406,6 +419,13 @@ pub(crate) fn store_transparent_indices<M: MeshTypes>(
 
     // Prepare un-sorted, but culled, indices for each direction.
     for ordering in DepthOrdering::exhaust() {
+        // Check if we are exceeding the limit.
+        // Note that this check ignores culling and will therefore stop before the actual limit;
+        // it’s not worth the performance cost of being precise.
+        if indices_out.len().saturating_add(input_index_count) > u32size(limit_indices) {
+            return Err(TooComplex::TooManyIndices);
+        }
+
         let meta = &mut transparent_meta_out[ordering.to_index()];
         if ordering == DepthOrdering::WITHIN {
             // `WITHIN` is slightly different: nothing is culled, and we already know the
@@ -417,7 +437,9 @@ pub(crate) fn store_transparent_indices<M: MeshTypes>(
             debug_assert!(!index_range.is_empty());
             *meta = TransparentMeta {
                 // Always dynamically sort everything.
-                dynamic_sub_ranges: SmallVec::from([Range::from(0..range_len(index_range))]),
+                dynamic_sub_ranges: SmallVec::from_iter(iter::once(Range::from(
+                    0..index_range_len(index_range),
+                ))),
                 // Haven't performed any sorting yet, so there is no region of validity.
                 depth_sort_validity: Aabb::EMPTY,
                 index_range,
@@ -464,7 +486,7 @@ fn static_sort<V: Vertex, P: Primitive>(
     let basis = ordering.sort_key_rotation().inverse().to_basis();
 
     let mut sortable_primitives: Vec<OrderedPrimitive<P>> =
-        Vec::with_capacity(indices.len() / P::LEN);
+        Vec::with_capacity(indices.len() / u32size(P::LEN));
     sortable_primitives.extend(
         P::as_chunks(indices)
             .iter()
@@ -511,9 +533,9 @@ fn static_sort<V: Vertex, P: Primitive>(
             let projection = basis.x;
             debug_assert_ne!(ordering.0[projection.axis()], Rel::Within);
 
-            let mut prim_group = Range { start: 0, end: 1 }; // indices into sortable_primitives, not single indices!
+            let mut prim_group: Range<IndexBound> = Range { start: 0, end: 1 }; // indices into sortable_primitives, not single indices!
             let mut group_upper_bound = sortable_primitives[0].min_max_on_axis(vertices, basis.x).1;
-            for (i, prim) in sortable_primitives[1..].iter().enumerate() {
+            for (i, prim) in iter::zip(0u32.., sortable_primitives[1..].iter()) {
                 let (qmin, qmax) = prim.min_max_on_axis(vertices, basis.x);
                 if qmin < group_upper_bound {
                     // Add this primitive to the group because it overlaps on the axis
@@ -632,7 +654,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         let mut new_validity = Aabb::EVERYWHERE;
 
         for sub_range in meta.dynamic_sub_ranges.iter().copied() {
-            let data_slice: &mut [P::Item] = &mut data[sub_range];
+            let data_slice: &mut [P::Item] = &mut data[index_range_to_usize(sub_range)];
             // We want to sort the primitives (rectangles or triangles),
             // so we reinterpret the slice as groups of indices.
             let primitives_slice: &mut [P] = P::as_chunks_mut(data_slice);
@@ -659,16 +681,16 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
 
         DepthSortResult {
             // Find start and end of the union of all dynamic_sub_ranges.
-            changed: match meta.dynamic_sub_ranges.as_slice() {
+            changed: (match meta.dynamic_sub_ranges.as_slice() {
                 [Range { start, end }] | [Range { start, .. }, .., Range { end, .. }] => {
                     let base = meta.index_range.start;
-                    Some(Range {
+                    Some(index_range_to_usize(Range {
                         start: base + start,
                         end: base + end,
-                    })
+                    }))
                 }
                 [] => None,
-            },
+            }),
             info: DepthSortInfo {
                 elements_sorted: prims_sorted,
                 groups_sorted,
@@ -694,7 +716,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     if needs_static_sort {
         // If we did a static sort, then all indices in the range changed,
         // not just the ones the dynamic sort touched.
-        result.changed = Some(meta.index_range);
+        result.changed = Some(index_range_to_usize(meta.index_range));
 
         result.info.elements_sorted += range_len(meta.index_range);
         result.info.static_groups_sorted += 1;
@@ -781,12 +803,12 @@ fn midpoint<V: Vertex, P: Primitive>(vertices: &[V], indices: P) -> Position {
 fn ixtend_giving_range<'a>(
     storage: &mut IndexVec,
     chunks: impl IntoIterator<Item = &'a IndexVec>,
-) -> Result<Range<usize>, OutOfMemory> {
-    let start = storage.len();
+) -> Result<Range<IndexBound>, TooComplex> {
+    let start = u32::try_from(storage.len()).err_is_unreachable();
     for chunk in chunks {
         storage.ixtend_without_offset(chunk.as_slice(..))?;
     }
-    let end = storage.len();
+    let end = u32::try_from(storage.len()).map_err(|_| TooComplex::TooManyIndices)?;
     Ok(Range { start, end })
 }
 

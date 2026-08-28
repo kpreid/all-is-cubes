@@ -6,6 +6,8 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
 
+use descriptive_unwrap::ResultExt as _;
+
 use all_is_cubes::block::{EvaluatedBlock, VoxelOpacityMask};
 use all_is_cubes::math::{Face, FaceMap};
 use all_is_cubes::space;
@@ -13,7 +15,7 @@ use all_is_cubes_render::Flaws;
 
 use crate::heap::{self, HeapUsage};
 use crate::texture::{self, Tile as _};
-use crate::{Aabbs, IndexVec, MeshOptions, MeshTypes, OutOfMemory, Vertex, planar};
+use crate::{Aabbs, IndexBound, IndexVec, MeshOptions, MeshTypes, TooComplex, Vertex, planar};
 
 #[cfg(doc)]
 use {crate::SpaceMesh, all_is_cubes::space::Space};
@@ -60,6 +62,9 @@ pub struct BlockMesh<M: MeshTypes> {
     /// All vertices not in [`Self::face_vertices`], grouped by their face normals.
     /// All of these vertices have positions in the interior of the unit cube.
     pub(super) interior_vertices: FaceMap<SubMesh<M>>,
+
+    /// Number of indices in all [`SubMesh`]es.
+    total_indices: IndexBound,
 
     /// Texture used by the vertices;
     /// holding this handle ensures that the texture coordinates stay valid.
@@ -151,6 +156,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
             py: SubMesh::EMPTY,
             pz: SubMesh::EMPTY,
         },
+        total_indices: 0,
         texture_used: None,
         voxel_opacity_mask: None,
         flaws: Flaws::empty(),
@@ -226,13 +232,8 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
     /// Returns the number of vertex indices in this mesh (three times the number of
     /// triangles).
-    // TODO(instancing): this is used for deciding whether to draw blocks as instances or within
-    // chunk meshes. That's implemented but not fully settled yet. Think about whether this should
-    // be public and whether it should count indices or whole triangles.
-    // Whatever is decided, also update `MeshMeta::count_indices()`.
-    #[cfg_attr(not(feature = "dynamic"), allow(dead_code))]
-    pub(crate) fn count_indices(&self) -> usize {
-        self.all_sub_meshes().map(SubMesh::count_indices).sum()
+    pub(crate) fn count_indices(&self) -> IndexBound {
+        self.total_indices
     }
 
     /// Returns the total memory occupied by this [`BlockMesh`] value and all its owned objects,
@@ -241,6 +242,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         let BlockMesh {
             face_vertices,
             interior_vertices,
+            total_indices: _,
             texture_used: _,
             voxel_opacity_mask, // TODO: we should be counting this
             flaws: _,
@@ -302,6 +304,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         let Self {
             face_vertices,
             interior_vertices,
+            total_indices,
             texture_used,
             voxel_opacity_mask,
             flaws,
@@ -309,6 +312,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
         clear_sub_mesh_map(face_vertices);
         clear_sub_mesh_map(interior_vertices);
+        *total_indices = 0;
         *texture_used = None;
         *voxel_opacity_mask = None;
         *flaws = Flaws::empty();
@@ -347,23 +351,25 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
     /// Do the final updates to a newly computed block mesh that need to be done whether or not
     /// there is an error from [`compute::compute_block_mesh()`].
-    #[expect(clippy::needless_pass_by_value)]
-    fn finalize_compute(&mut self, compute_result: Result<(), OutOfMemory>) {
-        if let Err(OutOfMemory { .. }) = compute_result {
-            self.recover_from_out_of_memory();
+    fn finalize_compute(&mut self, compute_result: Result<(), TooComplex>) {
+        if let Err(error) = compute_result {
+            self.recover_from_error(error);
         }
+
+        self.total_indices =
+            u32::try_from(self.all_sub_meshes().map(SubMesh::count_indices).sum::<usize>())
+                .err_is_unreachable();
 
         #[cfg(debug_assertions)]
         self.consistency_check();
     }
 
-    /// Handle allocation failure while building the mesh.
+    /// Handle allocation failure or numeric overflow while building the mesh.
     ///
     /// * Mark the mesh as flawed.
     /// * Fix an incorrect bounding box.
-    #[cold]
-    fn recover_from_out_of_memory(&mut self) {
-        self.flaws |= Flaws::OUT_OF_MEMORY;
+    fn recover_from_error(&mut self, error: TooComplex) {
+        self.flaws |= error.to_flaws();
         for sub_mesh in self.all_sub_meshes_mut() {
             sub_mesh.repair_bounding_box();
         }
@@ -371,9 +377,10 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
     #[cfg(debug_assertions)]
     fn consistency_check(&self) {
-        let is_oom = self.flaws.contains(Flaws::OUT_OF_MEMORY);
+        let had_error =
+            self.flaws.contains(Flaws::OUT_OF_MEMORY) | self.flaws.contains(Flaws::TOO_COMPLEX);
         for sub_mesh in self.all_sub_meshes() {
-            sub_mesh.consistency_check(is_oom);
+            sub_mesh.consistency_check(had_error);
         }
     }
 
@@ -396,6 +403,7 @@ impl<M: MeshTypes> Default for BlockMesh<M> {
         Self {
             face_vertices: FaceMap::default(),
             interior_vertices: FaceMap::default(),
+            total_indices: 0,
             texture_used: None,
             voxel_opacity_mask: None,
             flaws: Flaws::empty(),
@@ -411,13 +419,15 @@ where
         let Self {
             face_vertices,
             interior_vertices,
+            total_indices,
             texture_used,
             voxel_opacity_mask,
             flaws,
         } = self;
         // We first check the aggregate properties to have a higher chance of exiting early
         // without comparing the voxels in detail.
-        *texture_used == other.texture_used
+        *total_indices == other.total_indices
+            && *texture_used == other.texture_used
             && *flaws == other.flaws
             && *face_vertices == other.face_vertices
             && *interior_vertices == other.interior_vertices
@@ -430,6 +440,7 @@ impl<M: MeshTypes> fmt::Debug for BlockMesh<M> {
         let Self {
             face_vertices,
             interior_vertices,
+            total_indices: _, // redundant
             texture_used,
             voxel_opacity_mask,
             flaws,
@@ -449,6 +460,7 @@ impl<M: MeshTypes> Clone for BlockMesh<M> {
         Self {
             face_vertices: self.face_vertices.clone(),
             interior_vertices: self.interior_vertices.clone(),
+            total_indices: self.total_indices,
             texture_used: self.texture_used.clone(),
             voxel_opacity_mask: self.voxel_opacity_mask.clone(),
             flaws: self.flaws,
@@ -523,7 +535,7 @@ impl<M: MeshTypes> SubMesh<M> {
     }
 
     #[cfg(debug_assertions)]
-    fn consistency_check(&self, is_oom: bool) {
+    fn consistency_check(&self, had_error: bool) {
         use all_is_cubes::math::u32size;
         use descriptive_unwrap::ResultExt as _;
 
@@ -539,10 +551,10 @@ impl<M: MeshTypes> SubMesh<M> {
             "bounding box of vertices ≠ recorded bounding box"
         );
 
-        // Every vertex should be used at least once,
-        // and every index should be in-bounds.
-        // (But only allocate a bit-set to check usage if we’re not already in the OOM path.)
-        let mut used_vertices = (!is_oom).then(crate::BitSet::<u32>::new);
+        // Every vertex should be used at least once, and every index should be in-bounds.
+        // (But only allocate a bit-set to check usage if we are sure we are not potentially
+        // already recovering from an out-of-memory condition.)
+        let mut used_vertices = (!had_error).then(crate::BitSet::<u32>::new);
         for index in self
             .indices_opaque
             .as_slice(..)
@@ -556,7 +568,7 @@ impl<M: MeshTypes> SubMesh<M> {
             if let Some(uv) = &mut used_vertices {
                 match uv.insert(index) {
                     Ok(_) => {}
-                    Err(OutOfMemory { .. }) => {
+                    Err(crate::OutOfMemory { .. }) => {
                         used_vertices = None;
                     }
                 }

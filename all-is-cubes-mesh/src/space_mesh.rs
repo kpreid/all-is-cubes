@@ -3,20 +3,21 @@ use alloc::vec::Vec;
 use core::range::Range;
 use core::{fmt, mem, ops};
 
+use descriptive_unwrap::ResultExt as _;
 use exhaust::Exhaust;
 use itertools::izip;
 use smallvec::SmallVec;
 
-use all_is_cubes::math::{Cube, Face, FaceMap, GridAab, Vol, range_len};
+use all_is_cubes::math::{Cube, Face, FaceMap, GridAab, Vol};
 use all_is_cubes::space::{self, BlockIndex, Space};
 use all_is_cubes_render::Flaws;
 
 use crate::heap::HeapUsage;
 use crate::texture::Channels;
 use crate::{
-    Aabb, Aabbs, BlockMesh, DepthOrdering, IndexSlice, IndexVec, IndexVecDeque, Ixtend as _,
-    IxtendFront as _, MeshOptions, MeshRel, MeshTypes, OutOfMemory, Position, Vertex,
-    depth_sorting, reserve_vertices,
+    Aabb, Aabbs, BlockMesh, DepthOrdering, IndexBound, IndexSlice, IndexVec, IndexVecDeque,
+    Ixtend as _, IxtendFront as _, MeshOptions, MeshRel, MeshTypes, OutOfMemory, Position,
+    TooComplex, Vertex, depth_sorting, index_range_len, index_range_to_usize, reserve_vertices,
 };
 
 #[cfg(doc)]
@@ -212,8 +213,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
             block_meshes,
         ) {
             Ok(()) => (),
-            Err(OutOfMemory { .. }) => {
-                self.meta.flaws |= Flaws::OUT_OF_MEMORY;
+            Err(error) => {
+                self.meta.flaws |= error.to_flaws();
             }
         }
     }
@@ -239,8 +240,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
             block_meshes,
         ) {
             Ok(()) => (),
-            Err(OutOfMemory { .. }) => {
-                self.meta.flaws |= Flaws::OUT_OF_MEMORY;
+            Err(error) => {
+                self.meta.flaws |= error.to_flaws();
             }
         }
     }
@@ -249,9 +250,9 @@ impl<M: MeshTypes> SpaceMesh<M> {
         &mut self,
         space_data_source: impl Fn(Cube) -> Option<BlockIndex>,
         bounds: GridAab,
-        _options: &MeshOptions<M>,
+        options: &MeshOptions<M>,
         mut block_meshes: P,
-    ) -> Result<(), OutOfMemory>
+    ) -> Result<(), TooComplex>
     where
         P: GetBlockMesh<'p, M>,
     {
@@ -278,7 +279,9 @@ impl<M: MeshTypes> SpaceMesh<M> {
         // TODO: Consider reuse
         let mut transparent_indices: FaceMap<IndexVec> = FaceMap::default();
 
-        bounds.interior_iter().try_for_each(|cube| -> Result<(), OutOfMemory> {
+        let mut index_count: IndexBound = 0;
+
+        let write_result = bounds.interior_iter().try_for_each(|cube| -> Result<(), TooComplex> {
             // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
             // Do we want to make it the caller's responsibility to specify in-bounds?
             let index: BlockIndex = match space_data_source(cube) {
@@ -310,6 +313,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 &mut opaque_indices_deque,
                 &mut transparent_indices,
                 &mut self.meta,
+                &mut index_count,
+                options.limit_indices_per_mesh,
                 |face| {
                     let adjacent_cube = cube + face.normal_vector();
                     if let Some(adj_block_index) = space_data_source(adjacent_cube)
@@ -326,10 +331,23 @@ impl<M: MeshTypes> SpaceMesh<M> {
             )?;
 
             Ok(())
-        })?;
+        });
 
-        self.store_indices_and_finish_compute(opaque_indices_deque, transparent_indices)?;
-        Ok(())
+        match write_result {
+            Ok(()) | Err(TooComplex::TooManyIndices | TooComplex::TooManyVertices) => {
+                // Finish indices whether or not they will be incomplete.
+                self.store_indices_and_finish_compute(
+                    opaque_indices_deque,
+                    transparent_indices,
+                    options.limit_indices_per_mesh,
+                )?;
+            }
+            Err(TooComplex::OutOfMemory) => {
+                // Stop because we should not try to allocate more memory.
+            }
+        }
+
+        write_result
     }
 
     /// Store freshly computed indices into this mesh.
@@ -352,17 +370,20 @@ impl<M: MeshTypes> SpaceMesh<M> {
         &mut self,
         opaque_indices_deque: IndexVecDeque,
         transparent_indices: FaceMap<IndexVec>,
-    ) -> Result<(), OutOfMemory> {
+        limit_indices: IndexBound,
+    ) -> Result<(), TooComplex> {
         self.indices = IndexVec::from(opaque_indices_deque);
 
         // Set the opaque range to all indices which have already been stored
         // (which will be the opaque ones only).
-        self.meta.opaque_range = Range::from(0..self.indices.len());
+        self.meta.opaque_range =
+            Range::from(0..IndexBound::try_from(self.indices.len()).err_is_unreachable());
 
         depth_sorting::store_transparent_indices::<M>(
             &mut self.indices,
             &mut self.meta.transparent,
             transparent_indices,
+            limit_indices,
         )?;
 
         #[cfg(debug_assertions)]
@@ -491,11 +512,20 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     opaque_indices: &mut IndexVecDeque,
     transparent_indices: &mut FaceMap<IndexVec>,
     meta: &mut MeshMeta<M>,
+    output_index_count: &mut u32,
+    limit_indices_per_mesh: u32,
     mut neighbor_is_fully_opaque: impl FnMut(Face) -> Result<bool, OutOfMemory>,
-) -> Result<(), OutOfMemory> {
+) -> Result<(), TooComplex> {
     if block_mesh.is_empty() {
         return Ok(());
     }
+
+    let new_index_count: u32 = output_index_count.saturating_add(block_mesh.count_indices()); // TODO: shouldn't need to cast
+    if new_index_count > limit_indices_per_mesh {
+        meta.flaws.insert(Flaws::TOO_COMPLEX);
+        return Err(TooComplex::TooManyIndices);
+    }
+    *output_index_count = new_index_count;
 
     let first_new_vertex = vertices.0.len();
 
@@ -516,14 +546,14 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         let index_offset: u32 = vertices.0.len().try_into().expect("unreachable index overflow");
 
         if index_offset.checked_add(sub_mesh.vertices.0.len() as u32).is_none() {
-            // The mesh has sufficient indices that it is impossible to refer to them all with
+            // The mesh has sufficient vertices that it is impossible to refer to them all with
             // a single 32-bit index buffer. Also, something has probably gone horribly wrong.
             // Stop before we overflow the index arithmetic.
             //
             // Strictly speaking, this check is too strong, because we could have a mesh with
             // exactly 2³² vertices, such that the index of the last vertex is 2³² − 1, but that
             // is not a case worth bothering to support.
-            return Err(OutOfMemory::new());
+            return Err(TooComplex::TooManyVertices);
         }
 
         // Copy vertices.
@@ -584,7 +614,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
     /// `GridAab::ORIGIN_CUBE` and placing the block in it,
     /// but more efficient.
     fn from(block_mesh: &BlockMesh<M>) -> Self {
-        fn inner<M: MeshTypes>(block_mesh: &BlockMesh<M>) -> Result<SpaceMesh<M>, OutOfMemory> {
+        fn inner<M: MeshTypes>(block_mesh: &BlockMesh<M>) -> Result<SpaceMesh<M>, TooComplex> {
             let vertex_count = block_mesh.all_sub_meshes().map(|sm| sm.vertices.0.len()).sum();
 
             let mut space_mesh = SpaceMesh {
@@ -618,17 +648,22 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 &mut opaque_indices_deque,
                 &mut transparent_indices,
                 &mut space_mesh.meta, // partly redundant, but hard to skip
+                &mut 0,
+                IndexBound::MAX,
                 |_| Ok(false),
             )?;
-            space_mesh
-                .store_indices_and_finish_compute(opaque_indices_deque, transparent_indices)?;
+            space_mesh.store_indices_and_finish_compute(
+                opaque_indices_deque,
+                transparent_indices,
+                IndexBound::MAX,
+            )?;
 
             Ok(space_mesh)
         }
 
-        inner(block_mesh).unwrap_or_else(|_| {
+        inner(block_mesh).unwrap_or_else(|error| {
             let mut space_mesh = SpaceMesh::default();
-            space_mesh.meta.flaws.insert(Flaws::OUT_OF_MEMORY);
+            space_mesh.meta.flaws.insert(error.to_flaws());
             space_mesh
         })
     }
@@ -733,7 +768,7 @@ impl<'a, M: MeshTypes> GetBlockMesh<'a, M> for &'a [BlockMesh<M>] {
 /// so as to keep them allocated. (Therefore, this type is not [`Copy`].)
 pub struct MeshMeta<M: MeshTypes> {
     /// Where in the index vector the triangles with no partial transparency are arranged.
-    opaque_range: Range<usize>,
+    opaque_range: Range<IndexBound>,
 
     /// Ranges of index data for all partially-transparent triangles, sorted by depth
     /// as documented in [`Self::transparent_range()`], and other information to assist
@@ -783,7 +818,7 @@ impl<M: MeshTypes> MeshMeta<M> {
     /// of 0 or 1 and therefore may be drawn using a depth buffer rather than sorting.
     #[inline]
     pub fn opaque_range(&self) -> Range<usize> {
-        self.opaque_range
+        index_range_to_usize(self.opaque_range)
     }
 
     /// Returns a range of index data which contains the triangles with alpha values other
@@ -796,7 +831,7 @@ impl<M: MeshTypes> MeshMeta<M> {
     /// [`needs_depth_sorting()`][Self::needs_depth_sorting] reports whether this is necessary.
     #[inline]
     pub fn transparent_range(&self, ordering: DepthOrdering) -> Range<usize> {
-        self.transparent[ordering.to_index()].index_range
+        index_range_to_usize(self.transparent[ordering.to_index()].index_range)
     }
 
     /// Returns whether [`SpaceMesh::depth_sort_for_view()`] would have anything to do if called
@@ -928,7 +963,7 @@ impl<M: MeshTypes> Clone for MeshMeta<M> {
 pub(crate) struct TransparentMeta {
     /// Range of the mesh’s indices that should be *drawn* to draw its transparent parts in this
     /// ordering. Each [`DepthOrdering`] has a non-overlapping range.
-    pub(crate) index_range: Range<usize>,
+    pub(crate) index_range: Range<IndexBound>,
 
     /// Volume within which the current depth sort of the indices stored within `self.range`
     /// is still valid and does not need to be redone.
@@ -954,7 +989,7 @@ pub(crate) struct TransparentMeta {
     ///   * it has not yet been computed (and `depth_sort_validity == Aabb::EMPTY`), or
     ///   * dynamic sorting is never needed (e.g. because there is only one transparent box in
     ///     the mesh).
-    pub(crate) dynamic_sub_ranges: SmallVec<[Range<usize>; 1]>,
+    pub(crate) dynamic_sub_ranges: DynamicSubRanges,
 }
 
 impl TransparentMeta {
@@ -979,7 +1014,7 @@ impl TransparentMeta {
 
         for (i, sub_range) in dynamic_sub_ranges.iter().enumerate() {
             assert!(
-                !sub_range.is_empty() && sub_range.end <= range_len(index_range),
+                !sub_range.is_empty() && sub_range.end <= index_range_len(index_range),
                 "sub-range {i} of {range_count}, {sub_range:?}, \
                 is empty or does not fit in index range {index_range:?}",
                 range_count = dynamic_sub_ranges.len(),
@@ -1013,6 +1048,21 @@ impl fmt::Debug for TransparentMeta {
         Ok(())
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Type of [`TransparentMeta::dynamic_sub_ranges`].
+type DynamicSubRanges = SmallVec<[Range<IndexBound>; DYNAMIC_SUB_RANGE_SMALL_LEN]>;
+
+/// Chosen to fit as many elements as possible without increasing the overall size of the
+/// `SmallVec`.
+const DYNAMIC_SUB_RANGE_SMALL_LEN: usize =
+    size_of::<(usize, *const ())>() / size_of::<Range<IndexBound>>();
+
+/// Test that `DYNAMIC_SUB_RANGE_SMALL_LEN` is not too large.
+const _: () = {
+    debug_assert!(size_of::<DynamicSubRanges>() == size_of::<SmallVec<[Range<IndexBound>; 1]>>());
+};
 
 // -------------------------------------------------------------------------------------------------
 

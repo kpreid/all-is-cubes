@@ -19,13 +19,15 @@ use crate::block_mesh::extend::{
 use crate::block_mesh::planar;
 use crate::texture::{self, Plane as _, Tile as _};
 use crate::{
-    BlockMesh, IndexSlice, Ixtend as _, MeshOptions, MeshTypes, OutOfMemory, SubMesh,
+    BlockMesh, IndexSlice, Ixtend as _, MeshOptions, MeshTypes, SubMesh, TooComplex,
     TransparencyFormat, Viz, vertex,
 };
 
 // -------------------------------------------------------------------------------------------------
 
 /// Generate the [`BlockMesh`] data for the given [`EvaluatedBlock`], writing it into `output`.
+///
+/// Does not update [`BlockMesh::total_indices`].
 ///
 /// This private function is called by [`BlockMesh`]'s public functions.
 pub(super) fn compute_block_mesh<M: MeshTypes>(
@@ -35,7 +37,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
     options: &MeshOptions<M>,
     // Calls to `Viz` compile to nothing when the "rerun" feature is not enabled.
     mut viz: Viz,
-) -> Result<(), OutOfMemory> {
+) -> Result<(), TooComplex> {
     output.clear();
 
     let voxels = block.voxels();
@@ -177,7 +179,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     options: &MeshOptions<M>,
     voxel_opacity_mask: &block::VoxelOpacityMask,
     viz: &mut Viz,
-) -> Result<(), OutOfMemory> {
+) -> Result<(), TooComplex> {
     let flaws = &mut output.flaws;
     let mut used_any_vertex_colors = false;
 
@@ -210,6 +212,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
 
     let mut vertex_subset: Vec<AnalysisVertex> = Vec::new();
     vertex_subset.try_reserve(analysis.vertices().len() / 2)?;
+
+    let mut total_indices = 0;
 
     // Walk through the planes (layers) of the block, figuring out what geometry to
     // generate for each layer and whether it needs a texture.
@@ -393,8 +397,16 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                         )
                     }),
                     |triangle_indices| {
+                        if total_indices >= options.limit_indices_per_mesh {
+                            *flaws |= Flaws::TOO_COMPLEX;
+                            return Err(TooComplex::TooManyIndices);
+                        }
+                        total_indices += 3;
+
                         pass_indices
-                            .ixtend_with_offset(IndexSlice::U32(&triangle_indices), index_offset)
+                            .ixtend_with_offset(IndexSlice::U32(&triangle_indices), index_offset)?;
+
+                        Ok(())
                     },
                 )?;
 
