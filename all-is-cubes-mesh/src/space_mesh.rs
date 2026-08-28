@@ -483,6 +483,7 @@ impl<M: MeshTypes> Clone for SpaceMesh<M> {
 /// * an allocation fails, or
 /// * the mesh would contain more than [`u32::MAX`] vertices.
 ///   (This is not strictly a memory allocation error, but it needs to be handled similarly.)
+#[inline(always)] // mesh benchmarks show 2-5% speedup vs. no inline attribute
 fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     block_mesh: &BlockMesh<M>,
     translation: Cube,
