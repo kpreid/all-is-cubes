@@ -326,14 +326,9 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         texture_allocator: &M::Alloc,
         options: &MeshOptions<M>,
     ) {
-        match compute::compute_block_mesh(self, block, texture_allocator, options, Viz::disabled())
-        {
-            Ok(()) => {}
-            Err(OutOfMemory { .. }) => self.recover_from_out_of_memory(),
-        }
-
-        #[cfg(debug_assertions)]
-        self.consistency_check();
+        let compute_result =
+            compute::compute_block_mesh(self, block, texture_allocator, options, Viz::disabled());
+        self.finalize_compute(compute_result);
     }
 
     /// As [`Self::compute()`], but writes details of the algorithm execution to [`Viz`].
@@ -345,9 +340,17 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         options: &MeshOptions<M>,
         viz: Viz,
     ) {
-        match compute::compute_block_mesh(self, block, texture_allocator, options, viz) {
-            Ok(()) => {}
-            Err(OutOfMemory { .. }) => self.recover_from_out_of_memory(),
+        let compute_result =
+            compute::compute_block_mesh(self, block, texture_allocator, options, viz);
+        self.finalize_compute(compute_result);
+    }
+
+    /// Do the final updates to a newly computed block mesh that need to be done whether or not
+    /// there is an error from [`compute::compute_block_mesh()`].
+    #[expect(clippy::needless_pass_by_value)]
+    fn finalize_compute(&mut self, compute_result: Result<(), OutOfMemory>) {
+        if let Err(OutOfMemory { .. }) = compute_result {
+            self.recover_from_out_of_memory();
         }
 
         #[cfg(debug_assertions)]
@@ -358,6 +361,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     ///
     /// * Mark the mesh as flawed.
     /// * Fix an incorrect bounding box.
+    #[cold]
     fn recover_from_out_of_memory(&mut self) {
         self.flaws |= Flaws::OUT_OF_MEMORY;
         for sub_mesh in self.all_sub_meshes_mut() {
