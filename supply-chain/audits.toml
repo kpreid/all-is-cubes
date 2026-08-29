@@ -86,6 +86,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.2.1 -> 0.2.2"
 
+[[audits.chacha20]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.10.0 -> 0.10.2"
+
 [[audits.clap]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
