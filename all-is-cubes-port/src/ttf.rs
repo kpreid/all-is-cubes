@@ -13,7 +13,7 @@ use all_is_cubes::euclid::{Box2D, Point2D, Size2D, Transform2D, Translation2D};
 use all_is_cubes::text::{self, FontDef};
 use all_is_cubes::universe;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_mesh::planar;
+use all_is_cubes_mesh::{self as mesh, planar};
 
 use crate::ExportError;
 
@@ -378,23 +378,27 @@ fn glyph_to_bez_path(
 
     let mut path = kurbo::BezPath::new();
     planar::Outliner::new()
-        .outline(basis, vertices.into_iter(), |loop_| {
-            let mut first = true;
-            path.extend(loop_.iter().map(|vertex| {
-                let point = kurbo::Point::from(
-                    transform
-                        .transform_point(vertex.position.cast_unit().xy().to_f64())
-                        .to_f32()
-                        .to_tuple(),
-                );
-                if mem::take(&mut first) {
-                    kurbo::PathEl::MoveTo(point)
-                } else {
-                    kurbo::PathEl::LineTo(point)
-                }
-            }));
-            Ok(())
-        })
+        .outline(
+            basis,
+            vertices.into_iter(),
+            |loop_| -> Result<(), mesh::OutOfMemory> {
+                let mut first = true;
+                path.extend(loop_.iter().map(|vertex| {
+                    let point = kurbo::Point::from(
+                        transform
+                            .transform_point(vertex.position.cast_unit().xy().to_f64())
+                            .to_f32()
+                            .to_tuple(),
+                    );
+                    if mem::take(&mut first) {
+                        kurbo::PathEl::MoveTo(point)
+                    } else {
+                        kurbo::PathEl::LineTo(point)
+                    }
+                }));
+                Ok(())
+            },
+        )
         .expect("not handling OOM");
 
     path

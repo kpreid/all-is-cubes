@@ -172,12 +172,12 @@ impl Triangulator {
     }
 
     #[inline(never)] // no performance difference; smaller wasm binary
-    fn advance_sweep_position(
+    fn advance_sweep_position<E: From<OutOfMemory>>(
         &mut self,
         viz: &mut Viz,
-        triangle_callback: &mut impl FnMut([Index; 3]) -> Result<(), OutOfMemory>,
+        triangle_callback: &mut impl FnMut([Index; 3]) -> Result<(), E>,
         new_sweep_position: GridCoordinate,
-    ) -> Result<(), OutOfMemory> {
+    ) -> Result<(), E> {
         assert!(
             new_sweep_position > self.sweep_position,
             "incorrect vertex ordering"
@@ -186,7 +186,9 @@ impl Triangulator {
         // Keep the end-of-row old frontier vertices, which we didn't already handle by
         // encountering an input vertex that interacted with them, in the frontier.
         // These will be in `old_frontier` when this function finishes.
-        self.new_frontier.try_reserve(self.old_frontier.len())?;
+        self.new_frontier
+            .try_reserve(self.old_frontier.len())
+            .map_err(OutOfMemory::from)?;
         self.new_frontier.append(&mut self.old_frontier);
 
         if self.needs_ears_fixed {
@@ -223,7 +225,9 @@ impl Triangulator {
     ///
     /// # Errors
     ///
-    /// Returns an error if memory allocation fails.
+    /// Returns an error if memory allocation fails, or if `triangle_callback` returns an error.
+    /// You may choose any error type `E` for the sake of the callback, as long as it can be
+    /// created from [`OutOfMemory`]. If the callback cannot fail, use [`OutOfMemory`] as `E`.
     ///
     /// # Panics
     ///
@@ -234,25 +238,25 @@ impl Triangulator {
     /// Additional checking is done when [debug asssertions] are enabled.
     ///
     /// [debug asssertions]: https://doc.rust-lang.org/cargo/reference/profiles.html#debug-assertions
-    pub fn triangulate(
+    pub fn triangulate<E: From<OutOfMemory>>(
         &mut self,
         basis: Basis,
         input: impl Iterator<Item = Vertex>,
-        triangle_callback: impl FnMut([Index; 3]) -> Result<(), OutOfMemory>,
-    ) -> Result<(), OutOfMemory> {
+        triangle_callback: impl FnMut([Index; 3]) -> Result<(), E>,
+    ) -> Result<(), E> {
         self.triangulate_with_viz(&mut Viz::Disabled, basis, input, triangle_callback)
     }
 
     /// Same as [`Self::triangulate()`] but allows passing [`Viz`].
     #[allow(clippy::missing_errors_doc)]
     #[cfg_attr(feature = "_special_testing", visibility::make(pub))]
-    pub(crate) fn triangulate_with_viz(
+    pub(crate) fn triangulate_with_viz<E: From<OutOfMemory>>(
         &mut self,
         viz: &mut Viz,
         basis: Basis,
         input: impl Iterator<Item = Vertex>,
-        mut triangle_callback: impl FnMut([Index; 3]) -> Result<(), OutOfMemory>,
-    ) -> Result<(), OutOfMemory> {
+        mut triangle_callback: impl FnMut([Index; 3]) -> Result<(), E>,
+    ) -> Result<(), E> {
         // Set the basis, and ensure any previous usage of self does not affect the results.
         self.clear_and_set_basis(basis);
 
@@ -313,7 +317,7 @@ impl Triangulator {
                     previous_should_connect_forward = false;
 
                     // Not connected -- therefore the old vertex stays in the frontier.
-                    self.new_frontier.try_reserve(1)?;
+                    self.new_frontier.try_reserve(1).map_err(OutOfMemory::from)?;
                     self.new_frontier.push_back(passed_over_vertex);
                     moved_any_vertices = true;
                 }
@@ -327,7 +331,7 @@ impl Triangulator {
             // We now have the property that all vertices in old_frontier are perpendicularly
             // ahead of input_vertex.
 
-            self.new_frontier.try_reserve(1)?;
+            self.new_frontier.try_reserve(1).map_err(OutOfMemory::from)?;
             self.new_frontier.push_back(input_vertex);
 
             if !(input_vertex.connectivity.contains_any_of(Mask::Bs)) {
@@ -442,11 +446,11 @@ impl Triangulator {
     /// it is O(n²), so we want to give it as little work as possible.
     #[cold]
     #[mutants::skip] // TODO: could use making this work but it's tricky
-    fn clip_ears_in_new_frontier(
+    fn clip_ears_in_new_frontier<E>(
         &mut self,
         viz: &mut Viz,
-        triangle_callback: &mut impl FnMut([Index; 3]) -> Result<(), OutOfMemory>,
-    ) -> Result<(), OutOfMemory> {
+        triangle_callback: &mut impl FnMut([Index; 3]) -> Result<(), E>,
+    ) -> Result<(), E> {
         #![allow(clippy::reversed_empty_ranges)]
 
         debug_assert!(self.needs_ears_fixed);
@@ -527,12 +531,12 @@ impl Triangulator {
 /// `self.sweep_direction` is right and `self.perpendicular_direction` is up.
 #[cfg_attr(debug_assertions, track_caller)]
 #[inline(always)]
-fn emit(
+fn emit<E>(
     basis: &Basis,
     viz: &mut Viz,
-    triangle_callback: &mut impl FnMut([Index; 3]) -> Result<(), OutOfMemory>,
+    triangle_callback: &mut impl FnMut([Index; 3]) -> Result<(), E>,
     mut triangle: [&Vertex; 3],
-) -> Result<(), OutOfMemory> {
+) -> Result<(), E> {
     debug_assert!(
         basis.is_correct_winding(triangle),
         "input vertices erroneous or triangulator has a bug; \

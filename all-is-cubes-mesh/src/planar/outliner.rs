@@ -143,7 +143,9 @@ impl Outliner {
     ///
     /// # Errors
     ///
-    /// Returns an error if memory allocation fails.
+    /// Returns an error if memory allocation fails, or if `loop_callback` returns an error.
+    /// You may choose any error type `E` for the sake of the callback, as long as it can be
+    /// created from [`OutOfMemory`]. If the callback cannot fail, use [`OutOfMemory`] as `E`.
     ///
     /// # Panics
     ///
@@ -154,12 +156,12 @@ impl Outliner {
     /// Additional checking is done when [debug asssertions] are enabled.
     ///
     /// [debug asssertions]: https://doc.rust-lang.org/cargo/reference/profiles.html#debug-assertions
-    pub fn outline(
+    pub fn outline<E: From<OutOfMemory>>(
         &mut self,
         basis: Basis,
         input: impl Iterator<Item = Vertex>,
-        mut loop_callback: impl FnMut(&[Vertex]) -> Result<(), OutOfMemory>,
-    ) -> Result<(), OutOfMemory> {
+        mut loop_callback: impl FnMut(&[Vertex]) -> Result<(), E>,
+    ) -> Result<(), E> {
         self.basis = basis;
         for input_vertex in input {
             // std::eprintln!("--- State: {self:#?}\n--- Processing {input_vertex:?} ");
@@ -849,13 +851,19 @@ mod tests {
     fn check(vertices: &[Vertex], expected_paths: &[&[u8]]) {
         let mut actual_paths: Vec<Vec<u8>> = Vec::new();
         Outliner::new()
-            .outline(test_basis(), vertices.iter().copied(), |p| {
-                println!("Path {p:#?}");
-                actual_paths.push(
-                    p.iter().map(|v| u8::try_from(v.index).expect("index out of range")).collect(),
-                );
-                Ok(())
-            })
+            .outline(
+                test_basis(),
+                vertices.iter().copied(),
+                |p| -> Result<(), OutOfMemory> {
+                    println!("Path {p:#?}");
+                    actual_paths.push(
+                        p.iter()
+                            .map(|v| u8::try_from(v.index).expect("index out of range"))
+                            .collect(),
+                    );
+                    Ok(())
+                },
+            )
             .unwrap();
 
         // convert to &str for helpful printing
@@ -1210,10 +1218,14 @@ mod tests {
 
         let mut loops: Vec<Vec<u32>> = Vec::new();
         Outliner::new()
-            .outline(test_basis(), vertices.iter().copied(), |loop_| {
-                loops.push(loop_.iter().map(|v| v.index).collect());
-                Ok(())
-            })
+            .outline(
+                test_basis(),
+                vertices.iter().copied(),
+                |loop_| -> Result<(), OutOfMemory> {
+                    loops.push(loop_.iter().map(|v| v.index).collect());
+                    Ok(())
+                },
+            )
             .unwrap();
 
         let svg = format!(
@@ -1255,7 +1267,9 @@ mod tests {
 
             // Test that the outliner doesn’t panic, though we don’t know what its correct
             // output for this case is.
-            Outliner::new().outline(basis, vertices, |_| Ok(())).unwrap();
+            Outliner::new()
+                .outline(basis, vertices, |_| -> Result<(), OutOfMemory> { Ok(()) })
+                .unwrap();
         }
     }
 }

@@ -65,6 +65,10 @@ pub(crate) fn capacity_bytes<T>(v: &alloc::vec::Vec<T>) -> usize {
 
 /// Error type returned from certain functions when memory allocation fails, or when a mesh
 /// would reach hard numeric limits.
+///
+/// This error is not produced by [`BlockMesh`][crate::BlockMesh] and
+/// [`SpaceMesh`][crate::SpaceMesh] operations; they mark the mesh with
+/// [`Flaws::OUT_OF_MEMORY`][all_is_cubes_render::Flaws::OUT_OF_MEMORY] instead.
 #[derive(Debug)]
 pub struct OutOfMemory {
     _private: (),

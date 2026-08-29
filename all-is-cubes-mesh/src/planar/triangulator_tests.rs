@@ -26,7 +26,7 @@ fn run(vertices: &[planar::Vertex]) -> Vec<[u8; 3]> {
             vertices.iter().copied().inspect(|planar_vertex| {
                 println!("In: {planar_vertex:?}");
             }),
-            |triangle_indices: [u32; 3]| {
+            |triangle_indices: [u32; 3]| -> Result<(), crate::OutOfMemory> {
                 let triangle_positions: [GridPoint; 3] = triangle_indices.map(|index| {
                     vertices
                         .iter()
@@ -363,10 +363,14 @@ fn doc_example_svg_test() {
 
     let mut triangles = Vec::new();
     planar::Triangulator::new()
-        .triangulate(test_basis(), vertices.iter().copied(), |triangle| {
-            triangles.push(triangle);
-            Ok(())
-        })
+        .triangulate(
+            test_basis(),
+            vertices.iter().copied(),
+            |triangle| -> Result<(), crate::OutOfMemory> {
+                triangles.push(triangle);
+                Ok(())
+            },
+        )
         .unwrap();
 
     let svg = format!(
