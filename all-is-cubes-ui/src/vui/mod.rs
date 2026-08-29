@@ -19,6 +19,10 @@ pub use layout::*;
 mod page;
 #[cfg(feature = "session")]
 pub(crate) use page::*;
+#[cfg(feature = "session")]
+mod page_cache;
+#[cfg(feature = "session")]
+pub(crate) use page_cache::*;
 mod widget_trait;
 pub use widget_trait::*;
 pub mod widgets;

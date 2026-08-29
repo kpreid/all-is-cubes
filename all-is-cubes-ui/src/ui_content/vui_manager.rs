@@ -99,7 +99,7 @@ pub(crate) struct Vui {
     state: listen::Cell<Arc<VuiPageState>>,
 
     /// Caches instantiated [`Page`]s, including but not only for the current `state`.
-    pages: Pages,
+    pages: vui::PageCache<Arc<VuiPageState>>,
 
     /// Listens to the provided user graphics options.
     changed_graphics_options: listen::Flag,
@@ -190,13 +190,8 @@ impl Vui {
                 current_view: listen::Cell::new(Arc::new(UiViewState::default())),
                 current_focus_on_ui: false,
                 state: listen::Cell::new(Arc::new(VuiPageState::Hud)),
-                pages: Pages::new(
-                    &mut universe,
-                    &hud_inputs,
-                    tooltip_state.clone(),
-                    &notif_hub,
-                )
-                .err_is_unreachable(),
+                // TODO: Warm the cache in the background for `VuiPageState`s we know we will need.
+                pages: vui::PageCache::new(),
 
                 changed_graphics_options,
                 ui_graphics_options,
@@ -241,21 +236,6 @@ impl Vui {
 
     pub(crate) fn set_state(&mut self, state: impl Into<Arc<VuiPageState>>) {
         self.state.set(state.into());
-
-        // Special case: the dump state has to replace the widget tree, and
-        // unconditionally because we can't just check if it is equal (WidgetTree: !Eq)
-        if let VuiPageState::Dump {
-            previous: _,
-            content,
-        } = &*self.state.get()
-        {
-            let content: vui::Page = match content.try_ref() {
-                Some(page) => (*page).clone(),
-                None => vui::Page::empty(),
-            };
-            self.pages.dump_page = PageInst::new(content);
-        }
-
         self.compute_view_state();
     }
 
@@ -276,7 +256,36 @@ impl Vui {
         let universe = &mut self.universe;
 
         let state = self.state.get();
-        let next_page: &mut PageInst = self.pages.get_mut(&state);
+        #[allow(
+            clippy::unwrap_used,
+            reason = "TODO: handle page construction failures"
+        )]
+        let next_page: &mut PageInst = self.pages.get_mut(state.clone(), || {
+            let hud_inputs = &self.hud_inputs;
+            match *state {
+                VuiPageState::Hud => super::hud::new_hud_page(
+                    universe.read_ticket(),
+                    hud_inputs,
+                    self.tooltip_state.clone(),
+                ),
+                VuiPageState::Inventory => pages::new_inventory_page(hud_inputs),
+                VuiPageState::Paused => pages::new_paused_page(universe, hud_inputs).unwrap(),
+                VuiPageState::Settings => {
+                    pages::new_settings_page_widget_tree(universe.read_ticket(), hud_inputs)
+                }
+                VuiPageState::AboutText => pages::new_about_page(universe, hud_inputs).unwrap(),
+                VuiPageState::Progress => {
+                    pages::new_progress_page(&hud_inputs.hud_blocks.widget_theme, &self.notif_hub)
+                }
+                VuiPageState::Dump {
+                    previous: _,
+                    ref content,
+                } => match content.try_ref() {
+                    Some(page) => (*page).clone(),
+                    None => vui::Page::empty(),
+                },
+            }
+        });
 
         match *state {
             VuiPageState::Paused if self.changed_custom_commands.get_and_clear() => {
@@ -592,7 +601,7 @@ impl Vui {
 
 /// Identifies which “page” the UI should be showing — what should be in
 /// [`Vui::current_space()`].
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum VuiPageState {
     /// Normal gameplay, with UI elements around the perimeter.
     Hud,
@@ -640,66 +649,16 @@ impl VuiPageState {
     }
 }
 
-// -------------------------------------------------------------------------------------------------
-
-/// Storage of all [`PageInst`]s we might want to switch between.
-/// Loosely speaking, a map from [`VuiPageState`] to [`PageInst`].
-///
-/// TODO: Ideally this would not have hard-coded knowledge of specific pages, but we still haven’t
-/// figured out how the top level of the UI really ought to work.
-#[derive(Debug)]
-struct Pages {
-    hud_page: PageInst,
-    paused_page: PageInst,
-    inventory_page: PageInst,
-    about_page: PageInst,
-    progress_page: PageInst,
-    options_page: PageInst,
-    /// Whatever [`VuiPageState::Dump`] contained.
-    dump_page: PageInst,
-}
-
-impl Pages {
-    pub fn new(
-        universe: &mut Universe,
-        hud_inputs: &HudInputs,
-        tooltip_state: Arc<Mutex<TooltipState>>,
-        notif_hub: &notification::Hub,
-    ) -> Result<Self, vui::InstallVuiError> {
-        let hud_page = super::hud::new_hud_page(universe.read_ticket(), hud_inputs, tooltip_state);
-
-        let paused_page = pages::new_paused_page(universe, hud_inputs)?;
-        let inventory_page = pages::new_inventory_page(hud_inputs);
-        let options_page = pages::new_settings_page_widget_tree(universe.read_ticket(), hud_inputs);
-        let about_page = pages::new_about_page(universe, hud_inputs)?;
-        let progress_page =
-            pages::new_progress_page(&hud_inputs.hud_blocks.widget_theme, notif_hub);
-
-        Ok(Self {
-            hud_page: PageInst::new(hud_page),
-            paused_page: PageInst::new(paused_page),
-            inventory_page: PageInst::new(inventory_page),
-            options_page: PageInst::new(options_page),
-            about_page: PageInst::new(about_page),
-            dump_page: PageInst::new(vui::Page::empty()),
-            progress_page: PageInst::new(progress_page),
-        })
-    }
-
-    fn get_mut(&mut self, state: &VuiPageState) -> &mut PageInst {
-        match state {
-            VuiPageState::Hud => &mut self.hud_page,
-            VuiPageState::Paused => &mut self.paused_page,
-            VuiPageState::Inventory => &mut self.inventory_page,
-            VuiPageState::Settings => &mut self.options_page,
-            VuiPageState::AboutText => &mut self.about_page,
-            VuiPageState::Progress => &mut self.progress_page,
-
-            // Note: checking the `content` is handled in `set_state()`.
-            VuiPageState::Dump {
-                previous: _,
-                content: _,
-            } => &mut self.dump_page,
+impl vui::PageCacheKey for Arc<VuiPageState> {
+    fn retention(&self) -> vui::PageCacheRetention {
+        match **self {
+            VuiPageState::Hud => vui::PageCacheRetention::Forever,
+            VuiPageState::Inventory => vui::PageCacheRetention::Forever,
+            VuiPageState::Paused => vui::PageCacheRetention::Forever,
+            VuiPageState::Settings => vui::PageCacheRetention::Forever,
+            VuiPageState::AboutText => vui::PageCacheRetention::Forever,
+            VuiPageState::Progress => vui::PageCacheRetention::Forever,
+            VuiPageState::Dump { .. } => vui::PageCacheRetention::WhenUnused,
         }
     }
 }
