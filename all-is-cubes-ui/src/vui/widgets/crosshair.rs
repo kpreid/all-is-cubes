@@ -61,6 +61,10 @@ impl vui::WidgetController for CrosshairController {
             return Ok((vui::WidgetTransaction::default(), vui::Then::Drop));
         };
 
+        if self.todo.get_and_clear() {
+            context.request_draw();
+        }
+
         // TODO: waking
         Ok((vui::WidgetTransaction::default(), vui::Then::Step))
     }
@@ -68,11 +72,9 @@ impl vui::WidgetController for CrosshairController {
     fn draw(
         &mut self,
         context: &vui::WidgetContext<'_, '_>,
-        from_scratch: bool,
+        _from_scratch: bool,
     ) -> vui::WidgetTransaction {
-        if let Some(position) = context.grant().shrink_to_cube()
-            && (self.todo.get_and_clear() || from_scratch)
-        {
+        if let Some(position) = context.grant().shrink_to_cube() {
             SpaceTransaction::set_cube(
                 position,
                 None,

@@ -428,7 +428,8 @@ impl From<InstallVuiError> for all_is_cubes::linking::InGenError {
 
 /// Calls [`WidgetController::synchronize()`] on every widget installed in the space.
 #[cfg_attr(not(feature = "session"), allow(dead_code))]
-pub(crate) fn synchronize_widgets(
+#[doc(hidden)] // TODO: we need a better public answer to how running widgets works
+pub fn synchronize_widgets(
     world_read_ticket: ReadTicket<'_>,
     ui_read_ticket: ReadTicket<'_>,
     space: &space::Read<'_>,

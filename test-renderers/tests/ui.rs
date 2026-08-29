@@ -10,12 +10,14 @@ use clap::Parser as _;
 
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::linking::BlockProvider;
+use all_is_cubes::listen;
 use all_is_cubes::math::Face;
+use all_is_cubes::space;
+use all_is_cubes::transaction;
 use all_is_cubes::transaction::Transaction as _;
-use all_is_cubes::universe::{Universe, UniverseTransaction};
+use all_is_cubes::universe::{ReadTicket, StrongHandle, Universe, UniverseTransaction};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
-use all_is_cubes::{inv, listen};
-use all_is_cubes::{space, transaction};
+use all_is_cubes::{inv, time};
 use all_is_cubes_render::Rendering;
 use all_is_cubes_render::camera::Viewport;
 use all_is_cubes_render::raytracer::ortho::render_orthographic;
@@ -55,7 +57,7 @@ fn ui_render_tests(c: &mut test_renderers_types::TestCaseCollector<'_>) {
     c.insert("session_page_progress", None, session_page_progress);
     c.insert("widget_button_action", wu.clone(), widget_button_action);
     c.insert("widget_button_toggle", wu.clone(), widget_button_toggle);
-    c.insert("widget_crosshair", wu.clone(), widget_crosshair);
+    c.insert("widget_crosshair", None, widget_crosshair);
     // TODO: test for LayoutDebugFrame widget
     // TODO: test for Frame widget
     c.insert("widget_progress_bar", wu.clone(), widget_progress_bar);
@@ -154,22 +156,25 @@ async fn widget_button_toggle(mut context: RenderTestContext) {
 }
 
 async fn widget_crosshair(mut context: RenderTestContext) {
-    let theme = widget_theme(&context);
+    let theme = install_widget_theme(context.universe_mut()).await;
     let cell = listen::Cell::new(true);
     let widget = vui::leaf_widget(widgets::Crosshair::new(&theme, cell.as_source()));
-
-    // TODO: exercise changing the value, not just setting it.
 
     // TODO: something is going wrong with the rendering of this test: the crosshair doesn’t show
     // up sideways. Not this test’s concern, but a reason it may break in the future.
 
-    for value in [false, true] {
-        cell.set(value);
-        context.compare_image(
-            0,
-            render_widget(&context, &widget, vui::Gravity::splat(vui::Align::Center)),
-        );
-    }
+    multi_compare_widget(
+        &mut context,
+        &widget,
+        vui::Gravity::splat(vui::Align::Center),
+        |compare| {
+            compare(); // check initial draw without any updates
+            cell.set(false);
+            compare();
+            cell.set(true);
+            compare();
+        },
+    );
 }
 
 async fn widget_progress_bar(mut context: RenderTestContext) {
@@ -215,16 +220,21 @@ async fn create_session() -> Session {
 
 async fn create_widget_theme_universe() -> Arc<Universe> {
     let mut u = Universe::new();
+    install_widget_theme(&mut u).await;
+    Arc::from(u)
+}
+
+async fn install_widget_theme(u: &mut Universe) -> widgets::WidgetTheme {
     let mut txn = UniverseTransaction::default();
-    widgets::WidgetTheme::new(u.read_ticket(), &mut txn, YieldProgress::noop())
+    let theme = widgets::WidgetTheme::new(u.read_ticket(), &mut txn, YieldProgress::noop())
         .await
         .unwrap();
     inv::Icons::new(&mut txn, YieldProgress::noop())
         .await
         .install(u.read_ticket(), &mut txn)
         .unwrap();
-    txn.execute(&mut u, (), &mut transaction::no_outputs).unwrap();
-    Arc::from(u)
+    txn.execute(u, (), &mut transaction::no_outputs).unwrap();
+    theme
 }
 
 fn widget_theme(context: &RenderTestContext) -> widgets::WidgetTheme {
@@ -253,6 +263,9 @@ fn render_session(session: &Session) -> Rendering {
     rendering
 }
 
+/// Instantiate a widget and render it once.
+///
+/// Note that this cannot test that widgets correctly redraw when their inputs change.
 fn render_widget(
     context: &RenderTestContext,
     widget: &vui::WidgetTree,
@@ -279,4 +292,35 @@ fn render_widget(
     );
 
     rendering
+}
+
+/// Instantiate a widget and prepare to render it several times.
+fn multi_compare_widget(
+    context: &mut RenderTestContext,
+    widget: &vui::WidgetTree,
+    gravity: vui::Gravity,
+    test_procedure: impl FnOnce(&mut dyn FnMut()),
+) {
+    let space = widget
+        .to_space(
+            context.universe().read_ticket(),
+            space::Builder::default(),
+            gravity,
+        )
+        .unwrap();
+    let space_handle = StrongHandle::from(context.universe_mut().insert_anonymous(space));
+
+    test_procedure(&mut || {
+        let read_ticket = context.universe().read_ticket();
+        vui::synchronize_widgets(
+            ReadTicket::stub(),
+            read_ticket,
+            &space_handle.read(read_ticket).unwrap(),
+        );
+        context.universe_mut().step(false, time::Deadline::Whenever);
+        context.compare_image(
+            0,
+            render_orthographic(context.universe().read_ticket(), &space_handle),
+        )
+    });
 }
