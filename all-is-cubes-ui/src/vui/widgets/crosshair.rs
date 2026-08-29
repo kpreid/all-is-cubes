@@ -9,13 +9,18 @@ use all_is_cubes::{listen, universe};
 use crate::vui;
 
 #[derive(Debug)]
-pub(crate) struct Crosshair {
+#[doc(hidden)] // public only for tests; not a reliably reusable widget
+pub struct Crosshair {
     icon: Block,
     mouselook_mode: listen::DynSource<bool>,
 }
 
 impl Crosshair {
-    pub fn new(icon: Block, mouselook_mode: listen::DynSource<bool>) -> Arc<Self> {
+    pub fn new(
+        theme: &vui::widgets::WidgetTheme,
+        mouselook_mode: listen::DynSource<bool>,
+    ) -> Arc<Self> {
+        let icon = theme.widget_blocks[vui::widgets::WidgetBlocks::Crosshair].clone();
         Arc::new(Self {
             icon,
             mouselook_mode,
@@ -42,7 +47,7 @@ impl vui::Widget for Crosshair {
 
 /// Shows/hides the crosshair depending on mouselook mode.
 #[derive(Debug)]
-pub(crate) struct CrosshairController {
+struct CrosshairController {
     definition: Arc<Crosshair>,
     todo: listen::Flag,
 }

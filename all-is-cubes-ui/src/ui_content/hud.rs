@@ -16,7 +16,7 @@ use crate::apps::ControlMessage;
 use crate::ui_content::pages::open_page_button;
 use crate::ui_content::settings::{SettingsStyle, pause_toggle_button, settings_widgets};
 use crate::ui_content::{CueNotifier, UiTargets, VuiMessage, VuiPageState};
-use crate::vui::widgets::{self, TooltipState, WidgetBlocks};
+use crate::vui::widgets::{self, TooltipState};
 use crate::vui::{self, LayoutTree, UiBlocks, Widget, WidgetTree};
 
 pub(crate) const TOOLBAR_POSITIONS: u16 = 10;
@@ -65,7 +65,7 @@ pub(super) fn new_hud_page(
     let tooltip = widgets::Tooltip::new(tooltip_state, hud_inputs.hud_blocks.icons.clone());
     let hud_widget_tree: WidgetTree = Arc::new(LayoutTree::Hud {
         crosshair: vui::leaf_widget(widgets::Crosshair::new(
-            hud_inputs.hud_blocks.widget_theme.widget_blocks[WidgetBlocks::Crosshair].clone(),
+            &hud_inputs.hud_blocks.widget_theme,
             hud_inputs.mouselook_mode.clone(),
         )),
         toolbar: Arc::new(LayoutTree::Stack {

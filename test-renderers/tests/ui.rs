@@ -55,6 +55,7 @@ fn ui_render_tests(c: &mut test_renderers_types::TestCaseCollector<'_>) {
     c.insert("session_page_progress", None, session_page_progress);
     c.insert("widget_button_action", wu.clone(), widget_button_action);
     c.insert("widget_button_toggle", wu.clone(), widget_button_toggle);
+    c.insert("widget_crosshair", wu.clone(), widget_crosshair);
     // TODO: test for LayoutDebugFrame widget
     // TODO: test for Frame widget
     c.insert("widget_progress_bar", wu.clone(), widget_progress_bar);
@@ -143,6 +144,25 @@ async fn widget_button_toggle(mut context: RenderTestContext) {
         &theme,
         || {},
     ));
+    for value in [false, true] {
+        cell.set(value);
+        context.compare_image(
+            0,
+            render_widget(&context, &widget, vui::Gravity::splat(vui::Align::Center)),
+        );
+    }
+}
+
+async fn widget_crosshair(mut context: RenderTestContext) {
+    let theme = widget_theme(&context);
+    let cell = listen::Cell::new(true);
+    let widget = vui::leaf_widget(widgets::Crosshair::new(&theme, cell.as_source()));
+
+    // TODO: exercise changing the value, not just setting it.
+
+    // TODO: something is going wrong with the rendering of this test: the crosshair doesn’t show
+    // up sideways. Not this test’s concern, but a reason it may break in the future.
+
     for value in [false, true] {
         cell.set(value);
         context.compare_image(

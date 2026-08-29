@@ -13,7 +13,7 @@ use crate::vui;
 #[cfg(feature = "session")]
 mod crosshair;
 #[cfg(feature = "session")]
-pub(crate) use crosshair::*;
+pub use crosshair::*;
 mod frame;
 pub use frame::*;
 mod text;
