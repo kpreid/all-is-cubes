@@ -1,6 +1,8 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
+use descriptive_unwrap::ResultExt;
+
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "session"))]
 #[allow(unused_imports)]
@@ -152,13 +154,13 @@ impl ProgressBarController {
                 let fill_mask = mask_substance.clone().with_modifier(block::Move::new(
                     Face::NX,
                     block::Resolution::R16,
-                    u8::try_from(16 - partial_fill).unwrap(),
+                    u8::try_from(16 - partial_fill).err_is_unreachable(),
                     0,
                 ));
                 let empty_mask = mask_substance.with_modifier(block::Move::new(
                     Face::PX,
                     block::Resolution::R16,
-                    u8::try_from(partial_fill).unwrap(),
+                    u8::try_from(partial_fill).err_is_unreachable(),
                     0,
                 ));
 

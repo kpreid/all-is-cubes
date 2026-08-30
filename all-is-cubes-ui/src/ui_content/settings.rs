@@ -236,14 +236,13 @@ fn arb_toggle_button(
     let icon = hud_inputs.hud_blocks.ui_blocks[icon_key].clone();
     let text: Option<widgets::Label> = match style {
         SettingsStyle::CompactRow => None,
-        SettingsStyle::LabeledColumn => Some(
-            icon.evaluate(read_ticket) // TODO(read_ticket): we should probably get the label text elsewhere and remove this need for a read ticket
-                .unwrap()
-                .attributes()
-                .display_name
-                .clone()
-                .into(),
-        ),
+        #[expect(
+            clippy::unwrap_used,
+            reason = "TODO(read_ticket): we should probably get the label text elsewhere by another, infallible means"
+        )]
+        SettingsStyle::LabeledColumn => {
+            Some(icon.evaluate(read_ticket).unwrap().attributes().display_name.clone().into())
+        }
     };
     let label = widgets::ButtonLabel {
         icon: Some(icon),

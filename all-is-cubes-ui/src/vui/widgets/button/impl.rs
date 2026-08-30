@@ -5,6 +5,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::fmt;
 use core::sync::atomic::{AtomicU8, Ordering::Relaxed};
+use descriptive_unwrap::ResultExt;
 
 use all_is_cubes::behavior::BehaviorSetTransaction;
 use all_is_cubes::linking;
@@ -27,7 +28,10 @@ impl vui::Widget for ActionButton {
             common: CommonController::new(),
             // TODO: refactor so we lazily/updatably (re)create the txns with a current read ticket
             // when inputs are mutated.
-            txns: self.common.create_draw_txns(context.ui_read_ticket(), context.grant()).unwrap(),
+            txns: self
+                .common
+                .create_draw_txns(context.ui_read_ticket(), context.grant())
+                .err_is_unreachable(),
             definition: self,
         })
     }
@@ -43,7 +47,10 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton
         Box::new(ToggleButtonController {
             common: CommonController::new(),
             todo: listen::Flag::listening(true, &self.data_source),
-            txns: self.common.create_draw_txns(context.ui_read_ticket(), context.grant()).unwrap(),
+            txns: self
+                .common
+                .create_draw_txns(context.ui_read_ticket(), context.grant())
+                .err_is_unreachable(),
             definition: self,
         })
     }

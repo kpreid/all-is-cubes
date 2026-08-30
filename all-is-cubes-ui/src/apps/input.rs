@@ -15,6 +15,7 @@ use all_is_cubes::universe::{self, Handle, Universe};
 use all_is_cubes_render::camera::{self, NdcPoint2, NominalPixel, Viewport};
 
 use crate::settings;
+use crate::ui_content::ignore_command_channel_closure;
 use crate::{apps::ControlMessage, settings::Settings};
 
 type MousePoint = Point2D<f64, NominalPixel>;
@@ -348,8 +349,12 @@ impl InputProcessor {
             key: &'static settings::TypedKey<T>,
         ) {
             if let Some(settings) = settings {
-                settings.update(key, |_, data| {
-                    key.incrementer().unwrap().adjustment(data, true, true).unwrap()
+                settings.update(key, |old, data| -> T {
+                    let Some(incrementer) = key.incrementer() else {
+                        log::error!("setting {key:?} does not support incrementing");
+                        return old;
+                    };
+                    incrementer.adjustment(data, true, true).none_is_unreachable()
                 });
             }
         }
@@ -358,7 +363,7 @@ impl InputProcessor {
             match key {
                 Key::Escape => {
                     if let Some(ch) = control_channel {
-                        let _ = ch.try_send(ControlMessage::Back);
+                        ignore_command_channel_closure(ch.try_send(ControlMessage::Back));
                     }
                 }
                 Key::Character('i') => {
@@ -421,7 +426,7 @@ impl InputProcessor {
                 }
                 Key::Character('`' | '~') => {
                     if let Some(ch) = control_channel {
-                        let _ = ch.try_send(ControlMessage::EnterDebug);
+                        ignore_command_channel_closure(ch.try_send(ControlMessage::EnterDebug));
                     }
                 }
                 Key::Character(numeral) if numeral.is_ascii_digit() => {

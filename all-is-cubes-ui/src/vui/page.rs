@@ -12,6 +12,7 @@ use all_is_cubes::space::{self, Space, SpacePhysics};
 use all_is_cubes::text;
 use all_is_cubes::universe::{self, Handle, ReadTicket, StrongHandle, Universe};
 use all_is_cubes_render::camera::{self, ViewTransform};
+use descriptive_unwrap::ResultExt;
 
 use crate::vui::{
     self, Align, Gravity, InstallVuiError, LayoutGrant, LayoutTree, Layoutable, Widget, WidgetTree,
@@ -80,9 +81,9 @@ impl UiSize {
                 let frame_block = Block::from(color);
                 space.mutate(ReadTicket::stub(), |m| {
                     m.fill_uniform(GridAab::from_lower_size([0, 0, z], [w, h, 1]), &frame_block)
-                        .unwrap();
+                        .err_is_unreachable();
                     m.fill_uniform(GridAab::from_lower_size([1, 1, z], [w - 2, h - 2, 1]), &AIR)
-                        .unwrap();
+                        .err_is_unreachable();
                 });
             };
             add_frame(bounds.lower_bounds().z, Rgba::new(0.5, 0., 0., 1.));
@@ -318,7 +319,7 @@ impl PageInst {
                 m.fast_evaluate_light();
                 m.evaluate_light(10, drop);
             })
-            .unwrap();
+            .err_is_unreachable();
 
         Ok(space)
     }

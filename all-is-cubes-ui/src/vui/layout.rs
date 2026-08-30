@@ -1,4 +1,3 @@
-use all_is_cubes::universe::ReadTicket;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::sync::Arc;
@@ -6,10 +5,13 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
+
 use all_is_cubes::euclid::{self, Size3D, Vector3D, size3};
 use all_is_cubes::math::{Axis, Cube, Face, FaceMap, GridAab, GridPoint, GridSize};
 use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
+use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::{ConciseDebug, Fmt};
 
 use crate::vui::{InstallVuiError, Widget, WidgetBehavior};
@@ -365,12 +367,10 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                     }
 
                     // TODO: remainder computation is inelegant - we want .expand() but single axis
-                    #[expect(clippy::missing_panics_doc)]
                     let child_bounds = bounds.abut(direction.opposite(), -size_on_axis)
-                        .unwrap(/* always smaller, can't overflow */);
-                    #[expect(clippy::missing_panics_doc)]
+                        .err_is_unreachable(/* always smaller, can't overflow */);
                     let remainder_bounds = bounds.abut(direction, -(available_size - size_on_axis))
-                        .unwrap(/* always smaller, can't overflow */);
+                        .err_is_unreachable(/* always smaller, can't overflow */);
 
                     positioned_children.push(child.perform_layout(LayoutGrant {
                         bounds: child_bounds,
@@ -392,9 +392,10 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 ref toolbar,
                 ref control_bar,
             } => {
-                #[expect(clippy::missing_panics_doc, reason = "TODO")]
+                // TODO: instead of going through floats we should be able to ask GridAab for
+                // the central box (with some rounding policy).
                 let mut crosshair_pos =
-                    Cube::containing(grant.bounds.center()).unwrap(/* TODO: not unwrap */);
+                    Cube::containing(grant.bounds.center()).none_is_unreachable();
                 crosshair_pos.z = 0;
                 let crosshair_bounds = crosshair_pos.grid_aab();
                 // TODO: bounds of toolbar and control_bar should be just small enough to miss the crosshair. Also figure out exactly what their Z range should be

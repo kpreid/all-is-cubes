@@ -83,8 +83,10 @@ impl TooltipState {
         if self.dirty_inventory {
             self.dirty_inventory = false;
 
-            if let Some(character_handle) = &self.character {
-                let character = character_handle.read(world_read_ticket).unwrap();
+            if let Some(character_handle) = &self.character
+                // TODO: On HandleError, non-fatally indicate that our character is missing.
+                && let Ok(character) = character_handle.read(world_read_ticket)
+            {
                 let selected_slot =
                     character.selected_slots().get(1).copied().unwrap_or(inv::Ix::MAX);
                 if let Some(tool) = character.inventory().get(selected_slot).cloned() {

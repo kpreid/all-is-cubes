@@ -5,6 +5,8 @@ use core::iter;
 use core::range::Range;
 use std::sync::Mutex;
 
+use descriptive_unwrap::ResultExt as _;
+
 use all_is_cubes::block::{self, Block, Resolution};
 use all_is_cubes::character::Character;
 use all_is_cubes::content::palette;
@@ -334,7 +336,10 @@ impl WidgetController for ToolbarController {
         };
 
         // TODO: Use Then::Sleep and a waker
-        Ok((slots_txn.merge(pointers_txn).unwrap(), vui::Then::Step))
+        Ok((
+            slots_txn.merge(pointers_txn).err_is_unreachable(),
+            vui::Then::Step,
+        ))
     }
 
     // TODO: implement WidgetController::draw() instead of drawing from step()

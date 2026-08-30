@@ -2,6 +2,8 @@
 
 use alloc::sync::Arc;
 
+use descriptive_unwrap::ResultExt as _;
+
 use all_is_cubes::{
     arcstr::literal,
     block::{self, Block},
@@ -19,7 +21,6 @@ fn logo_font() -> text::Font {
 
 /// All is Cubes logo text as a widget, at "1:1" scale (1 block per font pixel).
 #[expect(clippy::module_name_repetitions)]
-#[expect(clippy::missing_panics_doc, reason = "infallible")]
 pub fn logo_text() -> Arc<dyn vui::Widget> {
     let foreground_text_block: Block = palette::LOGO_FILL.into();
     let background_text_block: Block = palette::LOGO_STROKE.into();
@@ -39,7 +40,7 @@ pub fn logo_text() -> Arc<dyn vui::Widget> {
                 })
                 .build(),
         )
-        .unwrap(),
+        .err_is_unreachable(),
     )
 }
 

@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::string::{String, ToString as _};
 use alloc::sync::Arc;
 use core::fmt;
+use descriptive_unwrap::ResultExt;
 use std::sync::Mutex;
 
 use flume::TryRecvError;
@@ -136,7 +137,7 @@ impl Vui {
             viewport_source, ..
         } = &params;
 
-        let empty_box = Box::new_uninit();
+        let empty_box = Box::<Self>::new_uninit();
         let mut universe = Universe::new();
 
         let mut content_txn = UniverseTransaction::default();
@@ -149,7 +150,9 @@ impl Vui {
             )
             .await,
         );
-        content_txn.execute(&mut universe, (), &mut transaction::no_outputs).unwrap();
+        content_txn
+            .execute(&mut universe, (), &mut transaction::no_outputs)
+            .err_is_unreachable();
 
         let (control_send, control_recv) = flume::bounded(100);
         let state = listen::Cell::new(Arc::new(VuiPageState::Hud));
@@ -185,7 +188,8 @@ impl Vui {
                     &hud_inputs,
                     tooltip_state.clone(),
                     &notif_hub,
-                ),
+                )
+                .err_is_unreachable(),
 
                 changed_graphics_options,
                 ui_graphics_options,
@@ -263,8 +267,9 @@ impl Vui {
 
                 // Note that this assignment replaces the stored PageInst,
                 // not just `next_page` this time.
-                *next_page =
-                    PageInst::new(pages::new_paused_page(universe, &self.hud_inputs).unwrap());
+                *next_page = PageInst::new(
+                    pages::new_paused_page(universe, &self.hud_inputs).err_is_unreachable(),
+                );
             }
             _ => {}
         }
@@ -275,7 +280,7 @@ impl Vui {
 
         let new_view_state = UiViewState {
             view_transform: page_layout.view_transform(
-                &next_space.read(universe.read_ticket()).unwrap(), // TODO: eliminate this unwrap
+                &next_space.read(universe.read_ticket()).err_is_unreachable(),
                 graphics_options.fov_y.into_inner(),
             ),
             space: Some(next_space),
@@ -483,16 +488,18 @@ impl Vui {
             VuiPageState::Hud => {
                 if !self.hud_inputs.paused.get() {
                     // Pause
-                    // TODO: instead of unwrapping, log and visually report the error
-                    // (there should be some simple way to do that).
                     // TODO: We should have a "set paused state" message instead of toggle.
-                    self.hud_inputs.app_control_channel.send(ControlMessage::TogglePause).unwrap();
+                    ignore_command_channel_closure(
+                        self.hud_inputs.app_control_channel.try_send(ControlMessage::TogglePause),
+                    );
                 }
             }
             VuiPageState::Paused => {
                 if self.hud_inputs.paused.get() {
                     // Unpause
-                    self.hud_inputs.app_control_channel.send(ControlMessage::TogglePause).unwrap();
+                    ignore_command_channel_closure(
+                        self.hud_inputs.app_control_channel.try_send(ControlMessage::TogglePause),
+                    );
                 }
             }
             VuiPageState::AboutText | VuiPageState::Settings => {
@@ -630,23 +637,23 @@ impl Pages {
         hud_inputs: &HudInputs,
         tooltip_state: Arc<Mutex<TooltipState>>,
         notif_hub: &notification::Hub,
-    ) -> Self {
+    ) -> Result<Self, vui::InstallVuiError> {
         let hud_page = super::hud::new_hud_page(universe.read_ticket(), hud_inputs, tooltip_state);
 
-        let paused_page = pages::new_paused_page(universe, hud_inputs).unwrap();
+        let paused_page = pages::new_paused_page(universe, hud_inputs)?;
         let options_page = pages::new_settings_page_widget_tree(universe.read_ticket(), hud_inputs);
-        let about_page = pages::new_about_page(universe, hud_inputs).unwrap();
+        let about_page = pages::new_about_page(universe, hud_inputs)?;
         let progress_page =
             pages::new_progress_page(&hud_inputs.hud_blocks.widget_theme, notif_hub);
 
-        Self {
+        Ok(Self {
             hud_page: PageInst::new(hud_page),
             paused_page: PageInst::new(paused_page),
             options_page: PageInst::new(options_page),
             about_page: PageInst::new(about_page),
             dump_page: PageInst::new(vui::Page::empty()),
             progress_page: PageInst::new(progress_page),
-        }
+        })
     }
 
     fn get_mut(&mut self, state: &VuiPageState) -> &mut PageInst {
@@ -705,6 +712,12 @@ impl fmt::Debug for Command {
         f.debug_struct("Command").field("label", &self.label).finish_non_exhaustive()
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Indicates that a channel send error should be ignored because it can only happen
+/// if the UI is shutting down.
+pub(crate) fn ignore_command_channel_closure(_: Result<(), flume::TrySendError<impl Sized>>) {}
 
 // -------------------------------------------------------------------------------------------------
 

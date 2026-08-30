@@ -6,7 +6,7 @@ use core::error::Error;
 use core::fmt::Debug;
 use core::sync::atomic::{self, AtomicBool};
 
-use bevy_platform::sync::Mutex;
+use bevy_platform::sync::{Mutex, PoisonError};
 
 use all_is_cubes::behavior::{self, Behavior};
 use all_is_cubes::math::GridAab;
@@ -256,16 +256,31 @@ impl VisitHandles for WidgetBehavior {
             controller,
             draw_requested: _,
         } = self;
+
         // Not visiting the widget because it is not used for actual behavior
         // (no handles it may contain will be used *by* this WidgetBehavior).
-        controller.lock().unwrap().visit_handles(visitor);
+
+        match controller.lock() {
+            Ok(controller) => {
+                controller.visit_handles(visitor);
+            }
+            Err(PoisonError { .. }) => {
+                // The widget controller had a previous panic.
+                // Don’t try to update it any more.
+            }
+        }
     }
 }
 
 impl Behavior<Space> for WidgetBehavior {
     fn step(&self, context: &behavior::Context<'_, '_, Space>) -> (UniverseTransaction, Then) {
         let (txn, then) = {
-            let controller = &mut *self.controller.lock().unwrap();
+            let Ok(mut controller) = self.controller.lock() else {
+                // The widget controller had a previous panic.
+                // Don’t try to update it any more.
+                return (UniverseTransaction::default(), Then::Drop);
+            };
+
             let widget_context = WidgetContext {
                 kind: CtxKind::Behavior(context),
                 grant: &self.widget.position,
@@ -440,7 +455,15 @@ pub fn synchronize_widgets(
             grant: &item.behavior.widget.position,
             draw_requested: &item.behavior.draw_requested,
         };
-        item.behavior.controller.lock().unwrap().synchronize(context, world_read_ticket);
+        match item.behavior.controller.lock() {
+            Ok(mut controller) => {
+                controller.synchronize(context, world_read_ticket);
+            }
+            Err(PoisonError { .. }) => {
+                // The widget controller had a previous panic.
+                // Don’t try to update it any more.
+            }
+        }
     }
 }
 
