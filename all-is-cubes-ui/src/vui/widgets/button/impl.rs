@@ -1,13 +1,14 @@
 //! Button widget controllers.
 
-use all_is_cubes::fluff::Fluff;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::fmt;
 use core::sync::atomic::{AtomicU8, Ordering::Relaxed};
-use descriptive_unwrap::ResultExt;
+
+use descriptive_unwrap::ResultExt as _;
 
 use all_is_cubes::behavior::BehaviorSetTransaction;
+use all_is_cubes::fluff::Fluff;
 use all_is_cubes::linking;
 use all_is_cubes::listen;
 use all_is_cubes::space::{self, SpaceBehaviorAttachment, SpaceTransaction};

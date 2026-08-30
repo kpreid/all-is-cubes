@@ -1,6 +1,5 @@
 //! Public API types and functions for button widgets.
 
-use all_is_cubes::universe;
 use alloc::sync::Arc;
 use core::fmt;
 use core::hash::Hash;
@@ -11,6 +10,7 @@ use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::Block;
 use all_is_cubes::linking;
 use all_is_cubes::listen;
+use all_is_cubes::universe;
 use all_is_cubes::universe::EphemeralOpaque;
 
 use crate::vui;

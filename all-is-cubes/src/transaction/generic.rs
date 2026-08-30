@@ -1,6 +1,7 @@
 use alloc::collections::BTreeMap;
+use core::fmt;
 use core::hash::Hash;
-use core::{fmt, mem};
+use core::mem;
 
 use bevy_ecs::prelude as ecs;
 

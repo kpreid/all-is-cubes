@@ -1,8 +1,10 @@
-use core::{fmt, ops};
+use core::fmt;
+use core::ops;
+
+use ordered_float::NotNan;
 
 use all_is_cubes::euclid::{Box3D, Point3D, Vector3D};
 use all_is_cubes::math::{Aab, Axis, lines};
-use ordered_float::NotNan;
 
 #[cfg(doc)]
 use crate::{BlockMesh, SpaceMesh};

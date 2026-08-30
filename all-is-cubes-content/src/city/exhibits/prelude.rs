@@ -1,9 +1,9 @@
 //! Common imports used via `use super::prelude::*` in sibling modules.
 
 pub(super) use alloc::boxed::Box;
+pub(super) use alloc::format;
 pub(super) use alloc::sync::Arc;
-pub(super) use alloc::vec::Vec;
-pub(super) use alloc::{format, vec};
+pub(super) use alloc::{vec, vec::Vec};
 pub(super) use core::convert::{TryFrom as _, identity};
 pub(super) use core::f64::consts::PI;
 pub(super) use core::iter;

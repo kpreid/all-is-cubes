@@ -4,7 +4,8 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
-use core::{fmt, mem};
+use core::fmt;
+use core::mem;
 
 use bevy_ecs::prelude as ecs;
 use descriptive_unwrap::{OptionExt as _, ResultExt as _};

@@ -1,7 +1,8 @@
 //! [`EvaluatedBlock`] and [`Evoxel`].
 
 use alloc::boxed::Box;
-use core::{fmt, ptr};
+use core::fmt;
+use core::ptr;
 
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]

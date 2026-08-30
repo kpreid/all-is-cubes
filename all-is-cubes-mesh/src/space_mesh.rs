@@ -1,7 +1,9 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use core::fmt;
+use core::mem;
+use core::ops;
 use core::range::Range;
-use core::{fmt, mem, ops};
 
 use descriptive_unwrap::ResultExt as _;
 use exhaust::Exhaust;

@@ -1,5 +1,3 @@
-use all_is_cubes::euclid::vec3;
-use all_is_cubes::math::FreeVector;
 use alloc::boxed::Box;
 use core::array;
 use core::fmt;
@@ -18,11 +16,11 @@ use all_is_cubes::block::{
     AIR, Block, BlockAttributes, BlockCollision, Primitive,
     Resolution::{self, R16},
 };
-use all_is_cubes::euclid::{Point2D, point2};
+use all_is_cubes::euclid::{Point2D, point2, vec3};
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{
-    Cube, GridAab, GridCoordinate, GridRotation, GridVector, Rgb, Rgb01, ZeroOne, chebyshev_length,
-    ps32, zo32,
+    Cube, FreeVector, GridAab, GridCoordinate, GridRotation, GridVector, Rgb, Rgb01, ZeroOne,
+    chebyshev_length, ps32, zo32,
 };
 use all_is_cubes::sound;
 use all_is_cubes::space::{self, SetCubeError, Sky};

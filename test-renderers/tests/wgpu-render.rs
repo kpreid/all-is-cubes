@@ -5,7 +5,8 @@
 use clap::Parser as _;
 use tokio::sync::OnceCell;
 
-use all_is_cubes_gpu::{headless, init};
+use all_is_cubes_gpu::headless;
+use all_is_cubes_gpu::init;
 use all_is_cubes_render::HeadlessRenderer;
 use all_is_cubes_render::camera::StandardCameras;
 

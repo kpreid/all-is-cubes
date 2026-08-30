@@ -2,8 +2,9 @@
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
 use alloc::format;
+use alloc::sync::Arc;
 use alloc::vec;
-use alloc::{sync::Arc, vec::Vec};
+use alloc::vec::Vec;
 use core::iter;
 
 use itertools::Itertools as _;

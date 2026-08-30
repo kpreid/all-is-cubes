@@ -19,8 +19,9 @@ use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{Camera, GraphicsOptions, TransparencyOption, Viewport};
 
+use crate::dynamic;
+use crate::testing;
 use crate::texture::NoTextures;
-use crate::{dynamic, testing};
 
 use super::{ChunkTodo, ChunkedSpaceMesh, CsmTodo, CsmUpdateInfo};
 

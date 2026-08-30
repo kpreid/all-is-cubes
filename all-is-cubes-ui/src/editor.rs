@@ -1,6 +1,5 @@
 //! VUI components related to allowing the user to inspect universe contents.
 
-use all_is_cubes::tag;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -10,6 +9,7 @@ use all_is_cubes::block::{self, Block};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::math::Face;
+use all_is_cubes::tag;
 use all_is_cubes::universe::{Handle, ReadTicket};
 
 use crate::ui_content::hud::HudInputs;

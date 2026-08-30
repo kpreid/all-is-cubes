@@ -1,8 +1,9 @@
 //! Data structures and code to generate summary output files from the tests.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::io;
 use std::path::PathBuf;
-use std::{fs, io};
 
 use tinytemplate::TinyTemplate;
 

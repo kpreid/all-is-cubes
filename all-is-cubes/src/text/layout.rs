@@ -2,12 +2,12 @@
 
 use core::fmt;
 
-use all_is_cubes_base::resolution::Resolution;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use euclid::{Box2D, Point2D, SideOffsets2D, Vector3D, point2, vec3};
 
+use crate::block::Resolution;
 use crate::math::{Cube, GridAab, GridCoordinate, GridPoint};
 use crate::text::{self, GlyphIndex, InGlyph};
 

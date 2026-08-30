@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, HashSet};
-use std::io::Write as _;
+use std::fs;
+use std::io::{self, Write as _};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use std::{fs, io};
 
 use async_fn_traits::AsyncFn1;
 use futures_util::stream;

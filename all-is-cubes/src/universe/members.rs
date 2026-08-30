@@ -6,8 +6,9 @@
 
 use alloc::boxed::Box;
 use core::any::Any;
+use core::fmt;
+use core::hash;
 use core::marker::PhantomData;
-use core::{fmt, hash};
 
 use bevy_ecs::prelude as ecs;
 use bevy_ecs::query::QueryData;

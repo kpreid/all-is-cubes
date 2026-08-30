@@ -95,7 +95,8 @@ mod tests {
     use super::*;
     use crate::block::Block;
     use crate::math::Rgba;
-    use crate::{op, time};
+    use crate::op;
+    use crate::time;
     use pretty_assertions::assert_eq;
 
     #[test]

@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
+use core::fmt;
 use core::marker::PhantomData;
-use core::{fmt, ops};
+use core::ops;
 
 use num_traits::Zero;
 

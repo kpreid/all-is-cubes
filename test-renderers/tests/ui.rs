@@ -9,15 +9,15 @@ use std::time::Instant;
 use clap::Parser as _;
 
 use all_is_cubes::arcstr::literal;
+use all_is_cubes::inv;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen;
 use all_is_cubes::math::Face;
 use all_is_cubes::space;
-use all_is_cubes::transaction;
-use all_is_cubes::transaction::Transaction as _;
+use all_is_cubes::time;
+use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{ReadTicket, StrongHandle, Universe, UniverseTransaction};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
-use all_is_cubes::{inv, time};
 use all_is_cubes_render::Rendering;
 use all_is_cubes_render::camera::Viewport;
 use all_is_cubes_render::raytracer::ortho::render_orthographic;

@@ -1,7 +1,8 @@
 //! [`BlockAttributes`] and closely related types.
 
 use alloc::sync::Arc;
-use core::{fmt, ops};
+use core::fmt;
+use core::ops;
 
 use arcstr::ArcStr;
 

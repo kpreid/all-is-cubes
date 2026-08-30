@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
-use core::{fmt, mem};
+use core::fmt;
+use core::mem;
 
 use descriptive_unwrap::OptionExt as _;
 use hashbrown::hash_map::Entry;

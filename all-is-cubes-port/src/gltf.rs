@@ -9,9 +9,11 @@
 #![expect(clippy::module_name_repetitions)] // TODO: review all the naming in this module
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::fmt;
+use std::io;
+use std::mem;
 use std::path::PathBuf;
 use std::time::Duration;
-use std::{fmt, io, mem};
 
 use futures_core::future::BoxFuture;
 pub use gltf_json as json;
