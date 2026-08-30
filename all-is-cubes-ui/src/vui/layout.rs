@@ -112,6 +112,7 @@ impl LayoutGrant {
     #[must_use]
     #[expect(
         clippy::missing_panics_doc,
+        clippy::unwrap_used,
         reason = "TODO: numeric overflow considerations"
     )]
     pub fn shrink_to(self, mut sizes: GridSize, enlarge_for_symmetry: bool) -> Self {

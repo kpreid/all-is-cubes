@@ -29,7 +29,6 @@
 #![no_std]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
-#![expect(clippy::unwrap_used, reason = "TODO")]
 #![cfg_attr(not(feature = "session"), allow(clippy::arc_with_non_send_sync))]
 #![cfg_attr(test, allow(dead_code_pub_in_binary, reason = "FP on test binaries"))]
 

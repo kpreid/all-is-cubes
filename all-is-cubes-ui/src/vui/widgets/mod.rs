@@ -1,5 +1,13 @@
 //! Specific UI widgets.
 
+#![cfg_attr(
+    feature = "session",
+    expect(
+        clippy::unwrap_used,
+        reason = "TODO: determine a good policy for widget mutex poisoning and implement it"
+    )
+)]
+
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
