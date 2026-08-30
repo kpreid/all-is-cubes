@@ -67,11 +67,14 @@ impl vui::Layoutable for ProgressBar {
 }
 
 impl vui::Widget for ProgressBar {
-    fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
+    fn controller(
+        self: Arc<Self>,
+        context: &vui::WidgetContext<'_, '_>,
+    ) -> Box<dyn vui::WidgetController> {
         Box::new(ProgressBarController {
             todo: listen::Flag::listening(true, &self.source),
             definition: self,
-            position: position.bounds,
+            position: context.grant().bounds,
             last_drawn_state: None,
         })
     }

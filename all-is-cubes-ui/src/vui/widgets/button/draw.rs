@@ -302,7 +302,7 @@ fn draw_button_multiblock_from_image(
     let back_color_block = illuminate(Block::builder().color(back_color));
     let rim_color_block = illuminate(Block::builder().color(theme::rim_lightening(back_color)));
     let space = space_from_image(
-        ReadTicket::stub(),
+        ReadTicket::stub(), // all color blocks are dependency-free
         image,
         GridRotation::RXyZ,
         &|color| match color {

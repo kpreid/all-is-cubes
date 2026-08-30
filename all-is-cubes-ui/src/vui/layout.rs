@@ -488,11 +488,8 @@ impl LayoutTree<Positioned<Arc<dyn Widget>>> {
             position,
         } in self.leaves()
         {
-            let controller_installation = WidgetBehavior::installation(
-                positioned_widget.clone(),
-                widget.clone().controller(position),
-                read_ticket,
-            )?;
+            let controller_installation =
+                WidgetBehavior::installation(positioned_widget.clone(), read_ticket)?;
             validate_widget_transaction(widget, &controller_installation, position)?;
             txn.merge_from(controller_installation)
                 .map_err(|error| InstallVuiError::Conflict {

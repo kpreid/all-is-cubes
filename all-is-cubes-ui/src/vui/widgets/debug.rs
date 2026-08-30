@@ -32,15 +32,19 @@ impl Layoutable for LayoutDebugFrame {
 }
 
 impl vui::Widget for LayoutDebugFrame {
-    fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
+    fn controller(
+        self: Arc<Self>,
+        context: &vui::WidgetContext<'_, '_>,
+    ) -> Box<dyn vui::WidgetController> {
         let box_style = &self.theme.layout_debug_box_style;
+        let grant = context.grant();
         let bounds = grant.bounds;
 
         let info_text = block::Text::builder()
             .string(all_is_cubes::arcstr::format!(
                 "Req {:?}\nGrant {:?}\nGrav {:?}",
                 self.requirements().refmt(&ConciseDebug),
-                grant.bounds,
+                bounds,
                 grant.gravity.to_array(),
             ))
             .font(universe::Builtin::font_system16().clone())

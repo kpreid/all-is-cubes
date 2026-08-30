@@ -70,7 +70,7 @@ pub trait Widget: Layoutable + Debug + Send + Sync {
     /// [`WidgetTree::installation()`](crate::vui::LayoutTree::installation) to create
     /// controllers and attach them to a [`Space`]. However, it is valid for a widget to
     /// reuse another widget's controller implementation.
-    fn controller(self: Arc<Self>, grant: &LayoutGrant) -> Box<dyn WidgetController>;
+    fn controller(self: Arc<Self>, context: &WidgetContext<'_, '_>) -> Box<dyn WidgetController>;
 }
 
 /// Does the work of making a particular region of a [`Space`] behave as a particular
@@ -206,7 +206,6 @@ impl WidgetBehavior {
     /// or an error if the controller's `initialize()` fails.
     pub(crate) fn installation(
         positioned_widget: Positioned<Arc<dyn Widget>>,
-        mut controller: Box<dyn WidgetController>,
         read_ticket: ReadTicket<'_>,
     ) -> Result<SpaceTransaction, InstallVuiError> {
         let draw_requested = AtomicBool::new(false);
@@ -215,6 +214,7 @@ impl WidgetBehavior {
             grant: &positioned_widget.position,
             draw_requested: &draw_requested,
         };
+        let mut controller = Arc::clone(&positioned_widget.value).controller(context);
         let init_txn = match controller.initialize(context) {
             Ok(t) => t,
             Err(e) => {

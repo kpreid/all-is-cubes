@@ -97,8 +97,11 @@ impl Layoutable for Toolbar {
 }
 
 impl Widget for Toolbar {
-    fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn WidgetController> {
-        let bounds = grant.bounds;
+    fn controller(
+        self: Arc<Self>,
+        context: &vui::WidgetContext<'_, '_>,
+    ) -> Box<dyn WidgetController> {
+        let bounds = context.grant().bounds;
 
         let todo_more = listen::StoreLock::new(ToolbarTodo {
             button_pressed_decay: [Duration::ZERO; inv::TOOL_SELECTIONS],

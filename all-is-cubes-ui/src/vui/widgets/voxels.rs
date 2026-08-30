@@ -62,10 +62,13 @@ impl vui::Layoutable for Voxels {
 }
 
 impl vui::Widget for Voxels {
-    fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
+    fn controller(
+        self: Arc<Self>,
+        context: &vui::WidgetContext<'_, '_>,
+    ) -> Box<dyn vui::WidgetController> {
         // This is similar but not identical to block::space_to_blocks().
 
-        let position = position.shrink_to(self.requirements().minimum, true);
+        let position = context.grant().shrink_to(self.requirements().minimum, true);
 
         // Calculate where the voxels should land in the blocks, respecting layout gravity,
         // by using the shrink_to algorithm again.

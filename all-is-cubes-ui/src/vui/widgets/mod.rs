@@ -78,8 +78,11 @@ impl universe::VisitHandles for OneshotController {
 ///
 /// Note that this does not quote the block.
 impl vui::Widget for Block {
-    fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
-        OneshotController::new(if let Some(cube) = grant.shrink_to_cube() {
+    fn controller(
+        self: Arc<Self>,
+        context: &vui::WidgetContext<'_, '_>,
+    ) -> Box<dyn vui::WidgetController> {
+        OneshotController::new(if let Some(cube) = context.grant().shrink_to_cube() {
             SpaceTransaction::set_cube(cube, None, Some(Block::clone(&self)))
         } else {
             SpaceTransaction::default()

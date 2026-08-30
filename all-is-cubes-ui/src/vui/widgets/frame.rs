@@ -69,7 +69,10 @@ impl vui::Layoutable for Frame {
 }
 
 impl vui::Widget for Frame {
-    fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
-        super::OneshotController::new(self.style.create_box(position.bounds))
+    fn controller(
+        self: Arc<Self>,
+        context: &vui::WidgetContext<'_, '_>,
+    ) -> Box<dyn vui::WidgetController> {
+        super::OneshotController::new(self.style.create_box(context.grant().bounds))
     }
 }

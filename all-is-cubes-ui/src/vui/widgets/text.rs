@@ -56,13 +56,16 @@ impl Layoutable for LargeText {
 }
 
 impl Widget for LargeText {
-    fn controller(self: Arc<Self>, position: &LayoutGrant) -> Box<dyn WidgetController> {
+    fn controller(
+        self: Arc<Self>,
+        context: &vui::WidgetContext<'_, '_>,
+    ) -> Box<dyn WidgetController> {
         let mut txn = SpaceTransaction::default();
         let draw_bounds = self.bounds();
-        let text_bounds = position.shrink_to(draw_bounds.size(), false).bounds;
+        let text_bounds = context.grant().shrink_to(draw_bounds.size(), false).bounds;
         self.text
             .draw_voxels_to_transaction(
-                ReadTicket::stub(), // TODO: should get a ticket from the widget instantiation process.
+                context.ui_read_ticket(),
                 &mut txn,
                 Gridgid::from_translation(text_bounds.lower_bounds() - draw_bounds.lower_bounds()),
             )
@@ -137,7 +140,7 @@ impl Layoutable for Label {
         LayoutRequest {
             minimum: self
                 .text(vui::Gravity::splat(vui::Align::Low))
-                .measure(ReadTicket::stub())
+                .measure(ReadTicket::stub()) // TODO: need read ticket available during layout
                 .unwrap() // TODO: should make this measurement on construction
                 .logical_bounding_blocks()
                 .size(),
@@ -146,15 +149,17 @@ impl Layoutable for Label {
 }
 
 impl Widget for Label {
-    fn controller(self: Arc<Self>, grant: &LayoutGrant) -> Box<dyn WidgetController> {
+    fn controller(
+        self: Arc<Self>,
+        context: &vui::WidgetContext<'_, '_>,
+    ) -> Box<dyn WidgetController> {
         // TODO: memoize `Text` construction for slightly more efficient reuse of widget
-        // (this will only matter once `Text` memoizes glyph layout)
 
         widgets::OneshotController::new(
             draw_text_txn(
-                ReadTicket::stub(), // TODO: should get a ticket from the widget instantiation process.
-                &self.text(grant.gravity),
-                grant,
+                context.ui_read_ticket(),
+                &self.text(context.grant().gravity),
+                context.grant(),
                 true,
             )
             .unwrap(), // TODO: error propagation
@@ -224,10 +229,13 @@ impl Layoutable for TextBox {
 }
 
 impl Widget for TextBox {
-    fn controller(self: Arc<Self>, grant: &LayoutGrant) -> Box<dyn WidgetController> {
+    fn controller(
+        self: Arc<Self>,
+        context: &vui::WidgetContext<'_, '_>,
+    ) -> Box<dyn WidgetController> {
         Box::new(TextBoxController {
             todo: listen::Flag::listening(false, &self.text_source),
-            grant: *grant,
+            grant: *context.grant(),
             definition: self,
         })
     }

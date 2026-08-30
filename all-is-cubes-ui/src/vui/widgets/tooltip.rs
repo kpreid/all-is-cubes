@@ -220,7 +220,7 @@ impl Layoutable for Tooltip {
 }
 
 impl Widget for Tooltip {
-    fn controller(self: Arc<Self>, _: &vui::LayoutGrant) -> Box<dyn WidgetController> {
+    fn controller(self: Arc<Self>, _: &vui::WidgetContext<'_, '_>) -> Box<dyn WidgetController> {
         Box::new(TooltipController {
             definition: self,
             currently_displayed: TooltipContents::JustStartedExisting,
