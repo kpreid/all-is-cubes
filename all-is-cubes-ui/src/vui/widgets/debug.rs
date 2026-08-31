@@ -35,7 +35,7 @@ impl vui::Widget for LayoutDebugFrame {
     fn controller(
         self: Arc<Self>,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Box<dyn vui::WidgetController> {
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
         let box_style = &self.theme.layout_debug_box_style;
         let grant = context.grant();
         let bounds = grant.bounds;
@@ -56,19 +56,23 @@ impl vui::Widget for LayoutDebugFrame {
             })
             .build();
 
-        super::OneshotController::new(SpaceTransaction::filling(bounds, |cube| {
-            // not bothering to skip outside text bounds.
-            let text_block = Block::from_primitive(block::Primitive::Text {
-                text: info_text.clone(),
-                offset: cube.lower_bounds() - bounds.lower_bounds(),
-            });
-            let block: Block = if let Some(box_block) = box_style.cube_at(bounds, cube).cloned() {
-                block::Composite::new(text_block, block::CompositeOperator::Over)
-                    .compose_or_replace(box_block)
-            } else {
-                text_block
-            };
-            CubeTransaction::replacing(None, Some(block))
-        }))
+        Ok(super::OneshotController::new(SpaceTransaction::filling(
+            bounds,
+            |cube| {
+                // not bothering to skip outside text bounds.
+                let text_block = Block::from_primitive(block::Primitive::Text {
+                    text: info_text.clone(),
+                    offset: cube.lower_bounds() - bounds.lower_bounds(),
+                });
+                let block: Block = if let Some(box_block) = box_style.cube_at(bounds, cube).cloned()
+                {
+                    block::Composite::new(text_block, block::CompositeOperator::Over)
+                        .compose_or_replace(box_block)
+                } else {
+                    text_block
+                };
+                CubeTransaction::replacing(None, Some(block))
+            },
+        )))
     }
 }

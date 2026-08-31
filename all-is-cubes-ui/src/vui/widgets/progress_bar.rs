@@ -9,9 +9,10 @@ use descriptive_unwrap::ResultExt;
 use num_traits::float::FloatCore as _;
 
 use all_is_cubes::block::{self, AIR, Block, Composite, CompositeOperator};
+use all_is_cubes::listen;
 use all_is_cubes::math::{Face, GridAab, GridCoordinate, GridSize, Rgb01, ZeroOne};
 use all_is_cubes::space::SpaceTransaction;
-use all_is_cubes::{listen, universe};
+use all_is_cubes::universe;
 
 use crate::vui;
 use crate::vui::widgets::{BoxStyle, WidgetTheme};
@@ -72,13 +73,13 @@ impl vui::Widget for ProgressBar {
     fn controller(
         self: Arc<Self>,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Box<dyn vui::WidgetController> {
-        Box::new(ProgressBarController {
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
+        Ok(Box::new(ProgressBarController {
             todo: listen::Flag::listening(true, &self.source),
             definition: self,
             position: context.grant().bounds,
             last_drawn_state: None,
-        })
+        }))
     }
 }
 
@@ -213,8 +214,8 @@ impl vui::WidgetController for ProgressBarController {
         &mut self,
         _context: &vui::WidgetContext<'_, '_>,
         _from_scratch: bool,
-    ) -> vui::WidgetTransaction {
-        self.paint_txn(&self.convert_state(&self.definition.source.get()))
+    ) -> Result<vui::WidgetTransaction, vui::InWidgetError> {
+        Ok(self.paint_txn(&self.convert_state(&self.definition.source.get())))
     }
 }
 

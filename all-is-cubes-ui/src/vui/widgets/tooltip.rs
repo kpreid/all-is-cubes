@@ -14,7 +14,7 @@ use all_is_cubes::time::{Duration, Tick};
 use all_is_cubes::universe::{ReadTicket, StrongHandle};
 use all_is_cubes::{inv, universe};
 
-use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController, widgets};
+use crate::vui::{self, LayoutRequest, Layoutable, widgets};
 
 #[derive(Debug)]
 #[doc(hidden)] // public for testing only; currently not designed to be general
@@ -221,12 +221,15 @@ impl Layoutable for Tooltip {
     }
 }
 
-impl Widget for Tooltip {
-    fn controller(self: Arc<Self>, _: &vui::WidgetContext<'_, '_>) -> Box<dyn WidgetController> {
-        Box::new(TooltipController {
+impl vui::Widget for Tooltip {
+    fn controller(
+        self: Arc<Self>,
+        _: &vui::WidgetContext<'_, '_>,
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
+        Ok(Box::new(TooltipController {
             definition: self,
             currently_displayed: TooltipContents::JustStartedExisting,
-        })
+        }))
     }
 }
 
@@ -236,7 +239,7 @@ struct TooltipController {
     currently_displayed: TooltipContents,
 }
 
-impl WidgetController for TooltipController {
+impl vui::WidgetController for TooltipController {
     fn synchronize(
         &mut self,
         context: &vui::WidgetContext<'_, '_>,
@@ -271,10 +274,10 @@ impl WidgetController for TooltipController {
         &mut self,
         context: &vui::WidgetContext<'_, '_>,
         from_scratch: bool,
-    ) -> vui::WidgetTransaction {
+    ) -> Result<vui::WidgetTransaction, vui::InWidgetError> {
         let new_contents = self.definition.state.lock().unwrap().current_contents.clone();
         if new_contents == self.currently_displayed && !from_scratch {
-            return vui::WidgetTransaction::default();
+            return Ok(vui::WidgetTransaction::default());
         }
 
         let grant = context.grant();
@@ -292,7 +295,7 @@ impl WidgetController for TooltipController {
         // Remember what we are about to draw so we know we don't need to redraw it.
         self.currently_displayed = new_contents;
 
-        widgets::text::draw_text_txn(context.ui_read_ticket(), &text, grant, false).unwrap() // TODO: widget trait must change to allow error propagation
+        widgets::text::draw_text_txn(context.ui_read_ticket(), &text, grant, false)
     }
 }
 

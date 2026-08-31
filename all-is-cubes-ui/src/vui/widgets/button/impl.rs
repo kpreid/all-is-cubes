@@ -24,8 +24,8 @@ impl vui::Widget for ActionButton {
     fn controller(
         self: Arc<Self>,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Box<dyn vui::WidgetController> {
-        Box::new(ActionButtonController {
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
+        Ok(Box::new(ActionButtonController {
             common: CommonController::new(),
             // TODO: refactor so we lazily/updatably (re)create the txns with a current read ticket
             // when inputs are mutated.
@@ -34,7 +34,7 @@ impl vui::Widget for ActionButton {
                 .create_draw_txns(context.ui_read_ticket(), context.grant())
                 .err_is_unreachable(),
             definition: self,
-        })
+        }))
     }
 }
 
@@ -44,8 +44,8 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton
     fn controller(
         self: Arc<Self>,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Box<dyn vui::WidgetController> {
-        Box::new(ToggleButtonController {
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
+        Ok(Box::new(ToggleButtonController {
             common: CommonController::new(),
             todo: listen::Flag::listening(true, &self.data_source),
             txns: self
@@ -53,7 +53,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton
                 .create_draw_txns(context.ui_read_ticket(), context.grant())
                 .err_is_unreachable(),
             definition: self,
-        })
+        }))
     }
 }
 
@@ -159,7 +159,7 @@ impl vui::WidgetController for ActionButtonController {
     fn initialize(
         &mut self,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Result<vui::WidgetTransaction, linking::InGenError> {
+    ) -> Result<vui::WidgetTransaction, vui::InWidgetError> {
         let grant = self.definition.common.shrink_bounds(*context.grant());
 
         Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
@@ -187,8 +187,8 @@ impl vui::WidgetController for ActionButtonController {
         &mut self,
         _context: &vui::WidgetContext<'_, '_>,
         _from_scratch: bool,
-    ) -> vui::WidgetTransaction {
-        self.draw_txn(self.common.state())
+    ) -> Result<vui::WidgetTransaction, vui::InWidgetError> {
+        Ok(self.draw_txn(self.common.state()))
     }
 }
 
@@ -198,7 +198,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
     fn initialize(
         &mut self,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Result<vui::WidgetTransaction, linking::InGenError> {
+    ) -> Result<vui::WidgetTransaction, vui::InWidgetError> {
         let grant = self.definition.common.shrink_bounds(*context.grant());
 
         Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
@@ -226,8 +226,8 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
         &mut self,
         _context: &vui::WidgetContext<'_, '_>,
         _from_scratch: bool,
-    ) -> vui::WidgetTransaction {
-        self.draw_txn(self.common.state())
+    ) -> Result<vui::WidgetTransaction, vui::InWidgetError> {
+        Ok(self.draw_txn(self.common.state()))
     }
 }
 

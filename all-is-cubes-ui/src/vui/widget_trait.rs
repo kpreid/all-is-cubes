@@ -9,7 +9,6 @@ use core::sync::atomic::{self, AtomicBool};
 use bevy_platform::sync::{Mutex, PoisonError};
 
 use all_is_cubes::behavior::{self, Behavior};
-use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
@@ -29,6 +28,12 @@ use all_is_cubes::universe::Handle;
 /// Transaction type produced by [`WidgetController`]s.
 /// Placeholder for likely wanting to change this later.
 pub type WidgetTransaction = SpaceTransaction;
+
+/// Error type that may be returned by widget implementations.
+///
+/// This is currently the same as [`all_is_cubes::linking::InGenError`] because the two situations
+/// are essentially identical.
+pub type InWidgetError = all_is_cubes::linking::InGenError;
 
 /// Something that can participate in UI layout (via [`Layoutable`]), and then turn into
 /// some interactive contents of a [`Space`] (via [`controller()`]) positioned according
@@ -74,7 +79,15 @@ pub trait Widget: Layoutable + Debug + Send + Sync {
     /// [`WidgetTree::installation()`](crate::vui::LayoutTree::installation) to create
     /// controllers and attach them to a [`Space`]. However, it is valid for a widget to
     /// reuse another widget's controller implementation.
-    fn controller(self: Arc<Self>, context: &WidgetContext<'_, '_>) -> Box<dyn WidgetController>;
+    ///
+    /// # Errors
+    ///
+    /// The widget may return an error in the event that it finds that the resources it requires are
+    /// not available, such as having an incorrect [`Handle`].
+    fn controller(
+        self: Arc<Self>,
+        context: &WidgetContext<'_, '_>,
+    ) -> Result<Box<dyn WidgetController>, InWidgetError>;
 }
 
 /// Does the work of making a particular region of a [`Space`] behave as a particular
@@ -101,7 +114,7 @@ pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     fn initialize(
         &mut self,
         context: &WidgetContext<'_, '_>,
-    ) -> Result<WidgetTransaction, InGenError> {
+    ) -> Result<WidgetTransaction, InWidgetError> {
         let _ = context;
         Ok(WidgetTransaction::default())
     }
@@ -148,12 +161,21 @@ pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     /// The transaction must not affect any part of the [`Space`] outside of its grant,
     /// or produce blocks that have such effects later.
     /// It must not conflict with the transaction produced by `step()` or `initialize()`.
+    ///
+    /// # Errors
+    ///
+    /// The controller may return an error in the event that it finds that the resources it requires
+    /// are no longer available, such as having a defunct [`Handle`].
     //---
     // TODO: Make this able to work without `&mut self`
-    fn draw(&mut self, context: &WidgetContext<'_, '_>, from_scratch: bool) -> WidgetTransaction {
+    fn draw(
+        &mut self,
+        context: &WidgetContext<'_, '_>,
+        from_scratch: bool,
+    ) -> Result<WidgetTransaction, InWidgetError> {
         let _ = context;
         let _ = from_scratch;
-        WidgetTransaction::default()
+        Ok(WidgetTransaction::default())
     }
 }
 
@@ -173,7 +195,7 @@ impl WidgetController for Box<dyn WidgetController> {
     fn initialize(
         &mut self,
         context: &WidgetContext<'_, '_>,
-    ) -> Result<WidgetTransaction, InGenError> {
+    ) -> Result<WidgetTransaction, InWidgetError> {
         (**self).initialize(context)
     }
 
@@ -185,7 +207,11 @@ impl WidgetController for Box<dyn WidgetController> {
         (**self).step(context)
     }
 
-    fn draw(&mut self, context: &WidgetContext<'_, '_>, from_scratch: bool) -> WidgetTransaction {
+    fn draw(
+        &mut self,
+        context: &WidgetContext<'_, '_>,
+        from_scratch: bool,
+    ) -> Result<WidgetTransaction, InWidgetError> {
         (**self).draw(context, from_scratch)
     }
 }
@@ -218,18 +244,16 @@ impl WidgetBehavior {
             grant: &positioned_widget.position,
             draw_requested: &draw_requested,
         };
-        let mut controller = Arc::clone(&positioned_widget.value).controller(context);
-        let init_txn = match controller.initialize(context) {
-            Ok(init_txn) => init_txn,
-            Err(error) => {
-                return Err(InstallVuiError::WidgetInitialization {
-                    widget: controller,
-                    error,
-                });
-            }
+        let init_error = |error: InWidgetError| InstallVuiError::WidgetInitialization {
+            widget: Arc::clone(&positioned_widget.value),
+            error,
         };
+
+        let mut controller =
+            Arc::clone(&positioned_widget.value).controller(context).map_err(init_error)?;
+        let init_txn = controller.initialize(context).map_err(init_error)?;
         // TODO: should we be calling synchronize() now?
-        let draw_txn = controller.draw(context, true);
+        let draw_txn = controller.draw(context, true).map_err(init_error)?;
         let full_init_txn =
             init_txn.merge(draw_txn).map_err(|error| InstallVuiError::Conflict {
                 error,
@@ -294,7 +318,9 @@ impl Behavior<Space> for WidgetBehavior {
                 .step(&widget_context)
                 .expect("TODO: behaviors should have an error reporting path");
             if self.draw_requested.fetch_and(false, atomic::Ordering::Acquire) {
-                let draw_txn = controller.draw(&widget_context, false);
+                // TODO: don’t panic, but log and mark the widget as broken
+                let draw_txn =
+                    controller.draw(&widget_context, false).expect("widget drawing failed");
                 (
                     step_txn.merge(draw_txn).expect("step and draw txn should not conflict"),
                     then,
@@ -376,12 +402,12 @@ pub enum InstallVuiError {
     /// The widget failed to initialize for some reason.
     #[displaydoc("error initializing widget ({widget:?})")]
     WidgetInitialization {
-        /// TODO: This should be `Arc<dyn Widget>` instead.
-        /// Or, if we come up with some way of giving widgets IDs, that.
-        widget: Box<dyn WidgetController>,
+        /// The widget which produced the error.
+        // TODO: If we come up with some way of giving widgets IDs, use that instead.
+        widget: Arc<dyn Widget>,
 
-        /// The error returned by [`WidgetController::initialize()`].
-        error: InGenError,
+        /// The error returned by [`WidgetController::initialize()`] or [`WidgetController::draw()`].
+        error: InWidgetError,
     },
 
     /// A transaction conflict arose between two widgets or parts of a widget's installation.
@@ -437,9 +463,9 @@ impl Error for InstallVuiError {
     }
 }
 
-impl From<InstallVuiError> for InGenError {
+impl From<InstallVuiError> for all_is_cubes::linking::InGenError {
     fn from(value: InstallVuiError) -> Self {
-        InGenError::other(value)
+        all_is_cubes::linking::InGenError::other(value)
     }
 }
 

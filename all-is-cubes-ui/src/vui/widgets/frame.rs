@@ -72,7 +72,9 @@ impl vui::Widget for Frame {
     fn controller(
         self: Arc<Self>,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Box<dyn vui::WidgetController> {
-        super::OneshotController::new(self.style.create_box(context.grant().bounds))
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
+        Ok(super::OneshotController::new(
+            self.style.create_box(context.grant().bounds),
+        ))
     }
 }

@@ -11,7 +11,6 @@ use all_is_cubes::block::{self, Block, Resolution};
 use all_is_cubes::character::Character;
 use all_is_cubes::content::palette;
 use all_is_cubes::inv;
-use all_is_cubes::linking::InGenError;
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::math::{
     Cube, GridAab, GridCoordinate, GridPoint, GridSize, GridSizeCoord, GridVector,
@@ -26,7 +25,7 @@ use all_is_cubes::{arcstr, universe};
 use crate::inv_watch::InventoryWatcher;
 use crate::ui_content::{CueMessage, CueNotifier, hud::HudBlocks};
 use crate::vui::widgets::{ToolbarButtonState, WidgetBlocks};
-use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction};
+use crate::vui::{self, LayoutRequest, Layoutable};
 
 /// Widget that displays inventory contents in toolbar format.
 ///
@@ -97,11 +96,11 @@ impl Layoutable for Toolbar {
     }
 }
 
-impl Widget for Toolbar {
+impl vui::Widget for Toolbar {
     fn controller(
         self: Arc<Self>,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Box<dyn WidgetController> {
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
         let bounds = context.grant().bounds;
 
         let todo_more = listen::StoreLock::new(ToolbarTodo {
@@ -109,7 +108,7 @@ impl Widget for Toolbar {
         });
         self.cue_channel.listen(todo_more.listener());
 
-        Box::new(ToolbarController {
+        Ok(Box::new(ToolbarController {
             todo_more,
             // TODO: obey gravity when positioning within the grant
             first_slot_position: Cube::new(
@@ -120,7 +119,7 @@ impl Widget for Toolbar {
                 bounds.lower_bounds().z + 1,
             ),
             definition: self,
-        })
+        }))
     }
 }
 
@@ -146,7 +145,7 @@ impl ToolbarController {
     fn write_items(
         &self,
         watcher: &InventoryWatcher,
-    ) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
+    ) -> Result<vui::WidgetTransaction, Box<dyn Error + Send + Sync>> {
         let mut txn = SpaceTransaction::default();
 
         // Note that `contents_iter` is infinite; when zipped with `slot_range` it is then
@@ -200,7 +199,7 @@ impl ToolbarController {
         &self,
         selected_slots: &[inv::Ix],
         pressed: [bool; inv::TOOL_SELECTIONS],
-    ) -> WidgetTransaction {
+    ) -> vui::WidgetTransaction {
         let mut txn = SpaceTransaction::default();
         for index in self.definition.slot_range {
             let position = self.slot_position(index);
@@ -225,11 +224,11 @@ impl ToolbarController {
     }
 }
 
-impl WidgetController for ToolbarController {
+impl vui::WidgetController for ToolbarController {
     fn initialize(
         &mut self,
         _: &vui::WidgetContext<'_, '_>,
-    ) -> Result<WidgetTransaction, InGenError> {
+    ) -> Result<vui::WidgetTransaction, vui::InWidgetError> {
         let slot_count = self.definition.slot_count();
 
         let mut txn = SpaceTransaction::default();
@@ -323,7 +322,7 @@ impl WidgetController for ToolbarController {
         let slots_txn = if should_update_inventory {
             self.write_items(watcher)?
         } else {
-            WidgetTransaction::default()
+            vui::WidgetTransaction::default()
         };
 
         // should_update_inventory is currently true when the selected_slots value changes.
@@ -331,7 +330,7 @@ impl WidgetController for ToolbarController {
         let pointers_txn = if should_update_inventory || should_update_pointers {
             self.write_pointers(&watcher.selected_slots(), pressed_buttons)
         } else {
-            WidgetTransaction::default()
+            vui::WidgetTransaction::default()
         };
 
         // TODO: Use Then::Sleep and a waker

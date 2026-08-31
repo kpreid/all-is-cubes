@@ -65,7 +65,7 @@ impl vui::Widget for Voxels {
     fn controller(
         self: Arc<Self>,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Box<dyn vui::WidgetController> {
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
         // This is similar but not identical to block::space_to_blocks().
 
         let position = context.grant().shrink_to(self.requirements().minimum, true);
@@ -107,7 +107,7 @@ impl vui::Widget for Voxels {
             block.modifiers_mut().clone_from(&self.modifiers);
             txn.at(cube).overwrite(block);
         }
-        super::OneshotController::new(txn)
+        Ok(super::OneshotController::new(txn))
     }
 }
 

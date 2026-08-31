@@ -9,7 +9,7 @@ use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::text;
 use all_is_cubes::universe::{self, ReadTicket};
 
-use crate::vui::{self, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetController, widgets};
+use crate::vui::{self, LayoutGrant, LayoutRequest, Layoutable, widgets};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -55,23 +55,21 @@ impl Layoutable for LargeText {
     }
 }
 
-impl Widget for LargeText {
+impl vui::Widget for LargeText {
     fn controller(
         self: Arc<Self>,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Box<dyn WidgetController> {
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
         let mut txn = SpaceTransaction::default();
         let draw_bounds = self.bounds();
         let text_bounds = context.grant().shrink_to(draw_bounds.size(), false).bounds;
-        self.text
-            .draw_voxels_to_transaction(
-                context.ui_read_ticket(),
-                &mut txn,
-                Gridgid::from_translation(text_bounds.lower_bounds() - draw_bounds.lower_bounds()),
-            )
-            .unwrap(); // TODO: widget trait must change to allow error propagation
+        self.text.draw_voxels_to_transaction(
+            context.ui_read_ticket(),
+            &mut txn,
+            Gridgid::from_translation(text_bounds.lower_bounds() - draw_bounds.lower_bounds()),
+        )?;
 
-        widgets::OneshotController::new(txn)
+        Ok(widgets::OneshotController::new(txn))
     }
 }
 
@@ -148,22 +146,19 @@ impl Layoutable for Label {
     }
 }
 
-impl Widget for Label {
+impl vui::Widget for Label {
     fn controller(
         self: Arc<Self>,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Box<dyn WidgetController> {
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
         // TODO: memoize `Text` construction for slightly more efficient reuse of widget
 
-        widgets::OneshotController::new(
-            draw_text_txn(
-                context.ui_read_ticket(),
-                &self.text(context.grant().gravity),
-                context.grant(),
-                true,
-            )
-            .unwrap(), // TODO: error propagation
-        )
+        Ok(widgets::OneshotController::new(draw_text_txn(
+            context.ui_read_ticket(),
+            &self.text(context.grant().gravity),
+            context.grant(),
+            true,
+        )?))
     }
 }
 
@@ -228,16 +223,16 @@ impl Layoutable for TextBox {
     }
 }
 
-impl Widget for TextBox {
+impl vui::Widget for TextBox {
     fn controller(
         self: Arc<Self>,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Box<dyn WidgetController> {
-        Box::new(TextBoxController {
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
+        Ok(Box::new(TextBoxController {
             todo: listen::Flag::listening(false, &self.text_source),
             grant: *context.grant(),
             definition: self,
-        })
+        }))
     }
 }
 
@@ -261,7 +256,7 @@ struct TextBoxController {
     grant: LayoutGrant,
 }
 
-impl WidgetController for TextBoxController {
+impl vui::WidgetController for TextBoxController {
     fn step(
         &mut self,
         context: &vui::WidgetContext<'_, '_>,
@@ -278,7 +273,7 @@ impl WidgetController for TextBoxController {
         &mut self,
         context: &vui::WidgetContext<'_, '_>,
         _from_scratch: bool,
-    ) -> vui::WidgetTransaction {
+    ) -> Result<vui::WidgetTransaction, vui::InWidgetError> {
         draw_text_txn(
             context.ui_read_ticket(),
             &text_for_widget(
@@ -291,7 +286,6 @@ impl WidgetController for TextBoxController {
             &self.grant,
             false, // overwrite any previous text
         )
-        .unwrap() // TODO: widget trait must change to allow error propagation
     }
 }
 
@@ -349,7 +343,7 @@ pub(crate) fn draw_text_txn(
     text: &Text,
     full_grant: &LayoutGrant,
     shrink: bool,
-) -> Result<SpaceTransaction, universe::HandleError> {
+) -> Result<SpaceTransaction, vui::InWidgetError> {
     let text_aabb = text.measure(read_ticket)?.logical_bounding_blocks();
     let shrunk_grant = full_grant.shrink_to(text_aabb.size(), true);
     let translation = shrunk_grant.bounds.lower_bounds() - text_aabb.lower_bounds();

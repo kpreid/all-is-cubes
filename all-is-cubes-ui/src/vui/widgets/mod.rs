@@ -5,7 +5,6 @@ use alloc::sync::Arc;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::euclid::size3;
-use all_is_cubes::linking::InGenError;
 use all_is_cubes::space::SpaceTransaction;
 use all_is_cubes::universe;
 
@@ -61,7 +60,7 @@ impl vui::WidgetController for OneshotController {
     fn initialize(
         &mut self,
         _: &vui::WidgetContext<'_, '_>,
-    ) -> Result<vui::WidgetTransaction, InGenError> {
+    ) -> Result<vui::WidgetTransaction, vui::InWidgetError> {
         Ok(self.0.take().unwrap_or_default())
     }
 
@@ -82,12 +81,14 @@ impl vui::Widget for Block {
     fn controller(
         self: Arc<Self>,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Box<dyn vui::WidgetController> {
-        OneshotController::new(if let Some(cube) = context.grant().shrink_to_cube() {
-            SpaceTransaction::set_cube(cube, None, Some(Block::clone(&self)))
-        } else {
-            SpaceTransaction::default()
-        })
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
+        Ok(OneshotController::new(
+            if let Some(cube) = context.grant().shrink_to_cube() {
+                SpaceTransaction::set_cube(cube, None, Some(Block::clone(&self)))
+            } else {
+                SpaceTransaction::default()
+            },
+        ))
     }
 }
 

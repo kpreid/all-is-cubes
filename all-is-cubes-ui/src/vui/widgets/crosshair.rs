@@ -3,8 +3,9 @@ use alloc::sync::Arc;
 
 use all_is_cubes::block::{AIR, Block};
 use all_is_cubes::euclid::size3;
+use all_is_cubes::listen;
 use all_is_cubes::space::SpaceTransaction;
-use all_is_cubes::{listen, universe};
+use all_is_cubes::universe;
 
 use crate::vui;
 
@@ -40,11 +41,11 @@ impl vui::Widget for Crosshair {
     fn controller(
         self: Arc<Self>,
         _: &vui::WidgetContext<'_, '_>,
-    ) -> Box<dyn vui::WidgetController> {
-        Box::new(CrosshairController {
+    ) -> Result<Box<dyn vui::WidgetController>, vui::InWidgetError> {
+        Ok(Box::new(CrosshairController {
             todo: listen::Flag::listening(false, &self.mouselook_mode),
             definition: self,
-        })
+        }))
     }
 }
 
@@ -76,8 +77,8 @@ impl vui::WidgetController for CrosshairController {
         &mut self,
         context: &vui::WidgetContext<'_, '_>,
         _from_scratch: bool,
-    ) -> vui::WidgetTransaction {
-        if let Some(position) = context.grant().shrink_to_cube() {
+    ) -> Result<vui::WidgetTransaction, vui::InWidgetError> {
+        Ok(if let Some(position) = context.grant().shrink_to_cube() {
             SpaceTransaction::set_cube(
                 position,
                 None,
@@ -89,7 +90,7 @@ impl vui::WidgetController for CrosshairController {
             )
         } else {
             vui::WidgetTransaction::default()
-        }
+        })
     }
 }
 
