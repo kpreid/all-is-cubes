@@ -1,6 +1,8 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
+
+use descriptive_unwrap::ResultExt as _;
 use exhaust::Exhaust;
 
 use all_is_cubes::arcstr::{self, literal};
@@ -309,15 +311,19 @@ fn setting_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'static
         "cannot use `setting_enum_button()` on setting without offered_value_list {key:?}"
     );
 
-    let label = vui::leaf_widget(widgets::Label::with_font(
-        label,
-        universe::Builtin::font_system16().clone(),
-        text::Positioning {
-            x: text::PositioningX::Right,
-            line_y: text::PositioningY::BodyMiddle,
-            z: text::PositioningZ::Back,
-        },
-    ));
+    let label = vui::leaf_widget(
+        widgets::Label::with_style(
+            ReadTicket::stub(), // font is a builtin
+            label,
+            universe::Builtin::font_system16().clone(),
+            Some(text::Positioning {
+                x: text::PositioningX::Right,
+                line_y: text::PositioningY::BodyMiddle,
+                z: text::PositioningZ::Back,
+            }),
+        )
+        .err_is_unreachable(),
+    );
 
     match style {
         SettingsStyle::CompactRow => LayoutTree::spacer(vui::LayoutRequest::EMPTY),

@@ -370,15 +370,19 @@ pub(crate) mod parts {
     }
 
     pub fn paragraph(text: impl Into<ArcStr>) -> WidgetTree {
-        vui::leaf_widget(widgets::Label::with_font(
-            text.into(),
-            universe::Builtin::font_body_text().clone(),
-            text::Positioning {
-                x: text::PositioningX::Left,
-                line_y: text::PositioningY::BodyTop,
-                z: text::PositioningZ::Back,
-            },
-        ))
+        vui::leaf_widget(
+            widgets::Label::with_style(
+                ReadTicket::stub(), // builtin font needs no ticket
+                text.into(),
+                universe::Builtin::font_body_text().clone(),
+                Some(text::Positioning {
+                    x: text::PositioningX::Left,
+                    line_y: text::PositioningY::BodyTop,
+                    z: text::PositioningZ::Back,
+                }),
+            )
+            .err_is_unreachable(), // builtin font is always available
+        )
     }
 }
 

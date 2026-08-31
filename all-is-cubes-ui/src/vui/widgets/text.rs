@@ -1,6 +1,8 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
+use descriptive_unwrap::ResultExt as _;
+
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::{self, Resolution::*, Text};
 use all_is_cubes::listen;
@@ -9,7 +11,7 @@ use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::text;
 use all_is_cubes::universe::{self, ReadTicket};
 
-use crate::vui::{self, LayoutGrant, LayoutRequest, Layoutable, widgets};
+use crate::vui::{self, widgets};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -47,9 +49,9 @@ impl LargeText {
     }
 }
 
-impl Layoutable for LargeText {
-    fn requirements(&self) -> LayoutRequest {
-        LayoutRequest {
+impl vui::Layoutable for LargeText {
+    fn requirements(&self) -> vui::LayoutRequest {
+        vui::LayoutRequest {
             minimum: self.bounds().size(),
         }
     }
@@ -85,32 +87,60 @@ pub struct Label {
     text: ArcStr,
     font: text::Font,
     positioning: Option<text::Positioning>,
+    layout_request: vui::LayoutRequest,
 }
 
 impl Label {
     /// Constructs a [`Label`] that draws the given text, with the standard UI label font.
     pub fn new(string: ArcStr) -> Self {
-        Self {
-            text: string,
-            font: universe::Builtin::font_system16().clone(),
-            positioning: None,
-        }
+        Self::with_style(
+            ReadTicket::stub(),
+            string,
+            universe::Builtin::font_system16().clone(),
+            None,
+        )
+        .err_is_unreachable() // system font is always available
     }
 
-    /// Constructs a [`Label`] that draws the given text, with a specified font.
-    //---
-    // TODO: undecided what's a good API
-    #[cfg_attr(not(feature = "session"), expect(dead_code))]
-    pub(crate) fn with_font(
+    /// Constructs a [`Label`] that draws the given text, with a specified font
+    /// and optional positioning override.
+    ///
+    /// If `positioning` is not specified, then the text positioning is determined by the
+    /// [`vui::Gravity`] of the widget layout this label is part of.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `read_ticket` is not sufficient to read `font`.
+    pub fn with_style(
+        read_ticket: ReadTicket<'_>,
         string: ArcStr,
         font: text::Font,
-        positioning: text::Positioning,
-    ) -> Self {
-        Self {
+        positioning: Option<text::Positioning>,
+    ) -> Result<Self, universe::HandleError> {
+        let mut new_self = Self {
             text: string,
             font,
-            positioning: Some(positioning),
-        }
+            positioning,
+            layout_request: vui::LayoutRequest::EMPTY,
+        };
+
+        new_self.layout_request = vui::LayoutRequest {
+            // Note that we use `Align::Low` (or we could equivalently use `Align::High`).
+            // If we were to use `Center`, then we might create bounds 1 block wider than is
+            // actually needed because the underlying text rendering would be centering within
+            // a cube, so for example a 1.5-cube-long text would occupy 3 cubes by sticking
+            // out 0.25 on each end, even though it would actually fit in 2.
+            //
+            // When we actually go to render text, we'll use the actual gravity and bounds,
+            // so this alignment choice won't matter.
+            minimum: new_self
+                .text(vui::Gravity::splat(vui::Align::Low))
+                .measure(read_ticket)?
+                .logical_bounding_blocks()
+                .size(),
+        };
+
+        Ok(new_self)
     }
 
     /// Creates and returns the [`Text`] object this widget displays.
@@ -123,26 +153,9 @@ impl Label {
     }
 }
 
-impl Layoutable for Label {
-    fn requirements(&self) -> LayoutRequest {
-        // TODO: memoize
-
-        // Note that we use `Align::Low` (or we could equivalently use `Align::High`).
-        // If we were to use `Center`, then we might create bounds 1 block wider than is actually
-        // needed because the underlying text rendering is (by default) centering within a cube,
-        // so for example a 1.5-cube-long text would occupy 3 cubes by sticking out 0.25 on each
-        // end, when it would actually fit in 2.
-        //
-        // When we actually go to render text, we'll use the actual gravity and bounds, so this
-        // alignment choice won't matter.
-        LayoutRequest {
-            minimum: self
-                .text(vui::Gravity::splat(vui::Align::Low))
-                .measure(ReadTicket::stub()) // TODO: need read ticket available during layout
-                .unwrap() // TODO: should make this measurement on construction
-                .logical_bounding_blocks()
-                .size(),
-        }
+impl vui::Layoutable for Label {
+    fn requirements(&self) -> vui::LayoutRequest {
+        self.layout_request.clone()
     }
 }
 
@@ -175,6 +188,7 @@ impl universe::VisitHandles for Label {
             text,
             font,
             positioning: _,
+            layout_request: _,
         } = self;
         text.visit_handles(visitor);
         font.visit_handles(visitor);
@@ -215,9 +229,9 @@ impl TextBox {
     }
 }
 
-impl Layoutable for TextBox {
-    fn requirements(&self) -> LayoutRequest {
-        LayoutRequest {
+impl vui::Layoutable for TextBox {
+    fn requirements(&self) -> vui::LayoutRequest {
+        vui::LayoutRequest {
             minimum: self.minimum_size,
         }
     }
@@ -253,7 +267,7 @@ impl universe::VisitHandles for TextBox {
 struct TextBoxController {
     definition: Arc<TextBox>,
     todo: listen::Flag,
-    grant: LayoutGrant,
+    grant: vui::LayoutGrant,
 }
 
 impl vui::WidgetController for TextBoxController {
@@ -341,7 +355,7 @@ fn gravity_to_positioning(gravity: vui::Gravity, ignore_y: bool) -> text::Positi
 pub(crate) fn draw_text_txn(
     read_ticket: ReadTicket<'_>,
     text: &Text,
-    full_grant: &LayoutGrant,
+    full_grant: &vui::LayoutGrant,
     shrink: bool,
 ) -> Result<SpaceTransaction, vui::InWidgetError> {
     let text_aabb = text.measure(read_ticket)?.logical_bounding_blocks();
@@ -375,6 +389,7 @@ pub(crate) fn draw_text_txn(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::vui::Layoutable as _;
     use all_is_cubes::arcstr::literal;
     use all_is_cubes::euclid::size3;
     use all_is_cubes::math::{GridSizeCoord, Rgba};
@@ -400,7 +415,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             widget.requirements(),
-            LayoutRequest {
+            vui::LayoutRequest {
                 minimum: size3(7 * GridSizeCoord::try_from(text.len()).unwrap(), 16, 1)
             }
         );
@@ -429,7 +444,7 @@ mod tests {
         // A previous bug would cause this to be 3 wide.
         assert_eq!(
             tree.requirements(),
-            LayoutRequest {
+            vui::LayoutRequest {
                 minimum: size3(2, 1, 1)
             }
         );

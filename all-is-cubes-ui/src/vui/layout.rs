@@ -55,7 +55,7 @@ pub fn install_widgets(
 /// to be interpreted by a layout algorithm to choose the real position.
 ///
 /// TODO: give this type and [`Layoutable`] better names
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[expect(clippy::exhaustive_structs)]
 pub struct LayoutRequest {
     /// The minimum dimensions required, without which correct functionality
