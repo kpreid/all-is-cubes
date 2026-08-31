@@ -43,7 +43,7 @@ impl WidgetTheme {
         txn: &mut UniverseTransaction,
         progress: YieldProgress,
     ) -> Result<Self, GenError> {
-        let widget_blocks = WidgetBlocks::new(txn, progress).await.install(read_ticket, txn)?;
+        let widget_blocks = WidgetBlocks::new(txn, progress).await?.install(read_ticket, txn)?;
 
         Ok(Self::from_provider(widget_blocks))
     }
@@ -137,10 +137,13 @@ impl fmt::Display for WidgetBlocks {
 }
 
 impl WidgetBlocks {
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the transaction already contains these blocks.
-    pub async fn new(txn: &mut UniverseTransaction, p: YieldProgress) -> BlockProvider<Self> {
+    /// Returns an error if the transaction already contains these blocks.
+    pub fn new(
+        txn: &mut UniverseTransaction,
+        p: YieldProgress,
+    ) -> impl Future<Output = Result<BlockProvider<Self>, GenError>> {
         BlockProvider::new(p, |key| {
             Ok(match key {
                 WidgetBlocks::Crosshair => block_from_image(
@@ -215,7 +218,10 @@ impl WidgetBlocks {
                         GridRotation::IDENTITY,
                         &default_srgb,
                     )?
-                    .display_name(format!("Progress Bar {}", if full {"Full"} else {"Empty"}))
+                    .display_name(format!(
+                        "Progress Bar {}",
+                        if full { "Full" } else { "Empty" }
+                    ))
                     .build_txn(txn)
                 }
 
@@ -248,8 +254,6 @@ impl WidgetBlocks {
                     .build(),
             })
         })
-        .await
-        .unwrap()
     }
 }
 
@@ -308,6 +312,7 @@ mod tests {
             &mut UniverseTransaction::default(),
             yield_progress_for_testing(),
         )
-        .await;
+        .await
+        .unwrap();
     }
 }

@@ -3,7 +3,7 @@ use core::fmt;
 use exhaust::Exhaust;
 
 use all_is_cubes::content::load_image::include_image;
-use all_is_cubes::linking::{BlockModule, BlockProvider};
+use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
 
@@ -74,7 +74,13 @@ impl fmt::Display for UiBlocks {
 }
 
 impl UiBlocks {
-    pub async fn new(txn: &mut UniverseTransaction, p: YieldProgress) -> BlockProvider<UiBlocks> {
+    /// # Errors
+    ///
+    /// Returns an error if the transaction already contains these blocks.
+    pub fn new(
+        txn: &mut UniverseTransaction,
+        p: YieldProgress,
+    ) -> impl Future<Output = Result<BlockProvider<UiBlocks>, GenError>> {
         BlockProvider::new(p, |key| {
             Ok(match key {
                 UiBlocks::BackButtonLabel => make_button_label_block(
@@ -162,8 +168,6 @@ impl UiBlocks {
                 )?,
             })
         })
-        .await
-        .unwrap()
     }
 
     #[cfg(feature = "session")]
@@ -209,7 +213,7 @@ mod tests {
         // Prove that the construction doesn’t panic
         let mut txn = UniverseTransaction::default();
         #[cfg_attr(not(feature = "session"), expect(unused_variables))]
-        let blocks = UiBlocks::new(&mut txn, yield_progress_for_testing()).await;
+        let blocks = UiBlocks::new(&mut txn, yield_progress_for_testing()).await.unwrap();
 
         #[cfg(feature = "session")]
         for setting_key in settings::Key::exhaust() {

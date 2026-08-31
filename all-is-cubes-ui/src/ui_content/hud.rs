@@ -156,7 +156,11 @@ impl HudBlocks {
         let [p1, p2] = p12.split(0.5);
         let widget_theme =
             widgets::WidgetTheme::new(read_ticket, txn, p1).await.err_is_unreachable();
-        let ui_blocks = UiBlocks::new(txn, p2).await.install(read_ticket, txn).err_is_unreachable();
+        let ui_blocks = UiBlocks::new(txn, p2)
+            .await
+            .err_is_unreachable()
+            .install(read_ticket, txn)
+            .err_is_unreachable();
         let icons = Icons::new(txn, p3).await.install(read_ticket, txn).err_is_unreachable();
         Self {
             widget_theme,

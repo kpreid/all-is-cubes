@@ -68,9 +68,8 @@ pub(crate) async fn demo_city(
     .unwrap();
     let ui_blocks_progress = progress.start_and_cut(0.05, "UiBlocks").await;
     vui::blocks::UiBlocks::new(&mut install_txn, ui_blocks_progress)
-        .await
-        .install(universe.read_ticket(), &mut install_txn)
-        .unwrap();
+        .await?
+        .install(universe.read_ticket(), &mut install_txn)?;
     let icons_blocks_progress = progress.start_and_cut(0.05, "Icons").await;
     all_is_cubes::inv::Icons::new(&mut install_txn, icons_blocks_progress)
         .await

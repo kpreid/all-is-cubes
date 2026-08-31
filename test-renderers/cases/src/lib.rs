@@ -740,6 +740,7 @@ async fn icons(mut context: RenderTestContext) {
         .unwrap();
     let ui_blocks_p = UiBlocks::new(&mut install_txn, yield_progress_for_testing())
         .await
+        .unwrap()
         .install(context.universe().read_ticket(), &mut install_txn)
         .unwrap();
     let widget_theme = WidgetTheme::new(
