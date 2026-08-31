@@ -50,6 +50,7 @@ pub(crate) enum TooComplex {
 
 impl TooComplex {
     pub(crate) fn to_flaws(self) -> Flaws {
+        // The function `mesh_might_be_incomplete` must know all of these flaws.
         match self {
             TooComplex::OutOfMemory => Flaws::OUT_OF_MEMORY,
             TooComplex::TooManyIndices => Flaws::TOO_COMPLEX,
@@ -64,4 +65,13 @@ impl From<alloc::collections::TryReserveError> for TooComplex {
     fn from(_: alloc::collections::TryReserveError) -> Self {
         TooComplex::OutOfMemory
     }
+}
+
+/// Determines whether a mesh computation was interrupted, and thus the mesh might
+/// contain an inconsistent set of vertices and indices.
+///
+/// In this case, we relax certain consistency checks.
+pub(crate) fn mesh_might_be_incomplete(flaws: Flaws) -> bool {
+    // This condition must include all of the flaws that `TooComplex::to_flaws()` can produce.
+    !(flaws & (Flaws::TOO_COMPLEX | Flaws::OUT_OF_MEMORY)).is_empty()
 }

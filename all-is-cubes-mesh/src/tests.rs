@@ -26,8 +26,8 @@ use all_is_cubes_render::camera::TransparencyOption;
 
 use crate::testing::{Allocator, TexPoint, TextureMt, mesh_blocks_and_space};
 use crate::{
-    BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering, IndexSlice, MeshOptions,
-    MeshTypes, PosCoord, SpaceMesh, block_meshes_for_space,
+    Aabb, Aabbs, BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering, IndexSlice,
+    MeshOptions, MeshTypes, PosCoord, SpaceMesh, block_meshes_for_space,
 };
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
@@ -852,6 +852,15 @@ mod complexity_limit {
 
         assert_eq!(mesh.count_indices(), ONE_AND_A_HALF_CUBES);
         assert_eq!(mesh.flaws(), Flaws::TOO_COMPLEX);
+        assert_eq!(
+            mesh.bounding_box(),
+            Aabbs {
+                // This is the same bounding box we’d get if the computation wasn’t limited,
+                // but that’s an accident of the geometry of the situation.
+                opaque: Aabb::from_iter([point3(0., 0., 0.), point3(0.75, 0.25, 0.25)]),
+                transparent: Aabb::EMPTY,
+            }
+        );
     }
 
     #[test]
@@ -878,6 +887,13 @@ mod complexity_limit {
         // so the number of indices is the number of indices of only one of the two cubes.
         assert_eq!(space_mesh.indices().len(), u32size(INDICES_PER_CUBE));
         assert_eq!(space_mesh.flaws(), Flaws::TOO_COMPLEX);
+        assert_eq!(
+            space_mesh.bounding_box(),
+            Aabbs {
+                opaque: Aabb::from_iter([point3(0., 0., 0.), point3(1., 1., 1.)]),
+                transparent: Aabb::EMPTY,
+            }
+        );
     }
 
     #[test]
@@ -902,5 +918,6 @@ mod complexity_limit {
 
         assert!(space_mesh.indices().len() <= u32size(ONE_AND_A_HALF_CUBES));
         assert_eq!(space_mesh.flaws(), Flaws::TOO_COMPLEX);
+        // No bounding box assertion because the exact result is fairly accidental.
     }
 }

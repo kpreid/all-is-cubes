@@ -15,7 +15,9 @@ use all_is_cubes_render::Flaws;
 
 use crate::heap::{self, HeapUsage};
 use crate::texture::{self, Tile as _};
-use crate::{Aabbs, IndexBound, IndexVec, MeshOptions, MeshTypes, TooComplex, Vertex, planar};
+use crate::{
+    Aabb, Aabbs, IndexBound, IndexVec, MeshOptions, MeshTypes, TooComplex, Vertex, planar,
+};
 
 #[cfg(doc)]
 use {crate::SpaceMesh, all_is_cubes::space::Space};
@@ -377,8 +379,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
     #[cfg(debug_assertions)]
     fn consistency_check(&self) {
-        let had_error =
-            self.flaws.contains(Flaws::OUT_OF_MEMORY) | self.flaws.contains(Flaws::TOO_COMPLEX);
+        let had_error = crate::mesh_might_be_incomplete(self.flaws);
         for sub_mesh in self.all_sub_meshes() {
             sub_mesh.consistency_check(had_error);
         }
@@ -518,20 +519,20 @@ impl<M: MeshTypes> SubMesh<M> {
         self.bounding_box = self.compute_bounding_box_from_scratch();
     }
 
-    /// Compute the bounding box this mesh *should* have from the vertices.
+    /// Compute the bounding box this mesh *should* have from the vertices
+    /// (that are used by the indices).
     ///
     /// # Panics
     ///
     /// Panics if the mesh contains indices with no corresponding vertices (out of range).
     fn compute_bounding_box_from_scratch(&self) -> Aabbs {
-        let mut output = Aabbs::EMPTY;
-        for index in self.indices_opaque.as_slice(..).iter_u32() {
-            output.opaque.add_point(self.vertices.0[index as usize].position());
+        let get_position = |index: u32| self.vertices.0[index as usize].position();
+        Aabbs {
+            opaque: Aabb::from_iter(self.indices_opaque.as_slice(..).iter_u32().map(get_position)),
+            transparent: Aabb::from_iter(
+                self.indices_transparent.as_slice(..).iter_u32().map(get_position),
+            ),
         }
-        for index in self.indices_transparent.as_slice(..).iter_u32() {
-            output.transparent.add_point(self.vertices.0[index as usize].position());
-        }
-        output
     }
 
     #[cfg(debug_assertions)]

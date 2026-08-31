@@ -125,31 +125,43 @@ impl<M: MeshTypes> SpaceMesh<M> {
     fn consistency_check(&self) {
         assert_eq!(self.vertices.0.len(), self.vertices.1.len());
         assert_eq!(self.opaque_range().start, 0);
-        let len_transparent_unculled =
-            ops::Range::from(self.transparent_range(DepthOrdering::WITHIN)).len();
-        for ordering in DepthOrdering::exhaust() {
-            let len = ops::Range::from(self.transparent_range(ordering)).len();
-            assert!(
-                len <= len_transparent_unculled,
-                "transparent range {ordering:?} is longer \
+
+        // Check the transparent ranges are internally consistent, but only if the mesh is complete.
+        if !crate::mesh_might_be_incomplete(self.flaws) {
+            let len_transparent_unculled =
+                ops::Range::from(self.transparent_range(DepthOrdering::WITHIN)).len();
+            for ordering in DepthOrdering::exhaust() {
+                let len = ops::Range::from(self.transparent_range(ordering)).len();
+                assert!(
+                    len <= len_transparent_unculled,
+                    "transparent range {ordering:?} is longer \
                     ({len}) than the unculled length {len_transparent_unculled}"
-            );
+                );
+            }
         }
+
         assert!(self.opaque_range().end.is_multiple_of(3));
         assert!(self.indices().len().is_multiple_of(3));
         for index in self.indices().iter_u32() {
             assert!(index < self.vertices.0.len() as u32);
         }
 
-        let mut bounding_box: Aabb = Aabb::EMPTY;
-        for vertex in &self.vertices.0 {
-            bounding_box.add_point(vertex.position());
+        let computed_bounding_box: Aabbs = self.compute_bounding_box_from_scratch();
+        let stored_bounding_box = self.bounding_box;
+        if crate::mesh_might_be_incomplete(self.flaws) {
+            // If mesh building was interrupted, the stored box might be too big
+            // without this indicating an error.
+            assert!(
+                stored_bounding_box.union(computed_bounding_box) == stored_bounding_box,
+                "bounding box of vertices {computed_bounding_box:?} \
+                    not contained by recorded bounding box {stored_bounding_box:?}"
+            );
+        } else {
+            assert_eq!(
+                computed_bounding_box, stored_bounding_box,
+                "computed bounding box ≠ recorded bounding box"
+            );
         }
-        assert_eq!(
-            bounding_box,
-            self.bounding_box.all().into(),
-            "bounding box of vertices ≠ recorded bounding box"
-        );
 
         self.transparent.iter().for_each(TransparentMeta::consistency_check);
     }
@@ -217,8 +229,13 @@ impl<M: MeshTypes> SpaceMesh<M> {
             Ok(()) => (),
             Err(error) => {
                 self.meta.flaws |= error.to_flaws();
+                // Recompute the bounding box because it might be wrong.
+                self.meta.bounding_box = self.compute_bounding_box_from_scratch();
             }
         }
+
+        #[cfg(debug_assertions)]
+        self.consistency_check();
     }
 
     /// Compute from `Space` data already captured.
@@ -388,10 +405,31 @@ impl<M: MeshTypes> SpaceMesh<M> {
             limit_indices,
         )?;
 
-        #[cfg(debug_assertions)]
-        self.consistency_check();
-
         Ok(())
+    }
+
+    /// Compute the bounding box this mesh *should* have from the vertices
+    /// (that are used by the indices).
+    ///
+    /// This function is used only for testing and for repairing meshes whose computation was
+    /// interrupted by an error.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the mesh contains indices with no corresponding vertices (out of range).
+    fn compute_bounding_box_from_scratch(&self) -> Aabbs {
+        let get_position = |index: u32| self.vertices.0[index as usize].position();
+        Aabbs {
+            opaque: Aabb::from_iter(
+                self.indices.as_slice(self.opaque_range()).iter_u32().map(get_position),
+            ),
+            transparent: Aabb::from_iter(
+                self.indices
+                    .as_slice(self.transparent_range(DepthOrdering::ALL_UNSORTED))
+                    .iter_u32()
+                    .map(get_position),
+            ),
+        }
     }
 
     /// Sort the existing indices of

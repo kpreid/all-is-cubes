@@ -222,6 +222,16 @@ impl From<Aabb> for Option<Aab> {
     }
 }
 
+impl FromIterator<Position> for Aabb {
+    /// Computes the bounding box of a collection of points.
+    fn from_iter<T: IntoIterator<Item = Position>>(iter: T) -> Self {
+        iter.into_iter().fold(Aabb::EMPTY, |mut aabb, point| {
+            aabb.add_point(point);
+            aabb
+        })
+    }
+}
+
 // Box3D considers an inside-out box to be one kind of “empty”, so we can convert to it without
 // caveat.
 impl From<Aabb> for Box3D<f32, MeshRel> {
