@@ -7,12 +7,12 @@ use all_is_cubes::block::{self, Block};
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::size3;
+use all_is_cubes::inv;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
 use all_is_cubes::text;
 use all_is_cubes::time::{Duration, Tick};
-use all_is_cubes::universe::{ReadTicket, StrongHandle};
-use all_is_cubes::{inv, universe};
+use all_is_cubes::universe::{self, ReadTicket, StrongHandle};
 
 use crate::vui::{self, LayoutRequest, Layoutable, widgets};
 
@@ -35,11 +35,16 @@ pub struct TooltipState {
 }
 
 impl TooltipState {
+    /// Mutate the [`TooltipState`] pointed to by `this_ref` so that it follows the state of
+    /// `character`.
+    ///
+    /// Returns an error if the `character` handle is defunct, or `world_read_ticket` is not
+    /// sufficient to read it.
     pub(crate) fn bind_to_character(
         world_read_ticket: ReadTicket<'_>,
         this_ref: &Arc<Mutex<Self>>,
         character: StrongHandle<Character>,
-    ) {
+    ) -> Result<(), universe::HandleError> {
         let (gate, listener) = FnListener::new(
             this_ref,
             move |this: &Mutex<Self>, change: &CharacterChange| match change {
@@ -55,13 +60,15 @@ impl TooltipState {
 
         // TODO: Think about what state results if either of the locks/borrows fails;
         // then stop using StrongHandle?
-        character.read(world_read_ticket).unwrap().listen(listener);
+        character.read(world_read_ticket)?.listen(listener);
         {
             let mut this = this_ref.lock().unwrap();
             this.character = Some(character);
             this.character_gate = gate;
             this.dirty_inventory = true;
         }
+
+        Ok(())
     }
 
     pub fn set_message(&mut self, text: ArcStr) {

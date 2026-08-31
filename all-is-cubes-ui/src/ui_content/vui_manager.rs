@@ -350,7 +350,8 @@ impl Vui {
                 world_read_ticket,
                 &self.tooltip_state,
                 character_handle,
-            );
+            )
+            .err_is_unreachable();
         }
 
         // Drain the control channel.
