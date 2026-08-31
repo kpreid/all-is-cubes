@@ -11,6 +11,7 @@ use all_is_cubes::block::{self, Block, Resolution};
 use all_is_cubes::character::Character;
 use all_is_cubes::content::palette;
 use all_is_cubes::inv;
+use all_is_cubes::linking::InGenError;
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::math::{
     Cube, GridAab, GridCoordinate, GridPoint, GridSize, GridSizeCoord, GridVector,
@@ -25,9 +26,7 @@ use all_is_cubes::{arcstr, universe};
 use crate::inv_watch::InventoryWatcher;
 use crate::ui_content::{CueMessage, CueNotifier, hud::HudBlocks};
 use crate::vui::widgets::{ToolbarButtonState, WidgetBlocks};
-use crate::vui::{
-    self, InstallVuiError, LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction,
-};
+use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction};
 
 /// Widget that displays inventory contents in toolbar format.
 ///
@@ -230,7 +229,7 @@ impl WidgetController for ToolbarController {
     fn initialize(
         &mut self,
         _: &vui::WidgetContext<'_, '_>,
-    ) -> Result<WidgetTransaction, InstallVuiError> {
+    ) -> Result<WidgetTransaction, InGenError> {
         let slot_count = self.definition.slot_count();
 
         let mut txn = SpaceTransaction::default();

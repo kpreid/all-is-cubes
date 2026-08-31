@@ -5,6 +5,7 @@ use alloc::sync::Arc;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::euclid::size3;
+use all_is_cubes::linking::InGenError;
 use all_is_cubes::space::SpaceTransaction;
 use all_is_cubes::universe;
 
@@ -60,7 +61,7 @@ impl vui::WidgetController for OneshotController {
     fn initialize(
         &mut self,
         _: &vui::WidgetContext<'_, '_>,
-    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+    ) -> Result<vui::WidgetTransaction, InGenError> {
         Ok(self.0.take().unwrap_or_default())
     }
 

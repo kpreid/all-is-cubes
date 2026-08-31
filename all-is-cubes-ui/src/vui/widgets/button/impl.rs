@@ -159,7 +159,7 @@ impl vui::WidgetController for ActionButtonController {
     fn initialize(
         &mut self,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+    ) -> Result<vui::WidgetTransaction, linking::InGenError> {
         let grant = self.definition.common.shrink_bounds(*context.grant());
 
         Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
@@ -198,7 +198,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
     fn initialize(
         &mut self,
         context: &vui::WidgetContext<'_, '_>,
-    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+    ) -> Result<vui::WidgetTransaction, linking::InGenError> {
         let grant = self.definition.common.shrink_bounds(*context.grant());
 
         Ok(SpaceTransaction::behaviors(BehaviorSetTransaction::insert(

@@ -9,6 +9,7 @@ use core::sync::atomic::{self, AtomicBool};
 use bevy_platform::sync::{Mutex, PoisonError};
 
 use all_is_cubes::behavior::{self, Behavior};
+use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
@@ -19,6 +20,9 @@ use all_is_cubes::universe::{HandleVisitor, ReadTicket, UniverseTransaction, Vis
 pub use all_is_cubes::behavior::Then;
 
 use crate::vui::{LayoutGrant, Layoutable, Positioned, validate_widget_transaction};
+
+#[cfg(doc)]
+use all_is_cubes::universe::Handle;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -89,15 +93,15 @@ pub trait Widget: Layoutable + Debug + Send + Sync {
 pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     /// Write the initial state of the widget to the space.
     /// This is called at most once.
-    #[expect(
-        clippy::missing_errors_doc,
-        reason = "TODO: error type is too broad \
-        and allows widgets to fill in fields that should be context"
-    )]
+    ///
+    /// # Errors
+    ///
+    /// The controller may return an error in the event that it finds that the resources it requires
+    /// are not available, such as having an incorrect [`Handle`].
     fn initialize(
         &mut self,
         context: &WidgetContext<'_, '_>,
-    ) -> Result<WidgetTransaction, InstallVuiError> {
+    ) -> Result<WidgetTransaction, InGenError> {
         let _ = context;
         Ok(WidgetTransaction::default())
     }
@@ -169,7 +173,7 @@ impl WidgetController for Box<dyn WidgetController> {
     fn initialize(
         &mut self,
         context: &WidgetContext<'_, '_>,
-    ) -> Result<WidgetTransaction, InstallVuiError> {
+    ) -> Result<WidgetTransaction, InGenError> {
         (**self).initialize(context)
     }
 
@@ -216,11 +220,11 @@ impl WidgetBehavior {
         };
         let mut controller = Arc::clone(&positioned_widget.value).controller(context);
         let init_txn = match controller.initialize(context) {
-            Ok(t) => t,
-            Err(e) => {
+            Ok(init_txn) => init_txn,
+            Err(error) => {
                 return Err(InstallVuiError::WidgetInitialization {
                     widget: controller,
-                    error: Box::new(e),
+                    error,
                 });
             }
         };
@@ -377,7 +381,7 @@ pub enum InstallVuiError {
         widget: Box<dyn WidgetController>,
 
         /// The error returned by [`WidgetController::initialize()`].
-        error: Box<InstallVuiError>,
+        error: InGenError,
     },
 
     /// A transaction conflict arose between two widgets or parts of a widget's installation.
@@ -433,9 +437,9 @@ impl Error for InstallVuiError {
     }
 }
 
-impl From<InstallVuiError> for all_is_cubes::linking::InGenError {
+impl From<InstallVuiError> for InGenError {
     fn from(value: InstallVuiError) -> Self {
-        all_is_cubes::linking::InGenError::other(value)
+        InGenError::other(value)
     }
 }
 
