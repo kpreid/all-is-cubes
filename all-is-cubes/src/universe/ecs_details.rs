@@ -231,16 +231,25 @@ pub(crate) struct StepInput {
     pub tick: time::Tick,
     /// Deadline for computing the entire step.
     pub deadline: time::Deadline,
-    /// How to divide light calculation time among spaces, based on the previous step
-    pub(crate) budget_per_space: Option<time::Duration>,
 }
 
 impl StepInput {
-    pub(crate) fn deadline_for_space(&self) -> all_is_cubes_base::time::Deadline {
-        match self.budget_per_space {
-            Some(budget) => self.deadline.min(time::Deadline::At(time::Instant::now() + budget)),
-            None => self.deadline,
-        }
+    /// Decides how much time to spend on light updates, assuming they will start now.
+    ///
+    /// Returns [`None`] if time is unlimited.
+    pub(crate) fn duration_for_space_light_updates(
+        &self,
+        divisor: usize,
+    ) -> Option<time::Duration> {
+        self.deadline
+            .remaining_since(time::Instant::now())
+            .map(|remaining: time::Duration| {
+                // TODO: margin of 5 ms for "everything that is not light" is an arbitrary figure.
+                let remaining_with_margin =
+                    remaining.checked_sub(time::Duration::from_millis(2)).unwrap_or(remaining);
+
+                remaining_with_margin.div_f32(divisor.max(1) as f32)
+            })
     }
 }
 

@@ -320,13 +320,7 @@ impl Universe {
         self.world.run_schedule(time::schedule::BeforeStepReset);
 
         let tick = self.world.resource_mut::<time::Clock>().advance(paused);
-        let step_input = ecs_details::StepInput {
-            tick,
-            deadline,
-            budget_per_space: deadline
-                .remaining_since(start_time)
-                .map(|dur| dur / u32::try_from(self.spaces_with_work).unwrap_or(1).max(1)),
-        };
+        let step_input = ecs_details::StepInput { tick, deadline };
         self.world.resource_mut::<CurrentStep>().0 = Some(step_input.clone());
 
         self.log_rerun_time();

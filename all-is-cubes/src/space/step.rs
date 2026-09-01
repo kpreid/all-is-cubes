@@ -31,6 +31,7 @@ use crate::transaction::{Merge as _, Transaction as _};
 use crate::universe::{
     self, InfoCollector, QueryStateBundle as _, ReadTicket, SealedMember as _, UniverseId,
 };
+#[cfg(feature = "auto-threads")]
 use crate::util::ignore_poison;
 
 use super::palette;
@@ -347,24 +348,62 @@ fn update_light_system(
     let _lex = lex.name("light", "-");
     let step_input = current_step.get()?;
 
-    // for access from par_iter
-    let info_collector = bevy_platform::sync::Mutex::new(info_collector);
+    cfg_select! {
+        feature = "auto-threads" => {
+            // for access from par_iter
+            let info_collector = bevy_platform::sync::Mutex::new(info_collector);
 
-    spaces_query.par_iter_mut().for_each(
-        |(palette, mut light_storage, mut contents, notifiers)| {
-            let (uc, mut change_buffer) =
-                Space::borrow_light_update_context_ecs(palette, &mut contents, notifiers);
-            let info = light_storage.update_light_from_queue(
-                uc,
-                &mut change_buffer,
-                // TODO: check whether we are actually running in parallel and give either subdivided or non-subdivided deadlines?
-                step_input.deadline_for_space().remaining_since(Instant::now()),
+            // Assume we can run in parallel, so the time per space is the full time.
+            // TODO: But the light updates themselves are also parallelized, so we may have
+            // contention that disagrees with such simple analyses. Fix that.
+            let duration = step_input.duration_for_space_light_updates(1);
+
+            spaces_query.par_iter_mut().for_each(
+                |(palette, mut light_storage, mut contents, notifiers)| {
+                    let (uc, mut change_buffer) =
+                        Space::borrow_light_update_context_ecs(palette, &mut contents, notifiers);
+                    let info = light_storage.update_light_from_queue(
+                        uc,
+                        &mut change_buffer,
+                        duration,
+                    );
+
+                    // ignore_poison is valid because we are appending only
+                    ignore_poison(info_collector.lock()).record(info);
+                },
+            );
+        }
+        _ => {
+            let mut info_collector = info_collector;
+
+            // Because execution is single-threaded, we need to partition the available time among
+            // the spaces that need it. In order to do so, find which ones have anything in their
+            // queue at all.
+            //
+            // TODO: Use some kind of change flags to not need to iterate over all spaces?
+            let spaces_needing_light_updates: usize = spaces_query
+                .iter()
+                .filter(|(_, light_storage, _, _)| !light_storage.light_update_queue.is_empty())
+                .count();
+            let duration = step_input.duration_for_space_light_updates(spaces_needing_light_updates);
+
+            spaces_query.iter_mut().for_each(
+                |(palette, mut light_storage, mut contents, notifiers)| {
+                    let (uc, mut change_buffer) =
+                        Space::borrow_light_update_context_ecs(palette, &mut contents, notifiers);
+                    let info = light_storage.update_light_from_queue(
+                        uc,
+                        &mut change_buffer,
+                        duration,
+                    );
+
+                    info_collector.record(info);
+                },
             );
 
-            // ignore_poison is valid because we are appending only
-            ignore_poison(info_collector.lock()).record(info);
-        },
-    );
+            // log::trace!("light duration requested {duration:?} actual time {:?}", t1 - t0);
+        }
+    }
 
     Ok(())
 }

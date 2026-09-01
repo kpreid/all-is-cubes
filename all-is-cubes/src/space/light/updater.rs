@@ -179,6 +179,9 @@ impl LightStorage {
     }
 
     /// Do some light updates.
+    ///
+    /// `budget` specifies the approximate amount of time that should be spent before stopping
+    /// even if the queue is still nonempty.
     pub(in crate::space) fn update_light_from_queue(
         &mut self,
         uc: UpdateCtx<'_>,
