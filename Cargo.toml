@@ -282,7 +282,7 @@ uninlined_format_args = "warn"
 unnecessary_self_imports = "warn"
 unnecessary_wraps = "warn"
 unused_async = "warn"
-unwrap_used = "warn"
+unwrap_used = "warn" # Use `descriptive_unwrap` functions or `expect()` instead.
 wrong_self_convention = "warn"
 
 [profile.dev]

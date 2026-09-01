@@ -5,6 +5,7 @@
 
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
+#![expect(clippy::unwrap_used, reason = "TODO")]
 
 // Note: Not all tests depend on having a browser, but it’s simpler to have all tests configured
 // this way rather than running tests twice.
