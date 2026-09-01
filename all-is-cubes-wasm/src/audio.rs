@@ -17,6 +17,7 @@ use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes_render::camera::Camera;
 use all_is_cubes_ui::apps::{SessionFluff, SessionFluffSource};
 
+use crate::web_glue::{ErrorFromJs, excontext};
 use crate::web_session::Session;
 
 // -------------------------------------------------------------------------------------------------
@@ -123,49 +124,65 @@ async fn audio_command_task(
                         },
                     };
 
-                    // Node chain we are constructing:
-                    // BufferSource → Gain → (Panner)? → Destination
+                    // This function is a pseudo-try-block for handling the JS errors
+                    // without exiting the loop.
+                    let result = (|| -> Result<(), ErrorFromJs> {
+                        // Node chain we are constructing:
+                        // BufferSource → Gain → (Panner)? → Destination
 
-                    let source_node = context.create_buffer_source().unwrap();
-                    source_node.set_buffer(Some(&buffer));
+                        let source_node = context
+                            .create_buffer_source()
+                            .map_err(excontext("createBufferSource"))?;
+                        source_node.set_buffer(Some(&buffer));
 
-                    let gain_node = context.create_gain().unwrap();
-                    gain_node.gain().set_value(gain);
+                        let gain_node = context.create_gain().map_err(excontext("createGain"))?;
+                        gain_node.gain().set_value(gain);
 
-                    source_node
-                        .connect_with_audio_node(&gain_node)
-                        .expect("audio graph logic error");
+                        source_node
+                            .connect_with_audio_node(&gain_node)
+                            .expect("audio graph logic error");
 
-                    match source {
-                        SessionFluffSource::World(position) => {
-                            let panner_node = context.create_panner().unwrap();
-                            panner_node.set_position(position.x, position.y, position.z);
-                            panner_node.set_panning_model(web_sys::PanningModelType::Hrtf);
+                        match source {
+                            SessionFluffSource::World(position) => {
+                                let panner_node =
+                                    context.create_panner().map_err(excontext("createPanner()"))?;
+                                panner_node.set_position(position.x, position.y, position.z);
+                                panner_node.set_panning_model(web_sys::PanningModelType::Hrtf);
 
-                            gain_node
-                                .connect_with_audio_node(&panner_node)
-                                .expect("audio graph logic error");
-                            panner_node
-                                .connect_with_audio_node(&context.destination())
-                                .expect("audio graph logic error");
+                                gain_node
+                                    .connect_with_audio_node(&panner_node)
+                                    .map_err(excontext("connecting audio nodes"))?;
+                                panner_node
+                                    .connect_with_audio_node(&context.destination())
+                                    .map_err(excontext("connecting audio nodes"))?;
+                            }
+                            SessionFluffSource::NonSpatial => {
+                                // Make direct connection without panner node
+                                gain_node
+                                    .connect_with_audio_node(&context.destination())
+                                    .map_err(excontext("connecting audio nodes"))?;
+                            }
+                            _ => unimplemented!("unknown `SessionFluffSource` variant {source:?}"),
                         }
-                        SessionFluffSource::NonSpatial => {
-                            // Make direct connection without panner node
-                            gain_node
-                                .connect_with_audio_node(&context.destination())
-                                .expect("audio graph logic error");
+
+                        // Randomize start time to reduce constructive interference effects.
+                        // TODO: get size of time range from universe tick rate.
+                        let when = js_sys::Math::random()
+                            .mul_add(const { 1. / 60. }, context.current_time());
+
+                        source_node.start_with_when(when).map_err(excontext("node.start()"))?;
+
+                        Ok(())
+                    })();
+
+                    match result {
+                        Ok(()) => {
+                            // log::trace!("played {fluff:?}");
                         }
-                        _ => unimplemented!("unknown `SessionFluffSource` variant {source:?}"),
+                        Err(error) => {
+                            log::error!("JS exception from audio playback {error}");
+                        }
                     }
-
-                    // Randomize start time to reduce constructive interference effects.
-                    // TODO: get size of time range from universe tick rate.
-                    let when =
-                        js_sys::Math::random().mul_add(const { 1. / 60. }, context.current_time());
-
-                    source_node.start_with_when(when).expect("audio graph logic error");
-
-                    // log::trace!("played {fluff:?}");
                 }
             }
 

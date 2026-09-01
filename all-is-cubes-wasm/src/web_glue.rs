@@ -1,12 +1,13 @@
 //! DOM and JS environment manipulation that isn't application-specific.
 
+use std::fmt;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
 use futures_core::future::BoxFuture;
-use js_sys::{Error, Function};
-use wasm_bindgen::JsCast; // dyn_into()
-use wasm_bindgen::prelude::Closure;
+use js_sys::{Error, Function, JsString};
+use wasm_bindgen::prelude::{Closure, wasm_bindgen};
+use wasm_bindgen::{JsCast, JsValue}; // dyn_into()
 use web_sys::{AddEventListenerOptions, Document, Element, Event, EventTarget, Text};
 use web_time::{Duration, Instant};
 
@@ -128,3 +129,39 @@ pub(crate) async fn yield_to_event_loop() {
 /// Time used by [`yield_to_event_loop`] to decude whether to actually yield.
 /// TODO: A thread-local would be a better expression of intent here.
 static NEXT_YIELD_INSTANT: LazyLock<Mutex<Instant>> = LazyLock::new(|| Mutex::new(Instant::now()));
+
+// -------------------------------------------------------------------------------------------------
+
+/// Attach context to a JS exception object and make it into a Rust error.
+pub(crate) fn excontext(context: &'static str) -> impl Fn(JsValue) -> ErrorFromJs {
+    move |exception| ErrorFromJs { context, exception }
+}
+
+/// Wrapper for a JS exception that we want to handle non-fatally.
+///
+/// This error type does not have an [`Error::source()`]; all details are in its own message.
+#[derive(Clone, Debug)]
+pub(crate) struct ErrorFromJs {
+    /// What we were doing. Should make sense preceded by “while”.
+    context: &'static str,
+    /// The exception caught.
+    exception: JsValue,
+}
+
+impl fmt::Display for ErrorFromJs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "caught exception while {context}: {exception}",
+            context = self.context,
+            exception = js_stringify(&self.exception),
+        )
+    }
+}
+
+impl core::error::Error for ErrorFromJs {}
+
+#[wasm_bindgen(inline_js = "export function js_stringify(x) { return String(x); }")]
+extern "C" {
+    fn js_stringify(value: &JsValue) -> JsString;
+}
