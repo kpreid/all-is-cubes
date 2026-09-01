@@ -233,7 +233,7 @@ impl Default for Settings {
 /// but is a snapshot.
 //---
 // TODO: rename this to a better name. Maybe this is Settings and the other is SettingsStore.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct Data(Arc<DataInner>);
 
 #[derive(Debug, Default)]
@@ -284,6 +284,18 @@ impl Data {
     /// It is not appropriate for listing the values of all settings that exist.
     pub fn iter_set(&self) -> impl Iterator<Item = (Key, Value)> {
         self.0.map.iter().map(|(k, sv)| (*k, sv.unparsed.clone()))
+    }
+}
+
+impl fmt::Debug for Data {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let DataInner {
+            map,
+            graphics_options: _,
+        } = &*self.0;
+        f.debug_map()
+            .entries(map.iter().map(|(k, v)| (k.as_str(), &v.unparsed)))
+            .finish()
     }
 }
 
@@ -582,10 +594,25 @@ mod tests {
     use super::*;
     use all_is_cubes::arcstr::literal;
     use all_is_cubes::math::ps64;
+    use alloc::format;
+    use pretty_assertions::assert_eq;
 
     /// Construct `Data` with a single non-default setting.
     fn one<T: Send + Sync + 'static>(key: &TypedKey<T>, value: T) -> Data {
         Data::from_iter([(key.key(), (key.serialize)(&value))])
+    }
+
+    #[test]
+    fn debug_data_empty() {
+        assert_eq!(format!("{:?}", Data::default()), "{}");
+    }
+
+    #[test]
+    fn debug_data_nonempty() {
+        assert_eq!(
+            format!("{:?}", one(SHOW_UI, true)),
+            r#"{"graphics/show-ui": "true"}"#
+        );
     }
 
     #[test]
