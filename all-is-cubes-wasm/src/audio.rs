@@ -6,6 +6,7 @@
 use core::fmt;
 use std::collections::HashMap;
 
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 use rand::{RngExt as _, SeedableRng as _};
 use wasm_bindgen::JsValue;
 use web_sys::{AudioBuffer, AudioContext, AudioListener, GainNode};
@@ -41,7 +42,7 @@ impl AudioTask {
         // Hook up ambient sound to channel
         let ambient_source = session.ambient_sound();
         ambient_source.listen(UpdateAmbientListener(sender.clone()));
-        sender.send(AudioCommand::UpdateAmbient).unwrap(); // ensure initial sync
+        sender.send(AudioCommand::UpdateAmbient).err_is_unreachable(); // ensure initial sync
 
         let (gate, listener) = FluffListener(sender).gate();
         session.listen_fluff(listener);
@@ -109,7 +110,9 @@ async fn audio_command_task(
                         Some(buffer) => buffer.clone(),
                         None => match convert_sound_to_buffer(
                             sample_rate,
-                            sound_handle.read(ReadTicket::stub()).unwrap(),
+                            sound_handle
+                                .read(ReadTicket::stub())
+                                .expect("TODO: arrange to have read tickets we need"),
                         ) {
                             Ok(buffer) => {
                                 sound_cache.insert(sound_handle.clone(), buffer.clone());
@@ -324,7 +327,7 @@ fn convert_sound_to_buffer(sample_rate: u32, sound: &SoundDef) -> Result<AudioBu
 
     let buffer = AudioBuffer::new(&{
         let options = web_sys::AudioBufferOptions::new(
-            left_vec.len().try_into().unwrap(),
+            left_vec.len().try_into().err_is_unreachable(),
             sample_rate as f32,
         );
         options.set_number_of_channels(2);
@@ -368,7 +371,7 @@ fn try_array_from_fn<T, E, const N: usize>(
 ) -> Result<[T; N], E> {
     let array_of_results: [Result<T, E>; N] = core::array::from_fn(function);
     if array_of_results.iter().any(|result| result.is_err()) {
-        Err(array_of_results.into_iter().find_map(Result::err).unwrap())
+        Err(array_of_results.into_iter().find_map(Result::err).none_is_unreachable())
     } else {
         Ok(array_of_results.map(|result| match result {
             Ok(value) => value,
