@@ -15,33 +15,17 @@ use crate::url_params::{OptionsInUrl, RendererOption, options_from_query_string}
 use crate::web_glue::yield_to_event_loop;
 use crate::web_session::{StaticDom, WebRenderer, WebSession, create_session};
 
+#[wasm_bindgen(start)]
+fn global_start_hook() {
+    configure_logging_and_panic_hook();
+}
+
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]
 pub async fn start_game() -> Result<(), JsValue> {
-    // Note: This used to be in a `#[wasm_bindgen(start)]` function, but that stopped working.
-    // Rather than stop to figure out what went wrong even though I Didn't Change Anything,
-    // I moved it here since this is our sole entry point in practice.
-    console_error_panic_hook::set_once();
-
-    // Initialize logging via the `log` crate's interface.
-    // We use `console_log` to perform the actual logging, but use our own project-wide filter.
-    log::set_logger({
-        struct FilteredWebLogger;
-        impl log::Log for FilteredWebLogger {
-            fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
-                all_is_cubes::util::log::standard_filter(metadata)
-            }
-            fn log(&self, record: &log::Record<'_>) {
-                if self.enabled(record.metadata()) {
-                    console_log::log(record);
-                }
-            }
-            fn flush(&self) {}
-        }
-        &FilteredWebLogger
-    })
-    .unwrap();
-    log::set_max_level(log::LevelFilter::Trace);
+    // Note: In the past, I’ve had trouble with #[wasm_bindgen(start)] not actually running.
+    // So, we configure logging here in case that happens again.
+    configure_logging_and_panic_hook();
 
     let window = web_sys::window().expect("missing `window`");
     let document = window.document().expect("missing `document`");
@@ -206,4 +190,32 @@ async fn init_wgpu(
     };
     let adapter = request_adapter_future.await?;
     Ok((surface, adapter))
+}
+
+/// Installs our preferred panic hook and [`log`] logger.
+///
+/// This function may be called multiple times, in which case each thing it configures may be
+/// set again or may be left unchanged, but in any case, will have no negative effects.
+fn configure_logging_and_panic_hook() {
+    console_error_panic_hook::set_once();
+
+    // Initialize logging via the `log` crate's interface.
+    // We use `console_log` to perform the actual logging, but use our own project-wide filter.
+    let (Ok(()) | Err(_)) = log::set_logger({
+        struct FilteredWebLogger;
+        impl log::Log for FilteredWebLogger {
+            fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+                all_is_cubes::util::log::standard_filter(metadata)
+            }
+            fn log(&self, record: &log::Record<'_>) {
+                if self.enabled(record.metadata()) {
+                    console_log::log(record);
+                }
+            }
+            fn flush(&self) {}
+        }
+        &FilteredWebLogger
+    });
+
+    log::set_max_level(log::LevelFilter::Trace);
 }
