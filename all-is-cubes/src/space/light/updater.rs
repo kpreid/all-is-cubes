@@ -210,7 +210,7 @@ impl LightStorage {
             // This will require making stored light data `Arc`ed and double-buffered or atomic,
             // so it can be consulted by the calculation.
             #[cfg(feature = "auto-threads")]
-            while self.light_update_queue.len() > 0 {
+            while !self.light_update_queue.is_empty() {
                 use core::array::from_fn;
 
                 enum Calc {

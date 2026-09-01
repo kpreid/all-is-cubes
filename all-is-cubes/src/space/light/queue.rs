@@ -176,6 +176,10 @@ impl LightUpdateQueue {
         self.queue.len() + sweep_items
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.sweep.is_none() && self.queue.len() == 0
+    }
+
     #[inline]
     pub fn peek_priority(&self) -> Priority {
         self.queue.peek_priority().unwrap_or(Priority::MIN)

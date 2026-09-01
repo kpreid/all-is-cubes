@@ -2,7 +2,6 @@
     feature = "_special_testing",
     expect(
         missing_debug_implementations,
-        clippy::len_without_is_empty,
         clippy::module_name_repetitions,
         clippy::new_without_default,
         reason = "module is conditionally public for testing only"
