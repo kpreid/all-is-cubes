@@ -285,6 +285,7 @@ impl WebSession {
         self.add_canvas_to_self_event_listener(
             "drop",
             false,
+            #[expect(clippy::unwrap_used, reason = "TODO")]
             move |this, _inner, event: DragEvent| {
                 let mut found_file = None;
                 if let Some(data_transfer) = event.data_transfer() {

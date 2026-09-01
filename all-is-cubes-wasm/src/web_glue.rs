@@ -38,6 +38,7 @@ pub fn get_mandatory_element<E: JsCast>(document: &Document, id: &'static str) -
         })
 }
 
+#[expect(clippy::unwrap_used, reason = "TODO")]
 pub fn replace_children_with_one_text_node(element: &Element) -> Text {
     let existing_string: Option<String> = element.text_content();
     let text = Text::new().unwrap();
