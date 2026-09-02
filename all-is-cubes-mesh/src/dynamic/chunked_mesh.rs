@@ -326,6 +326,7 @@ where
         // If we need to redo everything, then clear all the old blocks.
         if todo.all_blocks_and_chunks {
             todo.all_blocks_and_chunks = false;
+            todo.some_chunks_or_blocks = true;
             todo.blocks.extend(0..=((space.block_data().len() - 1) as BlockIndex));
             self.block_meshes.clear();
             // We don't need to clear self.chunks because they will automatically be considered
@@ -373,9 +374,10 @@ where
             });
         }
 
-        // Define iterator over chunks to be updated.
+        // This iterator iterates over chunks to be updated, *removing* them from `self.chunks`
+        // (so that they can be processed in parallel).
         let space_bounds_in_chunks = space.bounds().divide(CHUNK_SIZE);
-        let mut did_not_finish = false;
+        let mut did_not_finish_chunk_scan_due_to_timeout = false;
         let chunk_update_iterator = self
             .chunk_chart
             .chunks(view_chunk, OctantMask::ALL)
@@ -387,7 +389,7 @@ where
                 // the best we can do.)
                 let still_have_time = deadline > time::Instant::now();
                 if !still_have_time {
-                    did_not_finish = true;
+                    did_not_finish_chunk_scan_due_to_timeout = true;
                 }
                 still_have_time
             })
@@ -465,7 +467,7 @@ where
                 }
             });
 
-        // Update some chunk geometry and depth sorting.
+        // This function updates one chunk (both its mesh and depth sorting).
         let chunk_updater = |mut state: ChunkUpdateState<M, _>| {
             // TODO: The current split between this function and ChunkMesh::recompute() is
             // awkward and leads to misleading TimeStats results. It is motivated by keeping
@@ -585,16 +587,23 @@ where
             chunk_depth_sort_times += depth_sort_time;
         }
 
-        // Record outcome of processing
-        self.did_not_finish_chunks = did_not_finish;
-        if !did_not_finish {
+        // Record outcome of processing.
+        self.did_not_finish_chunks =
+            todo.some_chunks_or_blocks && did_not_finish_chunk_scan_due_to_timeout;
+        let complete = block_updates.all_done() && !self.did_not_finish_chunks;
+        if complete {
+            // Record that we now know there is nothing to do until some change
+            // notification arrives.
+            todo.some_chunks_or_blocks = false;
+        }
+        if !did_not_finish_chunk_scan_due_to_timeout {
+            // If we completed the startup chunk-only updates, then we can move on to full updates.
             self.startup_chunks_only = false;
         }
 
         // Instant at which we finished all processing
         let end_all_time = time::Instant::now();
 
-        let complete = block_updates.all_done() && !did_not_finish;
         if complete && self.complete_time.is_none() {
             log::debug!(
                 "SpaceRenderer({space}): all meshes done in {time}",
@@ -613,8 +622,12 @@ where
 
         let mut flaws = Flaws::empty();
         if !complete {
-            // TODO: Make this a little less strict; if we timed out but there is nothing in todo
-            // and we were previously complete, then there isn't actually any flaw.
+            // log::debug!(
+            //     "marking out of time, deadline was {:?}, actual time {:?}, did_not_finish={did_not_finish_chunk_scan_due_to_timeout} bud={}",
+            //     deadline.remaining_since(update_start_time),
+            //     end_all_time.saturating_duration_since(update_start_time),
+            //     block_updates.all_done()
+            // );
             flaws |= Flaws::OUT_OF_TIME;
         }
 
@@ -836,7 +849,14 @@ impl CsmUpdateInfo {
 /// [`ChunkedSpaceMesh`]'s set of things that need recomputing.
 #[derive(Debug, Default)]
 struct CsmTodo<const CHUNK_SIZE: GridCoordinate> {
+    /// Set when we need to rebuild all meshes.
+    /// This is set when, for example, graphics options change.
     all_blocks_and_chunks: bool,
+
+    /// Set whenever we mark something in `self.blocks` or `self.chunks`
+    /// (but not `self.all_blocks_and_chunks`);
+    /// cleared whenever we finish updating everything.
+    some_chunks_or_blocks: bool,
 
     // TODO: Benchmark using a BitSet instead.
     blocks: hashbrown::HashSet<BlockIndex>,
@@ -850,6 +870,7 @@ impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
     fn initially_dirty() -> Self {
         Self {
             all_blocks_and_chunks: true,
+            some_chunks_or_blocks: false,
             blocks: Default::default(),
             chunks: Default::default(),
         }
@@ -887,6 +908,7 @@ impl<const CHUNK_SIZE: GridCoordinate> listen::Store<SpaceChange> for CsmTodo<CH
                     new_block_index,
                     ..
                 } => {
+                    self.some_chunks_or_blocks = true;
                     self.modify_block_and_adjacent(cube, |chunk_todo| {
                         // TODO(instancing): Once we have "temporarily instance anything",
                         // the right thing to do here is only check the old index, not the new one,
@@ -906,6 +928,7 @@ impl<const CHUNK_SIZE: GridCoordinate> listen::Store<SpaceChange> for CsmTodo<CH
                 }
                 SpaceChange::BlockIndex(index) | SpaceChange::BlockEvaluation(index) => {
                     if !self.all_blocks_and_chunks {
+                        self.some_chunks_or_blocks = true;
                         self.blocks.insert(index);
                     }
                 }

@@ -388,8 +388,8 @@ fn did_not_finish_detection() {
             dynamic::noop_render_data_updater,
         );
 
-        // TODO: We should *not* see OUT_OF_TIME, because nothing needed doing.
-        assert_eq!(info.flaws, Flaws::UNFINISHED | Flaws::OUT_OF_TIME);
+        // We should *not* see OUT_OF_TIME, because nothing needed doing.
+        assert_eq!(info.flaws, Flaws::empty());
     }
 
     // Make a change, so we can test timeout of a non-initial update.
