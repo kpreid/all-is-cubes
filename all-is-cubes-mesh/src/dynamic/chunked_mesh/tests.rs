@@ -344,7 +344,7 @@ fn did_not_finish_detection() {
     );
 
     {
-        println!("--- timing out update");
+        println!("--- timing out initial update");
         let info = tester.csm.update(
             tester.universe.read_ticket(),
             &tester.camera,
@@ -366,8 +366,57 @@ fn did_not_finish_detection() {
     }
 
     {
-        println!("--- normal update");
-        // Now while we're at it, try finishing things and check that state too.
+        println!("--- normal update (#1)");
+        // Try finishing things and check that state too.
+        let info = tester.update(dynamic::noop_render_data_updater);
+        assert_eq!(
+            (
+                info.flaws,
+                tester.csm.did_not_finish_chunks,
+                tester.csm.complete_time.is_some(),
+            ),
+            (Flaws::empty(), false, true)
+        );
+    }
+
+    {
+        println!("--- timing out while still clean");
+        let info = tester.csm.update(
+            tester.universe.read_ticket(),
+            &tester.camera,
+            time::Deadline::Asap,
+            dynamic::noop_render_data_updater,
+        );
+
+        // TODO: We should *not* see OUT_OF_TIME, because nothing needed doing.
+        assert_eq!(info.flaws, Flaws::UNFINISHED | Flaws::OUT_OF_TIME);
+    }
+
+    // Make a change, so we can test timeout of a non-initial update.
+    let [block1] = make_some_blocks();
+    tester
+        .universe
+        .execute_1(
+            &tester.space,
+            SpaceTransaction::set_cube([1, 0, 0], Some(AIR), Some(block1)),
+        )
+        .unwrap();
+
+    {
+        println!("--- timing out while dirty");
+        let info = tester.csm.update(
+            tester.universe.read_ticket(),
+            &tester.camera,
+            time::Deadline::Asap,
+            dynamic::noop_render_data_updater,
+        );
+
+        assert_eq!(info.flaws, Flaws::UNFINISHED | Flaws::OUT_OF_TIME);
+    }
+
+    {
+        println!("--- normal update (#2)");
+        // Try finishing things and check that state too.
         let info = tester.update(dynamic::noop_render_data_updater);
         assert_eq!(
             (
