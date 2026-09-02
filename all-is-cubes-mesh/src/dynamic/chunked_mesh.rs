@@ -14,7 +14,8 @@ use all_is_cubes::euclid::{Box3D, Point3D, Translation3D, point3};
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::math::lines::Wireframe as _;
 use all_is_cubes::math::{
-    Aab, Cube, Face, FreeCoordinate, GridAab, GridCoordinate, OctantMask, lines, rgba_const,
+    Aab, Cube, Face, FreeCoordinate, FreePoint, GridAab, GridCoordinate, OctantMask, lines,
+    rgba_const,
 };
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
@@ -311,6 +312,25 @@ where
 
         let todo: &mut CsmTodo<_> = &mut self.todo.lock();
 
+        // Check for mesh options changes that would invalidate the meshes.
+        let mesh_options = {
+            let current_mesh_options = MeshOptions::new(graphics_options);
+            if Some(&current_mesh_options) != self.last_mesh_options.as_ref() {
+                todo.all_blocks_and_chunks = true;
+                self.last_mesh_options = Some(current_mesh_options);
+            }
+            self.last_mesh_options.as_ref().none_is_unreachable()
+        };
+
+        if !(todo.all_blocks_and_chunks
+            || todo.some_chunks_or_blocks
+            || view_chunk_is_different
+            || !self.eye_region.contains(view_point))
+        {
+            // There is no work to do, so we can skip all the bookkeeping for an update.
+            return (CsmUpdateInfo::default(), false);
+        }
+
         let Ok(ref space) = self.space.read(read_ticket) else {
             // Read ticket isn't adequate.
             return (
@@ -326,16 +346,6 @@ where
         if mem::take(&mut self.install_listener) {
             space.listen(self.todo.listener());
         }
-
-        // Check for mesh options changes that would invalidate the meshes.
-        let mesh_options = {
-            let current_mesh_options = MeshOptions::new(graphics_options);
-            if Some(&current_mesh_options) != self.last_mesh_options.as_ref() {
-                todo.all_blocks_and_chunks = true;
-                self.last_mesh_options = Some(current_mesh_options);
-            }
-            self.last_mesh_options.as_ref().none_is_unreachable()
-        };
 
         // If we need to redo everything, then clear all the old blocks.
         if todo.all_blocks_and_chunks {
@@ -1099,6 +1109,10 @@ impl EyeRegion {
             Some(b) => EyeRegion(b),
             None => EyeRegion::EMPTY,
         }
+    }
+
+    pub fn contains(&self, point: FreePoint) -> bool {
+        self.0.to_f64().contains_inclusive(point)
     }
 
     fn fmt_common(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
