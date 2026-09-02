@@ -751,7 +751,7 @@ impl Shuttle {
                 )?;
                 transaction
                     .execute(&mut self.game_universe, (), &mut transaction::no_outputs)
-                    .map_err(|e| ToolError::Internal(e.to_string()))?;
+                    .map_err(tool_error_from_execute)?;
 
                 // Spend a little time doing light updates, to ensure that changes right in front of
                 // the player are clean (and not flashes of blackness).
@@ -832,6 +832,25 @@ impl Shuttle {
                 None => ReadTicket::stub(),
             },
         }
+    }
+}
+
+/// Convert a failure to execute a tool's transaction into a [`ToolError`] to report.
+///
+/// A precondition failure means the transaction does not apply to the current state of the
+/// universe — for example, the tool would pick up a block but the character's inventory is
+/// full. That is an ordinary outcome of using a tool rather than a malfunction, so it is
+/// reported as [`ToolError::NotUsable`]; reporting it as [`ToolError::Internal`] would show
+/// the player the text of an internal error and log it as a bug.
+///
+/// The details are still recorded, at a log level which does not present them as a fault.
+fn tool_error_from_execute(error: transaction::ExecuteError) -> ToolError {
+    match error {
+        transaction::ExecuteError::Check(mismatch) => {
+            log::debug!("tool transaction did not apply: {mismatch}");
+            ToolError::NotUsable
+        }
+        error => ToolError::Internal(error.to_string()),
     }
 }
 
@@ -1512,7 +1531,7 @@ mod tests {
     use all_is_cubes::util::assert_send_sync;
     use core::sync::atomic::{AtomicUsize, Ordering};
     use futures_channel::oneshot;
-    use std::{eprintln, vec};
+    use std::{assert_matches, eprintln, vec};
 
     fn advance_time(session: &mut Session) {
         session.frame_clock.advance_by(session.universe().clock().schedule().delta_t());
@@ -1523,6 +1542,37 @@ mod tests {
     #[test]
     fn is_send_sync() {
         assert_send_sync::<Session>();
+    }
+
+    /// A tool whose transaction fails its precondition should be reported as an ordinary
+    /// unusable tool, not as an internal error.
+    ///
+    /// Regression test for <https://github.com/kpreid/all-is-cubes/issues/708>, where a
+    /// character inventory with no free slot produced the message
+    /// “unexpected error: transaction precondition not met in member 'character'”.
+    #[test]
+    fn execute_precondition_failure_is_not_usable_rather_than_internal() {
+        use all_is_cubes::content::make_some_blocks;
+        use all_is_cubes::space::SpaceTransaction;
+
+        let mut u = Universe::new();
+        let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let [block] = make_some_blocks();
+
+        // Require the cube to already contain `block`, which it does not; it is `AIR`.
+        // This is the same shape of failure as a tool trying to pick a block up into an
+        // inventory with no free slot: the precondition simply does not hold, and no
+        // change is made.
+        let error = SpaceTransaction::set_cube([0, 0, 0], Some(block), None)
+            .bind(space)
+            .execute(&mut u, (), &mut transaction::no_outputs)
+            .expect_err("transaction should fail its precondition");
+
+        assert!(
+            matches!(error, transaction::ExecuteError::Check(_)),
+            "expected a precondition failure, got {error:?}"
+        );
+        assert_matches!(tool_error_from_execute(error), ToolError::NotUsable);
     }
 
     #[macro_rules_attribute::apply(smol_macros::test)]
