@@ -3572,9 +3572,9 @@ checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
 name = "kira"
-version = "0.12.3"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "153de98083c9db32772ea9110826344c9c498c150add69d0f14c59dc5e78efa9"
+checksum = "fca8be8ab571564019979c2a010cca84e43fe94923681cf062d2fe22a9cf6ef2"
 dependencies = [
  "atomic-arena",
  "cpal",

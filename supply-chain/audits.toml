@@ -266,6 +266,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.12.0 -> 0.12.3"
 
+[[audits.kira]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.12.3 -> 0.12.4"
+
 [[audits.line-clipping]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
