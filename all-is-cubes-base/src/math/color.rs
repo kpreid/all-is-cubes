@@ -1014,19 +1014,19 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgb01 {
 #[cfg(feature = "rerun")]
 mod rerun {
     use super::*;
-    use re_sdk_types::datatypes;
+    use re_sdk_types::encodings;
 
-    impl From<Rgb> for datatypes::Rgba32 {
+    impl From<Rgb> for encodings::Rgba32 {
         #[inline]
         fn from(value: Rgb) -> Self {
             value.with_alpha_one().into()
         }
     }
-    impl From<Rgba> for datatypes::Rgba32 {
+    impl From<Rgba> for encodings::Rgba32 {
         #[inline]
         fn from(value: Rgba) -> Self {
             let [r, g, b, a] = value.to_srgb8();
-            datatypes::Rgba32::from_unmultiplied_rgba(r, g, b, a)
+            encodings::Rgba32::from_unmultiplied_rgba(r, g, b, a)
         }
     }
 }

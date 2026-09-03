@@ -168,6 +168,6 @@ fn convert_to_rerun_mesh(input: &mesh::SpaceMesh<Mt>, output: &mut rg::archetype
             vertices.iter().map(|v| rg::convert_vec(v.face.normal_vector::<f32, ()>())),
         )
         .with_triangle_indices(input.indices().iter_u32().tuples().map(|(i1, i2, i3)| {
-            rg::components::TriangleIndices(rg::datatypes::UVec3D::new(i1, i2, i3))
+            rg::components::TriangleIndices(rg::encodings::UVec3D::new(i1, i2, i3))
         }));
 }

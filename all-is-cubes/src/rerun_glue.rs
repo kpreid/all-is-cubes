@@ -20,8 +20,7 @@ use crate::math::{self, Axis, Rgb, Rgba, lines, rgba_const};
 // To support concise conditional debugging, this module re-exports many items from rerun.
 pub use re_log_types::{EntityPath, EntityPathPart, TimelineName, entity_path};
 pub use re_sdk::{RecordingStream, RecordingStreamBuilder, RecordingStreamResult};
-pub use re_sdk_types::datatypes;
-// pub use re_sdk_types::external::arrow::types::f16;
+pub use re_sdk_types::encodings;
 pub use re_sdk_types::{archetypes, components, view_coordinates};
 
 // -------------------------------------------------------------------------------------------------
@@ -360,7 +359,7 @@ pub enum ClassId {
     MeshVizEdgePz,
 }
 
-impl From<ClassId> for datatypes::ClassId {
+impl From<ClassId> for encodings::ClassId {
     fn from(value: ClassId) -> Self {
         Self(value as u16)
     }
@@ -392,10 +391,10 @@ fn annotation_context() -> archetypes::AnnotationContext {
     ];
 
     archetypes::AnnotationContext::new(descs.into_iter().map(|(id, label, color)| {
-        datatypes::AnnotationInfo {
+        encodings::AnnotationInfo {
             id: id as u16,
-            label: Some(label).filter(|label| !label.is_empty()).map(datatypes::Utf8::from),
-            color: Some(datatypes::Rgba32::from(color)),
+            label: Some(label).filter(|label| !label.is_empty()).map(encodings::Utf8::from),
+            color: Some(encodings::Rgba32::from(color)),
         }
     }))
 }
@@ -410,12 +409,12 @@ where
     let array: [f32; 3] = point.cast::<f32>().into();
     components::Position3D::from(array)
 }
-pub fn convert_vec<S, U>(v: euclid::Vector3D<S, U>) -> datatypes::Vec3D
+pub fn convert_vec<S, U>(v: euclid::Vector3D<S, U>) -> encodings::Vec3D
 where
     S: num_traits::NumCast + Copy,
 {
     let array: [f32; 3] = v.cast::<f32>().into();
-    datatypes::Vec3D::from(array)
+    encodings::Vec3D::from(array)
 }
 fn convert_half_sizes<S, U>(size: euclid::Size3D<S, U>) -> components::HalfSize3D
 where
@@ -425,12 +424,12 @@ where
 }
 pub fn convert_quaternion<S, Src, Dst>(
     rot: euclid::Rotation3D<S, Src, Dst>,
-) -> datatypes::Quaternion
+) -> encodings::Quaternion
 where
     S: num_traits::NumCast,
 {
     let rot = [rot.i, rot.j, rot.k, rot.r];
-    datatypes::Quaternion(
+    encodings::Quaternion(
         rot.map(|c| c.to_f32().expect("quaternion components must be convertible to f32")),
     )
 }

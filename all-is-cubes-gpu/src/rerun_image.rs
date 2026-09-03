@@ -270,7 +270,7 @@ fn perform_image_copy(
     // currently doesn't.
     let (pinhole, transform) = convert_camera_to_pinhole(camera);
 
-    let depth_range = rg::datatypes::Range1D([
+    let depth_range = rg::encodings::Range1D([
         camera.near_plane_distance().into_inner(),
         camera.view_distance().into_inner(),
     ]);
@@ -288,7 +288,7 @@ fn perform_image_copy(
                     .collect::<Vec<[u8; 4]>>()
                     .into_flattened(),
                 [size.width, size.height],
-                rg::datatypes::ChannelDatatype::F32,
+                rg::encodings::ChannelDatatype::F32,
             )
             .with_meter(1f32)
             .with_depth_range(depth_range),
@@ -321,7 +321,7 @@ fn convert_camera_to_pinhole(
     let tan_fov_y = (camera.fov_y() * 0.5).to_radians().tan() as f32;
     let tan_fov_x = tan_fov_y * aspect;
     #[rustfmt::skip]
-    let pinhole_matrix = rg::datatypes::Mat3x3([
+    let pinhole_matrix = rg::encodings::Mat3x3([
         // column major matrix (i.e. transposed in this textual display)
         half.width / tan_fov_x, 0.,                       0.,
         0.,                     half.height / tan_fov_y,  0.,

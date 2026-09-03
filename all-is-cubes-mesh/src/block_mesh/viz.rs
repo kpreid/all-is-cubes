@@ -331,7 +331,7 @@ impl Viz {
                     .map(|rel_index| rel_index + index_base)
                     .tuples()
                     .map(|(i1, i2, i3)| {
-                        rg::components::TriangleIndices(rg::datatypes::UVec3D::new(i1, i2, i3))
+                        rg::components::TriangleIndices(rg::encodings::UVec3D::new(i1, i2, i3))
                     }),
             );
 
