@@ -49,16 +49,23 @@ pub fn replace_children_with_one_text_node(element: &Element) -> Text {
     text
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Install an event listener which downcasts the event to the JavaScript type `E`.
-pub fn add_event_listener<E, F>(
-    target: &EventTarget,
+///
+/// Returns a guard object which removes the event listener when dropped.
+pub fn add_event_listener<T, E, F>(
+    target: T,
     event_type: &'static str,
     listener: F,
     options: &AddEventListenerOptions,
-) where
+) -> EventListener
+where
+    T: Into<EventTarget>,
     E: JsCast,
     F: Fn(E) + 'static,
 {
+    let target: EventTarget = target.into();
     let closure: Closure<dyn Fn(Event)> =
         Closure::wrap(Box::new(move |event: Event| match event.dyn_into::<E>() {
             Ok(event) => listener(event),
@@ -83,18 +90,52 @@ pub fn add_event_listener<E, F>(
         options,
     ) {
         Ok(()) => {}
-        Err(error) => {
+        Err(exception) => {
             // Not sure why this would ever fail, but log it if it does.
             console::error_3(
                 &JsString::from(format!(
                     "failed to install event listener for {event_type:?} on target %o: %o",
                 )),
-                target,
-                &error,
+                &target,
+                &exception,
             )
         }
     }
-    closure.forget(); // TODO: Instead return the closure or some other kind of handle
+    EventListener {
+        target,
+        event_type,
+        closure,
+    }
+}
+
+/// Owns an event listener, and removes it and cleans up the [`Closure`] when dropped.
+#[must_use = "dropping an EventListener will remove it"]
+pub(crate) struct EventListener {
+    target: EventTarget,
+    event_type: &'static str,
+    closure: Closure<dyn Fn(Event)>,
+}
+
+impl Drop for EventListener {
+    fn drop(&mut self) {
+        match self.target.remove_event_listener_with_callback(
+            self.event_type,
+            self.closure.as_ref().unchecked_ref(),
+        ) {
+            Ok(()) => {}
+            Err(exception) => {
+                // Not sure why this would ever fail, but log it if it does.
+                console::error_3(
+                    &JsString::from(format!(
+                        "failed to remove event listener for {event_type:?} on target %o: %o",
+                        event_type = self.event_type,
+                    )),
+                    &self.target,
+                    &exception,
+                )
+            }
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

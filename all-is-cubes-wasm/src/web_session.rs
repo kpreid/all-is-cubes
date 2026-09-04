@@ -26,7 +26,8 @@ use crate::audio::AudioTask;
 use crate::js_bindings::GuiHelpers;
 
 use crate::web_glue::{
-    add_event_listener, error_from_js, get_mandatory_element, replace_children_with_one_text_node,
+    EventListener, add_event_listener, error_from_js, get_mandatory_element,
+    replace_children_with_one_text_node,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -53,6 +54,9 @@ pub(crate) struct WebSession {
 
     // Parts of the state that need to be mutable
     inner_cell: RefCell<Inner>,
+
+    /// This vector is never consulted but keeps the listeners alive.
+    event_listeners: RefCell<Vec<EventListener>>,
 }
 
 struct Inner {
@@ -101,6 +105,8 @@ impl WebSession {
                         })
                     }))
                 },
+
+                event_listeners: RefCell::new(Vec::with_capacity(20)),
 
                 inner_cell: RefCell::new(Inner {
                     session,
@@ -208,8 +214,8 @@ impl WebSession {
             },
         );
 
-        add_event_listener(
-            &self.gui_helpers.canvas_helper().canvas(),
+        self.add_irregular_event_listener(
+            self.gui_helpers.canvas_helper().canvas(),
             "contextmenu",
             move |event: MouseEvent| {
                 // Inhibits context menu so that we can use right-click as a game action.
@@ -229,15 +235,15 @@ impl WebSession {
                     this.fullscreen_cell.set(state);
                 })
             };
-            add_event_listener(
-                document,
+            self.add_irregular_event_listener(
+                document.clone(),
                 "fullscreenchange",
                 listener.clone(),
                 &options_passive_true,
             );
             // Safari still does not have unprefixed fullscreen API as of version 16.1
-            add_event_listener(
-                document,
+            self.add_irregular_event_listener(
+                document.clone(),
                 "webkitfullscreenchange",
                 listener,
                 &options_passive_true,
@@ -256,14 +262,14 @@ impl WebSession {
                     }
                 })
             };
-            add_event_listener(
-                document,
+            self.add_irregular_event_listener(
+                document.clone(),
                 "pointerlockchange",
                 listener.clone(),
                 &options_passive_true,
             );
-            add_event_listener(
-                document,
+            self.add_irregular_event_listener(
+                document.clone(),
                 "pointerlockerror",
                 listener,
                 &options_passive_true,
@@ -331,6 +337,22 @@ impl WebSession {
         );
     }
 
+    fn add_irregular_event_listener<T, E, F>(
+        self: &Rc<Self>,
+        target: T,
+        event_name: &'static str,
+        callback: F,
+        options: &AddEventListenerOptions,
+    ) where
+        T: Into<web_sys::EventTarget>,
+        E: JsCast,
+        F: Fn(E) + 'static,
+    {
+        self.event_listeners
+            .borrow_mut()
+            .push(add_event_listener(target, event_name, callback, options));
+    }
+
     fn add_canvas_to_self_event_listener<E, F>(
         self: &Rc<Self>,
         event_name: &'static str,
@@ -341,8 +363,8 @@ impl WebSession {
         F: Fn(&Rc<Self>, &mut Inner, E) + 'static,
     {
         let weak_self_ref = Rc::downgrade(self);
-        add_event_listener(
-            &self.gui_helpers.canvas_helper().canvas(),
+        let listener = add_event_listener(
+            self.gui_helpers.canvas_helper().canvas(),
             event_name,
             move |event: E| {
                 Self::upgrade_in_callback(&weak_self_ref, |this, inner| {
@@ -355,6 +377,8 @@ impl WebSession {
                 options
             },
         );
+
+        self.event_listeners.borrow_mut().push(listener);
     }
 
     fn upgrade_in_callback<F>(weak_self_ref: &Weak<Self>, body: F)
