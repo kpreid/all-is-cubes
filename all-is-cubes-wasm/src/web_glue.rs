@@ -125,7 +125,11 @@ pub(crate) async fn yield_to_event_loop(window: Window) {
     // Check whether it's worth yielding.
     {
         let now = Instant::now();
-        let mut next = NEXT_YIELD_INSTANT.lock().unwrap();
+        let mut next = match NEXT_YIELD_INSTANT.lock() {
+            Ok(guard) => guard,
+            // state cannot be insterestingly corrupted, so ignore poison
+            Err(poison) => poison.into_inner(),
+        };
         if now > *next {
             // Set the next yield time.
             // TODO: Make this configurable. Right now, we only use this for initial startup,
@@ -138,20 +142,19 @@ pub(crate) async fn yield_to_event_loop(window: Window) {
         }
     }
 
-    // Scope to force non-Send things to be dropped.
+    // Scope to keep non-Send things out of the future state.
     let receiver = {
         let (sender, receiver) = futures_channel::oneshot::channel();
 
         let send_closure: Function = Closure::once_into_js(Box::new(move || {
             let _ = sender.send(());
         }))
-        .dyn_into()
-        .unwrap();
+        .unchecked_into();
 
         // TODO: setTimeout is a lousy way to yield because it has minimum delays. Build a better one.
         window
             .set_timeout_with_callback_and_timeout_and_arguments_0(&send_closure, 0)
-            .unwrap();
+            .expect("setTimeout should not error as we are using it");
 
         receiver
     };
