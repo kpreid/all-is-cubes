@@ -31,8 +31,8 @@ pub async fn start_game() -> Result<(), JsValue> {
     let document = window.document().expect("missing `document`");
 
     // TODO: StaticDom and GuiHelpers are the same kind of thing. Merge them?
-    let gui_helpers = make_all_static_gui_helpers(window, document.clone());
-    let static_dom = StaticDom::new(&document)?;
+    let gui_helpers = make_all_static_gui_helpers(&window, &document);
+    let static_dom = StaticDom::new(window, &document)?;
     {
         let list = static_dom.app_root.class_list();
         list.remove_1("state-script-not-loaded").unwrap();
@@ -66,7 +66,10 @@ async fn start_game_with_dom(
     static_dom: &StaticDom,
 ) -> Result<(), Box<dyn core::error::Error>> {
     let progress = yield_progress::Builder::new()
-        .yield_using(|_| yield_to_event_loop())
+        .yield_using({
+            let window = static_dom.window.clone();
+            move |_| yield_to_event_loop(window.clone())
+        })
         .progress_using({
             let progress_bar = SendWrapper::new(static_dom.progress_bar.clone());
             // TODO: hook up label
@@ -115,7 +118,9 @@ async fn start_game_with_dom(
                 cameras,
                 surface,
                 adapter,
-                Arc::new(crate::web_glue::Executor),
+                Arc::new(crate::web_glue::Executor {
+                    window: static_dom.window.clone(),
+                }),
             )
             .await?;
             WebRenderer::Wgpu(renderer)

@@ -8,7 +8,7 @@ use futures_core::future::BoxFuture;
 use js_sys::{Error, Function, JsString};
 use wasm_bindgen::prelude::{Closure, wasm_bindgen};
 use wasm_bindgen::{JsCast, JsValue}; // dyn_into()
-use web_sys::{AddEventListenerOptions, Document, Element, Event, EventTarget, Text};
+use web_sys::{AddEventListenerOptions, Document, Element, Event, EventTarget, Text, Window};
 use web_time::{Duration, Instant};
 
 // -------------------------------------------------------------------------------------------------
@@ -71,8 +71,10 @@ pub fn add_event_listener<E, F>(
 
 // -------------------------------------------------------------------------------------------------
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Executor;
+#[derive(Clone, Debug)]
+pub(crate) struct Executor {
+    pub(crate) window: Window,
+}
 
 impl all_is_cubes::util::Executor for Executor {
     fn spawn_background(&self, task_factory: &mut dyn FnMut() -> BoxFuture<'static, ()>) {
@@ -80,14 +82,18 @@ impl all_is_cubes::util::Executor for Executor {
     }
 
     fn yield_now(&self) -> BoxFuture<'static, ()> {
-        Box::pin(yield_to_event_loop())
+        Box::pin(yield_to_event_loop(self.window.clone()))
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 
 /// Yield to the browser's event loop (if significant time has passed since the last call).
-pub(crate) async fn yield_to_event_loop() {
+///
+/// Design note: This function could take `&Window`, but the current limitations of the
+/// `yield-progress` library, due to the current limitations of expressing async functions
+/// with boxed futures in stable Rust, mean that this function must not borrow anything.
+pub(crate) async fn yield_to_event_loop(window: Window) {
     // Check whether it's worth yielding.
     {
         let now = Instant::now();
@@ -115,8 +121,7 @@ pub(crate) async fn yield_to_event_loop() {
         .unwrap();
 
         // TODO: setTimeout is a lousy way to yield because it has minimum delays. Build a better one.
-        web_sys::window()
-            .unwrap()
+        window
             .set_timeout_with_callback_and_timeout_and_arguments_0(&send_closure, 0)
             .unwrap();
 

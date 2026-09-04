@@ -13,8 +13,8 @@ use all_is_cubes_render::camera::Viewport;
 extern "C" {
     #[wasm_bindgen(js_name = "makeAllStaticGuiHelpers")]
     pub fn make_all_static_gui_helpers(
-        window: web_sys::Window,
-        document: web_sys::Document,
+        window: &web_sys::Window,
+        document: &web_sys::Document,
     ) -> GuiHelpers;
 
     pub type GuiHelpers;

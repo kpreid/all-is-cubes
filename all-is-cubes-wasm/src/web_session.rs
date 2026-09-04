@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::{Closure, JsValue};
 use wasm_bindgen_futures::{JsFuture, spawn_local};
 use web_sys::{
     AddEventListenerOptions, DataTransferItem, Document, DragEvent, Element, Event, FocusEvent,
-    HtmlElement, HtmlProgressElement, KeyboardEvent, MouseEvent, Text, console,
+    HtmlElement, HtmlProgressElement, KeyboardEvent, MouseEvent, Text, Window, console,
 };
 
 use all_is_cubes::euclid::{Point2D, Vector2D};
@@ -379,8 +379,8 @@ impl WebSession {
 
     pub fn start_loop(&self) {
         // TODO: enforce this is only called once
-        web_sys::window()
-            .unwrap()
+        self.static_dom
+            .window
             .request_animation_frame(self.raf_callback.as_ref().unchecked_ref())
             .unwrap();
     }
@@ -450,8 +450,8 @@ impl WebSession {
 
         if inner.session.frame_clock.should_step() && !inner.step_callback_scheduled {
             inner.step_callback_scheduled = true;
-            web_sys::window()
-                .unwrap()
+            self.static_dom
+                .window
                 .set_timeout_with_callback_and_timeout_and_arguments_0(
                     self.step_callback.as_ref().unchecked_ref(),
                     0,
@@ -513,6 +513,7 @@ impl Inner {
 
 #[derive(Clone, Debug)]
 pub(crate) struct StaticDom {
+    pub(crate) window: Window,
     /// The highest-level element we're supposed to touch, used for setting CSS classes.
     /// Usually the document element.
     pub(crate) app_root: HtmlElement,
@@ -522,8 +523,9 @@ pub(crate) struct StaticDom {
 }
 
 impl StaticDom {
-    pub fn new(document: &Document) -> Result<Self, Error> {
+    pub fn new(window: Window, document: &Document) -> Result<Self, Error> {
         Ok(Self {
+            window,
             app_root: get_mandatory_element(document, "app-root")?,
             progress_bar: get_mandatory_element(document, "loading-progress-bar")?,
             loading_log: replace_children_with_one_text_node(&get_mandatory_element(
