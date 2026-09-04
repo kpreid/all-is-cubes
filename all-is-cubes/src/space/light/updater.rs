@@ -1018,7 +1018,7 @@ impl Fmt<StatusText> for LightUpdatesInfo {
         write!(
             fmt,
             "{update_count:4} (max diff {max_update_difference:3}) of {queue_count:4} cubes \
-            (max pri {max_queue_priority:3?}) \
+            (max pri {max_queue_priority:3.3?}) \
             in {active_spaces}/{total_spaces} spaces",
         )?;
         Ok(())

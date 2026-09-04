@@ -51,16 +51,21 @@ impl Priority {
 }
 
 impl fmt::Debug for Priority {
+    /// Supports the formatting options for width, precision, fill, and alignment.
+    ///
+    /// As per <https://doc.rust-lang.org/std/fmt/#precision>, the precision is interpreted as a
+    /// maximum length for the names of the named priorities. As a special case, abbreviated names
+    /// are used for lengths down to 3 characters.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if *self == Self::NEWLY_VISIBLE {
-            write!(f, "NEWLY_VISIBLE")
-        } else if *self == Self::UNINIT {
-            write!(f, "UNINIT")
-        } else if *self == Self::ESTIMATED {
-            write!(f, "ESTIMATED")
-        } else {
-            fmt::Display::fmt(&self.0, f)
-        }
+        f.pad(match (*self, f.precision()) {
+            (Self::NEWLY_VISIBLE, Some(..12)) => "NEW",
+            (Self::NEWLY_VISIBLE, _) => "NEWLY_VISIBLE",
+            (Self::UNINIT, Some(..12)) => "UNI",
+            (Self::UNINIT, _) => "UNINIT",
+            (Self::ESTIMATED, Some(..12)) => "EST",
+            (Self::ESTIMATED, _) => "ESTIMATED",
+            _ => return fmt::Display::fmt(&self.0, f),
+        })
     }
 }
 
