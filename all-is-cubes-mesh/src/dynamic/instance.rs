@@ -40,9 +40,13 @@ impl InstanceCollector {
     pub fn iter(
         &self,
     ) -> impl Iterator<Item = (BlockIndex, impl ExactSizeIterator<Item = Cube> + '_)> + '_ {
-        self.map
-            .iter()
-            .map(|(&block_index, instance_cubes)| (block_index, instance_cubes.iter().copied()))
+        self.map.iter().filter_map(|(&block_index, instance_cubes)| {
+            if instance_cubes.is_empty() {
+                None
+            } else {
+                Some((block_index, instance_cubes.iter().copied()))
+            }
+        })
     }
 }
 
