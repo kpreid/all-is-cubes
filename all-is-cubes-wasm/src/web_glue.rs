@@ -8,7 +8,9 @@ use futures_core::future::BoxFuture;
 use js_sys::{Error, Function, JsString};
 use wasm_bindgen::prelude::{Closure, wasm_bindgen};
 use wasm_bindgen::{JsCast, JsValue}; // dyn_into()
-use web_sys::{AddEventListenerOptions, Document, Element, Event, EventTarget, Text, Window};
+use web_sys::{
+    AddEventListenerOptions, Document, Element, Event, EventTarget, Text, Window, console,
+};
 use web_time::{Duration, Instant};
 
 // -------------------------------------------------------------------------------------------------
@@ -47,25 +49,51 @@ pub fn replace_children_with_one_text_node(element: &Element) -> Text {
     text
 }
 
+/// Install an event listener which downcasts the event to the JavaScript type `E`.
 pub fn add_event_listener<E, F>(
     target: &EventTarget,
-    event_type: &str,
+    event_type: &'static str,
     listener: F,
     options: &AddEventListenerOptions,
 ) where
     E: JsCast,
     F: Fn(E) + 'static,
 {
-    let closure: Closure<dyn Fn(Event)> = Closure::wrap(Box::new(move |event: Event| {
-        listener(event.dyn_into::<E>().unwrap())
-    }));
-    target
-        .add_event_listener_with_callback_and_add_event_listener_options(
-            event_type,
-            closure.as_ref().unchecked_ref(),
-            options,
-        )
-        .expect("addEventListener failure");
+    let closure: Closure<dyn Fn(Event)> =
+        Closure::wrap(Box::new(move |event: Event| match event.dyn_into::<E>() {
+            Ok(event) => listener(event),
+            // In the event that, for some reason, we receive an event that does not cast to the
+            // expected type, don’t panic; instead, discard it. This way, the application can continue
+            // functioning if a non-critical event misbehaves.
+            //
+            // We use `console` instead of `log` in order to allow JS object inspection instead of
+            // stringifying it.
+            Err(event) => console::error_2(
+                &JsString::from(format!(
+                    "event listener for {event_type:?} received event that \
+                        does not cast to {expected_type}: %o",
+                    expected_type = std::any::type_name::<E>(),
+                )),
+                &event,
+            ),
+        }));
+    match target.add_event_listener_with_callback_and_add_event_listener_options(
+        event_type,
+        closure.as_ref().unchecked_ref(),
+        options,
+    ) {
+        Ok(()) => {}
+        Err(error) => {
+            // Not sure why this would ever fail, but log it if it does.
+            console::error_3(
+                &JsString::from(format!(
+                    "failed to install event listener for {event_type:?} on target %o: %o",
+                )),
+                target,
+                &error,
+            )
+        }
+    }
     closure.forget(); // TODO: Instead return the closure or some other kind of handle
 }
 

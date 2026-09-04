@@ -331,7 +331,7 @@ impl WebSession {
 
     fn add_canvas_to_self_event_listener<E, F>(
         self: &Rc<Self>,
-        event_name: &str,
+        event_name: &'static str,
         passive: bool,
         callback: F,
     ) where
