@@ -169,6 +169,13 @@ static NEXT_YIELD_INSTANT: LazyLock<Mutex<Instant>> = LazyLock::new(|| Mutex::ne
 // -------------------------------------------------------------------------------------------------
 
 /// Attach context to a JS exception object and make it into a Rust error.
+pub(crate) fn error_from_js(context: &'static str, exception: JsValue) -> ErrorFromJs {
+    ErrorFromJs { context, exception }
+}
+
+/// Attach context to a JS exception object and make it into a Rust error.
+///
+/// This function is curried in order to be used within [`Result::map_err()`].
 pub(crate) fn excontext(context: &'static str) -> impl Fn(JsValue) -> ErrorFromJs {
     move |exception| ErrorFromJs { context, exception }
 }
@@ -176,12 +183,30 @@ pub(crate) fn excontext(context: &'static str) -> impl Fn(JsValue) -> ErrorFromJ
 /// Wrapper for a JS exception that we want to handle non-fatally.
 ///
 /// This error type does not have an [`Error::source()`]; all details are in its own message.
+///
+/// You can construct this using [`error_from_js()`] or [`.map_err(excontext)`][excontext].
 #[derive(Clone, Debug)]
 pub(crate) struct ErrorFromJs {
     /// What we were doing. Should make sense preceded by “while”.
-    context: &'static str,
+    pub context: &'static str,
     /// The exception caught.
-    exception: JsValue,
+    pub exception: JsValue,
+}
+
+impl ErrorFromJs {
+    /// Log the error to the browser console.
+    ///
+    /// When logging is the desired behavior, this is preferable to [`log::error!`],
+    /// because it allows the console user to inspect the JavaScript exception object.
+    pub fn log_to_console(self) {
+        console::error_2(
+            &JsString::from(format!(
+                "caught exception while {context}: %o",
+                context = self.context,
+            )),
+            &self.exception,
+        );
+    }
 }
 
 impl fmt::Display for ErrorFromJs {

@@ -1,11 +1,14 @@
 use std::sync::Arc;
 
-use js_sys::JsString;
 use send_wrapper::SendWrapper;
-use web_sys::{console, window};
+use web_sys::window;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes_ui::settings::{Data, Settings};
+
+use crate::web_glue::error_from_js;
+
+// -------------------------------------------------------------------------------------------------
 
 /// `localStorage` key prefix we stash our settings values in.
 ///
@@ -21,19 +24,16 @@ fn load_settings_from_local_storage() -> Option<Settings> {
     let initial_data: Data =
         Data::from_iter((0..len).filter_map(|i: u32| -> Option<(ArcStr, ArcStr)> {
             match storage.key(i) {
-                Err(error) => {
-                    console::warn_2(&JsString::from("localStorage.key() failed: %o"), &error);
+                Err(exception) => {
+                    error_from_js("localStorage.key()", exception).log_to_console();
                     None
                 }
                 Ok(None) => None, // length changed while iterating?
                 Ok(Some(storage_key)) => {
                     if let Some(settings_key) = storage_key.strip_prefix(PREFIX) {
                         match storage.get_item(&storage_key) {
-                            Err(error) => {
-                                console::warn_2(
-                                    &JsString::from("localStorage.getItem() failed: %o"),
-                                    &error,
-                                );
+                            Err(exception) => {
+                                error_from_js("localStorage.getItem()", exception).log_to_console();
                                 None
                             }
                             Ok(None) => None, // value deleted while iterating?
@@ -60,8 +60,8 @@ fn load_settings_from_local_storage() -> Option<Settings> {
                 let storage_key = format!("{PREFIX}{key}");
                 match storage.set_item(&storage_key, value.as_str()) {
                     Ok(()) => log::trace!("Stored {storage_key}"),
-                    Err(error) => {
-                        console::error_2(&JsString::from("Failed to store setting: %o"), &error)
+                    Err(exception) => {
+                        error_from_js("storing setting", exception).log_to_console();
                     }
                 }
             }

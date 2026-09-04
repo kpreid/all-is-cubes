@@ -26,8 +26,10 @@ use crate::audio::AudioTask;
 use crate::js_bindings::GuiHelpers;
 
 use crate::web_glue::{
-    add_event_listener, get_mandatory_element, replace_children_with_one_text_node,
+    add_event_listener, error_from_js, get_mandatory_element, replace_children_with_one_text_node,
 };
+
+// -------------------------------------------------------------------------------------------------
 
 pub(crate) type Session = all_is_cubes_ui::apps::Session;
 
@@ -318,9 +320,9 @@ impl WebSession {
                                 .unwrap();
                                 this.set_universe(universe);
                             }
-                            Err(e) => {
+                            Err(exception) => {
                                 // TODO: present error to UI
-                                console::error_2(&JsValue::from_str("failed to load file"), &e);
+                                error_from_js("loading dropped file", exception).log_to_console();
                             }
                         }
                     });
