@@ -1,9 +1,7 @@
 use std::fs;
-use std::io::{self};
+use std::io;
 use std::path::Path;
 use std::time::Instant;
-
-use rendiff::{Histogram, Threshold};
 
 use all_is_cubes::euclid::size2;
 use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText};
@@ -155,18 +153,18 @@ impl ComparisonImage {
 ///
 /// Note that this function does not make the final determination as to whether the test succeeds.
 pub(crate) fn save_and_compare_rendered_image(
-    test: ImageId,
-    allowed_difference: &Threshold,
+    test: &ImageId,
+    allowed_difference: &rendiff::Threshold,
     actual_rendering: &Rendering,
 ) -> (ComparisonRecord, LoadedExpectedImage) {
     let start_time = Instant::now();
 
     let info_string = format!("{}", actual_rendering.info.refmt(&StatusText::ALL));
-    let actual_file_path = image_path(&test, Version::Actual);
-    let diff_file_path = image_path(&test, Version::Diff);
+    let actual_file_path = image_path(test, Version::Actual);
+    let diff_file_path = image_path(test, Version::Diff);
 
     write_compressed_png(
-        rendering_to_oxipng(actual_rendering.clone())
+        &rendering_to_oxipng(actual_rendering.clone())
             .expect("rendering contains incorrect data size"),
         &low_compression_options(),
         &actual_file_path,
@@ -174,7 +172,7 @@ pub(crate) fn save_and_compare_rendered_image(
     .expect("failed to write actual image");
 
     // Load expected image, if any
-    let mut expected: LoadedExpectedImage = load_and_copy_expected_image(&test);
+    let mut expected: LoadedExpectedImage = load_and_copy_expected_image(test);
     if expected.image.is_none() {
         // Look for a generic all-renderers output file
         expected = load_and_copy_expected_image(&ImageId {
@@ -188,7 +186,7 @@ pub(crate) fn save_and_compare_rendered_image(
                 ComparisonImage::new(&expected.snapshot_file_path, ImageSize::zero()), // TODO: should be optional
                 ComparisonImage::new(&actual_file_path, actual_rendering.size),
                 None,
-                Histogram::ZERO,
+                rendiff::Histogram::ZERO,
                 ComparisonOutcome::NoExpected,
                 info_string,
             ),
@@ -204,7 +202,7 @@ pub(crate) fn save_and_compare_rendered_image(
     // Save diff image to disk
     let diff_c_image: Option<ComparisonImage> = if let Some(image) = diff_result.diff_image() {
         write_compressed_png(
-            imgref_to_oxipng(image.map_buf(<[_]>::to_vec))
+            &imgref_to_oxipng(image.map_buf(<[_]>::to_vec))
                 .expect("rendering contains incorrect data size"),
             &low_compression_options(),
             &diff_file_path,

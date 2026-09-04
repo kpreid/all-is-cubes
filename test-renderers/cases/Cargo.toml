@@ -21,3 +21,6 @@ all-is-cubes-ui = { workspace = true, features = ["session"] }
 exhaust = { workspace = true }
 rendiff = { workspace = true }
 serde = { workspace = true }
+
+[lints]
+workspace = true

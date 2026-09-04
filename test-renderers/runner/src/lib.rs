@@ -8,7 +8,9 @@
     clippy::module_name_repetitions,
     clippy::exhaustive_enums,
     clippy::exhaustive_structs,
+    clippy::manual_string_new,
     clippy::missing_panics_doc,
+    clippy::unwrap_used,
     reason = "library for internal use only"
 )]
 #![forbid(unsafe_code)]

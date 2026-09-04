@@ -1,6 +1,17 @@
 //! Types which are used by both `test-renderers-runner` and `test-renderers-cases`,
 //! broken out to minimize rebuilds when the test cases are edited.
 
+#![allow(
+    missing_debug_implementations,
+    missing_docs,
+    clippy::module_name_repetitions,
+    clippy::exhaustive_enums,
+    clippy::exhaustive_structs,
+    clippy::missing_panics_doc,
+    clippy::missing_errors_doc,
+    clippy::unwrap_used,
+    reason = "library for internal testing use only; does not need documentation or good errors"
+)]
 #![cfg_attr(test, allow(dead_code_pub_in_binary, reason = "FP on test binaries"))]
 
 use std::sync::{Arc, Mutex};
@@ -223,7 +234,7 @@ impl RenderTestContext {
         };
 
         let (mut record, expected) =
-            save_and_compare_rendered_image(combo, &allowed_difference.into(), &image);
+            save_and_compare_rendered_image(&combo, &allowed_difference.into(), &image);
         record.outcome = modify_outcome_accounting_for_flaws(image.flaws, record.outcome);
 
         if self.overwrite && record.outcome.could_be_overwritten() {
@@ -235,7 +246,7 @@ impl RenderTestContext {
 
             // TODO: better error reporting
             write_compressed_png(
-                rendering_to_oxipng(image).unwrap(),
+                &rendering_to_oxipng(image).unwrap(),
                 &high_compression_options(),
                 &expected.src_file_path,
             )

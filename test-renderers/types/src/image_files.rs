@@ -41,7 +41,7 @@ pub(crate) fn image_path(image_id: &ImageId, version: Version) -> PathBuf {
     let mut path = test_data_dir_path(suite, version);
 
     // Convenience kludge: ensure the directory exists
-    match std::fs::create_dir_all(&path) {
+    match fs::create_dir_all(&path) {
         Ok(()) => {}
         Err(e) => panic!("Failed to create output dir '{p}': {e}", p = path.display()),
     }
@@ -96,7 +96,7 @@ pub(crate) fn load_and_copy_expected_image(image_id: &ImageId) -> LoadedExpected
             // We write the image back from pixels, not bytewise.
             // This makes it canonical and contain only the information we actually compared.
             write_compressed_png(
-                imgref_to_oxipng(image.clone()).unwrap(),
+                &imgref_to_oxipng(image.clone()).unwrap(),
                 &low_compression_options(),
                 &snapshot_file_path,
             )
@@ -209,7 +209,7 @@ pub(crate) fn high_compression_options() -> oxipng::Options {
 }
 
 pub(crate) fn write_compressed_png(
-    input: oxipng::RawImage,
+    input: &oxipng::RawImage,
     options: &oxipng::Options,
     file_path: &Path,
 ) -> Result<(), Box<dyn Error>> {

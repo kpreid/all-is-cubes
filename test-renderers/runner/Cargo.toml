@@ -32,3 +32,6 @@ tinytemplate = { workspace = true }
 # * Misc other utilities.
 # We should consider replacing it anyway.
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync", "time"] }
+
+[lints]
+workspace = true

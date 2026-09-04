@@ -1,6 +1,15 @@
 //! Graphical test cases that can be run in any renderer.
 
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
+#![allow(
+    missing_docs,
+    clippy::exhaustive_enums,
+    clippy::exhaustive_structs,
+    clippy::missing_panics_doc,
+    clippy::missing_errors_doc,
+    clippy::unwrap_used,
+    reason = "library for internal testing use only; does not need documentation or good errors"
+)]
 #![expect(clippy::unused_async)]
 #![expect(clippy::cast_possible_wrap)]
 #![warn(
