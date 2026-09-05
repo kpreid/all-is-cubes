@@ -221,6 +221,16 @@ pub(crate) fn excontext(context: &'static str) -> impl Fn(JsValue) -> ErrorFromJ
     move |exception| ErrorFromJs { context, exception }
 }
 
+pub(crate) fn log_error_from_js(
+    context: &'static str,
+    operation: impl FnOnce() -> Result<(), JsValue>,
+) {
+    match operation() {
+        Ok(()) => {}
+        Err(exception) => error_from_js(context, exception).log_to_console(),
+    }
+}
+
 /// Wrapper for a JS exception that we want to handle non-fatally.
 ///
 /// This error type does not have an [`Error::source()`]; all details are in its own message.

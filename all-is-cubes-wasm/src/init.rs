@@ -12,7 +12,7 @@ use all_is_cubes_gpu as gpu;
 
 use crate::js_bindings::{GuiHelpers, make_all_static_gui_helpers};
 use crate::url_params::{OptionsInUrl, RendererOption, options_from_query_string};
-use crate::web_glue::yield_to_event_loop;
+use crate::web_glue::{log_error_from_js, yield_to_event_loop};
 use crate::web_session::{StaticDom, WebRenderer, WebSession, create_session};
 
 #[wasm_bindgen(start)]
@@ -33,11 +33,11 @@ pub async fn start_game() -> Result<(), JsValue> {
     // TODO: StaticDom and GuiHelpers are the same kind of thing. Merge them?
     let gui_helpers = make_all_static_gui_helpers(&window, &document);
     let static_dom = StaticDom::new(window, &document)?;
-    {
+    log_error_from_js("modifying classList", || {
         let list = static_dom.app_root.class_list();
-        list.remove_1("state-script-not-loaded").unwrap();
-        list.add_1("state-loading").unwrap();
-    }
+        list.remove_1("state-script-not-loaded")?;
+        list.add_1("state-loading")
+    });
 
     // This function split is basically a `try {}` if that were stable.
     match start_game_with_dom(document, gui_helpers, &static_dom).await {
@@ -162,12 +162,12 @@ async fn start_game_with_dom(
 
     // Do the final UI cleanup going from "loading" to "running".
     post_universe_progress.finish().await;
-    {
+    log_error_from_js("modifying classList", || {
         // TODO: make this part the WebSession's responsibility? Move the class list manip to StaticDom?
         let list = static_dom.app_root.class_list();
-        list.remove_1("state-loading").unwrap();
-        list.add_1("state-fully-loaded").unwrap();
-    }
+        list.remove_1("state-loading")?;
+        list.add_1("state-fully-loaded")
+    });
     console::log_1(&JsValue::from_str("start_game() completed."));
     static_dom.loading_log.set_data("");
     Ok(())
