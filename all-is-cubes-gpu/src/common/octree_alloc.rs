@@ -601,11 +601,29 @@ impl Fmt<StatusText> for Info {
             allocated_volume,
             used_volume,
         } = self;
+
+        let volume_to_percentage = if total_volume == 0 {
+            // Avoid dividing by zero and printing "NaN%", which is harmless but unaesthetic.
+            // Instead, this will cause the percentages to be "0%".
+            1.0
+        } else {
+            100.0 / total_volume as f32
+        };
+
+        let (total_volume_value, prefix) = if total_volume >= 1_000_000_000 {
+            (total_volume.div_ceil(1_000_000_000), "G")
+        } else if total_volume >= 1_000_000 {
+            (total_volume.div_ceil(1_000_000), "M")
+        } else {
+            // Initial capacity is 32ki (rounds up to 33k), so we don’t need a prefixless case.
+            (total_volume.div_ceil(1_000), "k")
+        };
+
         write!(
             fmt,
-            "{up:3}% used of {ap:3}% allocated of {total_volume}",
-            up = (used_volume as f32 / self.total_volume as f32 * 100.0).ceil(),
-            ap = (allocated_volume as f32 / self.total_volume as f32 * 100.0).ceil(),
+            "{up:3}% used of {ap:3}% allocated of{total_volume_value:4}{prefix} texels",
+            up = (used_volume as f32 * volume_to_percentage).ceil(),
+            ap = (allocated_volume as f32 * volume_to_percentage).ceil(),
         )
     }
 }
