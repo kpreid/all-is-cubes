@@ -126,7 +126,6 @@ impl WebSession {
     /// This method is broken out of `new()` so we can just use `self`. Well, some of the time.
     /// TODO: reconsider
     fn init_dom(self: Rc<Self>) {
-        let document = &self.gui_helpers.canvas_helper().canvas().owner_document().unwrap();
         let options_passive_true = AddEventListenerOptions::new();
         options_passive_true.set_passive(true);
 
@@ -224,56 +223,60 @@ impl WebSession {
             &AddEventListenerOptions::new(),
         );
 
-        // Fullscreen event listener, which goes on the document, not the canvas
-        {
-            let weak_self_ref: Weak<Self> = Rc::downgrade(&self);
-            let ch = self.gui_helpers.canvas_helper();
-            let listener = move |_event: Event| {
-                Self::upgrade_in_callback(&weak_self_ref, |this, _inner| {
-                    let state = Some(ch.is_fullscreen());
-                    log::warn!("got fullscreenchange {state:?}");
-                    this.fullscreen_cell.set(state);
-                })
-            };
-            self.add_irregular_event_listener(
-                document.clone(),
-                "fullscreenchange",
-                listener.clone(),
-                &options_passive_true,
-            );
-            // Safari still does not have unprefixed fullscreen API as of version 16.1
-            self.add_irregular_event_listener(
-                document.clone(),
-                "webkitfullscreenchange",
-                listener,
-                &options_passive_true,
-            );
-        }
+        if let Some(document) = self.gui_helpers.canvas_helper().canvas().owner_document() {
+            // Fullscreen event listener, which goes on the document, not the canvas
+            {
+                let weak_self_ref: Weak<Self> = Rc::downgrade(&self);
+                let ch = self.gui_helpers.canvas_helper();
+                let listener = move |_event: Event| {
+                    Self::upgrade_in_callback(&weak_self_ref, |this, _inner| {
+                        let state = Some(ch.is_fullscreen());
+                        log::warn!("got fullscreenchange {state:?}");
+                        this.fullscreen_cell.set(state);
+                    })
+                };
+                self.add_irregular_event_listener(
+                    document.clone(),
+                    "fullscreenchange",
+                    listener.clone(),
+                    &options_passive_true,
+                );
+                // Safari still does not have unprefixed fullscreen API as of version 16.1
+                self.add_irregular_event_listener(
+                    document.clone(),
+                    "webkitfullscreenchange",
+                    listener,
+                    &options_passive_true,
+                );
+            }
 
-        // pointerlock* listeners, which go on the document, not the canvas
-        {
-            let weak_self_ref: Weak<Self> = Rc::downgrade(&self);
-            let listener = move |_event: Event| {
-                Self::upgrade_in_callback(&weak_self_ref, |this, inner| {
-                    if !this.check_pointer_lock() {
-                        // If pointer lock was active and stopped, or if it failed to activate,
-                        // then acknowledge this in the UI and stop trying.
-                        inner.session.input_processor.set_mouselook_mode(false);
-                    }
-                })
-            };
-            self.add_irregular_event_listener(
-                document.clone(),
-                "pointerlockchange",
-                listener.clone(),
-                &options_passive_true,
-            );
-            self.add_irregular_event_listener(
-                document.clone(),
-                "pointerlockerror",
-                listener,
-                &options_passive_true,
-            );
+            // pointerlock* listeners, which go on the document, not the canvas
+            {
+                let weak_self_ref: Weak<Self> = Rc::downgrade(&self);
+                let listener = move |_event: Event| {
+                    Self::upgrade_in_callback(&weak_self_ref, |this, inner| {
+                        if !this.check_pointer_lock() {
+                            // If pointer lock was active and stopped, or if it failed to activate,
+                            // then acknowledge this in the UI and stop trying.
+                            inner.session.input_processor.set_mouselook_mode(false);
+                        }
+                    })
+                };
+                self.add_irregular_event_listener(
+                    document.clone(),
+                    "pointerlockchange",
+                    listener.clone(),
+                    &options_passive_true,
+                );
+                self.add_irregular_event_listener(
+                    document.clone(),
+                    "pointerlockerror",
+                    listener,
+                    &options_passive_true,
+                );
+            }
+        } else {
+            log::error!("canvas has no document; some event listeners will be missing");
         }
 
         // File drop listener.
