@@ -26,7 +26,7 @@ use crate::audio::AudioTask;
 use crate::js_bindings::GuiHelpers;
 
 use crate::web_glue::{
-    EventListener, add_event_listener, error_from_js, get_mandatory_element,
+    EventListener, add_event_listener, error_from_js, get_mandatory_element, log_error_from_js,
     replace_children_with_one_text_node,
 };
 
@@ -408,10 +408,16 @@ impl WebSession {
 
     pub fn start_loop(&self) {
         // TODO: enforce this is only called once
-        self.static_dom
-            .window
-            .request_animation_frame(self.raf_callback.as_ref().unchecked_ref())
-            .unwrap();
+
+        // Note: If this fails, the session will no longer make any progress.
+        // We log it instead of unwrapping anyway on the general principle of never panicking
+        // on Wasm.
+        log_error_from_js("requestAnimationFrame", || {
+            self.static_dom
+                .window
+                .request_animation_frame(self.raf_callback.as_ref().unchecked_ref())?;
+            Ok(())
+        });
     }
 
     pub fn set_universe(&self, universe: Box<Universe>) {
@@ -479,13 +485,16 @@ impl WebSession {
 
         if inner.session.frame_clock.should_step() && !inner.step_callback_scheduled {
             inner.step_callback_scheduled = true;
-            self.static_dom
-                .window
-                .set_timeout_with_callback_and_timeout_and_arguments_0(
+            // Note: If this fails, the session will no longer make any progress.
+            // We log it instead of unwrapping anyway on the general principle of never panicking
+            // on Wasm.
+            log_error_from_js("setTimeout for stepping", || {
+                self.static_dom.window.set_timeout_with_callback_and_timeout_and_arguments_0(
                     self.step_callback.as_ref().unchecked_ref(),
                     0,
-                )
-                .unwrap();
+                )?;
+                Ok(())
+            });
         }
 
         // Sync pointer lock state
