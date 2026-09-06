@@ -20,6 +20,7 @@ features = []
 
 [lib]
 bench = false
+doc = false # not (yet?) intended for general use with a clean API
 # Disable doctest running (we have none) to reduce total noise in `cargo test` output.
 doctest = false
 
