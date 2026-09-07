@@ -2,7 +2,6 @@
   "accessors": [
     {
       "bufferView": 0,
-      "byteOffset": 0,
       "count": 24,
       "componentType": 5126,
       "type": "VEC3",
@@ -40,7 +39,6 @@
     },
     {
       "bufferView": 1,
-      "byteOffset": 0,
       "count": 36,
       "componentType": 5123,
       "type": "SCALAR",

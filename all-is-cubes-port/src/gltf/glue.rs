@@ -7,6 +7,19 @@ use all_is_cubes::euclid;
 use descriptive_unwrap::ResultExt as _;
 use gltf_json::Index;
 use gltf_json::validation::Checked::Valid;
+use gltf_json::validation::USize64;
+
+// -------------------------------------------------------------------------------------------------
+
+/// In glTF, every `byteOffset` is optional and defaults to zero if omitted,
+/// so in the Rust structs, one should avoid producing `Some(USize64(0))` to save space.
+/// This function does that, by returning `Some(byte_offset)` only if the offset is nonzero.
+pub(crate) fn byte_offset_discarding_zero(byte_offset: USize64) -> Option<USize64> {
+    match byte_offset {
+        USize64(0) => None,
+        _ => Some(byte_offset),
+    }
+}
 
 /// For a [`gltf_json::Accessor`], find the elementwise minimum and maximum values
 /// in a slice of arrays of some kind of value.
@@ -128,7 +141,7 @@ where
 
     gltf_json::Accessor {
         buffer_view: Some(buffer_view),
-        byte_offset: Some(byte_offset.into()),
+        byte_offset: byte_offset_discarding_zero(byte_offset.into()),
         count: count.into(),
         component_type: Valid(gltf_json::accessor::GenericComponentType(
             gltf_json::accessor::ComponentType::F32,

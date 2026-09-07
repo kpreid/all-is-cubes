@@ -12,7 +12,7 @@ use all_is_cubes::math::range_len;
 use all_is_cubes_mesh::texture::Channels;
 use all_is_cubes_mesh::{IndexSlice, MeshTypes, SpaceMesh};
 
-use crate::gltf::glue::create_accessor;
+use crate::gltf::glue::{byte_offset_discarding_zero, create_accessor};
 use crate::gltf::{GltfTextureAllocator, GltfVertex, GltfWriter};
 
 // -------------------------------------------------------------------------------------------------
@@ -74,7 +74,7 @@ where
         buffer: buffer_index,
         byte_length: USize64::from(indices_byte_len),
         // Indexes are packed into the same buffer, so they start at the end of the vertex bytes
-        byte_offset: Some(USize64::from(vertices_byte_len)),
+        byte_offset: byte_offset_discarding_zero(USize64::from(vertices_byte_len)),
         byte_stride: None,
         name: Some(format!("{name} index")),
         // ElementArrayBuffer means index buffer
@@ -212,7 +212,9 @@ where
                     &mut writer.root.accessors,
                     gltf_json::Accessor {
                         buffer_view: Some(index_buffer_view),
-                        byte_offset: Some(USize64::from(index_range.start * index_type.size())),
+                        byte_offset: byte_offset_discarding_zero(USize64::from(
+                            index_range.start * index_type.size(),
+                        )),
                         count: USize64::from(range_len(index_range)),
                         component_type: Valid(gltf_json::accessor::GenericComponentType(
                             index_type,

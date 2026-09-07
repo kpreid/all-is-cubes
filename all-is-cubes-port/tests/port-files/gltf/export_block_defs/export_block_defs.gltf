@@ -2,7 +2,6 @@
   "accessors": [
     {
       "bufferView": 0,
-      "byteOffset": 0,
       "count": 24,
       "componentType": 5126,
       "type": "VEC3",
@@ -40,7 +39,6 @@
     },
     {
       "bufferView": 1,
-      "byteOffset": 0,
       "count": 36,
       "componentType": 5123,
       "type": "SCALAR",
@@ -48,7 +46,6 @@
     },
     {
       "bufferView": 2,
-      "byteOffset": 0,
       "count": 24,
       "componentType": 5126,
       "type": "VEC3",
@@ -86,7 +83,6 @@
     },
     {
       "bufferView": 3,
-      "byteOffset": 0,
       "count": 36,
       "componentType": 5123,
       "type": "SCALAR",
@@ -94,7 +90,6 @@
     },
     {
       "bufferView": 4,
-      "byteOffset": 0,
       "count": 24,
       "componentType": 5126,
       "type": "VEC3",
@@ -148,7 +143,6 @@
     },
     {
       "bufferView": 5,
-      "byteOffset": 0,
       "count": 36,
       "componentType": 5123,
       "type": "SCALAR",
@@ -156,7 +150,6 @@
     },
     {
       "bufferView": 6,
-      "byteOffset": 0,
       "count": 24,
       "componentType": 5126,
       "type": "VEC3",
@@ -210,7 +203,6 @@
     },
     {
       "bufferView": 7,
-      "byteOffset": 0,
       "count": 36,
       "componentType": 5123,
       "type": "SCALAR",
