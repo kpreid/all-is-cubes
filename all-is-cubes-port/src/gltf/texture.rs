@@ -345,7 +345,7 @@ pub struct GltfAtlasPoint {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Generates the atlas textures and necessary glTF entities.
+/// Generates the atlas textures and necessary glTF objects.
 pub(super) fn insert_block_texture_atlas(
     root: &mut gltf_json::Root,
     allocator: &GltfTextureAllocator,
@@ -376,7 +376,7 @@ pub(super) fn insert_block_texture_atlas(
     })
 }
 
-/// Starting with a `Buffer` of texture data, inserts all the entities for a `Texture`.
+/// Starting with a `Buffer` of texture data, inserts all the objects for a `Texture`.
 fn insert_one_image(
     root: &mut gltf_json::Root,
     name: &'static str,

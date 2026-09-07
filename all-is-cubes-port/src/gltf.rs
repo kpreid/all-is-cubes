@@ -1,10 +1,11 @@
 //! Export to the glTF 3D file format.
 //!
-//! To use this, create a [`GltfWriter`].
+//! This module provides lower-level access to glTF writing than a standard
+//! [`export_to_path()`][crate::export_to_path] would.
+//! It is not yet a fully documented or clean API.
+//! To use it, create a [`GltfWriter`].
 //!
 //! TODO: example code here
-//!
-//! TODO: This is not a clean, well-abstracted library API yet.
 
 #![expect(clippy::module_name_repetitions)] // TODO: review all the naming in this module
 
@@ -163,8 +164,11 @@ impl GltfWriter {
         }
     }
 
-    /// Returns a texture [`Allocator`](all_is_cubes_mesh::texture::Allocator) that writes
-    /// textures into this glTF asset
+    /// Returns an [`Allocator`](all_is_cubes_mesh::texture::Allocator) that writes provided
+    /// texture data into this glTF asset.
+    ///
+    /// Use this allocator when constructing [`all_is_cubes_mesh`] meshes that will be used in
+    /// this glTF asset.
     pub fn texture_allocator(&self) -> GltfTextureAllocator {
         self.texture_allocator.clone()
     }
@@ -208,6 +212,8 @@ impl GltfWriter {
     /// Add one [`SpaceMesh`] to the output.
     ///
     /// The mesh's texture allocator must be [`self.texture_allocator()`][Self::texture_allocator].
+    ///
+    /// This does not cause the mesh to be visible (it does not add any [`gltf_json::Node`]).
     pub fn add_mesh<M>(
         &mut self,
         name: &dyn fmt::Display,

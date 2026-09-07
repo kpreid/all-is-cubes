@@ -51,17 +51,6 @@ struct Shared {
 }
 
 impl GltfDataDestination {
-    /// Creates a [`GltfDataDestination`] that rejects all data.
-    pub fn null() -> GltfDataDestination {
-        Self(Arc::new(Shared {
-            discard: true,
-            maximum_inline_bytes: 0,
-            file_base_path: None,
-            suffix_uses: Mutex::new(HashSet::new()),
-            buffers: Mutex::new(Vec::new()),
-        }))
-    }
-
     /// `maximum_inline_length` is the maximum length of data which will be stored inline in the
     /// glTF file as a `data:` URL rather than separately.
     ///
@@ -87,6 +76,19 @@ impl GltfDataDestination {
             discard: false,
             maximum_inline_bytes,
             file_base_path,
+            suffix_uses: Mutex::new(HashSet::new()),
+            buffers: Mutex::new(Vec::new()),
+        }))
+    }
+
+    /// Creates a [`GltfDataDestination`] that discards all data.
+    ///
+    /// This is only useful for testing, when buffer contents are not relevant to the test.
+    pub fn null() -> GltfDataDestination {
+        Self(Arc::new(Shared {
+            discard: true,
+            maximum_inline_bytes: 0,
+            file_base_path: None,
             suffix_uses: Mutex::new(HashSet::new()),
             buffers: Mutex::new(Vec::new()),
         }))
@@ -185,7 +187,7 @@ impl GltfDataDestination {
         contents_fn(&mut implementation)?;
         let (uri, byte_length) = implementation.close()?;
 
-        // Create buffer entity.
+        // Create buffer object.
         let buffer = gltf_json::Buffer {
             name: Some(buffer_object_name),
             byte_length: USize64::from(byte_length),
@@ -302,7 +304,8 @@ impl SwitchingWriter {
                 // TODO: use crate::export::close_buffered_file() for consistency
                 let file = file.into_inner()?;
                 file.sync_data()?;
-                // clippy false positive when this code is compiled for wasm -- TODO: remove the file support when compiling for wasm
+                // clippy false positive when this code is compiled for wasm
+                // should be fixed by <https://github.com/rust-lang/rust/pull/162444>
                 #[allow(clippy::drop_non_drop)]
                 drop(file);
                 Ok((file_uri, bytes_written))
