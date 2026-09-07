@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fmt::Write as _;
 use std::fs::File;
-use std::io;
+use std::io::{self, Seek as _};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -22,7 +22,7 @@ use super::glue::{Lef32, create_accessor};
 /// If cloned, the clone will provide equivalent access to the same destination and may be
 /// used interchangeably.
 ///
-/// TODO: Add support for combining buffers and writing `.glb` combined files.
+/// TODO: Add support for writing `.glb` combined files.
 #[derive(Clone, Debug)]
 pub struct GltfDataDestination(Arc<Shared>);
 
@@ -49,6 +49,14 @@ struct Shared {
     /// These will later be moved into the [`gltf_json::Root`].
     /// This vector is only appended to, so its indices are stable.
     buffers: Mutex<Vec<gltf_json::Buffer>>,
+
+    /// * `None`: each data segment created by a single [`GltfDataDestination::write()`] call is a
+    ///   separate buffer, either inlined or written to a new file.
+    /// * `Some`: all data segments are written to this file, which is the contents of buffer 0.
+    ///
+    /// Note: While it is possible to write to a `File` by reference without using a mutex,
+    /// that would allow undesired interleaving of data.
+    shared_buffer_file: Option<Mutex<File>>,
 }
 
 impl GltfDataDestination {
@@ -61,10 +69,22 @@ impl GltfDataDestination {
     /// paths like `foo/bar-buffername.glbin`.
     /// If it is `None`, then buffers may not exceed `maximum_inline_length`.
     ///
+    /// If `multiple_files` is `true`, each piece of data is written to a separate `.glbin` file.
+    /// If it is `false`, exactly one file is used.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if accessing the file system fails.
+    ///
     /// # Panics
     ///
-    /// Panics if `file_base_path` does not contain a file name.
-    pub fn new(file_base_path: Option<PathBuf>, maximum_inline_bytes: usize) -> Self {
+    /// Panics if `file_base_path` does not contain a file name,
+    /// or is missing when `multiple_files` is `false`.
+    pub fn new(
+        file_base_path: Option<PathBuf>,
+        maximum_inline_bytes: usize,
+        multiple_files: bool,
+    ) -> io::Result<Self> {
         if let Some(file_base_path) = &file_base_path {
             assert!(
                 file_base_path.file_stem().is_some(),
@@ -73,13 +93,45 @@ impl GltfDataDestination {
             );
         }
 
-        Self(Arc::new(Shared {
+        // TODO: check for non-collision. also it would be better if we just took this path as a parameter
+        let shared_data_file_path = if !multiple_files {
+            Some(
+                file_base_path
+                    .as_ref()
+                    .expect("must have a file_base_path in single-file mode")
+                    .with_extension("glbin"),
+            )
+        } else {
+            None
+        };
+
+        Ok(Self(Arc::new(Shared {
             discard: false,
+            suffix_uses: Mutex::new(HashSet::new()),
+            buffers: Mutex::new(
+                if let Some(shared_data_file_path) = &shared_data_file_path {
+                    vec![gltf_json::Buffer {
+                        byte_length: USize64(0), // replaced later
+                        name: None,
+                        uri: Some(file_name_to_relative_url(
+                            shared_data_file_path.file_name().none_is_unreachable(),
+                        )?),
+                        extensions: None,
+                        extras: Default::default(),
+                    }]
+                } else {
+                    Vec::new()
+                },
+            ),
+            shared_buffer_file: if let Some(shared_data_file_path) = shared_data_file_path {
+                Some(Mutex::new(File::create(shared_data_file_path)?))
+            } else {
+                None
+            },
+
             maximum_inline_bytes,
             file_base_path,
-            suffix_uses: Mutex::new(HashSet::new()),
-            buffers: Mutex::new(Vec::new()),
-        }))
+        })))
     }
 
     /// Creates a [`GltfDataDestination`] that discards all data.
@@ -92,6 +144,7 @@ impl GltfDataDestination {
             file_base_path: None,
             suffix_uses: Mutex::new(HashSet::new()),
             buffers: Mutex::new(Vec::new()),
+            shared_buffer_file: None,
         }))
     }
 
@@ -106,6 +159,11 @@ impl GltfDataDestination {
     ///   like `foo-{proposed_file_name}-20.{proposed_file_extension}`.
     /// * `data_type` should specify the type of data being written, and will be used to make
     ///   decisions about how and where the data is stored.
+    ///
+    /// Note: If a shared data file is in use, then this will take a lock on that shared file,
+    /// and therefore will block until writes from other threads complete.
+    /// Accordingly, `contents_fn` should complete its work quickly and avoid blocking on anything
+    /// but the writes it must perform.
     ///
     /// # Errors
     ///
@@ -138,6 +196,26 @@ impl GltfDataDestination {
 
         let mut implementation = if self.0.discard {
             SwitchingWriter::Null { bytes_written: 0 }
+        } else if let Some(shared_file_mutex) = &self.0.shared_buffer_file {
+            // We could recover from this PoisonError, because we don’t care about whether the
+            // *other* contents of the file are valid, just where they are, but there is no point
+            // in bothering.
+            let mut file = shared_file_mutex.lock().map_err(dispose_of_poison)?;
+
+            // Ensure that the new data has sufficient alignment, regardless of where the
+            // previous data ended.
+            let end_of_previous_data: u64 = file.stream_position()?;
+            let start_of_new_data: u64 =
+                end_of_previous_data.next_multiple_of(data_type.minimum_alignment());
+            if start_of_new_data != end_of_previous_data {
+                file.seek(io::SeekFrom::Start(start_of_new_data))?;
+            }
+
+            SwitchingWriter::SharedFile {
+                offset: start_of_new_data,
+                bytes_written: 0,
+                file,
+            }
         } else if let Some(file_base_path) = &self.0.file_base_path {
             // Ensure uniqueness of the file suffix.
             // TODO: Only do this if we exceed the in-memory limit?
@@ -182,24 +260,29 @@ impl GltfDataDestination {
 
         // Write data to file
         contents_fn(&mut implementation)?;
-        let (uri, byte_length) = implementation.close()?;
+        let (uri, byte_offset, byte_length) = implementation.close()?;
 
-        // Create buffer object.
-        let buffer = gltf_json::Buffer {
-            name: Some(buffer_object_name),
-            byte_length: USize64::from(byte_length),
-            uri,
-            extensions: Default::default(),
-            extras: Default::default(),
+        // Create buffer object, if and only if we aren’t using a shared buffer.
+        let buffer_index = if self.0.shared_buffer_file.is_some() {
+            // The shared buffer is always buffer index 0
+            Index::<gltf_json::Buffer>::new(0)
+        } else {
+            let buffer = gltf_json::Buffer {
+                name: Some(buffer_object_name),
+                byte_length: USize64::from(byte_length),
+                uri,
+                extensions: Default::default(),
+                extras: Default::default(),
+            };
+            Index::push(
+                &mut *self.0.buffers.lock().map_err(dispose_of_poison)?,
+                buffer,
+            )
         };
-        let buffer_index = Index::push(
-            &mut *self.0.buffers.lock().map_err(dispose_of_poison)?,
-            buffer,
-        );
 
         Ok(BufferAddress {
             buffer: buffer_index,
-            byte_offset: USize64(0),
+            byte_offset,
             byte_length: USize64::from(byte_length),
         })
     }
@@ -209,10 +292,23 @@ impl GltfDataDestination {
     /// If clones of this destination exist, it is still usable to make glTF with more content,
     /// but this is not the intended usage pattern and will incur an additional clone of the data.
     pub(crate) fn into_buffers(self) -> io::Result<Vec<gltf_json::Buffer>> {
-        match Arc::try_unwrap(self.0) {
-            Ok(inner) => inner.buffers.into_inner().map_err(dispose_of_poison),
-            Err(arc) => Ok(arc.buffers.lock().map_err(dispose_of_poison)?.clone()),
+        let shared_buffer_file_length = if let Some(shared_file_mutex) = &self.0.shared_buffer_file
+        {
+            Some(shared_file_mutex.lock().map_err(dispose_of_poison)?.metadata()?.len())
+        } else {
+            None
+        };
+
+        let mut buffers = match Arc::try_unwrap(self.0) {
+            Ok(inner) => inner.buffers.into_inner().map_err(dispose_of_poison)?,
+            Err(arc) => arc.buffers.lock().map_err(dispose_of_poison)?.clone(),
+        };
+
+        if let Some(shared_buffer_file_length) = shared_buffer_file_length {
+            buffers[0].byte_length = USize64::from(shared_buffer_file_length);
         }
+
+        Ok(buffers)
     }
 }
 
@@ -277,6 +373,19 @@ impl DataType {
             DataType::Png => "image/png",
         }
     }
+
+    /// Returns a sufficient alignment for this type of data.
+    fn minimum_alignment(self) -> u64 {
+        match self {
+            // “The offset ... MUST be a multiple of the size of the accessor’s component type.”
+            // — https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#data-alignment
+            // Our biggest component type is f32.
+            DataType::Mesh => const { size_of::<f32>() as u64 },
+
+            // Images stored in glTF have no alignment requirements.
+            DataType::Png => 1,
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -288,7 +397,7 @@ impl DataType {
 /// Does not guarantee the length is correct if `write()` is called after
 /// an IO error was previously returned.
 #[derive(Debug)]
-enum SwitchingWriter {
+enum SwitchingWriter<'f> {
     Null {
         bytes_written: usize,
     },
@@ -304,13 +413,19 @@ enum SwitchingWriter {
         bytes_written: usize,
         file_uri: Option<String>,
     },
+    SharedFile {
+        file: std::sync::MutexGuard<'f, File>,
+        /// Offset in the file at which this data segment starts.
+        offset: u64,
+        bytes_written: usize,
+    },
 }
 
-impl SwitchingWriter {
+impl SwitchingWriter<'_> {
     /// Close the file (if any) and return the uri and the bytes written.
-    fn close(self) -> io::Result<(Option<String>, usize)> {
+    fn close(self) -> io::Result<(Option<String>, USize64, usize)> {
         match self {
-            SwitchingWriter::Null { bytes_written } => Ok((None, bytes_written)),
+            SwitchingWriter::Null { bytes_written } => Ok((None, USize64(0), bytes_written)),
             SwitchingWriter::Memory {
                 buffer, data_type, ..
             } => {
@@ -329,7 +444,7 @@ impl SwitchingWriter {
                 // in question is for e.g. base64 components within ordinary URLs or
                 // file names.
                 base64::engine::general_purpose::STANDARD.encode_string(&buffer, &mut url);
-                Ok((Some(url), buffer.len()))
+                Ok((Some(url), USize64(0), buffer.len()))
             }
             SwitchingWriter::File {
                 bytes_written,
@@ -344,13 +459,22 @@ impl SwitchingWriter {
                 // should be fixed by <https://github.com/rust-lang/rust/pull/162444>
                 #[allow(clippy::drop_non_drop)]
                 drop(file);
-                Ok((file_uri, bytes_written))
+                Ok((file_uri, USize64(0), bytes_written))
+            }
+            SwitchingWriter::SharedFile {
+                file,
+                offset,
+                bytes_written,
+                ..
+            } => {
+                drop(file); // release mutex guard
+                Ok((None, USize64(offset), bytes_written))
             }
         }
     }
 }
 
-impl io::Write for SwitchingWriter {
+impl io::Write for SwitchingWriter<'_> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         match *self {
             SwitchingWriter::Null {
@@ -394,6 +518,15 @@ impl io::Write for SwitchingWriter {
                 *bytes_written += n;
                 Ok(n)
             }
+            SwitchingWriter::SharedFile {
+                ref mut file,
+                ref mut bytes_written,
+                offset: _,
+            } => {
+                let n = file.write(bytes)?;
+                *bytes_written += n;
+                Ok(n)
+            }
         }
     }
 
@@ -402,6 +535,7 @@ impl io::Write for SwitchingWriter {
             SwitchingWriter::Null { .. } => Ok(()),
             SwitchingWriter::Memory { .. } => Ok(()),
             SwitchingWriter::File { file, .. } => file.flush(),
+            SwitchingWriter::SharedFile { file, .. } => file.flush(),
         }
     }
 }
@@ -505,6 +639,8 @@ fn dispose_of_poison<G>(_: std::sync::PoisonError<G>) -> io::Error {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
 
     /// Write one byte to make the buffer nonempty.
@@ -535,7 +671,7 @@ mod tests {
 
     #[test]
     fn inline_only_success() {
-        let d = GltfDataDestination::new(None, usize::MAX);
+        let d = GltfDataDestination::new(None, usize::MAX, true).unwrap();
 
         let buffer_index_and_offset = d
             .write("foo".into(), "bar", DataType::Mesh, |w| {
@@ -559,7 +695,7 @@ mod tests {
 
     #[test]
     fn inline_only_failure() {
-        let d = GltfDataDestination::new(None, 1);
+        let d = GltfDataDestination::new(None, 1, true).unwrap();
 
         let error = d
             .write("foo".into(), "bar", DataType::Mesh, |w| {
@@ -580,7 +716,7 @@ mod tests {
         file_base_path.push("basepath.gltf");
         println!("Base path: {}", file_base_path.display());
 
-        let d = GltfDataDestination::new(Some(file_base_path), 3);
+        let d = GltfDataDestination::new(Some(file_base_path), 3, true).unwrap();
         let buffer_index_and_offset = d
             .write("foo".into(), "bar", DataType::Mesh, |w| {
                 w.write_all(&[1, 2, 3])?;
@@ -608,7 +744,7 @@ mod tests {
         file_base_path.push("basepath.gltf");
         println!("Base path: {}", file_base_path.display());
 
-        let d = GltfDataDestination::new(Some(file_base_path), 0);
+        let d = GltfDataDestination::new(Some(file_base_path), 0, true).unwrap();
         d.write("foo".into(), "bar", DataType::Mesh, write1).unwrap();
         d.write("foo".into(), "bar", DataType::Mesh, write1).unwrap();
 
@@ -618,13 +754,60 @@ mod tests {
         assert_eq!(e2.uri.as_deref(), Some("basepath-bar-2.glbin"));
     }
 
+    /// Tests single-file mode and that alignment is performed within the file.
+    #[test]
+    fn single_file_and_alignment() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let mut file_base_path = temp_dir.path().to_owned();
+        file_base_path.push("basepath.gltf");
+        println!("Base path: {}", file_base_path.display());
+
+        let d = GltfDataDestination::new(Some(file_base_path), 0, false).unwrap();
+        let addr1 = d
+            .write("p1".into(), "p3", DataType::Mesh, |w| {
+                w.write_all(&[1, 2, 3])
+            })
+            .unwrap();
+        let addr2 = d.write("p2".into(), "p3", DataType::Mesh, |w| w.write_all(&[4])).unwrap();
+        let addr3 = d.write("p3".into(), "p3", DataType::Mesh, |w| w.write_all(&[5])).unwrap();
+
+        assert_eq!(
+            (addr1, addr2, addr3),
+            (
+                BufferAddress {
+                    buffer: Index::new(0),
+                    byte_offset: USize64(0),
+                    byte_length: USize64(3),
+                },
+                BufferAddress {
+                    buffer: Index::new(0),
+                    byte_offset: USize64(4),
+                    byte_length: USize64(1),
+                },
+                BufferAddress {
+                    buffer: Index::new(0),
+                    byte_offset: USize64(8),
+                    byte_length: USize64(1),
+                },
+            )
+        );
+        let [buffer_object] =
+            <[gltf_json::Buffer; 1]>::try_from(d.into_buffers().unwrap()).unwrap();
+        // These two file names must be distinct.
+        assert_eq!(buffer_object.uri.as_deref(), Some("basepath.glbin"));
+        assert_eq!(
+            fs::read(temp_dir.path().join("basepath.glbin")).unwrap(),
+            vec![1, 2, 3, 0, 4, 0, 0, 0, 5]
+        );
+    }
+
     #[test]
     fn url_encoding() {
         let temp_dir = tempfile::tempdir().unwrap();
         let mut file_base_path = temp_dir.path().to_owned();
         file_base_path.push("base path.gltf");
 
-        let d = GltfDataDestination::new(Some(file_base_path), 0);
+        let d = GltfDataDestination::new(Some(file_base_path), 0, true).unwrap();
         d.write("object name".into(), "object file", DataType::Mesh, write1).unwrap();
 
         let [buffer_object] =

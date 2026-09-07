@@ -752,8 +752,9 @@ mod tests {
         let mut file_base_path = temp_dir.path().to_owned();
         file_base_path.push("filetest.gltf");
 
-        let allocator =
-            GltfTextureAllocator::new(GltfDataDestination::new(Some(file_base_path), 0));
+        let allocator = GltfTextureAllocator::new(
+            GltfDataDestination::new(Some(file_base_path), 0, true).unwrap(),
+        );
         let mut tile = allocator
             .allocate(GridAab::ORIGIN_CUBE, Channels::Reflectance)
             .expect("allocation");

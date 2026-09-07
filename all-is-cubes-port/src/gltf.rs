@@ -446,7 +446,8 @@ pub(crate) fn export_gltf(
         GltfDataDestination::new(
             Some(destination.clone()),
             gltf_maximum_inline_bytes.unwrap_or(usize::MAX),
-        ),
+            true,
+        )?,
         if gltf_min_linear {
             gltf_json::texture::MinFilter::Linear
         } else {

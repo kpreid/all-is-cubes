@@ -145,7 +145,8 @@ impl Recorder {
                     mpsc::sync_channel::<write_gltf::MeshRecordMsg>(1);
 
                 let writer = GltfWriter::new(
-                    GltfDataDestination::new(Some(options.output_path.clone()), 2000),
+                    GltfDataDestination::new(Some(options.output_path.clone()), 2000, true)
+                        .context("could not open glTF data file")?,
                     if cameras.graphics_options().antialiasing.is_msaa() {
                         port::gltf::json::texture::MinFilter::Linear
                     } else {
