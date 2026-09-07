@@ -12,6 +12,7 @@ use all_is_cubes::math::range_len;
 use all_is_cubes_mesh::texture::Channels;
 use all_is_cubes_mesh::{IndexSlice, MeshTypes, SpaceMesh};
 
+use crate::gltf::buffer::BufferAddress;
 use crate::gltf::glue::{byte_offset_discarding_zero, create_accessor};
 use crate::gltf::{GltfTextureAllocator, GltfVertex, GltfWriter};
 
@@ -47,23 +48,16 @@ where
     let vertices_byte_len = bytemuck::cast_slice::<GltfVertex, u8>(mesh.vertices().0).len();
     let indices_byte_len = mesh.indices().as_bytes().len();
     let buffer_object_name = format!("{name} data");
-    let buffer_file_suffix = format!("mesh-{i}", i = writer.root.buffers.len());
+    let buffer_file_suffix = "mesh".to_owned();
 
-    // Push the vertex & index buffer early.
-    // If we are doing texture coordinates, we need to fill this in later with texture coordinates
-    // from the texture atlas, but have the object index now.
-    let buffer_index = writer.root.push(gltf_json::Buffer {
-        byte_length: USize64::from(vertices_byte_len.strict_add(indices_byte_len)),
-        name: Some(buffer_object_name.clone()),
-        uri: None, // to be filled in later
-        extensions: Default::default(),
-        extras: Default::default(),
-    });
+    // We must create our buffer views before we know what buffer index and offset they point to.
+    // This placeholder index is obviously invalid until we can replace it.
+    let dummy_buffer_index = Index::new(u32::MAX);
 
     let vertex_buffer_view = writer.root.push(gltf_json::buffer::View {
-        buffer: buffer_index,
+        buffer: dummy_buffer_index, // replaced later
         byte_length: USize64::from(vertices_byte_len),
-        byte_offset: None,
+        byte_offset: None, // replaced later
         byte_stride: Some(Stride(size_of::<GltfVertex>())),
         name: Some(format!("{name} vertex")),
         target: Some(Valid(gltf_json::buffer::Target::ArrayBuffer)),
@@ -71,10 +65,9 @@ where
         extras: Default::default(),
     });
     let index_buffer_view = writer.root.push(gltf_json::buffer::View {
-        buffer: buffer_index,
+        buffer: dummy_buffer_index, // replaced later
         byte_length: USize64::from(indices_byte_len),
-        // Indexes are packed into the same buffer, so they start at the end of the vertex bytes
-        byte_offset: byte_offset_discarding_zero(USize64::from(vertices_byte_len)),
+        byte_offset: None, // replaced later
         byte_stride: None,
         name: Some(format!("{name} index")),
         // ElementArrayBuffer means index buffer
@@ -134,17 +127,18 @@ where
         writer.meshes_awaiting_texture_coordinates.push(MeshAwaitingTextureCoordinates {
             vertices,
             index_bytes,
-            buffer_index,
+            vertex_buffer_view,
+            index_buffer_view,
             buffer_object_name,
             buffer_file_suffix,
             texcoord_accessor_index,
         });
     } else {
-        // If the mesh contains only vertex colors, we can write the buffer immediately.
+        // If the mesh contains only vertex colors, we can write the vertex buffer immediately.
 
         let vertex_bytes = bytemuck::must_cast_slice::<GltfVertex, u8>(mesh.vertices().0);
         // TODO: use the given name (sanitized) in the file name
-        writer.root.buffers[buffer_index.value()] = writer
+        let real_buffer = writer
             .buffer_dest
             .write(buffer_object_name, &buffer_file_suffix, "glbin", |w| {
                 w.write_all(vertex_bytes)?;
@@ -164,6 +158,14 @@ where
                 Ok(())
             })
             .expect("buffer write error"); // TODO: error propagation
+
+        link_buffer_views_to_buffer(
+            &mut writer.root,
+            vertex_bytes.len(),
+            real_buffer,
+            vertex_buffer_view,
+            index_buffer_view,
+        );
     }
 
     writer.flaws |= mesh.flaws();
@@ -262,10 +264,15 @@ pub(in crate::gltf) struct MeshAwaitingTextureCoordinates {
     ///
     /// We don’t need to patch this, but we do want to write it into the same buffer, so we need
     /// to hold onto it until then.
+    ///
+    /// TODO: When we support GLB / writing to shared buffers, we will no longer have any
+    /// reason to do this combination, and can instead write the indices immediately.
     index_bytes: Vec<u8>,
 
-    /// glTF buffer entry that needs its URI updated after writing.
-    buffer_index: Index<gltf_json::Buffer>,
+    // glTF buffer views that need their `buffer` fields updated once the vertex buffer is
+    // created or known.
+    vertex_buffer_view: Index<gltf_json::buffer::View>,
+    index_buffer_view: Index<gltf_json::buffer::View>,
 
     // Name passed to [`GltfDataDestination::write`].
     buffer_object_name: String,
@@ -299,22 +306,52 @@ impl MeshAwaitingTextureCoordinates {
         accessor.min = min;
         accessor.max = max;
 
-        // Write the buffer data (vertices followed by indices) and replace the placeholder
-        // buffer object
+        // Write the buffer data (vertices followed by indices).
+        //
+        // TODO: When we support GLB / writing to shared buffers, we will no longer have any
+        // reason to do this combination of vertices and indices here, and can just call
+        // write() twice.
+        let vertex_bytes = bytemuck::must_cast_slice::<GltfVertex, u8>(&self.vertices);
         let buffer = buffer_dest.write(
             self.buffer_object_name,
             &self.buffer_file_suffix,
             "glbin",
             |w| {
-                w.write_all(bytemuck::must_cast_slice::<GltfVertex, u8>(&self.vertices))?;
+                w.write_all(vertex_bytes)?;
                 w.write_all(&self.index_bytes)?;
                 Ok(())
             },
         )?;
-        root.buffers[self.buffer_index.value()] = buffer;
+
+        link_buffer_views_to_buffer(
+            root,
+            vertex_bytes.len(),
+            buffer,
+            self.vertex_buffer_view,
+            self.index_buffer_view,
+        );
 
         Ok(())
     }
+}
+
+/// Update a mesh’s two buffer views to actually point to the buffer.
+fn link_buffer_views_to_buffer(
+    root: &mut gltf_json::Root,
+    vertex_data_length: usize,
+    buffer: BufferAddress,
+    vertex_buffer_view: Index<gltf_json::buffer::View>,
+    index_buffer_view: Index<gltf_json::buffer::View>,
+) {
+    let vertex_buffer_view = &mut root.buffer_views[vertex_buffer_view.value()];
+    vertex_buffer_view.buffer = buffer.buffer;
+    vertex_buffer_view.byte_offset = byte_offset_discarding_zero(buffer.byte_offset);
+    let index_buffer_view = &mut root.buffer_views[index_buffer_view.value()];
+    index_buffer_view.buffer = buffer.buffer;
+    // If this arithmetic could overflow, then we’d have failed while writing.
+    index_buffer_view.byte_offset = byte_offset_discarding_zero(USize64::from(
+        buffer.byte_offset.0 + vertex_data_length as u64,
+    ));
 }
 
 // -------------------------------------------------------------------------------------------------

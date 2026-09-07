@@ -15,7 +15,8 @@ use all_is_cubes::math::{self, Axis, Cube, GridAab, GridRotation, Gridgid};
 use all_is_cubes_mesh::texture::{self, TilePoint};
 
 use crate::gltf::GltfDataDestination;
-use crate::gltf::glue::Lef32;
+use crate::gltf::buffer::BufferAddress;
+use crate::gltf::glue::{Lef32, byte_offset_discarding_zero};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -111,7 +112,7 @@ impl GltfTextureAllocator {
         self.gatherer.is_empty()
     }
 
-    pub(crate) fn write_png_atlas(&self) -> Result<Atlas<gltf_json::Buffer>, io::Error> {
+    pub(crate) fn write_png_atlas(&self) -> Result<Atlas<BufferAddress>, io::Error> {
         let Atlas {
             reflectance,
             emission,
@@ -137,7 +138,7 @@ impl GltfTextureAllocator {
     fn write_one_image(
         &self,
         image: &image::ImageBuffer<image::Rgba<u8>, Vec<u8>>,
-    ) -> Result<gltf_json::Buffer, io::Error> {
+    ) -> Result<BufferAddress, io::Error> {
         self.destination.write(String::from("texture"), "texture", "png", |w| {
             // `image` wants `Write + Seek` but `w` is not currently `Seek`
             let mut tmp = io::Cursor::new(Vec::new());
@@ -379,15 +380,18 @@ pub(super) fn insert_block_texture_atlas(
 fn insert_one_image(
     root: &mut gltf_json::Root,
     name: &'static str,
-    image_buffer: gltf_json::Buffer,
+    image_buffer: BufferAddress,
     sampler: gltf_json::Index<gltf_json::texture::Sampler>,
 ) -> gltf_json::Index<gltf_json::Texture> {
-    let block_texture_len = image_buffer.byte_length;
-    let block_texture_buffer = root.push(image_buffer);
+    let BufferAddress {
+        buffer,
+        byte_offset,
+        byte_length,
+    } = image_buffer;
     let block_texture_buffer_view = root.push(gltf_json::buffer::View {
-        buffer: block_texture_buffer,
-        byte_length: block_texture_len,
-        byte_offset: None,
+        buffer,
+        byte_length,
+        byte_offset: byte_offset_discarding_zero(byte_offset),
         byte_stride: None,
         name: Some(name.into()),
         target: None,

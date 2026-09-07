@@ -217,22 +217,12 @@
     {
       "byteLength": 936,
       "name": "'block0' data",
-      "uri": "export_block_defs-mesh-0.glbin"
+      "uri": "export_block_defs-mesh.glbin"
     },
     {
       "byteLength": 936,
       "name": "'block1' data",
-      "uri": "export_block_defs-mesh-1.glbin"
-    },
-    {
-      "byteLength": 936,
-      "name": "'block2' data",
       "uri": "export_block_defs-mesh-2.glbin"
-    },
-    {
-      "byteLength": 936,
-      "name": "'block3' data",
-      "uri": "export_block_defs-mesh-3.glbin"
     },
     {
       "byteLength": 2359,
@@ -243,6 +233,16 @@
       "byteLength": 816,
       "name": "texture",
       "uri": "export_block_defs-texture-2.png"
+    },
+    {
+      "byteLength": 936,
+      "name": "'block2' data",
+      "uri": "export_block_defs-mesh-3.glbin"
+    },
+    {
+      "byteLength": 936,
+      "name": "'block3' data",
+      "uri": "export_block_defs-mesh-4.glbin"
     }
   ],
   "bufferViews": [
@@ -275,40 +275,40 @@
       "target": 34963
     },
     {
-      "buffer": 2,
+      "buffer": 4,
       "byteLength": 864,
       "byteStride": 36,
       "name": "'block2' vertex",
       "target": 34962
     },
     {
-      "buffer": 2,
+      "buffer": 4,
       "byteLength": 72,
       "byteOffset": 864,
       "name": "'block2' index",
       "target": 34963
     },
     {
-      "buffer": 3,
+      "buffer": 5,
       "byteLength": 864,
       "byteStride": 36,
       "name": "'block3' vertex",
       "target": 34962
     },
     {
-      "buffer": 3,
+      "buffer": 5,
       "byteLength": 72,
       "byteOffset": 864,
       "name": "'block3' index",
       "target": 34963
     },
     {
-      "buffer": 4,
+      "buffer": 2,
       "byteLength": 2359,
       "name": "reflectance"
     },
     {
-      "buffer": 5,
+      "buffer": 3,
       "byteLength": 816,
       "name": "emission"
     }

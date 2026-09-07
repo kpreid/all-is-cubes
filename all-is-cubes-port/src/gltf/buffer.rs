@@ -13,18 +13,20 @@ use gltf_json::validation::USize64;
 
 use super::glue::{Lef32, create_accessor};
 
+// -------------------------------------------------------------------------------------------------
+
 /// Designates the location where glTF buffer data (meshes, textures) should be written
 /// (either to disk files or inline in the glTF JSON).
 ///
 /// If cloned, the clone will provide equivalent access to the same destination and may be
 /// used interchangeably.
 ///
-/// TODO: Add support for `.glb` combined files.
+/// TODO: Add support for combining buffers and writing `.glb` combined files.
 #[derive(Clone, Debug)]
-pub struct GltfDataDestination(Arc<Inner>);
+pub struct GltfDataDestination(Arc<Shared>);
 
 #[derive(Debug)]
-struct Inner {
+struct Shared {
     /// If true, all data is unconditionally discarded. For testing only.
     discard: bool,
 
@@ -41,25 +43,32 @@ struct Inner {
     /// Filename suffixes (the 'bar' in `foo-bar.glbin`) that have already been used,
     /// tracked to ensure uniqueness.
     suffix_uses: Mutex<HashSet<String>>,
+
+    /// Buffers that have been created by [`GltfDataDestination::write()`] calls.
+    /// These will later be moved into the [`gltf_json::Root`].
+    /// This vector is only appended to, so its indices are stable.
+    buffers: Mutex<Vec<gltf_json::Buffer>>,
 }
 
 impl GltfDataDestination {
     /// Creates a [`GltfDataDestination`] that rejects all data.
     pub fn null() -> GltfDataDestination {
-        Self(Arc::new(Inner {
+        Self(Arc::new(Shared {
             discard: true,
             maximum_inline_bytes: 0,
             file_base_path: None,
             suffix_uses: Mutex::new(HashSet::new()),
+            buffers: Mutex::new(Vec::new()),
         }))
     }
 
     /// `maximum_inline_length` is the maximum length of data which will be stored inline in the
     /// glTF file as a `data:` URL rather than separately.
     ///
-    /// `file_base_path` is the file path (optionally with extension which will be stripped) to use as a
-    /// base name for data files beside the glTF file. For example, if `file_base_path` is
-    /// `foo/bar.gltf`, then buffer files will be written to paths like `foo/bar-buffername.glbin`.
+    /// `file_base_path` is the file path (optionally with extension which will be stripped) to
+    /// use as a base name for data files beside the glTF file.
+    /// For example, if `file_base_path` is `foo/bar.gltf`, then buffer files will be written to
+    /// paths like `foo/bar-buffername.glbin`.
     /// If it is `None`, then buffers may not exceed `maximum_inline_length`.
     ///
     /// # Panics
@@ -74,23 +83,24 @@ impl GltfDataDestination {
             );
         }
 
-        Self(Arc::new(Inner {
+        Self(Arc::new(Shared {
             discard: false,
             maximum_inline_bytes,
             file_base_path,
             suffix_uses: Mutex::new(HashSet::new()),
+            buffers: Mutex::new(Vec::new()),
         }))
     }
 
-    /// Write glTF buffer data, then return a [`gltf_json::Buffer`] pointing to it by
-    /// one of the permitted means.
+    /// Write glTF buffer data, then return the buffer index and offset into that buffer where
+    /// the provided data will be found.
     ///
     /// * `contents_fn` will be called with a buffered writer to write the data to.
-    /// * `buffer_entity_name` is the `name` that will be in the returned [`gltf_json::Buffer`]
-    ///   entity.
+    /// * `buffer_object_name` is the `name` that may be given to the [`gltf_json::Buffer`] object
+    ///   if it is not shared with other data.
     /// * `proposed_file_name` will be included in the name of the generated data file,
-    ///   if there is one; for example, `foo.gltf` will have data files named like
-    ///   `foo-{proposed_file_name}-20.{proposed_file_extension}`.
+    ///   if there is one for this data alone; for example, `foo.gltf` will have data files named
+    ///   like `foo-{proposed_file_name}-20.{proposed_file_extension}`.
     /// * `proposed_file_extension` should be `glbin` or an image format.
     ///
     /// # Errors
@@ -105,14 +115,13 @@ impl GltfDataDestination {
     //
     // ---
     // TODO: Add context (filename) to the IO error
-    #[expect(clippy::missing_panics_doc, reason = "implementation deficiency")]
-    pub fn write<F>(
+    pub(crate) fn write<F>(
         &self,
-        buffer_entity_name: String,
+        buffer_object_name: String,
         proposed_file_name: &str,
         proposed_file_extension: &str,
         contents_fn: F,
-    ) -> io::Result<gltf_json::Buffer>
+    ) -> io::Result<BufferAddress>
     where
         F: FnOnce(&mut dyn io::Write) -> io::Result<()>,
     {
@@ -129,9 +138,7 @@ impl GltfDataDestination {
             // Ensure uniqueness of the file suffix.
             // TODO: Only do this if we exceed the in-memory limit?
             let unique_file_suffix: String = {
-                let mut suffix_uses = self.0.suffix_uses.lock().map_err(|_| {
-                    io::Error::other("previous panic while using GltfDataDestination")
-                })?;
+                let mut suffix_uses = self.0.suffix_uses.lock().map_err(dispose_of_poison)?;
                 make_unique_name(proposed_file_name, &mut suffix_uses)
             };
 
@@ -178,13 +185,35 @@ impl GltfDataDestination {
         contents_fn(&mut implementation)?;
         let (uri, byte_length) = implementation.close()?;
 
-        Ok(gltf_json::Buffer {
+        // Create buffer entity.
+        let buffer = gltf_json::Buffer {
+            name: Some(buffer_object_name),
             byte_length: USize64::from(byte_length),
-            name: Some(buffer_entity_name),
             uri,
             extensions: Default::default(),
             extras: Default::default(),
+        };
+        let buffer_index = Index::push(
+            &mut *self.0.buffers.lock().map_err(dispose_of_poison)?,
+            buffer,
+        );
+
+        Ok(BufferAddress {
+            buffer: buffer_index,
+            byte_offset: USize64(0),
+            byte_length: USize64::from(byte_length),
         })
+    }
+
+    /// Returns the buffers that should go into the glTF JSON.
+    ///
+    /// If clones of this destination exist, it is still usable to make glTF with more content,
+    /// but this is not the intended usage pattern and will incur an additional clone of the data.
+    pub(crate) fn into_buffers(self) -> io::Result<Vec<gltf_json::Buffer>> {
+        match Arc::try_unwrap(self.0) {
+            Ok(inner) => inner.buffers.into_inner().map_err(dispose_of_poison),
+            Err(arc) => Ok(arc.buffers.lock().map_err(dispose_of_poison)?.clone()),
+        }
     }
 }
 
@@ -193,6 +222,34 @@ impl PartialEq for GltfDataDestination {
         Arc::ptr_eq(&self.0, &other.0)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// A buffer and an offset in it, created by [`GltfDataDestination::write()`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct BufferAddress {
+    /// The index of the buffer in the glTF asset.
+    pub buffer: Index<gltf_json::Buffer>,
+    /// The offset of the beginning of the data from the beginning of the buffer.
+    pub byte_offset: USize64,
+    /// Length of the data in bytes.
+    /// (We include this because it is handy, not because it is required.)
+    pub byte_length: USize64,
+}
+
+impl BufferAddress {
+    /// Byte zero of buffer zero.
+    #[cfg(test)]
+    pub(crate) fn from_length_at_zero(len: usize) -> Self {
+        Self {
+            buffer: Index::new(0),
+            byte_offset: USize64(0),
+            byte_length: USize64::from(len),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// An implementation of [`io::Write`] which can dynamically switch from
 /// an in-memory buffer to a file based on the length, and in any case
@@ -309,7 +366,9 @@ impl io::Write for SwitchingWriter {
     }
 }
 
-/// Create a buffer from the given data, and return an accessor to it.
+// -------------------------------------------------------------------------------------------------
+
+/// Store the given data in a buffer, and return an accessor to the data.
 ///
 /// The `data_source` iterator should be cheap to clone,
 /// as it will be consulted multiple times.
@@ -327,19 +386,21 @@ where
     I: IntoIterator<Item = [f32; COMPONENTS], IntoIter: ExactSizeIterator> + Clone,
     [Lef32; COMPONENTS]: bytemuck::Pod,
 {
-    let length = data_source.clone().into_iter().len();
-    let buffer = dest.write(name.clone(), file_suffix, "glbin", |w| {
+    let BufferAddress {
+        buffer,
+        byte_offset,
+        byte_length,
+    } = dest.write(name.clone(), file_suffix, "glbin", |w| {
         for item in data_source.clone() {
             w.write_all(bytemuck::bytes_of(&item.map(Lef32::from)))?;
         }
         Ok(())
     })?;
-    let buffer_index = root.push(buffer);
 
     let buffer_view = root.push(gltf_json::buffer::View {
-        buffer: buffer_index,
-        byte_length: (length * size_of::<[Lef32; COMPONENTS]>()).into(),
-        byte_offset: None,
+        buffer,
+        byte_length,
+        byte_offset: Some(byte_offset),
         byte_stride: None,
         name: Some(name.clone()),
         target: None,
@@ -370,6 +431,12 @@ fn make_unique_name(proposed: &str, used: &mut HashSet<String>) -> String {
     chosen
 }
 
+fn dispose_of_poison<G>(_: std::sync::PoisonError<G>) -> io::Error {
+    io::Error::other("previous panic while using GltfDataDestination; cannot continue")
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -377,32 +444,50 @@ mod tests {
     #[test]
     fn discard() {
         let d = GltfDataDestination::null();
-        let buffer_entity =
+
+        let buffer_index_and_offset =
             d.write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 3])).unwrap();
-        assert_eq!(buffer_entity.name, Some("foo".into()));
-        assert_eq!(buffer_entity.uri, None);
-        assert_eq!(buffer_entity.byte_length, USize64(3));
+
+        assert_eq!(
+            buffer_index_and_offset,
+            BufferAddress::from_length_at_zero(3)
+        );
+        let [buffer_object] =
+            <[gltf_json::Buffer; 1]>::try_from(d.into_buffers().unwrap()).unwrap();
+        assert_eq!(buffer_object.name, Some("foo".into()));
+        assert_eq!(buffer_object.uri, None);
+        assert_eq!(buffer_object.byte_length, USize64(3));
     }
 
     #[test]
     fn inline_only_success() {
         let d = GltfDataDestination::new(None, usize::MAX);
-        let buffer_entity =
+
+        let buffer_index_and_offset =
             d.write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 255])).unwrap();
-        assert_eq!(buffer_entity.name, Some("foo".into()));
+
         assert_eq!(
-            buffer_entity.uri.as_deref(),
+            buffer_index_and_offset,
+            BufferAddress::from_length_at_zero(3)
+        );
+        let [buffer_object] =
+            <[gltf_json::Buffer; 1]>::try_from(d.into_buffers().unwrap()).unwrap();
+        assert_eq!(buffer_object.name, Some("foo".into()));
+        assert_eq!(
+            buffer_object.uri.as_deref(),
             Some("data:application/gltf-buffer;base64,AQL/") // AQL/ = 000000 010000 001011 111111
         );
-        assert_eq!(buffer_entity.byte_length, USize64(3));
+        assert_eq!(buffer_object.byte_length, USize64(3));
     }
 
     #[test]
     fn inline_only_failure() {
         let d = GltfDataDestination::new(None, 1);
+
         let error = d
             .write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 255]))
             .unwrap_err();
+
         assert_eq!(
             error.to_string(),
             "no destination was provided for glTF buffers > 1 bytes"
@@ -417,17 +502,24 @@ mod tests {
         println!("Base path: {}", file_base_path.display());
 
         let d = GltfDataDestination::new(Some(file_base_path), 3);
-        let buffer_entity = d
+        let buffer_index_and_offset = d
             .write("foo".into(), "bar", "glbin", |w| {
                 w.write_all(&[1, 2, 3])?;
                 w.write_all(&[4, 5, 6])?;
                 Ok(())
             })
             .unwrap();
-        assert_eq!(buffer_entity.name, Some("foo".into()));
+
+        assert_eq!(
+            buffer_index_and_offset,
+            BufferAddress::from_length_at_zero(6)
+        );
+        let [buffer_object] =
+            <[gltf_json::Buffer; 1]>::try_from(d.into_buffers().unwrap()).unwrap();
+        assert_eq!(buffer_object.name, Some("foo".into()));
         // Note that the URL is relative, not including the temp dir.
-        assert_eq!(buffer_entity.uri.as_deref(), Some("basepath-bar.glbin"));
-        assert_eq!(buffer_entity.byte_length, USize64(6));
+        assert_eq!(buffer_object.uri.as_deref(), Some("basepath-bar.glbin"));
+        assert_eq!(buffer_object.byte_length, USize64(6));
     }
 
     #[test]
@@ -438,9 +530,10 @@ mod tests {
         println!("Base path: {}", file_base_path.display());
 
         let d = GltfDataDestination::new(Some(file_base_path), 0);
-        let e1 = d.write("foo".into(), "bar", "glbin", write1).unwrap();
-        let e2 = d.write("foo".into(), "bar", "glbin", write1).unwrap();
+        d.write("foo".into(), "bar", "glbin", write1).unwrap();
+        d.write("foo".into(), "bar", "glbin", write1).unwrap();
 
+        let [e1, e2] = <[gltf_json::Buffer; 2]>::try_from(d.into_buffers().unwrap()).unwrap();
         // These two file names must be distinct.
         assert_eq!(e1.uri.as_deref(), Some("basepath-bar.glbin"));
         assert_eq!(e2.uri.as_deref(), Some("basepath-bar-2.glbin"));

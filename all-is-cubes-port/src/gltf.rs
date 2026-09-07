@@ -391,6 +391,9 @@ impl GltfWriter {
             });
         }
 
+        debug_assert!(self.root.buffers.is_empty());
+        self.root.buffers = self.buffer_dest.into_buffers()?;
+
         Ok(self.root)
     }
 
