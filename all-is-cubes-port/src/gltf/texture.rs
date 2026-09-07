@@ -121,9 +121,9 @@ impl GltfTextureAllocator {
 
         // Store image data to glTF buffers
         // TODO: add error context
-        let reflectance = self.write_one_image(&reflectance)?;
+        let reflectance = self.write_one_image("reflectance", &reflectance)?;
         let emission = if let Some(emission) = emission {
-            Some(self.write_one_image(&emission)?)
+            Some(self.write_one_image("emission", &emission)?)
         } else {
             None
         };
@@ -137,9 +137,10 @@ impl GltfTextureAllocator {
 
     fn write_one_image(
         &self,
+        name: &str,
         image: &image::ImageBuffer<image::Rgba<u8>, Vec<u8>>,
     ) -> Result<BufferAddress, io::Error> {
-        self.destination.write(String::from("texture"), "texture", "png", |w| {
+        self.destination.write(String::from(name), name, "png", |w| {
             // `image` wants `Write + Seek` but `w` is not currently `Seek`
             let mut tmp = io::Cursor::new(Vec::new());
             image
@@ -769,7 +770,7 @@ mod tests {
                 .unwrap()
                 .map(|e| e.unwrap().file_name().into_string().unwrap())
                 .collect::<Vec<String>>(),
-            vec!["filetest-texture.png"],
+            vec!["filetest-reflectance.png"],
         );
     }
 }

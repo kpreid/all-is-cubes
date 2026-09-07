@@ -226,13 +226,13 @@
     },
     {
       "byteLength": 2359,
-      "name": "texture",
-      "uri": "export_block_defs-texture.png"
+      "name": "reflectance",
+      "uri": "export_block_defs-reflectance.png"
     },
     {
       "byteLength": 816,
-      "name": "texture",
-      "uri": "export_block_defs-texture-2.png"
+      "name": "emission",
+      "uri": "export_block_defs-emission.png"
     },
     {
       "byteLength": 936,
