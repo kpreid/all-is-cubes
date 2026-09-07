@@ -214,11 +214,16 @@ impl GltfWriter {
     /// The mesh's texture allocator must be [`self.texture_allocator()`][Self::texture_allocator].
     ///
     /// This does not cause the mesh to be visible (it does not add any [`gltf_json::Node`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Ok(Some(index))` if the mesh was added, `Ok(None)` if the given `mesh` was empty,
+    /// or `Err` if an IO error occurred.
     pub fn add_mesh<M>(
         &mut self,
         name: &dyn fmt::Display,
         mesh: &SpaceMesh<M>,
-    ) -> Option<Index<gltf_json::Mesh>>
+    ) -> io::Result<Option<Index<gltf_json::Mesh>>>
     where
         M: MeshTypes<Vertex = GltfVertex, Alloc = GltfTextureAllocator>,
     {
@@ -499,7 +504,7 @@ pub(crate) fn export_gltf(
                         &mesh_options,
                     ));
 
-                    let mesh_index = writer.add_mesh(&name, &mesh);
+                    let mesh_index = writer.add_mesh(&name, &mesh)?;
                     // TODO: if the mesh is empty/None, should we include the node anyway or not?
                     let mesh_node = writer.root.push(gltf_json::Node {
                         mesh: mesh_index,
@@ -533,7 +538,7 @@ pub(crate) fn export_gltf(
             p.set_label(&name);
             p.progress(0.01).await;
             {
-                let mesh_index = writer.add_mesh(&name, &mesh);
+                let mesh_index = writer.add_mesh(&name, &mesh)?;
                 let mesh_node = writer.root.push(gltf_json::Node {
                     mesh: mesh_index,
                     // SpaceMesh translates everything so the lower bounds of the requested region

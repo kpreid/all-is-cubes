@@ -29,7 +29,7 @@ fn gltf_mesh(
     let blocks = block_meshes_for_space(space, &writer.texture_allocator(), options);
     let mesh: SpaceMesh<GltfMt> = SpaceMesh::new(space, space.bounds(), options, &*blocks);
 
-    let index = writer.add_mesh(&"mesh", &mesh);
+    let index = writer.add_mesh(&"mesh", &mesh).unwrap();
 
     (mesh, index)
 }

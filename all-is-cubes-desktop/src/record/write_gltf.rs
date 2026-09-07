@@ -168,7 +168,8 @@ pub(super) fn start_gltf_writing(
             while let Ok(msg) = scene_receiver.recv() {
                 match msg {
                     MeshRecordMsg::AddMesh(name, mesh, mesh_index_cell) => {
-                        let mesh_index = writer.add_mesh(&format!("{name:?}"), &mesh);
+                        // TODO: propagate error rather than panicking
+                        let mesh_index = writer.add_mesh(&format!("{name:?}"), &mesh).unwrap();
                         mesh_index_cell
                             .set(mesh_index)
                             .expect("mesh index cell used more than once");

@@ -23,12 +23,16 @@ use crate::gltf::{GltfTextureAllocator, GltfVertex, GltfWriter};
 /// If the mesh requires textures, it will contain partially placeholder data until the
 /// texture atlas is finalized.
 ///
-/// If the input is empty, does nothing and returns `None`.
+/// If the input is empty, does nothing and returns `Ok(None)`.
+///
+/// # Errors
+///
+/// Returns `Err` if an IO error occurs while writing mesh data to disk.
 pub(crate) fn add_mesh<M>(
     writer: &mut GltfWriter,
     name: &dyn fmt::Display,
     mesh: &SpaceMesh<M>,
-) -> Option<Index<gltf_json::Mesh>>
+) -> io::Result<Option<Index<gltf_json::Mesh>>>
 where
     // TODO: This generic bound (rather than `SpaceMesh<GltfMt>`) is a workaround to allow
     // `all-is-cubes-port` to define its own `DynamicMeshTypes`. This is a sign that maybe
@@ -36,7 +40,7 @@ where
     M: MeshTypes<Vertex = GltfVertex, Alloc = GltfTextureAllocator>,
 {
     if mesh.is_empty() {
-        return None;
+        return Ok(None);
     }
 
     let channels_used = mesh.texture_channels_used();
@@ -138,26 +142,26 @@ where
 
         let vertex_bytes = bytemuck::must_cast_slice::<GltfVertex, u8>(mesh.vertices().0);
         // TODO: use the given name (sanitized) in the file name
-        let real_buffer = writer
-            .buffer_dest
-            .write(buffer_object_name, &buffer_file_suffix, "glbin", |w| {
-                w.write_all(vertex_bytes)?;
-                // Convert index bytes to little-endian
-                match mesh.indices() {
-                    IndexSlice::U16(slice) => {
-                        for index in slice {
-                            w.write_all(&index.to_le_bytes())?;
+        let real_buffer =
+            writer
+                .buffer_dest
+                .write(buffer_object_name, &buffer_file_suffix, "glbin", |w| {
+                    w.write_all(vertex_bytes)?;
+                    // Convert index bytes to little-endian
+                    match mesh.indices() {
+                        IndexSlice::U16(slice) => {
+                            for index in slice {
+                                w.write_all(&index.to_le_bytes())?;
+                            }
+                        }
+                        IndexSlice::U32(slice) => {
+                            for index in slice {
+                                w.write_all(&index.to_le_bytes())?;
+                            }
                         }
                     }
-                    IndexSlice::U32(slice) => {
-                        for index in slice {
-                            w.write_all(&index.to_le_bytes())?;
-                        }
-                    }
-                }
-                Ok(())
-            })
-            .expect("buffer write error"); // TODO: error propagation
+                    Ok(())
+                })?;
 
         link_buffer_views_to_buffer(
             &mut writer.root,
@@ -245,7 +249,7 @@ where
     };
     let mesh_index = Index::push(&mut writer.root.meshes, mesh_object);
 
-    Some(mesh_index)
+    Ok(Some(mesh_index))
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -483,7 +487,7 @@ mod tests {
         let blocks = mesh::block_meshes_for_space(space, &writer.texture_allocator(), options);
         let mesh: SpaceMesh<GltfMt> = SpaceMesh::new(space, space.bounds(), options, &*blocks);
 
-        let index = writer.add_mesh(&"mesh", &mesh);
+        let index = writer.add_mesh(&"mesh", &mesh).unwrap();
 
         (mesh, index)
     }
