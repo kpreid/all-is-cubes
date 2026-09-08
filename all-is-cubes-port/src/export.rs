@@ -274,16 +274,42 @@ impl Default for ExportSet {
 ///
 /// Many of the fields of this struct are format-specific.
 /// If the export is not to that format, their values are ignored.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct ExportOptions {
-    /// [`Format::Gltf`]: Maximum size, in bytes, of data which is embedded in the glTF JSON text
+    /// [`Format::Gltf`] and [`Format::Glb`]:
+    /// Maximum size, in bytes, of data which is embedded in the glTF JSON text
     /// rather than a separate file. If [`None`], then unlimited.
+    ///
+    /// Default value: [`None`].
     pub gltf_maximum_inline_bytes: Option<usize>,
 
-    /// [`Format::Gltf`]: Whether to use linear blending (`LINEAR`) or single samples (`NEAREST`)
+    /// [`Format::Gltf`] and [`Format::Glb`]:
+    /// Whether to use linear blending (`LINEAR`) or single samples (`NEAREST`)
     /// for textures when they are displayed at a scale smaller than 1 texel per image pixel.
+    ///
+    /// Default value: [`false`].
     pub gltf_min_linear: bool,
+
+    /// [`Format::Gltf`]:
+    /// Whether to write glTF buffers (`.glbin`) and images (`.png`) as individual files,
+    /// instead of a single combined `.glbin` file.
+    ///
+    /// This option is ignored by [`Format::Glb`]; auxiliary files are never created.
+    ///
+    /// Default value: [`true`].
+    pub gltf_multiple_files: bool,
+}
+
+impl Default for ExportOptions {
+    fn default() -> Self {
+        // Whenever changing this, update the documentation too.
+        Self {
+            gltf_maximum_inline_bytes: None,
+            gltf_min_linear: false,
+            gltf_multiple_files: true, // TODO: legacy
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

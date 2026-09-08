@@ -438,6 +438,7 @@ pub(crate) fn export_gltf(
     let &ExportOptions {
         gltf_maximum_inline_bytes,
         gltf_min_linear,
+        gltf_multiple_files,
     } = options;
 
     let block_defs = source.contents.extract_type::<block::BlockDef>();
@@ -456,7 +457,7 @@ pub(crate) fn export_gltf(
             GltfDataDestination::new(
                 Some(destination.clone()),
                 gltf_maximum_inline_bytes.unwrap_or(usize::MAX),
-                true,
+                gltf_multiple_files,
             )?,
         )
     };

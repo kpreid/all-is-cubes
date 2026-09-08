@@ -101,6 +101,7 @@ async fn export_snapshot_test(
         &{
             let mut options = port::ExportOptions::default();
             // Use separate files so that e.g. the PNG can be inspected easily.
+            options.gltf_multiple_files = true;
             options.gltf_maximum_inline_bytes = Some(0);
             options
         },
