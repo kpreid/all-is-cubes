@@ -294,6 +294,7 @@ dependencies = [
  "kurbo",
  "log",
  "macro_rules_attribute",
+ "percent-encoding",
  "pollster",
  "pretty_assertions",
  "rayon",

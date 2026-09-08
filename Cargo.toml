@@ -125,7 +125,8 @@ noise-functions = { version = "0.8.5", default-features = false, features = ["li
 nosy = { version = "0.3.0", default-features = false }
 num-traits = { version = "0.2.19", default-features = false }
 ordered-float = { version = "5.5.0", default-features = false }
-paste = {version = "1.0.15", default-features = false }
+paste = { version = "1.0.15", default-features = false }
+percent-encoding = { version = "2.3.2", default-features = false, features = ["alloc"] }
 petgraph = { version = "0.8.2", default-features = false, features = ["graphmap"] }
 png-decoder = { version = "0.2.0", default-features = false } # used by all-is-cubes for no_std-compatible reading pngs
 png = { version = "0.18.1", default-features = false } # used by all-is-cubes-desktop for writing pngs

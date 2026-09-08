@@ -40,6 +40,7 @@ gltf = [
     "dep:bytemuck", # buffer creation
     "dep:gltf-json",
     "dep:image", # texture writing
+    "dep:percent-encoding", # URL path encoding
     "dep:rectangle-pack", # texture atlas creation
     "dep:serde_json",
 ]
@@ -107,6 +108,7 @@ bytemuck = { workspace = true, optional = true, features = ["derive"] }
 gltf-json = { version = ">=1.4.1, <1.5.0", optional = true, default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
 # Used to write glTF textures
 image = { workspace = true, optional = true, features = ["png"] }
+percent-encoding = { workspace = true, optional = true }
 # Used to pack glTF textures
 # std feature enables use of HashMap instead of BTreeMap
 rectangle-pack = { workspace = true, optional = true, features = ["std"] }

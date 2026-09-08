@@ -171,6 +171,7 @@ dependencies = [
  "itertools",
  "kurbo",
  "log",
+ "percent-encoding",
  "pollster",
  "rectangle-pack",
  "serde_json",

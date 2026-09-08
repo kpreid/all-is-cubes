@@ -425,19 +425,27 @@ fn make_unique_name(proposed: &str, used: &mut HashSet<String>) -> String {
 /// Convert the name (not path) of a file that we are writing to a relative URL
 /// that may appear in the glTF data.
 fn file_name_to_relative_url(buffer_file_name: &std::ffi::OsStr) -> Result<String, io::Error> {
-    // TODO: this path needs URL-encoding (excepting slashes)
-    Ok(buffer_file_name
-        .to_str()
-        .ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "glTF file path must be valid UTF-8, but “{}” was not",
-                    buffer_file_name.to_string_lossy()
-                ),
-            )
-        })?
-        .to_string())
+    // Strictly speaking, “UTF-8” is not the actual requirement here. However, if we were to support
+    // a platform-specific-encoded file name, we’d need to get the specific right bytes to put in a
+    // file URL, which are not what `OsStr` bytes are, and is not available in a cross-platform
+    // way. So, we say “if UTF-8 is not right, we don’t support that case”.
+    //
+    // TODO: Ideally we’d raise this error well before the export process begins.
+    let unencoded_str = buffer_file_name.to_str().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "glTF file name must be valid UTF-8, but “{}” was not",
+                buffer_file_name.to_string_lossy()
+            ),
+        )
+    })?;
+
+    // This set is conservative, consisting only of common characters that are known to be OK.
+    const CHAR_SET_TO_ESCAPE: &percent_encoding::AsciiSet =
+        &percent_encoding::NON_ALPHANUMERIC.remove(b'-').remove(b'_').remove(b'.');
+
+    Ok(percent_encoding::percent_encode(unencoded_str.as_bytes(), CHAR_SET_TO_ESCAPE).to_string())
 }
 
 fn dispose_of_poison<G>(_: std::sync::PoisonError<G>) -> io::Error {
@@ -449,6 +457,11 @@ fn dispose_of_poison<G>(_: std::sync::PoisonError<G>) -> io::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Write one byte to make the buffer nonempty.
+    fn write1(w: &mut dyn io::Write) -> io::Result<()> {
+        w.write_all(&[0])
+    }
 
     #[test]
     fn discard() {
@@ -548,8 +561,25 @@ mod tests {
         assert_eq!(e2.uri.as_deref(), Some("basepath-bar-2.glbin"));
     }
 
-    /// Write one byte to make the buffer nonempty.
-    fn write1(w: &mut dyn io::Write) -> io::Result<()> {
-        w.write_all(&[0])
+    #[test]
+    fn url_encoding() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let mut file_base_path = temp_dir.path().to_owned();
+        file_base_path.push("base path.gltf");
+
+        let d = GltfDataDestination::new(Some(file_base_path), 0);
+        d.write("object name".into(), "object file", "glbin", write1).unwrap();
+
+        let [buffer_object] =
+            <[gltf_json::Buffer; 1]>::try_from(d.into_buffers().unwrap()).unwrap();
+        assert_eq!(
+            buffer_object.name,
+            Some("object name".into()),
+            "name should not be escaped"
+        );
+        assert_eq!(
+            buffer_object.uri.as_deref(),
+            Some("base%20path-object%20file.glbin")
+        );
     }
 }
