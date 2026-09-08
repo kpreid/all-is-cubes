@@ -300,6 +300,7 @@ dependencies = [
  "rayon",
  "read-fonts",
  "rectangle-pack",
+ "rstest",
  "serde_json",
  "smol-macros",
  "snapbox",

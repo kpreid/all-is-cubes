@@ -11,7 +11,8 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
-use std::io;
+use std::fs;
+use std::io::{self, Seek, Write};
 use std::mem;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -29,7 +30,7 @@ use all_is_cubes_mesh::{BlockMesh, MeshOptions, MeshTypes, SpaceMesh, block_mesh
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform};
 
-use crate::{ExportError, ExportErrorKind, ExportOptions, ExportSet, Format};
+use crate::{ExportError, ExportErrorKind, ExportOptions, ExportSet, FileWriter, Format};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -427,6 +428,7 @@ impl GltfWriter {
 
 // The funny return type is to work with [`crate::export_to_path`].
 pub(crate) fn export_gltf(
+    use_glb: bool,
     progress: YieldProgress,
     read_ticket: ReadTicket<'_>,
     options: &ExportOptions,
@@ -442,12 +444,25 @@ pub(crate) fn export_gltf(
     let spaces = source.contents.extract_type::<all_is_cubes::space::Space>();
     source.reject_unsupported(Format::Gltf)?;
 
+    let (glb_binary_temp_file, data_destination) = if use_glb {
+        let temp_file = tempfile::tempfile()?;
+        (
+            Some(temp_file.try_clone()?),
+            GltfDataDestination::for_glb(temp_file),
+        )
+    } else {
+        (
+            None,
+            GltfDataDestination::new(
+                Some(destination.clone()),
+                gltf_maximum_inline_bytes.unwrap_or(usize::MAX),
+                true,
+            )?,
+        )
+    };
+
     let mut writer = GltfWriter::new(
-        GltfDataDestination::new(
-            Some(destination.clone()),
-            gltf_maximum_inline_bytes.unwrap_or(usize::MAX),
-            true,
-        )?,
+        data_destination,
         if gltf_min_linear {
             gltf_json::texture::MinFilter::Linear
         } else {
@@ -564,17 +579,105 @@ pub(crate) fn export_gltf(
             p.finish().await;
         }
 
-        {
-            let mut file = crate::open_buffered_file(&destination)?;
+        // TODO: add filename context to the errors from accessing the .glb or .gltf file
+        if let Some(mut glb_binary_temp_file) = glb_binary_temp_file {
+            // `GltfDataDestination` will leave the file cursor at the end, so we need to
+            // seek back to the start.
+
+            let mut glb_file = crate::open_buffered_file(&destination)?;
+
+            let root = writer.into_root(Duration::from_secs(1))?;
+
+            // `GltfDataDestination` will have left the file cursor at the end, so we need to seek
+            // back to the start, *after* `into_root()` has finished doing things with it.
+            glb_binary_temp_file.seek(io::SeekFrom::Start(0))?;
+
+            write_glb(&root, &mut glb_file, glb_binary_temp_file)?;
+
+            crate::close_buffered_file(&destination, glb_file)?;
+        } else {
+            let mut gltf_file = crate::open_buffered_file(&destination)?;
             writer
                 .into_root(Duration::from_secs(1))?
-                .to_writer_pretty(&mut file) // TODO: non-pretty option
+                .to_writer_pretty(&mut gltf_file) // TODO: non-pretty option
                 .map_err(|_| -> ExportError { todo!("serialization error conversion") })?;
-            crate::close_buffered_file(&destination, file)?;
+            crate::close_buffered_file(&destination, gltf_file)?;
         }
 
         Ok(())
     }))
+}
+
+/// Write GLB data to an already-opened file.
+///
+/// `binary_data_file` is the temporary file containing the binary chunk of the GLB; it will be
+/// copied from.
+fn write_glb(
+    root: &gltf_json::Root,
+    glb_file: &mut FileWriter,
+    mut binary_data_file: fs::File,
+) -> Result<(), ExportError> {
+    // TODO: attach filenames to IO errors
+
+    let binary_data_length = u32::try_from(binary_data_file.metadata()?.len()).expect("TODO");
+
+    // GLB header and JSON chunk header.
+    // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#binary-header
+    let file_and_json_header = [
+        *b"glTF",           // magic number
+        2u32.to_le_bytes(), // GLB version number
+        0u32.to_le_bytes(), // file length, to be filled in later.
+        0u32.to_le_bytes(), // JSON chunk length, to be filled in later.
+        *b"JSON",           // JSON chunk header
+    ];
+    let file_and_json_header = bytemuck::bytes_of(&file_and_json_header);
+    glb_file.write_all(file_and_json_header)?;
+
+    // JSON chunk data.
+    root.to_writer(&mut *glb_file)
+        .map_err(|_| -> ExportError { todo!("serialization error conversion") })?;
+
+    // Check how much JSON we wrote.
+    let json_text_length =
+        u32::try_from(glb_file.stream_position()?.strict_sub(file_and_json_header.len() as u64))
+            .expect("TODO");
+
+    // Pad JSON with spaces to satisfy required alignment.
+    // <https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#structured-json-content>
+    let json_chunk_length = json_text_length.next_multiple_of(4);
+    glb_file.write_all(&b"   "[0..(json_chunk_length - json_text_length) as usize])?;
+
+    // Binary chunk header.
+    let binary_chunk_header = [
+        binary_data_length.to_le_bytes(),
+        *b"BIN\0", // Binary chunk header
+    ];
+    let binary_chunk_header = bytemuck::bytes_of(&binary_chunk_header);
+    glb_file.write_all(binary_chunk_header)?;
+    io::copy(&mut binary_data_file, glb_file)?;
+
+    // Pad with nulls to satisfy required alignment.
+    let binary_chunk_length = binary_data_length.next_multiple_of(4);
+    glb_file.write_all(&[0, 0, 0][0..(binary_chunk_length - binary_data_length) as usize])?;
+
+    // Compute the lengths we need to fill in.
+    let total_length = binary_chunk_length
+        .strict_add(json_chunk_length)
+        .strict_add(file_and_json_header.len() as u32)
+        .strict_add(binary_chunk_header.len() as u32);
+
+    debug_assert_eq!(
+        u64::from(total_length),
+        glb_file.stream_position()?,
+        "computed total length should equal file size"
+    );
+
+    // Seek back and write the file length and JSON length (which happen to be adjacent).
+    glb_file.seek(io::SeekFrom::Start(8))?;
+    glb_file
+        .write_all([total_length.to_le_bytes(), json_chunk_length.to_le_bytes()].as_flattened())?;
+
+    Ok(())
 }
 
 /// Construct gltf camera entity.

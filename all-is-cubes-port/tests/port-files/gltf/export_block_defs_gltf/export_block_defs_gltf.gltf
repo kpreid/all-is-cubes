@@ -217,32 +217,32 @@
     {
       "byteLength": 936,
       "name": "'block0' data",
-      "uri": "export_block_defs-mesh.glbin"
+      "uri": "export_block_defs_gltf-mesh.glbin"
     },
     {
       "byteLength": 936,
       "name": "'block1' data",
-      "uri": "export_block_defs-mesh-2.glbin"
+      "uri": "export_block_defs_gltf-mesh-2.glbin"
     },
     {
       "byteLength": 2359,
       "name": "reflectance",
-      "uri": "export_block_defs-reflectance.png"
+      "uri": "export_block_defs_gltf-reflectance.png"
     },
     {
       "byteLength": 816,
       "name": "emission",
-      "uri": "export_block_defs-emission.png"
+      "uri": "export_block_defs_gltf-emission.png"
     },
     {
       "byteLength": 936,
       "name": "'block2' data",
-      "uri": "export_block_defs-mesh-3.glbin"
+      "uri": "export_block_defs_gltf-mesh-3.glbin"
     },
     {
       "byteLength": 936,
       "name": "'block3' data",
-      "uri": "export_block_defs-mesh-4.glbin"
+      "uri": "export_block_defs_gltf-mesh-4.glbin"
     }
   ],
   "bufferViews": [

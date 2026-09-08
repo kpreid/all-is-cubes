@@ -80,16 +80,24 @@ fn gltf_smoke_test() {
 /// to an expected file.
 async fn export_snapshot_test(
     test_name: &'static str,
+    format: Format,
     read_ticket: ReadTicket<'_>,
     export_set: ExportSet,
 ) {
     let destination_dir = tempfile::tempdir().unwrap();
-    let destination: PathBuf = destination_dir.path().join(format!("{test_name}.gltf"));
+    let destination: PathBuf = destination_dir.path().join(format!(
+        "{test_name}.{extension}",
+        extension = match format {
+            Format::Gltf => "gltf",
+            Format::Glb => "glb",
+            _ => unreachable!(),
+        }
+    ));
 
     port::export_to_path(
         yield_progress_for_testing(),
         read_ticket,
-        Format::Gltf,
+        format,
         &{
             let mut options = port::ExportOptions::default();
             // Use separate files so that e.g. the PNG can be inspected easily.
@@ -110,8 +118,10 @@ async fn export_snapshot_test(
     );
 }
 
-#[macro_rules_attribute::apply(smol_macros::test)]
-async fn export_block_defs() {
+#[rstest::rstest]
+#[case("export_block_defs_gltf", Format::Gltf)]
+#[case("export_block_defs_glb", Format::Glb)]
+fn export_block_defs(#[case] test_name: &'static str, #[case] format: Format) {
     let mut universe = Universe::new();
     let blocks1: [Block; 2] = make_some_blocks();
     let blocks2: [Block; 2] = make_some_voxel_blocks(&mut universe);
@@ -127,7 +137,9 @@ async fn export_block_defs() {
         },
     ));
 
-    export_snapshot_test("export_block_defs", universe.read_ticket(), export_set).await;
+    pollster::block_on(async {
+        export_snapshot_test(test_name, format, universe.read_ticket(), export_set).await;
+    });
 }
 
 #[macro_rules_attribute::apply(smol_macros::test)]
@@ -150,6 +162,7 @@ async fn export_space() {
 
     export_snapshot_test(
         "export_space",
+        Format::Gltf,
         universe.read_ticket(),
         ExportSet::all_of_universe(&universe),
     )

@@ -29,6 +29,7 @@
 //!             <td><a href="enum.Format.html#variant.AicJson"><code>Format::AicJson</code></a></td>
 //!             <td><code>.alliscubesjson</code></td>
 //!         </tr>
+//!         <!-- -->
 //!         <tr>
 //!             <td>MagicaVoxel <code>.vox</code></td>
 //!             <td><code style="text-wrap-mode:nowrap">"dot-vox"</code></td>
@@ -47,21 +48,27 @@
 //!             <td><a href="enum.Format.html#variant.DotVox"><code>Format::DotVox</code></a></td>
 //!             <td><code>.vox</code></td>
 //!         </tr>
+//!         <!-- -->
 //!         <tr>
 //!             <td><a href="https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html">glTF 2.0</a></td>
 //!             <td><code>"gltf"</code></td>
-//!             <td rowspan=2></td>
-//!             <td rowspan=2>
+//!             <td rowspan=3></td>
+//!             <td rowspan=3>
 //!                 <code>Block</code>&nbsp;to&nbsp;model,<br>
 //!                 <code>Block</code>s&nbsp;to&nbsp;scene,<br>
 //!                 <code>Space</code>&nbsp;to&nbsp;scene
 //!             </td>
-//!             <td rowspan=2>Has some bugs. Output is suitable for rendering but not necessarily editing due to combined meshes.</td>
+//!             <td rowspan=3>Has some bugs. Output is suitable for rendering but not necessarily editing due to combined meshes.</td>
 //!         </tr>
 //!         <tr>
 //!             <td><a href="enum.Format.html#variant.Gltf"><code>Format::Gltf</code></a></td>
 //!             <td><code>.gltf</code></td>
 //!         </tr>
+//!         <tr>
+//!             <td><a href="enum.Format.html#variant.Glb"><code>Format::Glb</code></a></td>
+//!             <td><code>.glb</code></td>
+//!         </tr>
+//!         <!-- -->
 //!         <tr>
 //!             <td><a href="https://en.wikipedia.org/wiki/STL_(file_format)">STL</a></td>
 //!             <td><code>"stl"</code></td>
@@ -76,6 +83,7 @@
 //!             <td><a href="enum.Format.html#variant.Stl"><code>Format::Stl</code></a></td>
 //!             <td><code>.stl</code></td>
 //!         </tr>
+//!         <!-- -->
 //!         <tr>
 //!             <td><a href="https://en.wikipedia.org/wiki/TrueType">TTF</a></td>
 //!             <td><code>"ttf"</code></td>
@@ -197,8 +205,6 @@ pub enum Format {
     ///
     /// TODO: document how auxiliary files are handled
     ///
-    /// TODO: support `.glb` binary format.
-    ///
     /// * Export only. Exports [`Block`] to glTF meshes and [`Block`] or [`Space`] to a glTF scene.
     /// * Creates a single `.gltf` file and additional `.glbin` and `.png` files.
     /// * Filename extension: `.gltf`
@@ -206,6 +212,11 @@ pub enum Format {
     ///
     /// [glTF 2.0]: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
     Gltf,
+
+    /// glTF `.glb` container format.
+    ///
+    /// Identical to [`Format::Gltf`] except that it always produces a single file.
+    Glb,
 
     /// [STL] format.
     ///
@@ -240,6 +251,7 @@ impl Format {
             Format::AicJson => "All is Cubes",
             Format::DotVox => "MagicaVoxel .vox",
             Format::Gltf => "glTF",
+            Format::Glb => "GLB",
             Format::Stl => "STL",
             Format::Ttf => "TTF",
         }
@@ -252,7 +264,7 @@ impl Format {
         match self {
             Format::AicJson => true,
             Format::DotVox => false,
-            Format::Gltf => false, // TODO: implement light
+            Format::Gltf | Format::Glb => false, // TODO: implement light
             Format::Stl => false,
             Format::Ttf => false,
         }

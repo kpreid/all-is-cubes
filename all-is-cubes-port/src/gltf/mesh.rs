@@ -271,8 +271,9 @@ pub(in crate::gltf) struct MeshAwaitingTextureCoordinates {
     /// We don’t need to patch this, but we do want to write it into the same buffer, so we need
     /// to hold onto it until then.
     ///
-    /// TODO: When we support GLB / writing to shared buffers, we will no longer have any
-    /// reason to do this combination, and can instead write the indices immediately.
+    /// TODO: Now that shared buffers are supported by `GltfDataDestination`, we have less reason
+    /// to bother doing this, and should consider discarding the mechanism entirely. The cost would
+    /// be that multi-file mode makes even more files.
     index_bytes: Vec<u8>,
 
     // glTF buffer views that need their `buffer` fields updated once the vertex buffer is
@@ -314,9 +315,9 @@ impl MeshAwaitingTextureCoordinates {
 
         // Write the buffer data (vertices followed by indices).
         //
-        // TODO: When we support GLB / writing to shared buffers, we will no longer have any
-        // reason to do this combination of vertices and indices here, and can just call
-        // write() twice.
+        // TODO: Now that shared buffers are supported by `GltfDataDestination`, we have less
+        // reason to bother doing this, and should consider discarding the mechanism entirely.
+        // The cost would be that multi-file mode makes even more files.
         let vertex_bytes = bytemuck::must_cast_slice::<GltfVertex, u8>(&self.vertices);
         let buffer = buffer_dest.write(
             self.buffer_object_name,

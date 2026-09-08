@@ -105,9 +105,17 @@ pub fn export_to_path(
                 )
             }
             #[cfg(feature = "gltf")]
-            Format::Gltf => {
+            Format::Gltf | Format::Glb => {
                 // glTF writes multiple files under its own control.
-                crate::gltf::export_gltf(progress, read_ticket, options, source, destination)?
+                // GLB writes a single file under its own control.
+                crate::gltf::export_gltf(
+                    format == Format::Glb,
+                    progress,
+                    read_ticket,
+                    options,
+                    source,
+                    destination,
+                )?
             }
             #[cfg(feature = "stl")]
             Format::Stl => crate::stl::export_stl(progress, read_ticket, source, &destination)?,

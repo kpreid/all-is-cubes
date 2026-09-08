@@ -47,6 +47,7 @@ gltf = [
     "dep:percent-encoding", # URL path encoding
     "dep:rectangle-pack", # texture atlas creation
     "dep:serde_json",
+    "dep:tempfile", # temporary data storage when building GLB
 ]
 # Writing STL (triangle mesh) files.
 stl = [
@@ -87,6 +88,7 @@ log = { workspace = true }
 # Used for internal execution of not-publicly-async code
 pollster = { workspace = true }
 rayon = { workspace = true, optional = true }
+tempfile = { workspace = true, optional = true }
 # Not used directly as an extern crate, but we need to enable features.
 yield-progress = { workspace = true }
 yoke = { workspace = true }
@@ -119,12 +121,13 @@ rectangle-pack = { workspace = true, optional = true, features = ["std"] }
 
 [dev-dependencies]
 all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
+either = { workspace = true }
 font-types = { version = "0.12.3" } # reading fonts; version must match read-fonts
 macro_rules_attribute = { workspace = true }
-read-fonts = { version = "0.43.0" } # reading fonts
-snapbox = { workspace = true, features = ["path"] }
-either = { workspace = true }
 pretty_assertions = { workspace = true }
+read-fonts = { version = "0.43.0" } # reading fonts
+rstest = { workspace = true }
+snapbox = { workspace = true, features = ["path"] }
 tempfile = { workspace = true }
 # Using smol for async test-running.
 # TODO: Consider defining our own macros and stripping down the dependencies.

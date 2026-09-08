@@ -21,8 +21,6 @@ use super::glue::{Lef32, create_accessor};
 ///
 /// If cloned, the clone will provide equivalent access to the same destination and may be
 /// used interchangeably.
-///
-/// TODO: Add support for writing `.glb` combined files.
 #[derive(Clone, Debug)]
 pub struct GltfDataDestination(Arc<Shared>);
 
@@ -132,6 +130,30 @@ impl GltfDataDestination {
             maximum_inline_bytes,
             file_base_path,
         })))
+    }
+
+    /// Creates a [`GltfDataDestination`] that writes all data to a single file, assuming that
+    /// their contents will separately be transferred to the binary chunk of a GLB file afterward.
+    ///
+    /// In this mode, as per [glTF 2.0 § 3.6.1.2], the first buffer object produced will have no
+    /// `"uri"` property and be taken to refer to the contents of the GLB binary chunk.
+    ///
+    /// [glTF 2.0 § 3.6.1.2]: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#glb-stored-buffer
+    pub fn for_glb(temporary_file: File) -> Self {
+        Self(Arc::new(Shared {
+            discard: false,
+            suffix_uses: Mutex::new(HashSet::new()),
+            buffers: Mutex::new(vec![gltf_json::Buffer {
+                byte_length: USize64(0), // replaced later
+                name: None,
+                uri: None, // for GLB, buffer 0 has no `uri`
+                extensions: None,
+                extras: Default::default(),
+            }]),
+            shared_buffer_file: Some(Mutex::new(temporary_file)),
+            maximum_inline_bytes: 0,
+            file_base_path: None,
+        }))
     }
 
     /// Creates a [`GltfDataDestination`] that discards all data.
@@ -639,9 +661,9 @@ fn dispose_of_poison<G>(_: std::sync::PoisonError<G>) -> io::Error {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use super::*;
+    use std::fs;
+    use std::io::Read as _;
 
     /// Write one byte to make the buffer nonempty.
     fn write1(w: &mut dyn io::Write) -> io::Result<()> {
@@ -799,6 +821,47 @@ mod tests {
             fs::read(temp_dir.path().join("basepath.glbin")).unwrap(),
             vec![1, 2, 3, 0, 4, 0, 0, 0, 5]
         );
+    }
+
+    /// Tests GLB-export mode, which is distinct because it does not give a `uri` to the buffer
+    /// and does not use a base path.
+    #[test]
+    fn for_glb() {
+        let mut temp_file = tempfile::tempfile().unwrap();
+        let d = GltfDataDestination::for_glb(temp_file.try_clone().unwrap());
+
+        let addr1 = d
+            .write("p1".into(), "p3", DataType::Mesh, |w| {
+                w.write_all(&[1, 2, 3])
+            })
+            .unwrap();
+        let addr2 = d.write("p2".into(), "p3", DataType::Mesh, |w| w.write_all(&[4])).unwrap();
+
+        assert_eq!(
+            (addr1, addr2),
+            (
+                BufferAddress {
+                    buffer: Index::new(0),
+                    byte_offset: USize64(0),
+                    byte_length: USize64(3),
+                },
+                BufferAddress {
+                    buffer: Index::new(0),
+                    byte_offset: USize64(4),
+                    byte_length: USize64(1),
+                },
+            )
+        );
+        let [buffer_object] =
+            <[gltf_json::Buffer; 1]>::try_from(d.into_buffers().unwrap()).unwrap();
+        // These two file names must be distinct.
+        assert_eq!(buffer_object.byte_length, USize64(5));
+        assert_eq!(buffer_object.uri, None);
+
+        temp_file.seek(io::SeekFrom::Start(0)).unwrap();
+        let mut contents_of_temp_file = Vec::new();
+        temp_file.read_to_end(&mut contents_of_temp_file).unwrap();
+        assert_eq!(contents_of_temp_file, vec![1, 2, 3, 0, 4]);
     }
 
     #[test]
