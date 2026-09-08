@@ -15,7 +15,7 @@ use all_is_cubes::math::{self, Axis, Cube, GridAab, GridRotation, Gridgid};
 use all_is_cubes_mesh::texture::{self, TilePoint};
 
 use crate::gltf::GltfDataDestination;
-use crate::gltf::buffer::BufferAddress;
+use crate::gltf::buffer::{BufferAddress, DataType};
 use crate::gltf::glue::{Lef32, byte_offset_discarding_zero};
 
 // -------------------------------------------------------------------------------------------------
@@ -140,7 +140,7 @@ impl GltfTextureAllocator {
         name: &str,
         image: &image::ImageBuffer<image::Rgba<u8>, Vec<u8>>,
     ) -> Result<BufferAddress, io::Error> {
-        self.destination.write(String::from(name), name, "png", |w| {
+        self.destination.write(String::from(name), name, DataType::Png, |w| {
             // `image` wants `Write + Seek` but `w` is not currently `Seek`
             let mut tmp = io::Cursor::new(Vec::new());
             image
@@ -401,7 +401,7 @@ fn insert_one_image(
     });
     let block_texture_image = root.push(gltf_json::Image {
         buffer_view: Some(block_texture_buffer_view),
-        mime_type: Some(gltf_json::image::MimeType("image/png".into())),
+        mime_type: Some(gltf_json::image::MimeType(DataType::Png.mime_type().into())),
         name: Some(name.into()),
         uri: None,
         extensions: None,

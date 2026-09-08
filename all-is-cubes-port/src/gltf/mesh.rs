@@ -12,7 +12,7 @@ use all_is_cubes::math::range_len;
 use all_is_cubes_mesh::texture::Channels;
 use all_is_cubes_mesh::{IndexSlice, MeshTypes, SpaceMesh};
 
-use crate::gltf::buffer::BufferAddress;
+use crate::gltf::buffer::{BufferAddress, DataType};
 use crate::gltf::glue::{byte_offset_discarding_zero, create_accessor};
 use crate::gltf::{GltfTextureAllocator, GltfVertex, GltfWriter};
 
@@ -142,26 +142,28 @@ where
 
         let vertex_bytes = bytemuck::must_cast_slice::<GltfVertex, u8>(mesh.vertices().0);
         // TODO: use the given name (sanitized) in the file name
-        let real_buffer =
-            writer
-                .buffer_dest
-                .write(buffer_object_name, &buffer_file_suffix, "glbin", |w| {
-                    w.write_all(vertex_bytes)?;
-                    // Convert index bytes to little-endian
-                    match mesh.indices() {
-                        IndexSlice::U16(slice) => {
-                            for index in slice {
-                                w.write_all(&index.to_le_bytes())?;
-                            }
-                        }
-                        IndexSlice::U32(slice) => {
-                            for index in slice {
-                                w.write_all(&index.to_le_bytes())?;
-                            }
+        let real_buffer = writer.buffer_dest.write(
+            buffer_object_name,
+            &buffer_file_suffix,
+            DataType::Mesh,
+            |w| {
+                w.write_all(vertex_bytes)?;
+                // Convert index bytes to little-endian
+                match mesh.indices() {
+                    IndexSlice::U16(slice) => {
+                        for index in slice {
+                            w.write_all(&index.to_le_bytes())?;
                         }
                     }
-                    Ok(())
-                })?;
+                    IndexSlice::U32(slice) => {
+                        for index in slice {
+                            w.write_all(&index.to_le_bytes())?;
+                        }
+                    }
+                }
+                Ok(())
+            },
+        )?;
 
         link_buffer_views_to_buffer(
             &mut writer.root,
@@ -319,7 +321,7 @@ impl MeshAwaitingTextureCoordinates {
         let buffer = buffer_dest.write(
             self.buffer_object_name,
             &self.buffer_file_suffix,
-            "glbin",
+            DataType::Mesh,
             |w| {
                 w.write_all(vertex_bytes)?;
                 w.write_all(&self.index_bytes)?;

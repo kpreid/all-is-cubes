@@ -2,12 +2,13 @@
 
 use std::collections::HashSet;
 use std::ffi::OsString;
+use std::fmt::Write as _;
 use std::fs::File;
 use std::io;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use descriptive_unwrap::OptionExt as _;
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 use gltf_json::Index;
 use gltf_json::validation::USize64;
 
@@ -103,7 +104,8 @@ impl GltfDataDestination {
     /// * `proposed_file_name` will be included in the name of the generated data file,
     ///   if there is one for this data alone; for example, `foo.gltf` will have data files named
     ///   like `foo-{proposed_file_name}-20.{proposed_file_extension}`.
-    /// * `proposed_file_extension` should be `glbin` or an image format.
+    /// * `data_type` should specify the type of data being written, and will be used to make
+    ///   decisions about how and where the data is stored.
     ///
     /// # Errors
     ///
@@ -121,7 +123,7 @@ impl GltfDataDestination {
         &self,
         buffer_object_name: String,
         proposed_file_name: &str,
-        proposed_file_extension: &str,
+        data_type: DataType,
         contents_fn: F,
     ) -> io::Result<BufferAddress>
     where
@@ -147,7 +149,12 @@ impl GltfDataDestination {
             // Construct the file name (which is also the _relative_ path from gltf to data file).
             let mut buffer_file_name: OsString =
                 file_base_path.file_stem().none_is_unreachable().to_owned();
-            buffer_file_name.push(format!("-{unique_file_suffix}.{proposed_file_extension}"));
+            write!(
+                buffer_file_name,
+                "-{unique_file_suffix}.{extension}",
+                extension = data_type.extension()
+            )
+            .err_is_unreachable();
 
             // Construct the relative URL the glTF file will contain.
             let relative_url = file_name_to_relative_url(&buffer_file_name)?;
@@ -161,6 +168,7 @@ impl GltfDataDestination {
                 limit: self.0.maximum_inline_bytes,
                 path: Some(buffer_file_path),
                 future_file_uri: Some(relative_url),
+                data_type,
             }
         } else {
             SwitchingWriter::Memory {
@@ -168,6 +176,7 @@ impl GltfDataDestination {
                 limit: self.0.maximum_inline_bytes,
                 path: None,
                 future_file_uri: None,
+                data_type,
             }
         };
 
@@ -241,6 +250,37 @@ impl BufferAddress {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Types of data that may appear in a glTF "buffer" or "image".
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum DataType {
+    /// Vertex and index data.
+    Mesh,
+    /// PNG encoded image data.
+    Png,
+}
+
+impl DataType {
+    /// Returns the file extension for this data type, as specified by
+    /// [glTF 2.0 § 2.6](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#file-extensions-and-media-types).
+    pub fn extension(self) -> &'static str {
+        match self {
+            DataType::Mesh => "glbin",
+            DataType::Png => "png",
+        }
+    }
+
+    /// Returns the media type (MIME type) for this data type, as specified by
+    /// [glTF 2.0 § 2.6](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#file-extensions-and-media-types).
+    pub fn mime_type(self) -> &'static str {
+        match self {
+            DataType::Mesh => "application/gltf-buffer",
+            DataType::Png => "image/png",
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// An implementation of [`io::Write`] which can dynamically switch from
 /// an in-memory buffer to a file based on the length, and in any case
 /// remembers the length written and encodes the final URI of the data.
@@ -257,6 +297,7 @@ enum SwitchingWriter {
         limit: usize,
         future_file_uri: Option<String>,
         path: Option<PathBuf>,
+        data_type: DataType,
     },
     File {
         file: io::BufWriter<File>,
@@ -270,12 +311,19 @@ impl SwitchingWriter {
     fn close(self) -> io::Result<(Option<String>, usize)> {
         match self {
             SwitchingWriter::Null { bytes_written } => Ok((None, bytes_written)),
-            SwitchingWriter::Memory { buffer, .. } => {
+            SwitchingWriter::Memory {
+                buffer, data_type, ..
+            } => {
                 use base64::Engine as _;
 
-                let prefix = "data:application/gltf-buffer;base64,";
-                let mut url = String::with_capacity(prefix.len() + buffer.len() * 6 / 8 + 3);
-                url += prefix;
+                let mut url = String::with_capacity(
+                    const { "data:;base64,".len() }
+                        + data_type.mime_type().len()
+                        + buffer.len() * 6 / 8
+                        + 3,
+                );
+                write!(url, "data:{};base64,", data_type.mime_type()).err_is_unreachable();
+
                 // Note: The so-called “URL_SAFE” character set is *not* the correct
                 // format for data URLs; standard base64 is correct. The URL safety
                 // in question is for e.g. base64 components within ordinary URLs or
@@ -316,6 +364,7 @@ impl io::Write for SwitchingWriter {
                 limit,
                 ref path,
                 ref future_file_uri,
+                data_type: _,
             } => {
                 let n = buffer.write(bytes)?;
                 if buffer.len() > limit {
@@ -359,12 +408,12 @@ impl io::Write for SwitchingWriter {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Store the given data in a buffer, and return an accessor to the data.
+/// Store the given data in a buffer view, and return an accessor to the data.
 ///
 /// The `data_source` iterator should be cheap to clone,
 /// as it will be consulted multiple times.
 ///
-/// This function only creates non-interleaved and non-concatenated buffers,
+/// This function only creates non-interleaved buffer views,
 /// and does not set the `target`, so it is not suitable for vertices.
 pub(crate) fn create_buffer_and_accessor<I, const COMPONENTS: usize>(
     root: &mut gltf_json::Root,
@@ -381,7 +430,7 @@ where
         buffer,
         byte_offset,
         byte_length,
-    } = dest.write(name.clone(), file_suffix, "glbin", |w| {
+    } = dest.write(name.clone(), file_suffix, DataType::Mesh, |w| {
         for item in data_source.clone() {
             w.write_all(bytemuck::bytes_of(&item.map(Lef32::from)))?;
         }
@@ -467,8 +516,11 @@ mod tests {
     fn discard() {
         let d = GltfDataDestination::null();
 
-        let buffer_index_and_offset =
-            d.write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 3])).unwrap();
+        let buffer_index_and_offset = d
+            .write("foo".into(), "bar", DataType::Mesh, |w| {
+                w.write_all(&[1, 2, 3])
+            })
+            .unwrap();
 
         assert_eq!(
             buffer_index_and_offset,
@@ -485,8 +537,11 @@ mod tests {
     fn inline_only_success() {
         let d = GltfDataDestination::new(None, usize::MAX);
 
-        let buffer_index_and_offset =
-            d.write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 255])).unwrap();
+        let buffer_index_and_offset = d
+            .write("foo".into(), "bar", DataType::Mesh, |w| {
+                w.write_all(&[1, 2, 255])
+            })
+            .unwrap();
 
         assert_eq!(
             buffer_index_and_offset,
@@ -507,7 +562,9 @@ mod tests {
         let d = GltfDataDestination::new(None, 1);
 
         let error = d
-            .write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 255]))
+            .write("foo".into(), "bar", DataType::Mesh, |w| {
+                w.write_all(&[1, 2, 255])
+            })
             .unwrap_err();
 
         assert_eq!(
@@ -525,7 +582,7 @@ mod tests {
 
         let d = GltfDataDestination::new(Some(file_base_path), 3);
         let buffer_index_and_offset = d
-            .write("foo".into(), "bar", "glbin", |w| {
+            .write("foo".into(), "bar", DataType::Mesh, |w| {
                 w.write_all(&[1, 2, 3])?;
                 w.write_all(&[4, 5, 6])?;
                 Ok(())
@@ -552,8 +609,8 @@ mod tests {
         println!("Base path: {}", file_base_path.display());
 
         let d = GltfDataDestination::new(Some(file_base_path), 0);
-        d.write("foo".into(), "bar", "glbin", write1).unwrap();
-        d.write("foo".into(), "bar", "glbin", write1).unwrap();
+        d.write("foo".into(), "bar", DataType::Mesh, write1).unwrap();
+        d.write("foo".into(), "bar", DataType::Mesh, write1).unwrap();
 
         let [e1, e2] = <[gltf_json::Buffer; 2]>::try_from(d.into_buffers().unwrap()).unwrap();
         // These two file names must be distinct.
@@ -568,7 +625,7 @@ mod tests {
         file_base_path.push("base path.gltf");
 
         let d = GltfDataDestination::new(Some(file_base_path), 0);
-        d.write("object name".into(), "object file", "glbin", write1).unwrap();
+        d.write("object name".into(), "object file", DataType::Mesh, write1).unwrap();
 
         let [buffer_object] =
             <[gltf_json::Buffer; 1]>::try_from(d.into_buffers().unwrap()).unwrap();

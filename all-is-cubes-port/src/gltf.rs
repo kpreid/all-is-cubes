@@ -36,14 +36,19 @@ use crate::{ExportError, ExportErrorKind, ExportOptions, ExportSet, Format};
 mod buffer;
 pub use buffer::GltfDataDestination;
 use buffer::create_buffer_and_accessor;
+
 mod animation;
 use animation::FrameState;
+
 mod mesh;
 use mesh::MaterialKey;
+
 mod glue;
 use glue::{convert_quaternion, empty_node};
+
 mod texture;
 pub use texture::{GltfAtlasPoint, GltfTextureAllocator, GltfTexturePlane, GltfTile};
+
 mod vertex;
 pub use vertex::GltfVertex;
 
