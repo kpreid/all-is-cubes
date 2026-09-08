@@ -150,19 +150,7 @@ impl GltfDataDestination {
             buffer_file_name.push(format!("-{unique_file_suffix}.{proposed_file_extension}"));
 
             // Construct the relative URL the glTF file will contain.
-            // TODO: this path needs URL-encoding (excepting slashes)
-            let relative_url = buffer_file_name
-                .to_str()
-                .ok_or_else(|| {
-                    io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!(
-                            "glTF file path must be valid UTF-8, but “{}” was not",
-                            buffer_file_name.to_string_lossy()
-                        ),
-                    )
-                })?
-                .to_string();
+            let relative_url = file_name_to_relative_url(&buffer_file_name)?;
 
             // Construct the absolute path which we are going to write to.
             let mut buffer_file_path = file_base_path.clone();
@@ -432,6 +420,24 @@ fn make_unique_name(proposed: &str, used: &mut HashSet<String>) -> String {
     };
     used.insert(chosen.clone());
     chosen
+}
+
+/// Convert the name (not path) of a file that we are writing to a relative URL
+/// that may appear in the glTF data.
+fn file_name_to_relative_url(buffer_file_name: &std::ffi::OsStr) -> Result<String, io::Error> {
+    // TODO: this path needs URL-encoding (excepting slashes)
+    Ok(buffer_file_name
+        .to_str()
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!(
+                    "glTF file path must be valid UTF-8, but “{}” was not",
+                    buffer_file_name.to_string_lossy()
+                ),
+            )
+        })?
+        .to_string())
 }
 
 fn dispose_of_poison<G>(_: std::sync::PoisonError<G>) -> io::Error {
