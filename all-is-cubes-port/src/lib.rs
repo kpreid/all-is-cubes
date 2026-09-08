@@ -2,32 +2,35 @@
 //!
 //! Currently supported formats:
 //!
+// (When updating this table, also update the documentation of the Format enum!)
 //! <table>
 //!     <thead>
 //!         <tr>
-//!             <th rowspan=2>Format</th>
+//!             <th>Format</th>
 //!             <th>Feature</th>
 //!             <th rowspan=2>Imports</th>
 //!             <th rowspan=2>Exports</th>
 //!             <th rowspan=2>Caveats</th>
 //!         </tr>
 //!         <tr>
+//!             <th>Variant</th>
 //!             <th>File extension</th>
 //!         </tr>
 //!     </thead>
 //!     <tbody>
 //!         <tr>
-//!             <td rowspan=2>All is Cubes native</td>
+//!             <td>All is Cubes native</td>
 //!             <td><code>"native"</code></td>
 //!             <td rowspan=2><strong>All</strong></td>
 //!             <td rowspan=2><strong>All</strong></td>
 //!             <td rowspan=2>Version compatibility not yet guaranteed.</td>
 //!         </tr>
 //!         <tr>
+//!             <td><a href="enum.Format.html#variant.AicJson"><code>Format::AicJson</code></a></td>
 //!             <td><code>.alliscubesjson</code></td>
 //!         </tr>
 //!         <tr>
-//!             <td rowspan=2>MagicaVoxel <code>.vox</code></td>
+//!             <td>MagicaVoxel <code>.vox</code></td>
 //!             <td><code style="text-wrap-mode:nowrap">"dot-vox"</code></td>
 //!             <td rowspan=2>
 //!                 <code>Block</code>&nbsp;from&nbsp;model,<br>
@@ -41,10 +44,11 @@
 //!             <td rowspan=2>Scene import is buggy. Materials are not exported at all.</td>
 //!         </tr>
 //!         <tr>
+//!             <td><a href="enum.Format.html#variant.DotVox"><code>Format::DotVox</code></a></td>
 //!             <td><code>.vox</code></td>
 //!         </tr>
 //!         <tr>
-//!             <td rowspan=2><a href="https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html">glTF 2.0</a></td>
+//!             <td><a href="https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html">glTF 2.0</a></td>
 //!             <td><code>"gltf"</code></td>
 //!             <td rowspan=2></td>
 //!             <td rowspan=2>
@@ -55,10 +59,11 @@
 //!             <td rowspan=2>Has some bugs. Output is suitable for rendering but not necessarily editing due to combined meshes.</td>
 //!         </tr>
 //!         <tr>
+//!             <td><a href="enum.Format.html#variant.Gltf"><code>Format::Gltf</code></a></td>
 //!             <td><code>.gltf</code></td>
 //!         </tr>
 //!         <tr>
-//!             <td rowspan=2><a href="https://en.wikipedia.org/wiki/STL_(file_format)">STL</a></td>
+//!             <td><a href="https://en.wikipedia.org/wiki/STL_(file_format)">STL</a></td>
 //!             <td><code>"stl"</code></td>
 //!             <td rowspan=2></td>
 //!             <td rowspan=2>
@@ -68,10 +73,11 @@
 //!             <td rowspan=2>Meshes are not necessarily "manifold"/"watertight".</td>
 //!         </tr>
 //!         <tr>
+//!             <td><a href="enum.Format.html#variant.Stl"><code>Format::Stl</code></a></td>
 //!             <td><code>.stl</code></td>
 //!         </tr>
 //!         <tr>
-//!             <td rowspan=2><a href="https://en.wikipedia.org/wiki/TrueType">TTF</a></td>
+//!             <td><a href="https://en.wikipedia.org/wiki/TrueType">TTF</a></td>
 //!             <td><code>"ttf"</code></td>
 //!             <td rowspan=2></td>
 //!             <td rowspan=2>
@@ -80,6 +86,7 @@
 //!             <td rowspan=2></td>
 //!         </tr>
 //!         <tr>
+//!             <td><a href="enum.Format.html#variant.Ttf"><code>Format::Ttf</code></a></td>
 //!             <td><code>.ttf</code></td>
 //!         </tr>
 //!     </tbody>
@@ -115,7 +122,7 @@
 use std::fmt;
 
 #[cfg(doc)]
-use all_is_cubes::space::Space;
+use all_is_cubes::{block::Block, space::Space};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -157,23 +164,44 @@ mod tests;
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Format {
+    // Whenever changing this documentation, update the library documentation’s table too.
     /// Native format: JSON-encoded All is Cubes universe serialization.
+    ///
+    /// Compatibility with future versions of All is Cubes is not yet guaranteed.
+    ///
+    /// * Import and export
+    /// * Always uses a single file
+    /// * Filename extension: `.alliscubesjson`
+    /// * Cargo feature: `"native"`
     AicJson,
 
     /// [MagicaVoxel `.vox`][vox] file.
     ///
-    /// TODO: document version details and export limitations
+    /// * Imports [`Block`] from `.vox` models or scenes, and [`Space`] from `.vox` scenes.
+    /// * Exports [`Block`] to `.vox` models, and [`Space`] to `.vox` scenes.
+    /// * Always uses a single file
+    /// * Known issues:
+    ///     * Scene import does not position models correctly.
+    ///     * Materials are not exported at all.
+    /// * Filename extension: `.vox`
+    /// * Cargo feature: `"dot-vox"`
     ///
     /// [vox]: https://github.com/ephtracy/voxel-model/blob/master/MagicaVoxel-file-format-vox.txt
     DotVox,
 
     /// [glTF 2.0] format (`.gltf` JSON with auxiliary files).
     ///
-    /// TODO: document capabilities
+    /// Can export blocks or spaces to glTF assets.
+    /// Binary data is stored in one or more `.glbin` file accompanying the requested file.
     ///
     /// TODO: document how auxiliary files are handled
     ///
     /// TODO: support `.glb` binary format.
+    ///
+    /// * Export only. Exports [`Block`] to glTF meshes and [`Block`] or [`Space`] to a glTF scene.
+    /// * Creates a single `.gltf` file and additional `.glbin` and `.png` files.
+    /// * Filename extension: `.gltf`
+    /// * Cargo feature: `"gltf"`
     ///
     /// [glTF 2.0]: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
     Gltf,
@@ -182,12 +210,22 @@ pub enum Format {
     ///
     /// Supports exporting block and space shapes without color.
     ///
+    /// * Export only. Exports [`Block`]s and [`Space`]s.
+    /// * Creates one `.stl` file per exported block or space.
+    /// * Filename extension: `.stl`
+    /// * Cargo feature: `"stl"`
+    ///
     /// [STL]: <https://en.wikipedia.org/wiki/STL_(file_format)>
     Stl,
 
     /// [TrueType] font format (`.ttf`).
     ///
-    /// Supports exporting [`FontDef`] values as web-compatible fonts.
+    /// Supports exporting web-compatible fonts.
+    ///
+    /// * Export only. Exports [`FontDef`]s only.
+    /// * Creates one `.ttf` file per exported font.
+    /// * Filename extension: `.ttf`
+    /// * Cargo feature: `"ttf"`
     ///
     /// [`FontDef`]: all_is_cubes::text::FontDef
     /// [TrueType]: https://en.wikipedia.org/wiki/TrueType
