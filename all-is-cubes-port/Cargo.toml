@@ -20,13 +20,17 @@ features = []
 bench = false
 
 [features]
-default = ["all-formats", "export", "import"]
-# Importing all selected formats
+default = ["import-all-formats", "export-all-formats"]
+# Enables import capability for all enabled formats.
 import = []
-# Exporting all selected formats
+# Enables export capability for all enabled formats.
 export = []
-# Enable all supported formats
-all-formats = ["native", "gltf", "stl", "dot-vox", "ttf"]
+# Enable importing all formats that can be imported.
+# This feature has no effects except for the features it enables.
+import-all-formats = ["import", "native", "dot-vox"]
+# Enable exporting all formats that can be exported.
+# This feature has no effects except for the features it enables.
+export-all-formats = ["export", "native", "gltf", "stl", "dot-vox", "ttf"]
 # Reading and writing native All is Cubes universe files.
 native = [
     "all-is-cubes/save",

@@ -47,10 +47,10 @@ record = [
     "dep:png",
     "dep:all-is-cubes-mesh", # used in glTF recording
     "all-is-cubes-port/export",
-    "all-is-cubes-port/all-formats",
+    "all-is-cubes-port/export-all-formats",
 ]
 # Importing non-native data formats.
-import = ["all-is-cubes-port/import", "all-is-cubes-port/all-formats"]
+import = ["all-is-cubes-port/import-all-formats"]
 # Required for `--graphics=terminal` and `--graphics=print`;
 # rendering scenes to colored text and interactive terminal sessions.
 terminal = ["dep:ratatui", "dep:unicode-width"]

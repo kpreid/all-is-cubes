@@ -14,7 +14,7 @@ cargo-fuzz = true
 all-is-cubes = { path = "../all-is-cubes", features = ["arbitrary", "_special_testing"] }
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", features = ["_special_testing"] }
 all-is-cubes-mesh = { path = "../all-is-cubes-mesh", features = ["arbitrary", "_special_testing"] }
-all-is-cubes-port = { path = "../all-is-cubes-port", features = ["import", "all-formats"] }
+all-is-cubes-port = { path = "../all-is-cubes-port", features = ["import-all-formats"] }
 arbitrary = { version = "1.4.1", features = ["derive"] }
 libfuzzer-sys = "0.4"
 pollster = { version = "1.0.0" }

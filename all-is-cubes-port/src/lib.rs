@@ -99,7 +99,8 @@
 //! * `"import"`: importing/loading.
 //! * `"export"`: exporting/saving.
 //! * Features for each supported format, as listed in the above table.
-//! * `"all-formats"`: Enables all format features.
+//! * `"import-all-formats"`: Enables `"import"` and all format features that support importing.
+//! * `"export-all-formats"`: Enables `"export"` and all format features that support exporting.
 //! * `"auto-threads"`:
 //!   Enables implicit use of threads for parallel processing,
 //!   including via [`rayon`]’s global thread pool.
