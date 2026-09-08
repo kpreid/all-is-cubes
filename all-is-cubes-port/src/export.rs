@@ -297,17 +297,18 @@ pub struct ExportOptions {
     ///
     /// This option is ignored by [`Format::Glb`]; auxiliary files are never created.
     ///
-    /// Default value: [`true`].
+    /// Default value: [`false`].
     pub gltf_multiple_files: bool,
 }
 
+#[expect(clippy::derivable_impls)]
 impl Default for ExportOptions {
     fn default() -> Self {
         // Whenever changing this, update the documentation too.
         Self {
             gltf_maximum_inline_bytes: None,
             gltf_min_linear: false,
-            gltf_multiple_files: true, // TODO: legacy
+            gltf_multiple_files: false,
         }
     }
 }
