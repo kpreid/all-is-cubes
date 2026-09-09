@@ -125,7 +125,7 @@ either = { workspace = true }
 font-types = { version = "0.12.3" } # reading fonts; version must match read-fonts
 macro_rules_attribute = { workspace = true }
 pretty_assertions = { workspace = true }
-read-fonts = { version = "0.43.0" } # reading fonts
+read-fonts = { version = "0.44.0" } # reading fonts
 rstest = { workspace = true }
 snapbox = { workspace = true, features = ["path"] }
 tempfile = { workspace = true }

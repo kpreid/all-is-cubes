@@ -298,7 +298,7 @@ dependencies = [
  "pollster",
  "pretty_assertions",
  "rayon",
- "read-fonts",
+ "read-fonts 0.44.0",
  "rectangle-pack",
  "rstest",
  "serde_json",
@@ -2346,9 +2346,9 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "font-types"
-version = "0.12.4"
+version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e64eb721ca85a34323425f4041adc5d82704d3782d5f8f03793bc012419dce23"
+checksum = "b8eb065f3251655b3c90e22e5e363f310fc5332fb3402e37bbc94752283248f6"
 dependencies = [
  "bytemuck",
 ]
@@ -5800,6 +5800,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "read-fonts"
+version = "0.44.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5a0cf4bb6cbce4c29756270d189a5e400ac05e91192161d83a0bcb6e68492e8"
+dependencies = [
+ "bytemuck",
+ "font-types",
+ "once_cell",
+]
+
+[[package]]
 name = "rectangle-pack"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8103,7 +8114,7 @@ dependencies = [
  "indexmap",
  "kurbo",
  "log",
- "read-fonts",
+ "read-fonts 0.43.2",
 ]
 
 [[package]]
