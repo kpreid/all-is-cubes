@@ -15,6 +15,7 @@ use all_is_cubes::math::{
 use crate::OutOfMemory;
 use crate::TransparencyFormat;
 use crate::block_mesh::viz::Viz;
+use crate::planar;
 
 #[cfg(feature = "rerun")]
 use descriptive_unwrap::ResultExt as _;
@@ -68,7 +69,7 @@ const EMPTY_PLANE_BOX: PlaneBox = PlaneBox(Box2D {
 ///
 /// This data type is used by [`BlockMesh`] as part of its process for building meshes.
 /// However, that is currently limited to an implementation detail; it is not possible to provide
-/// [`Analysis`] to or obtain it from the [`BlockMesh`] computation.
+/// [`Analysis`] to, or obtain it, from the [`BlockMesh`] computation.
 /// That may be rectified in future versions.
 //
 // TODO: Consider whether this should be renamed to `Shape` or another less abstract name.
@@ -342,6 +343,102 @@ impl Analysis {
     #[cfg(feature = "rerun")]
     pub(crate) fn delete_occupied_plane(&mut self, face: Face, layer: GridCoordinate) {
         self.occupied_planes[face][layer as usize] = EMPTY_PLANE_BOX;
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+impl AnalysisVertex {
+    /// Converts this vertex to a [`planar::Vertex`],
+    /// which may be used in [`planar::Triangulator`] or [`planar::Outliner`].
+    ///
+    /// * `basis` is the orientation of the plane to be considered.
+    /// * `index` becomes the [`index`][field@planar::Vertex::index] field of the output.
+    /// * `transparent` chooses between two modes for computing the
+    ///   [`connectivity`][field@planar::Vertex::connectivity]:
+    ///   * `false`: report opaque surfaces; ignore transparent ones.
+    ///   * `true`: process transparent surfaces; use opaque ones as occlusion of them only.
+    ///
+    /// This function is not responsible for checking whether the vertex lies on the plane of
+    /// interest.
+    /// Applications of this function generally must filter or partition vertices beforehand.
+    pub fn to_planar(self, basis: &planar::Basis, index: u32, transparent: bool) -> planar::Vertex {
+        use planar::Mask;
+
+        // Forget about hidden voxel faces -- transform “this volume is solid” mask into
+        // “this is a visible surface” mask.
+        let opaque = self.opaque & !self.opaque.shift(basis.face().opposite());
+        // Note: transparent counts as obscuring transparent, in the sense that we don't try
+        // to generate faces for it. If we did, not only would we generate way too much
+        // geometry, we'd fail assertions because the analysis vertices aren't meant to provide
+        // the corners needed for those surfaces.
+        let renderable = self.renderable & !self.renderable.shift(basis.face().opposite());
+
+        // Compute the surfaces adjacent to this vertex that this execution should actually render.
+        let should_render = (
+            if transparent {
+                // Find transparent voxels only (neither invisible nor opaque)
+                renderable & !opaque
+            } else {
+                opaque
+            })
+            // Mask off all voxels whose surface would be occluded by opaque surfaces,
+            // and also the voxels that are above rather than below the surface.
+            & (!opaque).shift(basis.face().opposite());
+
+        // Returns whether the vertex borders a part of the polygon that extends in the
+        // `(sweep_direction, perpendicular_direction)` quadrant,
+        // or negated as indicated.
+        //
+        // TODO(planar_new): better explanation
+        #[inline(always)]
+        fn av_connectivity(
+            forward_in_sweep: bool,
+            forward_in_perpendicular: bool,
+            basis: &planar::Basis,
+            should_render: OctantMask,
+        ) -> bool {
+            // Out of those surfaces, check the single quadrant we are being asked about in this
+            // particular call.
+            //
+            // Shift all the unwanted bits out (by shifting in the opposite direction to the one we
+            // are testing), then check if the wanted one is left.
+            // (This always picks one octant, but in order to express this in terms of a `math::Octant`
+            // we'd have to prove the 3 faces are orthogonal to each other.)
+            should_render
+                .shift(if forward_in_sweep {
+                    -basis.sweep_direction()
+                } else {
+                    basis.sweep_direction()
+                })
+                .shift(if forward_in_perpendicular {
+                    -basis.perpendicular_direction()
+                } else {
+                    basis.perpendicular_direction()
+                })
+                .any()
+        }
+
+        let mut connectivity = Mask::Empty;
+
+        if av_connectivity(true, true, basis, should_render) {
+            connectivity |= Mask::Fsfp;
+        }
+        if av_connectivity(true, false, basis, should_render) {
+            connectivity |= Mask::Fsbp;
+        }
+        if av_connectivity(false, true, basis, should_render) {
+            connectivity |= Mask::Bsfp;
+        }
+        if av_connectivity(false, false, basis, should_render) {
+            connectivity |= Mask::Bsbp;
+        }
+
+        planar::Vertex {
+            position: self.position.map(GridCoordinate::from),
+            connectivity,
+            index,
+        }
     }
 }
 

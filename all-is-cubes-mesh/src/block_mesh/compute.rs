@@ -314,7 +314,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     &mut bounding_box.transparent,
                 ),
             ] {
-                // Iterator over analysis vertices filtered to the current plane.
+                // Collect, and assign indices to, vertices which lie in the current plane.
                 vertex_subset.clear();
                 vertex_subset.extend(analysis.vertices().iter().filter(|&v| {
                     // Filter to vertices on this layer,
@@ -389,12 +389,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     viz,
                     triangulator_basis,
                     vertex_subset.iter().zip(0u32..).map(|(&v, index)| {
-                        analysis_vertex_to_planar_vertex(
-                            &triangulator_basis,
-                            v,
-                            index,
-                            pass_is_transparent,
-                        )
+                        v.to_planar(&triangulator_basis, index, pass_is_transparent)
                     }),
                     |triangle_indices| {
                         if total_indices >= options.limit_indices_per_mesh {
@@ -454,94 +449,4 @@ fn get_voxel_with_limit(
         }
     };
     evoxel
-}
-
-/// Converts an [`analyze::AnalysisVertex`] to a [`planar::Vertex`] accepted by
-/// [`planar::Triangulator`].
-///
-/// The `transparent` parameter selects between two modes:
-///
-/// * `false`: triangulate opaque surfaces; ignore transparent ones.
-/// * `true`: triangulate transparent surfaces; use opaque ones as occlusion only.
-fn analysis_vertex_to_planar_vertex(
-    basis: &planar::Basis,
-    vertex: AnalysisVertex,
-    index: u32,
-    transparent: bool,
-) -> planar::Vertex {
-    use planar::Mask;
-
-    // Forget about hidden voxel faces -- transform “this volume is solid” mask into
-    // “this is a visible surface” mask. TODO(planar_new): express this more strongly typed?
-    let opaque = vertex.opaque & !vertex.opaque.shift(basis.face().opposite());
-    // Note: transparent counts as obscuring transparent, in the sense that we don't try
-    // to generate faces for it. If we did, not only would we generate way too much
-    // geometry, we'd fail assertions because the analysis vertices aren't meant to provide
-    // the corners needed for those surfaces.
-    let renderable = vertex.renderable & !vertex.renderable.shift(basis.face().opposite());
-
-    // Compute the surfaces adjacent to this vertex that this execution should actually render.
-    let should_render = (if transparent {
-        // Find transparent voxels only (neither invisible nor opaque)
-        renderable & !opaque
-    } else {
-        opaque
-    })
-    // Mask off all voxels whose surface would be occluded by opaque surfaces,
-    // and also the voxels that are above rather than below the surface.
-    & (!opaque).shift(basis.face().opposite());
-
-    // Returns whether the vertex borders a part of the polygon that extends in the
-    // `(sweep_direction, perpendicular_direction)` quadrant,
-    // or negated as indicated.
-    //
-    // TODO(planar_new): better explanation
-    #[inline(always)]
-    fn av_connectivity(
-        forward_in_sweep: bool,
-        forward_in_perpendicular: bool,
-        basis: &planar::Basis,
-        should_render: OctantMask,
-    ) -> bool {
-        // Out of those surfaces, check the single quadrant we are being asked about in this
-        // particular call.
-        //
-        // Shift all the unwanted bits out (by shifting in the opposite direction to the one we
-        // are testing), then check if the wanted one is left.
-        // (This always picks one octant, but in order to express this in terms of a `math::Octant`
-        // we'd have to prove the 3 faces are orthogonal to each other.)
-        should_render
-            .shift(if forward_in_sweep {
-                -basis.sweep_direction()
-            } else {
-                basis.sweep_direction()
-            })
-            .shift(if forward_in_perpendicular {
-                -basis.perpendicular_direction()
-            } else {
-                basis.perpendicular_direction()
-            })
-            .any()
-    }
-
-    let mut connectivity = Mask::Empty;
-
-    if av_connectivity(true, true, basis, should_render) {
-        connectivity |= Mask::Fsfp;
-    }
-    if av_connectivity(true, false, basis, should_render) {
-        connectivity |= Mask::Fsbp;
-    }
-    if av_connectivity(false, true, basis, should_render) {
-        connectivity |= Mask::Bsfp;
-    }
-    if av_connectivity(false, false, basis, should_render) {
-        connectivity |= Mask::Bsbp;
-    }
-
-    planar::Vertex {
-        position: vertex.position.map(GridCoordinate::from),
-        connectivity,
-        index,
-    }
 }
