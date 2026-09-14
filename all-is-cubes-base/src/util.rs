@@ -20,6 +20,9 @@ mod multi_failure;
 #[cfg(any(feature = "std", test))]
 pub use multi_failure::MultiFailure;
 
+// no exports because it is a `macro_export`
+mod test_case_macros;
+
 // -------------------------------------------------------------------------------------------------
 
 /// Interface to start concurrent tasks.

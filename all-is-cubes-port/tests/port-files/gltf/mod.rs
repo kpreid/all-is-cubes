@@ -119,10 +119,13 @@ async fn export_snapshot_test(
     );
 }
 
-#[rstest::rstest]
-#[case("export_block_defs_gltf", Format::Gltf)]
-#[case("export_block_defs_glb", Format::Glb)]
-fn export_block_defs(#[case] test_name: &'static str, #[case] format: Format) {
+#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+fn export_block_defs(
+    #[case(gltf = ("export_block_defs_gltf", Format::Gltf))]
+    #[case(glb = ("export_block_defs_glb", Format::Glb))]
+    test_name_and_format: (&'static str, Format),
+) {
+    let (test_name, format) = test_name_and_format;
     let mut universe = Universe::new();
     let blocks1: [Block; 2] = make_some_blocks();
     let blocks2: [Block; 2] = make_some_voxel_blocks(&mut universe);

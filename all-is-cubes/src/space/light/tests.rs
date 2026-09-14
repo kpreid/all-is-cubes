@@ -71,8 +71,13 @@ fn initial_value_initialized_after_creation() {
 
 /// Tests that the values returned from [`Space::get_light()`] on out-of-bounds cubes
 /// match the sky, when they should.
-#[rstest::rstest]
-fn out_of_bounds_light_is_sky(#[values(0.0, 0.5, 1.0)] opacity: f32) {
+#[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+fn out_of_bounds_light_is_sky(
+    #[case(opacity_0 = 0.0)]
+    #[case(opacity_05 = 0.5)]
+    #[case(opacity_1 = 1.0)]
+    opacity: f32,
+) {
     // TOOD: For more coverage, add a non-opaque block
     let space = Space::builder(GridAab::ORIGIN_CUBE)
         .sky(Sky::Octants([
@@ -105,8 +110,12 @@ fn out_of_bounds_light_is_sky(#[values(0.0, 0.5, 1.0)] opacity: f32) {
     }
 }
 
-#[rstest::rstest]
-fn step(#[values(false, true)] paused: bool) {
+#[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+fn step(
+    #[case(unpaused = false)]
+    #[case(paused = true)]
+    paused: bool,
+) {
     let mut universe = Universe::new();
     let color = Rgb::new(1.0, 0.0, 0.0);
     let space = universe

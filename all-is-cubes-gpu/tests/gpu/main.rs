@@ -24,10 +24,16 @@ pub(crate) async fn instance() -> &'static wgpu::Instance {
 // -------------------------------------------------------------------------------------------------
 
 /// Test that the [`LightTexture`] performs partial updates correctly.
-#[rstest::rstest]
+#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
 fn light_texture_write_read(
-    #[values(false, true)] use_scatter: bool,
-    #[values(16, 19, 30, 50)] space_size_param: u32,
+    #[case(bulk = false)]
+    #[case(scatter = true)]
+    use_scatter: bool,
+    #[case(s16 = 16)]
+    #[case(s19 = 19)]
+    #[case(s30 = 30)]
+    #[case(s50 = 50)]
+    space_size_param: u32,
 ) {
     use all_is_cubes::block::AIR;
 

@@ -25,7 +25,6 @@ criterion = { workspace = true }
 imgref = { workspace = true }
 macro_rules_attribute = { workspace = true }
 pretty_assertions = { workspace = true }
-rstest = { workspace = true }
 smol-macros = { workspace = true }
 
 [lints]

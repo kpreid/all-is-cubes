@@ -126,7 +126,6 @@ font-types = { version = "0.12.3" } # reading fonts; version must match read-fon
 macro_rules_attribute = { workspace = true }
 pretty_assertions = { workspace = true }
 read-fonts = { version = "0.43.0" } # reading fonts
-rstest = { workspace = true }
 snapbox = { workspace = true, features = ["path"] }
 tempfile = { workspace = true }
 # Using smol for async test-running.

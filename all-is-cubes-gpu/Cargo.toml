@@ -108,7 +108,6 @@ criterion = { workspace = true }
 image = { workspace = true }
 indoc = { workspace = true }
 macro_rules_attribute = { workspace = true }
-rstest = { workspace = true }
 # Used in benchmark
 scopeguard = { workspace = true }
 # Using smol for async test-running.

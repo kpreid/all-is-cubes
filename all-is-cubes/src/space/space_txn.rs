@@ -843,8 +843,12 @@ mod tests {
     /// the check phase.
     ///
     /// Also test the outcome when there is no such change.
-    #[rstest::rstest]
-    fn block_changed_between_check_and_commit(#[values(false, true)] actually_change: bool) {
+    #[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+    fn block_changed_between_check_and_commit(
+        #[case(no_change = false)]
+        #[case(changed = true)]
+        actually_change: bool,
+    ) {
         let mut u = universe::Universe::new();
         let [initial_block_value, final_block_value] = make_some_blocks();
         let block_handle = u.insert_anonymous(block::BlockDef::new(

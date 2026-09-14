@@ -260,21 +260,24 @@ fn bounding_voxels_of_positioning_high() {
 /// “round up” options in that they shouldn’t *change without notice*.
 ///
 /// TODO: this test overlaps with tests in layout.rs. We should keep only one of them, probably.
-#[rstest::rstest]
-#[case(PositioningX::Left, false, 0..16, 0..36)]
-#[case(PositioningX::Right, false, 0..16, -20..16)]
-#[case(PositioningX::Center, false, 0..16, -10..26)]
-#[case(PositioningX::Center, true, 0..16, -2..19)]
-#[case(PositioningX::Center, false, 0..15, -10..26)]
-#[case(PositioningX::Center, true, 0..15, -3..18)]
-#[case(PositioningX::Center, false, 1..16, -9..27)]
-#[case(PositioningX::Center, true, 1..16, -2..19)]
+#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
 fn positioning_x(
-    #[case] pos: PositioningX,
-    #[case] odd_character_width: bool,
-    #[case] bounds_range: core::ops::Range<i32>,
-    #[case] expected: core::ops::Range<i32>,
+    #[case(case0 = (PositioningX::Left, false, 0..16, 0..36))]
+    #[case(case1 = (PositioningX::Right, false, 0..16, -20..16))]
+    #[case(case2 = (PositioningX::Center, false, 0..16, -10..26))]
+    #[case(case3 = (PositioningX::Center, true, 0..16, -2..19))]
+    #[case(case4 = (PositioningX::Center, false, 0..15, -10..26))]
+    #[case(case5 = (PositioningX::Center, true, 0..15, -3..18))]
+    #[case(case6 = (PositioningX::Center, false, 1..16, -9..27))]
+    #[case(case7 = (PositioningX::Center, true, 1..16, -2..19))]
+    params: (
+        PositioningX,
+        bool,
+        core::ops::Range<i32>,
+        core::ops::Range<i32>,
+    ),
 ) {
+    let (pos, odd_character_width, bounds_range, expected) = params;
     let text = Text::builder()
         .string(if odd_character_width {
             // must have an odd number of characters
@@ -331,9 +334,11 @@ fn no_intersection_with_block() {
     assert!(!ev.visible());
 }
 
-#[rstest::rstest]
+#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
 fn overflowing_coordinates(
-    #[values(GridCoordinate::MIN, GridCoordinate::MAX)] coordinate: GridCoordinate,
+    #[case(min = GridCoordinate::MIN)]
+    #[case(max = GridCoordinate::MAX)]
+    coordinate: GridCoordinate,
 ) {
     // we only care that this doesn't panic
     Block::from_primitive(Primitive::Text {

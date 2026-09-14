@@ -65,7 +65,6 @@ sync_wrapper = { workspace = true, optional = true }
 [dev-dependencies]
 futures-channel = { workspace = true }
 pretty_assertions = { workspace = true }
-rstest = { workspace = true }
 # Using smol for async test-running.
 # TODO: Consider defining our own macros and stripping down the dependencies.
 smol-macros = { workspace = true }

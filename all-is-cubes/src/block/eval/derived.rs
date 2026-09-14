@@ -452,14 +452,12 @@ mod tests {
         miri,
         ignore = "Miri adds unrealistic *nondeterministic* error. TODO: Can we avoid the ops in question?"
     )]
-    #[rstest::rstest]
+    #[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
     fn solid_block_equivalent_at_any_resolution(
-        #[values(
-            Rgba::BLACK,
-            Rgba::WHITE,
-            Rgba::TRANSPARENT,
-            Rgba::new(0.0, 0.5, 1.0, 0.5)
-        )]
+        #[case(black = Rgba::BLACK)]
+        #[case(white = Rgba::WHITE)]
+        #[case(invisible = Rgba::TRANSPARENT)]
+        #[case(transparent = Rgba::new(0.0, 0.5, 1.0, 0.5))]
         color: Rgba,
     ) {
         let voxel = Evoxel::from_color(color);

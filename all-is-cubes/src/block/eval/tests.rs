@@ -7,7 +7,6 @@ use std::dbg;
 
 use euclid::{Vector3D, point3};
 use pretty_assertions::assert_eq;
-use rstest::rstest;
 
 use crate::block::{
     self, AIR, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision,
@@ -265,11 +264,17 @@ fn voxels_checked_individually() {
 
 /// Test that light emission from voxels doesn't depend on resolution, or rather, the emission
 /// is taken as an intensive property rather than an extensive property.
-#[rstest]
 #[cfg_attr(miri, ignore = "slow under Miri")]
+#[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
 fn voxels_emission_equivalence(
-    #[values(Rgba::TRANSPARENT, Rgba::new(0.0, 0.5, 1.0, 0.5))] reflectance: Rgba,
-    #[values(R1, R2, R4, R32)] resolution: Resolution,
+    #[case(no_opacity = Rgba::TRANSPARENT)]
+    #[case(half_opacity = Rgba::new(0.0, 0.5, 1.0, 0.5))]
+    reflectance: Rgba,
+    #[case(r1 = R1)]
+    #[case(r2 = R2)]
+    #[case(r4 = R4)]
+    #[case(r32 = R32)]
+    resolution: Resolution,
 ) {
     let mut universe = Universe::new();
     let atom_emission = Rgb::new(1.0, 2.0, 3.0);

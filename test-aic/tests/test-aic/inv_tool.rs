@@ -1,5 +1,4 @@
 use pretty_assertions::assert_eq;
-use rstest::rstest;
 
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::block::{self, AIR, Block, Resolution::*};
@@ -177,8 +176,12 @@ async fn icon_remove_block() {
     );
 }
 
-#[rstest]
-fn use_remove_block(#[values(false, true)] keep: bool) {
+#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+fn use_remove_block(
+    #[case(discard = false)]
+    #[case(keep = true)]
+    keep: bool,
+) {
     let [existing] = make_some_blocks();
     let mut tester = ToolTester::new(|m| {
         m.set([1, 0, 0], &existing).unwrap();
@@ -230,8 +233,12 @@ async fn icon_place_block() {
     );
 }
 
-#[rstest]
-fn use_block(#[values(Tool::Block, Tool::InfiniteBlocks)] tool_ctor: fn(Block) -> Tool) {
+#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+fn use_block(
+    #[case(block = Tool::Block)]
+    #[case(infinite_blocks = Tool::InfiniteBlocks)]
+    tool_ctor: fn(Block) -> Tool,
+) {
     let [existing, tool_block] = make_some_blocks();
     let tool = tool_ctor(tool_block.clone());
     let expect_consume = matches!(tool, Tool::Block(_));
@@ -329,10 +336,14 @@ fn use_block_with_inventory_config() {
 
 /// If a block has a `placement_action`, then that action is performed instead of the
 /// normal placement. TODO: how this interacts with consumption is not yet worked out.
-#[rstest]
+#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
 fn use_block_which_has_placement_action(
-    #[values(Tool::Block, Tool::InfiniteBlocks)] tool_ctor: fn(Block) -> Tool,
-    #[values(false, true)] in_front: bool,
+    #[case(block = Tool::Block)]
+    #[case(infinite_blocks = Tool::InfiniteBlocks)]
+    tool_ctor: fn(Block) -> Tool,
+    #[case(same_cube = false)]
+    #[case(in_front = true)]
+    in_front: bool,
 ) {
     let [existing_target] = make_some_blocks();
     let modifier_to_add: block::Modifier =
@@ -421,9 +432,11 @@ fn use_block_stack_decrements() {
     assert_eq!(tester.character().inventory().slots()[0], Slot::Empty);
 }
 
-#[rstest]
+#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
 fn use_block_with_obstacle(
-    #[values(Tool::Block, Tool::InfiniteBlocks)] tool_ctor: fn(Block) -> Tool,
+    #[case(block = Tool::Block)]
+    #[case(infinite_blocks = Tool::InfiniteBlocks)]
+    tool_ctor: fn(Block) -> Tool,
 ) {
     let [existing, tool_block, obstacle] = make_some_blocks();
     let tool = tool_ctor(tool_block);
@@ -445,9 +458,11 @@ fn use_block_with_obstacle(
     assert_eq!(&tester.space()[[0, 0, 0]], &obstacle);
 }
 
-#[rstest]
+#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
 fn use_block_without_target(
-    #[values(Tool::Block, Tool::InfiniteBlocks)] tool_ctor: fn(Block) -> Tool,
+    #[case(block = Tool::Block)]
+    #[case(infinite_blocks = Tool::InfiniteBlocks)]
+    tool_ctor: fn(Block) -> Tool,
 ) {
     let [tool_block] = make_some_blocks();
     let tool = tool_ctor(tool_block);

@@ -19,6 +19,9 @@ pub use all_is_cubes_base::util::{
     assert_send_sync, log,
 };
 
+#[doc(hidden)] // not public API yet
+pub use all_is_cubes_base::cartesian_product_test;
+
 // -------------------------------------------------------------------------------------------------
 // Modules from this crate
 

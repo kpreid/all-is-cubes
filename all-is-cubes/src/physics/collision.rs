@@ -845,8 +845,12 @@ mod tests {
     }
 
     #[cfg_attr(miri, ignore = "slow under Miri")]
-    #[rstest::rstest]
-    fn aab_raycast_aligned_with_grid(#[values(false, true)] reversed: bool) {
+    #[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+    fn aab_raycast_aligned_with_grid(
+        #[case(not_reversed = false)]
+        #[case(reversed = true)]
+        reversed: bool,
+    ) {
         // not-round-in-base-2 numbers to provoke rounding misbehavior
         let absolute_aab = Aab::from_lower_upper([0.3, 0.6, 0.9], [1.3, 1.6, 1.9]);
 

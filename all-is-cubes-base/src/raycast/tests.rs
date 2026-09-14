@@ -277,13 +277,16 @@ fn start_on_cube_edge_perpendicular() {
     );
 }
 
-#[rstest::rstest]
-fn start_just_past_bounds(#[values(false, true)] include_exit: bool) {
+#[macro_rules_attribute::apply(crate::cartesian_product_test)]
+fn start_just_past_bounds(
+    #[case(exclude_exit = false)]
+    #[case(include_exit = true)]
+    include_exit: bool,
+) {
     assert_no_steps(
         Raycaster::new([1.5, 0.5, 0.5], [1., 0., 0.]).within(GridAab::ORIGIN_CUBE, include_exit),
     );
 }
-
 #[test]
 fn start_outside_of_integer_range() {
     assert_no_steps(Raycaster::new(
@@ -306,8 +309,12 @@ fn start_outside_of_integer_range() {
 
 /// Regression test (found by fuzzing) for being outside of integer
 /// range while also using `within()`.
-#[rstest::rstest]
-fn start_outside_of_integer_range_with_bounds(#[values(false, true)] include_exit: bool) {
+#[macro_rules_attribute::apply(crate::cartesian_product_test)]
+fn start_outside_of_integer_range_with_bounds(
+    #[case(exclude_exit = false)]
+    #[case(include_exit = true)]
+    include_exit: bool,
+) {
     let bounds = GridAab::from_lower_size([0, 0, 0], [10, 10, 10]);
     assert_no_steps(
         Raycaster::new(point3(0., 1e303, 0.), vec3(0., -1e303, 0.)).within(bounds, include_exit),
@@ -351,8 +358,12 @@ fn exiting_integer_limit_negative() {
     );
 }
 
-#[rstest::rstest]
-fn within_bounds(#[values(false, true)] include_exit: bool) {
+#[macro_rules_attribute::apply(crate::cartesian_product_test)]
+fn within_bounds(
+    #[case(exclude_exit = false)]
+    #[case(include_exit = true)]
+    include_exit: bool,
+) {
     // Ray oriented diagonally on the -X side of bounds that are short on the X axis.
     let mut r = Raycaster::new(point3(0.0, -0.25, -0.5), vec3(1.0, 1.0, 1.0)).within(
         GridAab::from_lower_size([2, -10, -10], [2, 20, 20]),
@@ -397,8 +408,12 @@ fn regression_test_1() {
 
 /// `within()` wasn't working for axis-aligned rays that don't intersect the world,
 /// which should produce zero steps.
-#[rstest::rstest]
-fn regression_test_2(#[values(false, true)] include_exit: bool) {
+#[macro_rules_attribute::apply(crate::cartesian_product_test)]
+fn regression_test_2(
+    #[case(exclude_exit = false)]
+    #[case(include_exit = true)]
+    include_exit: bool,
+) {
     let bounds = GridAab::from_lower_size(GridPoint::new(0, 0, 0), [10, 10, 10]);
     assert_steps_option(
         &mut Raycaster::new(

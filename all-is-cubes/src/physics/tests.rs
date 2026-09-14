@@ -84,8 +84,12 @@ fn test_body() -> Body {
     Body::new_minimal([0., 2., 0.], Aab::from_radius(ps64(0.5)))
 }
 
-#[rstest::rstest]
-fn freefall(#[values(false, true)] gravity: bool) {
+#[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+fn freefall(
+    #[case(no_gravity = false)]
+    #[case(gravity = true)]
+    gravity: bool,
+) {
     let mut tester = BodyTester::new(
         {
             let mut space = Space::empty_positive(1, 1, 1);

@@ -789,8 +789,15 @@ mod tests {
     }
 
     /// Exercise the analysis on the outputs of `make_slab()`.
-    #[rstest::rstest]
-    fn analyze_slab(#[values(0, 1, 2, 3, 4)] thickness: i32) {
+    #[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+    fn analyze_slab(
+        #[case(t0 = 0)]
+        #[case(t1 = 1)]
+        #[case(t2 = 2)]
+        #[case(t3 = 3)]
+        #[case(t4 = 4)]
+        thickness: i32,
+    ) {
         let mut u = Universe::new();
 
         let slab = all_is_cubes::content::make_slab(&mut u, thickness, Resolution::R4);

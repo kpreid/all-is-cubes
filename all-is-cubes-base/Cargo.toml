@@ -56,9 +56,9 @@ serde = { workspace = true, optional = true, features = ["derive"] }
 [dev-dependencies]
 indoc = { workspace = true }
 itertools = { workspace = true }
+macro_rules_attribute = { workspace = true }
 pretty_assertions = { workspace = true }
 rand_xoshiro = { workspace = true }
-rstest = { workspace = true }
 
 [lints]
 workspace = true

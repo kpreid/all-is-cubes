@@ -424,8 +424,12 @@ mod tests {
         }
     }
 
-    #[rstest::rstest]
-    fn pageinst_caches_with_or_without_enlargement(#[values(5, 6)] height: GridSizeCoord) {
+    #[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+    fn pageinst_caches_with_or_without_enlargement(
+        #[case(small = 5)]
+        #[case(large = 6)]
+        height: GridSizeCoord,
+    ) {
         let mut universe = Universe::new();
         let mut inst = PageInst::new(make_page_with_size(5, height));
         let requested = UiSize { size: size2(5, 5) };

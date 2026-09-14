@@ -76,8 +76,8 @@ smallvec = { workspace = true }
 visibility = { workspace = true, optional = true }
 
 [dev-dependencies]
+macro_rules_attribute = { workspace = true }
 pretty_assertions = { workspace = true }
-rstest = { workspace = true }
 # Used for its escaping routine.
 tinytemplate = { workspace = true }
 

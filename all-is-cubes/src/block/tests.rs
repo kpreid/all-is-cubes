@@ -243,8 +243,12 @@ fn overflow_evaluate() {
     );
 }
 
-#[rstest::rstest]
-fn self_referential_evaluate(#[values(false, true)] via_mutation: bool) {
+#[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+fn self_referential_evaluate(
+    #[case(via_construction = false)]
+    #[case(via_mutation = true)]
+    via_mutation: bool,
+) {
     let mut universe = Universe::new();
     let block = self_referential_block(&mut universe, via_mutation);
 
@@ -284,8 +288,12 @@ fn self_referential_evaluate(#[values(false, true)] via_mutation: bool) {
     }
 }
 
-#[rstest::rstest]
-fn self_referential_listen(#[values(false, true)] via_mutation: bool) {
+#[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+fn self_referential_listen(
+    #[case(via_construction = false)]
+    #[case(via_mutation = true)]
+    via_mutation: bool,
+) {
     let mut universe = Universe::new();
     let block = self_referential_block(&mut universe, via_mutation);
     // This should *not* produce an error, because BlockDef manages its own notifier and we want

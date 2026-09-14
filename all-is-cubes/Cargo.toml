@@ -170,7 +170,6 @@ criterion = { workspace = true }
 futures-util = { workspace = true }
 indoc = { workspace = true }
 pretty_assertions = { workspace = true }
-rstest = { workspace = true }
 serde_json = { workspace = true }
 # Using smol for async test-running.
 # TODO: Consider defining our own macros and stripping down the dependencies.
