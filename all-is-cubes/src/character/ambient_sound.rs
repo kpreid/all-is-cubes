@@ -83,7 +83,7 @@ impl State {
             let ray = Ray::new(ray_origin, global_direction);
             let sound = sound_from_one_ray(ray, space);
 
-            sample.set_to_weighted_sum_of(ps32(1.0), [&sound.pan(local_direction)].into_iter());
+            sample.set_to_weighted_sum_of(ps32(1.0), [&sound.pan(local_direction)]);
         }
     }
 

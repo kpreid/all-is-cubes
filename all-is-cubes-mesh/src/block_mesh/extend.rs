@@ -385,7 +385,7 @@ pub(crate) fn reserve_vertices_exact<T, U>(
 /// Returns an error if memory allocation fails.
 pub(crate) fn push_vertices_from_iter<V: crate::Vertex>(
     output: &mut (Vec<V>, Vec<V::SecondaryData>),
-    input: impl Iterator<Item = (V, V::SecondaryData)>,
+    input: impl IntoIterator<Item = (V, V::SecondaryData)>,
 ) -> Result<(), crate::OutOfMemory> {
     for (v0, v1) in input {
         output.0.try_reserve(1)?;

@@ -159,7 +159,7 @@ impl Outliner {
     pub fn outline<E: From<OutOfMemory>>(
         &mut self,
         basis: Basis,
-        input: impl Iterator<Item = Vertex>,
+        input: impl IntoIterator<Item = Vertex>,
         mut loop_callback: impl FnMut(&[Vertex]) -> Result<(), E>,
     ) -> Result<(), E> {
         self.basis = basis;

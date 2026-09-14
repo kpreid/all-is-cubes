@@ -289,7 +289,7 @@ impl SpatialAmbient {
     pub(crate) fn set_to_weighted_sum_of<'i>(
         &mut self,
         existing_value_weight: PositiveSign<f32>,
-        iter: impl Iterator<Item = &'i SpatialAmbient> + Clone,
+        iter: impl IntoIterator<Item = &'i SpatialAmbient> + Clone,
     ) {
         let Self {
             left: Ambient {

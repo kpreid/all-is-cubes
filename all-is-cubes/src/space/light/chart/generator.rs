@@ -150,7 +150,7 @@ impl RayTreeNode {
 }
 
 #[cfg_attr(feature = "_special_testing", visibility::make(pub))]
-fn rays_to_tree(rays: impl Iterator<Item = OneRay>) -> RayTreeNode {
+fn rays_to_tree(rays: impl IntoIterator<Item = OneRay>) -> RayTreeNode {
     let mut tree = RayTreeNode {
         relative_cube: Point3D::default(),
         children: FaceMap::default(),

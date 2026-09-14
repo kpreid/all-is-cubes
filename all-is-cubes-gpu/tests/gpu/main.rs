@@ -70,7 +70,7 @@ fn light_texture_write_read(
                 &device,
                 &queue,
                 &space.read(),
-                LightChunk::all_in_region(space.bounds()).into_iter(),
+                LightChunk::all_in_region(space.bounds()),
             );
         } else {
             lt.ensure_mapped(&queue, &space.read(), space.bounds());

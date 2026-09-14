@@ -241,7 +241,7 @@ impl Triangulator {
     pub fn triangulate<E: From<OutOfMemory>>(
         &mut self,
         basis: Basis,
-        input: impl Iterator<Item = Vertex>,
+        input: impl IntoIterator<Item = Vertex>,
         triangle_callback: impl FnMut([Index; 3]) -> Result<(), E>,
     ) -> Result<(), E> {
         self.triangulate_with_viz(&mut Viz::Disabled, basis, input, triangle_callback)
@@ -254,7 +254,7 @@ impl Triangulator {
         &mut self,
         viz: &mut Viz,
         basis: Basis,
-        input: impl Iterator<Item = Vertex>,
+        input: impl IntoIterator<Item = Vertex>,
         mut triangle_callback: impl FnMut([Index; 3]) -> Result<(), E>,
     ) -> Result<(), E> {
         // Set the basis, and ensure any previous usage of self does not affect the results.

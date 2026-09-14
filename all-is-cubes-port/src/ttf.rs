@@ -378,27 +378,23 @@ fn glyph_to_bez_path(
 
     let mut path = kurbo::BezPath::new();
     planar::Outliner::new()
-        .outline(
-            basis,
-            vertices.into_iter(),
-            |loop_| -> Result<(), mesh::OutOfMemory> {
-                let mut first = true;
-                path.extend(loop_.iter().map(|vertex| {
-                    let point = kurbo::Point::from(
-                        transform
-                            .transform_point(vertex.position.cast_unit().xy().to_f64())
-                            .to_f32()
-                            .to_tuple(),
-                    );
-                    if mem::take(&mut first) {
-                        kurbo::PathEl::MoveTo(point)
-                    } else {
-                        kurbo::PathEl::LineTo(point)
-                    }
-                }));
-                Ok(())
-            },
-        )
+        .outline(basis, vertices, |loop_| -> Result<(), mesh::OutOfMemory> {
+            let mut first = true;
+            path.extend(loop_.iter().map(|vertex| {
+                let point = kurbo::Point::from(
+                    transform
+                        .transform_point(vertex.position.cast_unit().xy().to_f64())
+                        .to_f32()
+                        .to_tuple(),
+                );
+                if mem::take(&mut first) {
+                    kurbo::PathEl::MoveTo(point)
+                } else {
+                    kurbo::PathEl::LineTo(point)
+                }
+            }));
+            Ok(())
+        })
         .expect("not handling OOM");
 
     path

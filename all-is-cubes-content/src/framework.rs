@@ -109,9 +109,10 @@ impl Queue {
     /// tasks are replacing.
     fn extend_front(
         &mut self,
-        additional_tasks: impl Iterator<Item = Task>,
+        additional_tasks: impl IntoIterator<Item = Task>,
         replacing_time_estimate: PositiveSign<f32>,
     ) {
+        let additional_tasks = additional_tasks.into_iter();
         self.tasks.reserve(additional_tasks.size_hint().0);
         let mut count: usize = 0;
         let mut total_time_estimate: PositiveSign<f32> = ps32(0.0);
