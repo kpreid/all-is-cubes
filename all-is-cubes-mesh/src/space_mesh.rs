@@ -360,7 +360,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
         // Set the opaque range to all indices which have already been stored
         // (which will be the opaque ones only).
         self.meta.ngm.opaque_range =
-            Range::from(0..IndexBound::try_from(self.indices.len()).err_is_unreachable());
+            0..IndexBound::try_from(self.indices.len()).err_is_unreachable();
 
         depth_sorting::store_transparent_indices::<M>(
             &mut self.indices,
@@ -635,7 +635,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 indices: IndexVec::new(), // placeholder
                 meta: MeshMeta {
                     ngm: MeshMetaNonGeneric {
-                        opaque_range: Range::from(0..0),
+                        opaque_range: 0..0,
                         transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
                         block_indices_used: BlockIndexSet::from_iter([0]),
                         has_non_rect_transparency: block_mesh
@@ -950,7 +950,7 @@ impl MeshMetaNonGeneric {
             bounding_box,
             flaws,
         } = self;
-        *opaque_range = Range::from(0..0);
+        *opaque_range = 0..0;
         *transparent = [TransparentMeta::EMPTY; DepthOrdering::COUNT];
         block_indices_used.clear();
         *has_non_rect_transparency = false;
@@ -1543,11 +1543,8 @@ mod tests {
         assert!(mesh.is_empty());
         assert_eq!(mesh.vertices(), (&[][..], &[][..]));
         assert_eq!(mesh.indices(), IndexSlice::U16(&[]));
-        assert_eq!(mesh.opaque_range(), Range::from(0..0));
-        assert_eq!(
-            mesh.transparent_range(DepthOrdering::WITHIN),
-            Range::from(0..0)
-        );
+        assert_eq!(mesh.opaque_range(), 0..0);
+        assert_eq!(mesh.transparent_range(DepthOrdering::WITHIN), 0..0);
         assert_eq!(mesh.textures_used(), &[]);
         assert_eq!(mesh.texture_channels_used(), None);
         assert_eq!(dbg!(mesh.total_byte_size()), size_of::<TestMesh>());
