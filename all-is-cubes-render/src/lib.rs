@@ -1,3 +1,5 @@
+#![feature(const_default)]
+#![feature(const_trait_impl)]
 #![feature(doc_cfg)]
 #![cfg_attr(test, feature(fmt_debug))]
 #![feature(impl_restriction)]
