@@ -789,7 +789,7 @@ mod tests {
     }
 
     /// Exercise the analysis on the outputs of `make_slab()`.
-    #[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+    #[all_is_cubes::util::cartesian_product_test]
     fn analyze_slab(
         #[case(t0 = 0)]
         #[case(t1 = 1)]

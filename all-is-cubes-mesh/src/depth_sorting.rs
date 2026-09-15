@@ -948,7 +948,7 @@ mod tests {
     /// Tests that the expected [`DepthSortResult`] is produced under various conditions.
     /// Also serves as a smoke test for the `has_non_rect_transparency` case
     /// (checks that it doesn’t panic, but not that the actual sort is correct).
-    #[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+    #[all_is_cubes::util::cartesian_product_test]
     fn depth_sort_result_from_space_mesh(
         #[case(opaque = false)]
         #[case(transparent = true)]

@@ -71,7 +71,7 @@ fn initial_value_initialized_after_creation() {
 
 /// Tests that the values returned from [`Space::get_light()`] on out-of-bounds cubes
 /// match the sky, when they should.
-#[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+#[crate::util::cartesian_product_test]
 fn out_of_bounds_light_is_sky(
     #[case(opacity_0 = 0.0)]
     #[case(opacity_05 = 0.5)]
@@ -110,7 +110,7 @@ fn out_of_bounds_light_is_sky(
     }
 }
 
-#[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+#[crate::util::cartesian_product_test]
 fn step(
     #[case(unpaused = false)]
     #[case(paused = true)]

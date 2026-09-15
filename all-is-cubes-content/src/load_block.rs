@@ -253,7 +253,7 @@ mod tests {
 
     const IMAGE_2X2: &LazyImage = include_image!("load_block/test_2x2_0rgb.png");
 
-    #[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+    #[all_is_cubes::util::cartesian_product_test]
     fn image_simple_extrusion(
         #[case(visible = lb::Vox::DEFAULT)]
         #[case(invisible = lb::Vox::DENOTES_AIR)]

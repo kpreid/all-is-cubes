@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 use all_is_cubes::block;
 use all_is_cubes::universe::{Handle, Name};
-use all_is_cubes::util::yield_progress_for_testing;
+use all_is_cubes::util::{async_test, yield_progress_for_testing};
 
 #[cfg(all(feature = "export", feature = "import"))]
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn import_export_native_format() {
     let import_path = PathBuf::from(concat!(
         env!("CARGO_MANIFEST_DIR"),
