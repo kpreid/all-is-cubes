@@ -36,7 +36,7 @@ use crate::universe;
 /// * A suggestion for camera automatic exposure / eye-adaptation simulation, based on the light
 ///   around it.
 #[derive(Clone, Default, ecs::Component)]
-#[require(exposure::State, character::ambient_sound::State)]
+#[require(exposure::State, character::ambient_sound::State, PreviousBodyVelocity)]
 pub(crate) struct CharacterEye {
     /// Offset to be added to the body position to produce the drawn eye (camera) position.
     displacement_pos: Vector3D<FreeCoordinate, Cube>,
