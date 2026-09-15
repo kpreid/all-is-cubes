@@ -378,12 +378,12 @@ mod tests {
     const RANDOM_CASES: usize = if cfg!(miri) { 1 } else { 100 };
 
     fn random_grid_matrix(mut rng: impl Rng) -> GridMatrix {
-        let mut r = || rng.random_range(-100..=100);
+        let mut r = || rng.random_range(ops::RangeInclusive::from(-100..=100));
         GridMatrix::new(r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r())
     }
 
     fn random_possibly_invertible_matrix(mut rng: impl Rng) -> GridMatrix {
-        let mut r = |n: GridCoordinate| rng.random_range(-n..=n);
+        let mut r = |n: GridCoordinate| rng.random_range(ops::RangeInclusive::from(-n..=n));
         GridMatrix::new(
             r(1),
             r(1),

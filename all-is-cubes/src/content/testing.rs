@@ -1,3 +1,5 @@
+use core::ops;
+
 use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 use euclid::vec2;
 use num_traits::Euclid as _;
@@ -71,49 +73,51 @@ pub async fn light_bench_space(
             );
             let section_bounds = layout.section_bounds(sx, sz);
             let color = Block::from(Rgba::new(
-                rng.random_range(0.0..=1.0),
-                rng.random_range(0.0..=1.0),
-                rng.random_range(0.0..=1.0),
+                rng.random_range(ops::RangeInclusive::from(0.0..=1.0)),
+                rng.random_range(ops::RangeInclusive::from(0.0..=1.0)),
+                rng.random_range(ops::RangeInclusive::from(0.0..=1.0)),
                 if rng.random_bool(0.125) { 0.5 } else { 1.0 },
             ));
-            space.mutate(universe.read_ticket(), |m| match rng.random_range(0..3) {
-                0 => {
-                    m.fill_uniform(section_bounds, &color).err_is_unreachable();
+            space.mutate(universe.read_ticket(), |m| {
+                match rng.random_range(ops::Range::from(0..3)) {
+                    0 => {
+                        m.fill_uniform(section_bounds, &color).err_is_unreachable();
+                    }
+                    1 => {
+                        m.fill_uniform(
+                            section_bounds
+                                .shrink(FaceMap::default().with(Face::PY, layout.yup()))
+                                .none_is_unreachable(),
+                            &color,
+                        )
+                        .err_is_unreachable();
+                        m.fill_uniform(
+                            section_bounds
+                                .shrink(FaceMap {
+                                    nx: 1,
+                                    ny: 0,
+                                    nz: 1,
+                                    px: 1,
+                                    py: 0,
+                                    pz: 1,
+                                })
+                                .none_is_unreachable(),
+                            &AIR,
+                        )
+                        .err_is_unreachable();
+                    }
+                    2 => {
+                        m.fill(section_bounds, |_| {
+                            if rng.random_bool(0.25) {
+                                Some(&color)
+                            } else {
+                                Some(&AIR)
+                            }
+                        })
+                        .err_is_unreachable();
+                    }
+                    _ => unreachable!("rng range"),
                 }
-                1 => {
-                    m.fill_uniform(
-                        section_bounds
-                            .shrink(FaceMap::default().with(Face::PY, layout.yup()))
-                            .none_is_unreachable(),
-                        &color,
-                    )
-                    .err_is_unreachable();
-                    m.fill_uniform(
-                        section_bounds
-                            .shrink(FaceMap {
-                                nx: 1,
-                                ny: 0,
-                                nz: 1,
-                                px: 1,
-                                py: 0,
-                                pz: 1,
-                            })
-                            .none_is_unreachable(),
-                        &AIR,
-                    )
-                    .err_is_unreachable();
-                }
-                2 => {
-                    m.fill(section_bounds, |_| {
-                        if rng.random_bool(0.25) {
-                            Some(&color)
-                        } else {
-                            Some(&AIR)
-                        }
-                    })
-                    .err_is_unreachable();
-                }
-                _ => unreachable!("rng range"),
             })
         }
         progress.finish().await;
@@ -209,7 +213,8 @@ impl LightBenchLayout {
         let size = self.array_side_lengths;
         let size_z = GridCoordinate::from(size.y);
         let total = GridCoordinate::from(size.x) * size_z;
-        (0..total).map(move |i| i.div_rem_euclid(&size_z))
+        // ExactSizeIterator not available on new range
+        ops::Range::from(0..total).map(move |i| i.div_rem_euclid(&size_z))
     }
 
     // Bounds in which one of the sections should be drawn.
