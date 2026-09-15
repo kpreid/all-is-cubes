@@ -28,7 +28,7 @@ test = false # any testable code will be in lib
 # If enabled, the All is Cubes game client static files will be included in the server
 # binary. This is larger and slower to compile but creates a binary not needing any
 # accompanying files.
-embed = []
+embed = ["dep:descriptive-unwrap"]
 
 [dependencies]
 # TODO: server doesn't actually have any game-server functionality so this is unnecessary
@@ -36,7 +36,8 @@ embed = []
 anyhow = { workspace = true }
 axum = { version = "0.8.1", features = ["tower-log"] }
 clap = { workspace = true }
-descriptive-unwrap = { workspace = true }
+# optional just to not get (nightly) cargo::unused_dependencies warnings
+descriptive-unwrap = { workspace = true, optional = true }
 include_dir = "0.7.2"
 simplelog = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

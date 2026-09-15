@@ -109,7 +109,6 @@ dependencies = [
  "naga-rust-embed",
  "num-traits",
  "pollster",
- "pretty_assertions",
  "rand 0.10.2",
  "rand_xoshiro",
  "resource",
