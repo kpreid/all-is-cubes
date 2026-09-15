@@ -31,7 +31,7 @@
 /// `my_test::transparent::animated`.
 #[macro_export]
 macro_rules! cartesian_product_test {
-    (
+    attr() (
         $(#[doc = $doc:expr])*
         $(#[test])?
         $(#[ignore = $ignore_reason:expr])?

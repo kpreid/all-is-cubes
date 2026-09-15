@@ -245,7 +245,7 @@ fn overflow_evaluate() {
     );
 }
 
-#[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+#[crate::util::cartesian_product_test]
 fn self_referential_evaluate(
     #[case(via_construction = false)]
     #[case(via_mutation = true)]
@@ -290,7 +290,7 @@ fn self_referential_evaluate(
     }
 }
 
-#[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+#[crate::util::cartesian_product_test]
 fn self_referential_listen(
     #[case(via_construction = false)]
     #[case(via_mutation = true)]
