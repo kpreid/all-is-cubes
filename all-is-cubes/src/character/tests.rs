@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec;
 use std::assert_matches;
@@ -17,26 +18,40 @@ use crate::raycast::Ray;
 use crate::space::Space;
 use crate::time;
 use crate::transaction::{self, Transaction as _, TransactionTester};
-use crate::universe::Universe;
+use crate::universe::{Handle, Universe};
 
-fn test_spawn(f: impl Fn(&mut Space) -> Spawn) -> Character {
+/// Construct a character from a particular [`Spawn`] which is not a space’s default.
+fn create_character_in_space(
+    f: impl Fn(&mut Space) -> Spawn,
+) -> (Box<Universe>, Handle<Space>, Handle<Character>) {
     let mut universe = Universe::new();
     let mut space = Space::empty_positive(1, 1, 1);
     let spawn = f(&mut space);
-    let space = universe.insert_anonymous(space);
-    Character::spawn(&spawn, space)
+    let space_handle = universe.insert_anonymous(space);
+    let character_handle = universe
+        .insert(
+            "character".into(),
+            Character::spawn(&spawn, space_handle.clone()),
+        )
+        .unwrap();
+    (universe, space_handle, character_handle)
+}
+
+fn default_spawn(space: &mut Space) -> Spawn {
+    space.spawn().clone()
 }
 
 #[test]
 fn spawn_inferred_position() {
     let bounds = GridAab::from_lower_size([0, 17, 0], [3, 3, 3]);
-    let character = test_spawn(|space| {
+    let (universe, _space, character) = create_character_in_space(|space| {
         let mut spawn = Spawn::default_for_new_space(space.bounds());
         spawn.set_bounds(bounds);
         spawn
     });
 
     // Character's box should be standing on the bottom of the bounds.
+    let character = character.read(universe.read_ticket()).unwrap();
     let cbox = character.body.collision_box_abs();
     dbg!(character.body.position(), cbox);
     assert_eq!(
@@ -50,12 +65,13 @@ fn spawn_inventory() {
     let inventory_data = vec![Slot::from(Tool::InfiniteBlocks(block::from_color!(
         0.1, 0.2, 0.3
     )))];
-    let character = test_spawn(|space| {
+    let (universe, _space, character) = create_character_in_space(|space| {
         let mut spawn = Spawn::default_for_new_space(space.bounds());
         spawn.set_inventory(inventory_data.clone());
         spawn
     });
 
+    let character = character.read(universe.read_ticket()).unwrap();
     let i = character.inventory.inventory();
     assert_eq!(i.slots[0], inventory_data[0]);
     assert_eq!(i.slots[1], Slot::Empty);
@@ -64,19 +80,21 @@ fn spawn_inventory() {
 
 #[test]
 fn spawn_look_direction_default() {
-    let character = test_spawn(|space| space.spawn().clone());
+    let (universe, _space, character) = create_character_in_space(default_spawn);
+    let character = character.read(universe.read_ticket()).unwrap();
     assert_eq!(character.body.yaw, 0.0);
     assert_eq!(character.body.pitch, 0.0);
 }
 
 #[test]
 fn spawn_look_direction() {
-    let character = test_spawn(|space| {
+    let (universe, _space, character) = create_character_in_space(|space| {
         let mut spawn = Spawn::default_for_new_space(space.bounds());
         spawn.set_look_direction(Vector3D::new(1., 1., -1.));
         spawn
     });
 
+    let character = character.read(universe.read_ticket()).unwrap();
     // Using round() as rough approximate-eq, which makes this test compatible with Miri
     // and any platforms that have actually nondeterministic float ops.
     assert_eq!(
@@ -87,12 +105,8 @@ fn spawn_look_direction() {
 
 #[test]
 fn inventory_transaction() {
-    let mut universe = Universe::new();
-    let space = Space::empty_positive(1, 1, 1);
-    let space_handle = universe.insert_anonymous(space);
-    let character = Character::spawn_default(universe.read_ticket(), space_handle.clone()).unwrap();
+    let (mut universe, _space, character_handle) = create_character_in_space(default_spawn);
     let log = Log::new();
-    let character_handle = universe.insert_anonymous(character);
     character_handle.read(universe.read_ticket()).unwrap().listen(log.listener());
 
     let item = Tool::InfiniteBlocks(AIR);
