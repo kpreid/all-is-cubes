@@ -1,3 +1,5 @@
+#![feature(macro_attr)]
+
 //! Tests that require a GPU device, but are not rendering tests
 //! (those are found in the `test-renderers` package).
 
@@ -26,7 +28,7 @@ pub(crate) async fn instance() -> &'static wgpu::Instance {
 // -------------------------------------------------------------------------------------------------
 
 /// Test that the [`LightTexture`] performs partial updates correctly.
-#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+#[all_is_cubes::util::cartesian_product_test]
 fn light_texture_write_read(
     #[case(bulk = false)]
     #[case(scatter = true)]
