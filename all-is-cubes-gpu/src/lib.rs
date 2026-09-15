@@ -1,3 +1,6 @@
+#![feature(const_clone)]
+#![feature(const_convert)]
+#![feature(const_trait_impl)]
 #![feature(doc_cfg)]
 
 //! Algorithms for rendering [All is Cubes] content using a GPU, via
