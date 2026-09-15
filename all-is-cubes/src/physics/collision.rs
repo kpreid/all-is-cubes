@@ -664,7 +664,7 @@ mod tests {
             );
             #[expect(deprecated, reason = "TODO")]
             let step = aab_raycast::aab_raycast_legacy(moving_aab, ray, false)
-                .nth(rng.random_range(1..10))
+                .nth(rng.random_range(core::ops::Range::from(1..10)))
                 .unwrap();
             let axis = step.face().axis().expect("should have an axis");
             let segment = ray.scale_direction(step.t_distance()); // TODO: this should be a function? Should aab_raycast return a special step type with these features?

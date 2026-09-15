@@ -132,13 +132,12 @@ impl BoxStyle {
         resolution: Resolution,
     ) -> impl Iterator<Item = GridAab> + Clone + Send + 'static {
         let resolution = GridCoordinate::from(resolution);
-        let ranges =
-            [0..resolution * 3, resolution * 3..resolution * 4].map(core::range::Range::from);
+        let ranges = [0..resolution * 3, resolution * 3..resolution * 4];
 
         ranges.into_iter().flat_map(move |y_range| {
-            ranges.into_iter().map(move |x_range| {
-                GridAab::from_ranges([x_range, y_range, core::range::Range::from(0..resolution)])
-            })
+            ranges
+                .into_iter()
+                .map(move |x_range| GridAab::from_ranges([x_range, y_range, 0..resolution]))
         })
     }
 

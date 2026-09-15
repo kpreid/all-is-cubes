@@ -273,8 +273,8 @@ fn positioning_x(
     params: (
         PositioningX,
         bool,
-        core::ops::Range<i32>,
-        core::ops::Range<i32>,
+        core::range::Range<i32>,
+        core::range::Range<i32>,
     ),
 ) {
     let (pos, odd_character_width, bounds_range, expected) = params;
@@ -308,7 +308,7 @@ fn positioning_x(
 
     assert_eq!(
         text.measure(ReadTicket::stub()).unwrap().logical_bounding_voxels().x_range(),
-        core::range::Range::from(expected)
+        expected
     );
 }
 
