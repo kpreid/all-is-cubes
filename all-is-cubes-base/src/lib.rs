@@ -10,6 +10,7 @@
 #![move_size_limit = "256"]
 #![feature(macro_attr)]
 #![feature(mut_restriction)]
+#![feature(new_range)]
 #![feature(try_blocks)]
 
 //! This library is an internal component of [`all-is-cubes`],

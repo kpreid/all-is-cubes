@@ -2,6 +2,7 @@
 #![feature(const_convert)]
 #![feature(const_trait_impl)]
 #![feature(doc_cfg)]
+#![feature(new_range)]
 
 //! Algorithms for rendering [All is Cubes] content using a GPU, via
 //! the [`wgpu`] graphics library.

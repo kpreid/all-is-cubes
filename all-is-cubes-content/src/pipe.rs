@@ -167,8 +167,9 @@ pub(crate) fn make_pipe_blocks(txn: &mut UniverseTransaction) -> (Block, Block) 
     ) -> Block {
         // frames are offset by 1 so that the frames take effect at the same time as the *effect*
         // of the tick_action. TODO: evidence we need to change how Schedule works.
-        let animation =
-            block::Animation::new((1..60).step_by(6).map(|phase| (phase + 1, f(txn, phase))));
+        let animation = block::Animation::new(
+            (1..60).into_iter().step_by(6).map(|phase| (phase + 1, f(txn, phase))),
+        );
         Block::from(txn.insert_anonymous(BlockDef::new_animated(txn.read_ticket(), animation)))
     }
 

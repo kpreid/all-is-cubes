@@ -654,7 +654,7 @@ impl EverythingRenderer {
                 0,
                 self.lines_buffer.get().expect("missing lines buffer!").slice(..),
             );
-            world_render_pass.draw(0..self.lines_vertex_count, 0..1);
+            world_render_pass.draw((0..self.lines_vertex_count).into(), (0..1).into());
         }
 
         // New render pass so we clear the depth buffer for the UI.
@@ -684,7 +684,7 @@ impl EverythingRenderer {
         // Draw backdrop.
         ui_render_pass.set_pipeline(&self.pipelines.backdrop_render_pipeline);
         ui_render_pass.set_bind_group(0, Some(&self.backdrop_bind_group), &[]);
-        ui_render_pass.draw(0..3, 0..1); // fullscreen triangle
+        ui_render_pass.draw((0..3).into(), (0..1).into()); // fullscreen triangle
 
         let lines_to_ui_time = time::Instant::now();
         let ui_draw_info = if !is_raytracing {

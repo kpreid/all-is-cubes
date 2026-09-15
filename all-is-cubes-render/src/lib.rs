@@ -3,6 +3,7 @@
 #![feature(doc_cfg)]
 #![cfg_attr(test, feature(fmt_debug))]
 #![feature(impl_restriction)]
+#![feature(new_range)]
 
 //! Raytracer and rendering abstractions for the all-is-cubes engine.
 //!
