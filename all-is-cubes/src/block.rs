@@ -793,7 +793,7 @@ impl BlRotate for Block {
     }
 }
 
-impl From<&'static Primitive> for Block {
+const impl From<&'static Primitive> for Block {
     /// Constructs a [`Block`] which references the given static [`Primitive`].
     ///
     /// This performs no allocation.
@@ -815,12 +815,12 @@ impl From<Primitive> for Block {
 // or borrowed `Block`. The motivation for this is to avoid unnecessary cloning
 // (in case an individual block has large data).
 // TODO: Eliminate these given the new Block-is-a-pointer world.
-impl From<Block> for Cow<'_, Block> {
+const impl From<Block> for Cow<'_, Block> {
     fn from(block: Block) -> Self {
         Cow::Owned(block)
     }
 }
-impl<'a> From<&'a Block> for Cow<'a, Block> {
+const impl<'a> From<&'a Block> for Cow<'a, Block> {
     fn from(block: &'a Block) -> Self {
         Cow::Borrowed(block)
     }
@@ -980,9 +980,6 @@ pub const AIR: Block = Block(BlockPtr::Static(&Primitive::Air));
 // TODO: uncomfortable with where this impl block is located
 impl Primitive {
     /// Construct a [`Primitive`] from a reflectance color.
-    ///
-    /// This function is equivalent to `Block::from(color)` but it can be used in const contexts
-    /// and returns a [`Primitive`] instead of a [`Block`].
     pub const fn from_color(color: Rgba) -> Primitive {
         Primitive::Atom(Atom::from_color(color))
     }
