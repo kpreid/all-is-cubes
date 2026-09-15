@@ -47,6 +47,8 @@ pub(crate) struct CharacterEye {
     /// the camera coordinate system (whose look direction is the -Z axis) to the [`Space`]'s
     /// coordinate system.
     ///
+    /// [`None`] if a step has not occurred since the character was added to the universe.
+    ///
     /// See the documentation for [`ViewTransform`] for the interpretation of this transform.
     pub view_transform: Option<ViewTransform>,
 }
