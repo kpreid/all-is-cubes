@@ -76,7 +76,7 @@ impl Quote {
     }
 }
 
-impl From<Quote> for block::Modifier {
+const impl From<Quote> for block::Modifier {
     fn from(value: Quote) -> Self {
         block::Modifier::Quote(value)
     }

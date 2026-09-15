@@ -180,7 +180,7 @@ impl GraphicsOptions {
         show_ui: true,
         antialiasing: AntialiasingOption::None,
         debug_info_text: true,
-        debug_info_text_contents: ShowStatus::DEFAULT,
+        debug_info_text_contents: ShowStatus::default(),
         debug_behaviors: false,
         debug_chunk_boxes: false,
         debug_collision_boxes: false,
@@ -248,6 +248,7 @@ impl fmt::Debug for GraphicsOptions {
     }
 }
 
+// TODO: const impl default (needs more impls)
 impl Default for GraphicsOptions {
     /// Default graphics options broadly have “everything reasonable” turned on
     /// (they may disable things that are not well-implemented yet).
@@ -269,7 +270,7 @@ impl Default for GraphicsOptions {
             show_ui: true,
             antialiasing: AntialiasingOption::default(),
             debug_info_text: true,
-            debug_info_text_contents: ShowStatus::DEFAULT,
+            debug_info_text_contents: ShowStatus::default(),
             debug_behaviors: false,
             debug_chunk_boxes: false,
             debug_collision_boxes: false,
@@ -375,7 +376,7 @@ impl ToneMappingOperator {
 /// [`ToneMappingOperator`].
 ///
 #[doc = include_str!("serde-warning.md")]
-#[derive(Clone, Default, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum ExposureOption {
@@ -387,7 +388,6 @@ pub enum ExposureOption {
     ///
     /// Note: If [`GraphicsOptions::lighting_display`] is disabled,
     /// then this currently will act as `Fixed(1.0)`.
-    #[default]
     Automatic,
 }
 
@@ -406,6 +406,12 @@ impl ExposureOption {
             ExposureOption::Fixed(value) => value,
             ExposureOption::Automatic => PositiveSign::<f32>::ONE,
         }
+    }
+}
+
+const impl Default for ExposureOption {
+    fn default() -> Self {
+        ExposureOption::Automatic
     }
 }
 
