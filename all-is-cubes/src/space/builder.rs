@@ -129,7 +129,7 @@ impl<'universe> Builder<'universe, ()> {
             read_ticket: ReadTicket::stub(),
             bounds: (),
             spawn: None,
-            physics: SpacePhysics::DEFAULT,
+            physics: SpacePhysics::default(),
             behaviors: BehaviorSet::new(),
             contents: Fill::Block(AIR),
         }

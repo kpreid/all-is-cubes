@@ -206,7 +206,7 @@ impl FpsCounter {
     }
 }
 
-impl Default for FpsCounter {
+const impl Default for FpsCounter {
     fn default() -> Self {
         Self::new()
     }
