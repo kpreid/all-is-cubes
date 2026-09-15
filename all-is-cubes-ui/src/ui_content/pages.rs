@@ -2,7 +2,7 @@
 
 use alloc::string::String;
 use alloc::sync::Arc;
-use alloc::vec;
+use alloc::{vec, vec::Vec};
 
 use all_is_cubes::arcstr::{ArcStr, literal};
 use all_is_cubes::block::Resolution::*;
@@ -27,16 +27,14 @@ pub(super) fn new_inventory_page(hud_inputs: &HudInputs) -> vui::Page {
     let column_count = 10;
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face::NY,
-        children: (0u16..row_count)
-            .map(|row| {
-                vui::leaf_widget(widgets::Toolbar::new(
-                    hud_inputs.character_inventory_watcher.clone(),
-                    Arc::clone(&hud_inputs.hud_blocks),
-                    (row * column_count)..((row + 1) * column_count),
-                    hud_inputs.cue_channel.clone(),
-                ))
-            })
-            .collect(),
+        children: Vec::from_iter((0u16..row_count).into_iter().map(|row| {
+            vui::leaf_widget(widgets::Toolbar::new(
+                hud_inputs.character_inventory_watcher.clone(),
+                Arc::clone(&hud_inputs.hud_blocks),
+                (row * column_count)..((row + 1) * column_count),
+                hud_inputs.cue_channel.clone(),
+            ))
+        })),
     });
     vui::Page::new_modal_dialog(
         &hud_inputs.hud_blocks.widget_theme,

@@ -332,6 +332,7 @@ mod tests {
     fn get_row(image: &TextRayImage, y: usize) -> String {
         //let reset = Colors::new(Color::Reset, Color::Reset);
         (0..image.viewport.framebuffer_size.width as usize)
+            .into_iter()
             .map(|x| {
                 let (text, _color) = image_patch_to_character(image, Vector2D::new(x, y));
                 //assert_eq!(color, reset);
