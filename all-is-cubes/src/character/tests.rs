@@ -4,7 +4,7 @@ use alloc::vec;
 use std::assert_matches;
 use std::dbg;
 
-use euclid::{Vector3D, point3};
+use euclid::{Vector3D, point3, vec3};
 
 use crate::block::{self, AIR};
 use crate::character::{
@@ -12,8 +12,8 @@ use crate::character::{
 };
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listen as _, Log};
-use crate::math::{Face, GridAab, Rgb01};
-use crate::physics::BodyTransaction;
+use crate::math::{Face, FreePoint, GridAab, Rgb01};
+use crate::physics::{Body, BodyTransaction};
 use crate::raycast::Ray;
 use crate::space::Space;
 use crate::time;
@@ -100,6 +100,52 @@ fn spawn_look_direction() {
     assert_eq!(
         (character.body.yaw.round(), character.body.pitch.round()),
         (45.0, (-1f64).atan2(2.0f64.sqrt()).to_degrees().round()),
+    );
+}
+
+#[test]
+fn view_transform_and_eye_displacement() {
+    let initial_body_position: FreePoint = point3(1., 2., 3.);
+    let (mut universe, _space, character_handle) = create_character_in_space(|space| {
+        let mut spawn = Spawn::default_for_new_space(space.bounds());
+        spawn.set_eye_position(initial_body_position);
+        spawn
+    });
+    universe.set_clock(time::Clock::new(time::TickSchedule::per_second(60), 0));
+    // TODO: this should be doable via a transaction
+    universe
+        .mutate_component(&character_handle, |body: &mut Body| {
+            body.add_velocity(vec3(1., 0., 0.))
+        })
+        .unwrap();
+
+    assert_eq!(
+        Character::view(&character_handle, universe.read_ticket())
+            .unwrap()
+            .1
+            .translation,
+        initial_body_position.to_vector(),
+        "view translation initial state",
+    );
+
+    universe.step(false, time::Deadline::Whenever);
+
+    let new_body_position = character_handle.read(universe.read_ticket()).unwrap().body.position();
+    let new_eye_position = Character::view(&character_handle, universe.read_ticket())
+        .unwrap()
+        .1
+        .translation
+        .to_point();
+    dbg!(new_body_position, new_eye_position);
+    assert_ne!(
+        new_body_position, initial_body_position,
+        "body should have moved"
+    );
+    // very rough assertion that doesn’t check the properties of the offset beyond being nonzero,
+    // demonstrating that the eye displacement system is operating
+    assert!(
+        new_body_position.distance_to(new_eye_position) > 0.0001,
+        "view translation after one step should be offset from body",
     );
 }
 
