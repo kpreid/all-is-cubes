@@ -67,6 +67,7 @@ pub(crate) fn add_systems(world: &mut ecs::World) {
 /// System function to run physics for [`Body`].
 pub(super) fn body_physics_step_system(
     lex: rg::LogExecution,
+    universe_id: ecs::Res<universe::UniverseId>,
     current_step: ecs::Res<universe::CurrentStep>,
     mut info_collector: ecs::ResMut<universe::InfoCollector<BodyStepInfo>>,
     characters: ecs::Query<(
@@ -93,7 +94,7 @@ pub(super) fn body_physics_step_system(
             Vector3D::zero()
         };
 
-        physics_output.last_step_info = match space_handle.read_from_query(&spaces) {
+        physics_output.last_step_info = match space_handle.read_from_query(*universe_id, &spaces) {
             Ok(space) => {
                 let colliding_cubes = &mut physics_output.colliding_cubes;
                 colliding_cubes.clear();

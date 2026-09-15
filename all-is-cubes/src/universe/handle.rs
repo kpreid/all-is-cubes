@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
-use core::any::Any;
+use core::any::{Any, type_name};
 use core::assert_matches;
 use core::fmt;
 use core::hash;
@@ -314,28 +314,6 @@ impl<T: 'static> Handle<T> {
         }
     }
 
-    /// Obtains the [`ecs::Entity`] for this handle, without checking a universe ID up front.
-    ///
-    /// Returns an error if the handle does not correspond to an entity.
-    fn as_entity_in_some_universe(&self) -> Result<ecs::Entity, HandleError> {
-        match &*self.inner.state.lock().expect("Handle::state lock error") {
-            &State::Member { entity, .. } => Ok(entity),
-
-            // Ignore universe mismatch so that Handle::new_gone() takes this branch.
-            &State::Gone { reason } => Err(self.create_error(HandleErrorKind::Gone { reason })),
-
-            #[cfg(feature = "save")]
-            State::Deserializing { .. } => Err(self.create_error(HandleErrorKind::NotReady)),
-
-            State::Pending => Err(self.create_error(HandleErrorKind::NotYetInserted {
-                ticket_universe_id: None,
-                ticket_origin: Location::caller(),
-            })),
-
-            State::Builtin => Err(self.create_error(HandleErrorKind::Builtin)),
-        }
-    }
-
     /// Returns the unique ID of the universe this handle belongs to.
     ///
     /// Returns [`None`] if this [`Handle`]:
@@ -435,35 +413,52 @@ impl<T: 'static> Handle<T> {
 
     /// As [`Handle::read()`] but reads the data from an [`ecs::Query`] instead of a [`ReadTicket`].
     ///
+    /// `universe_id` must be the ID of the same universe that `query` queries.
+    ///
     /// # Errors
     ///
     /// Returns an error if:
     ///
     /// * The [`Handle`] is defunct.
     /// * Components are missing from the entity in the world queried.
+    ///
+    /// # Panics
+    ///
+    /// May panic, or return incorrect results, if `universe_id`  and `query` do not originate from
+    /// the same universe.
     #[inline(never)]
     #[track_caller]
     pub(crate) fn read_from_query<'w>(
         &self,
+        universe_id: UniverseId,
         query: &'w HandleReadQuery<'w, 'w, T>,
     ) -> Result<T::Read<'w>, HandleError>
     where
         T: UniverseMember,
     {
-        let (membership, data) = query
-            .get(self.as_entity_in_some_universe()?)
-            .map_err(|error| panic!("TODO(ecs): precisely report query error {error:?}"))?;
-        if membership.handle == *self {
-            Ok(T::read_from_query(data))
-        } else {
-            Err(HandleError {
+        let entity = self.as_entity(universe_id)?;
+        match query.get(entity) {
+            Ok((membership, data)) if membership.handle == *self => Ok(T::read_from_query(data)),
+
+            // Handle belongs to the right universe, but the member has not been inserted,
+            Ok((membership, _)) => Err(HandleError {
                 name: self.name(),
                 handle_universe_id: membership.handle.universe_id(),
                 kind: HandleErrorKind::NotYetInserted {
                     ticket_universe_id: None,
                     ticket_origin: Location::caller(),
                 },
-            })
+            }),
+
+            Err(error) => {
+                panic!(
+                    "unexpected error in \
+                    Handle::read_from_query({self:?}, {universe_id:?}, {query:?}) \
+                    reading entity {entity:?} for {member_type} query {query_type}: {error:?}",
+                    member_type = type_name::<T>(),
+                    query_type = type_name::<HandleReadQuery<'_, '_, T>>()
+                )
+            }
         }
     }
 

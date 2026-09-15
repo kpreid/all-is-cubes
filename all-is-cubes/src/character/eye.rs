@@ -124,6 +124,7 @@ fn step_eye_position(
 
 fn step_exposure(
     lex: rg::LogExecution,
+    universe_id: ecs::Res<universe::UniverseId>,
     current_step: ecs::Res<universe::CurrentStep>,
     eyes: ecs::Query<(&ParentSpace, &CharacterEye, &mut exposure::State)>,
     spaces: universe::HandleReadQuery<space::Space>,
@@ -141,7 +142,7 @@ fn step_exposure(
     // but we would need plumbing for when to add/remove it.
 
     for (ParentSpace(space_handle), eye, mut exposure) in eyes {
-        let Ok(space) = space_handle.read_from_query(&spaces) else {
+        let Ok(space) = space_handle.read_from_query(*universe_id, &spaces) else {
             continue;
         };
         let Some(view_transform) = eye.view_transform else {
@@ -156,6 +157,7 @@ fn step_exposure(
 
 fn step_ambient_sound(
     lex: rg::LogExecution,
+    universe_id: ecs::Res<universe::UniverseId>,
     current_step: ecs::Res<universe::CurrentStep>,
     eyes: ecs::Query<(
         &ParentSpace,
@@ -173,7 +175,7 @@ fn step_ambient_sound(
     // but we would need plumbing for when to add/remove it.
 
     for (ParentSpace(space_handle), eye, mut exposure) in eyes {
-        let Ok(space) = space_handle.read_from_query(&spaces) else {
+        let Ok(space) = space_handle.read_from_query(*universe_id, &spaces) else {
             continue;
         };
         let Some(view_transform) = eye.view_transform else {
