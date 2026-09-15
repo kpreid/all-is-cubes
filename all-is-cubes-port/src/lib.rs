@@ -1,3 +1,6 @@
+#![feature(const_default)]
+#![feature(const_convert)]
+#![feature(const_trait_impl)]
 #![feature(doc_cfg)]
 #![feature(large_assignments)]
 #![move_size_limit = "2000"] // top offenders: 1. SpaceMesh; 2. load_dot_vox()
