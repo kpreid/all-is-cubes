@@ -14,7 +14,7 @@ use ordered_float::NotNan;
 )]
 use num_traits::float::Float as _;
 
-use crate::camera::Eye;
+use crate::camera::{self, Eye};
 #[cfg(not(any(feature = "std", test)))]
 #[allow(
     unused_imports,
@@ -305,6 +305,18 @@ impl Body {
 
         self.yaw = (180.0 - (direction.x).atan2(direction.z).to_degrees()).rem_euclid(360.0);
         self.pitch = -(direction.y).atan2(horizontal_distance).to_degrees();
+    }
+
+    /// Returns the view transform defined by this body’s state, *without* the additional
+    /// momentum-driven displacements done for characters.
+    ///
+    /// Used by [`crate::character`] as part of computing the transform actually used when
+    /// looking through a character’s eyes.
+    pub(crate) fn view_transform_without_eye_displacement(&self) -> camera::ViewTransform {
+        camera::ViewTransform {
+            rotation: self.look_rotation(),
+            translation: self.position().to_vector(),
+        }
     }
 
     // TODO: should this be able to compute its answer without needing `PhysicsOutputs`?

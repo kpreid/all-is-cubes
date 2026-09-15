@@ -20,7 +20,8 @@ pub enum Eye {}
 /// Representation of a camera viewpoint and orientation.
 ///
 /// Note that this is treated as a transform **from** the origin looking in the &minus;Z
-/// direction (eye space) **to** the camera position and orientation (world space).
+/// direction (eye space, where the look direction is the -Z axis)
+/// **to** the camera position and orientation (world space).
 /// This is done so that the [`RigidTransform3D::translation`] vector is equal to the
 /// world position, rather than needing to be rotated by the view direction.
 pub type ViewTransform = RigidTransform3D<FreeCoordinate, Eye, Cube>;
