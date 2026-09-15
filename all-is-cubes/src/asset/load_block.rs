@@ -42,6 +42,7 @@ use crate::block::Atom;
 ///
 // TODO: make a runnable example using a suitable png file
 /// ```no_run
+/// # #![feature(new_range)]
 /// # fn main() -> Result<(), all_is_cubes::linking::InGenError> {
 /// use all_is_cubes::{
 ///     arcstr::literal,
@@ -125,8 +126,7 @@ pub enum Expansion {
     /// within the given ranges.
     ///
     /// The image must be square, and its side length must be some [`Resolution`].
-    // TODO: switch to core::range::Range when the range syntax for it is stable
-    Extrude(&'static [core::ops::Range<GridCoordinate>]),
+    Extrude(&'static [core::range::Range<GridCoordinate>]),
 
     /// Treat the image as a series of slices on the depth (Z before rotation) axis.
     /// Slices are arranged along the vertical axis,
@@ -324,7 +324,7 @@ impl Context<'_> {
                         // TODO: polishing: make bad data not allocate unbounded memory
                         let extrusion_cubes: Vec<Cube> = extrusion
                             .iter()
-                            .cloned()
+                            .copied()
                             .flatten()
                             .map(|z| {
                                 Cube::from(rotation.transform_vector(vec3(0, 0, z)).to_point())
