@@ -65,7 +65,7 @@ pub struct Builder<'u, P, Txn> {
     transaction: Txn,
 }
 
-impl Default for Builder<'_, NeedsPrimitive, ()> {
+const impl Default for Builder<'_, NeedsPrimitive, ()> {
     fn default() -> Self {
         Self::new()
     }
@@ -376,7 +376,12 @@ impl<P: BuildPrimitive> Builder<'_, P, ()> {
     ///
     /// This method may only be used when the builder has *not* been used with `voxels_fn()`,
     /// since in that case a universe transaction must be executed.
-    pub fn build(self) -> Block {
+    //---
+    // TODO: Make this const fn when `BlockAttributes` has const `PartialEq`.
+    pub fn build(self) -> Block
+    where
+        P: BuildPrimitive,
+    {
         let (block, ()) = self.build_block_and_txn_internal();
         block
     }
@@ -470,7 +475,7 @@ pub struct NeedsPrimitive;
 /// TODO: This is not currently necessary; we can replace the BuildPrimitive types with the
 /// primitive itself. (But will that remain true?)
 #[doc(hidden)]
-pub impl(crate) trait BuildPrimitive {
+pub impl(crate) const trait BuildPrimitive {
     fn build_primitive(self) -> Primitive;
 }
 
@@ -483,7 +488,7 @@ pub struct Atom {
     emission: Rgb,
     collision: block::Collision,
 }
-impl BuildPrimitive for Atom {
+const impl BuildPrimitive for Atom {
     fn build_primitive(self) -> Primitive {
         Primitive::Atom(block::Atom {
             color: self.color,

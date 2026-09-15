@@ -159,20 +159,20 @@ mod conversions_for_atom {
         }
     }
 
-    impl From<Rgb01> for Atom {
+    const impl From<Rgb01> for Atom {
         /// Construct an [`Atom`] with the given reflectance color, and default attributes.
         fn from(color: Rgb01) -> Self {
             Self::from_color(color.with_alpha_one())
         }
     }
-    impl From<Rgba> for Atom {
+    const impl From<Rgba> for Atom {
         /// Construct an [`Atom`] with the given reflectance color, and default attributes.
         fn from(color: Rgba) -> Self {
             Self::from_color(color)
         }
     }
 
-    impl From<Atom> for Primitive {
+    const impl From<Atom> for Primitive {
         fn from(value: Atom) -> Self {
             Primitive::Atom(value)
         }
