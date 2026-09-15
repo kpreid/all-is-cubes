@@ -21,8 +21,8 @@ fn load_settings_from_local_storage() -> Option<Settings> {
     let storage: web_sys::Storage = window()?.local_storage().ok()??;
 
     let len = storage.length().ok()?;
-    let initial_data: Data =
-        Data::from_iter((0..len).filter_map(|i: u32| -> Option<(ArcStr, ArcStr)> {
+    let initial_data: Data = Data::from_iter((0..len).into_iter().filter_map(
+        |i: u32| -> Option<(ArcStr, ArcStr)> {
             match storage.key(i) {
                 Err(exception) => {
                     error_from_js("localStorage.key()", exception).log_to_console();
@@ -47,7 +47,8 @@ fn load_settings_from_local_storage() -> Option<Settings> {
                     }
                 }
             }
-        }));
+        },
+    ));
 
     log::trace!("Loaded settings: {initial_data:?}");
 

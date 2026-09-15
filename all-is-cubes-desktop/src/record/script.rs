@@ -257,7 +257,9 @@ mod tests {
         data.push(Duration::from_secs(40), vec3(0.0, 0.0, 1.0));
 
         assert_eq!(
-            Vec::from_iter((0..10).map(|i| data.get(Duration::from_secs(i * 5)).unwrap())),
+            Vec::from_iter(
+                (0..10).into_iter().map(|i| data.get(Duration::from_secs(i * 5)).unwrap())
+            ),
             [
                 vec3(1.0, 0.0, 0.0),
                 vec3(1.0, 0.0, 0.0),
