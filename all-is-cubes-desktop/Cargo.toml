@@ -70,7 +70,7 @@ rerun = [
 all-is-cubes = { workspace = true, features = ["auto-threads", "save", "std"] }
 # TODO: make template support an optional feature, and this dependency with it
 all-is-cubes-content = { workspace = true, features = ["std"] }
-all-is-cubes-gpu = { workspace = true, features = ["auto-threads", "wgpu"] }
+all-is-cubes-gpu = { workspace = true, features = ["auto-threads"] }
 all-is-cubes-mesh = { workspace = true, optional = true, features = ["dynamic"] }
 # TODO: make all file access an optional feature
 all-is-cubes-port = { workspace = true, features = ["auto-threads", "import", "native"] }

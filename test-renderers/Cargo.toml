@@ -83,7 +83,7 @@ test-renderers-runner = { path = "runner" }
 test-renderers-types = { path = "types" }
 
 all-is-cubes = { workspace = true, features = ["save"] }
-all-is-cubes-gpu = { workspace = true, features = ["wgpu"] }
+all-is-cubes-gpu = { workspace = true }
 all-is-cubes-content = { workspace = true, optional = true }
 all-is-cubes-port = { workspace = true, optional = true, features = ["export", "gltf"] }
 all-is-cubes-render = { workspace = true, features = ["raytracer", "serde", "std"] }

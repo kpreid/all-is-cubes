@@ -95,7 +95,6 @@ send_wrapper = { workspace = true, features = ["futures"] }
 wasm-bindgen-futures = { workspace = true }
 # For initializing tests on web. (This is not a dev-dependency because some of said tests are not in this package.)
 web-sys = { version = "0.3.104", features = ["OffscreenCanvas"] }
-wgpu = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Using smol for async test-running.
