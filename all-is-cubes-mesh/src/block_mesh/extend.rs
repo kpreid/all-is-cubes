@@ -324,7 +324,6 @@ impl QuadTransform {
                 &face
                     .face_transform(1)
                     .to_matrix()
-                    .to_free()
                     .with_source::<MeshRel>()
                     .with_destination::<MeshRel>()
                     .cast::<PosCoord>(),
@@ -333,7 +332,6 @@ impl QuadTransform {
                 &face
                     .face_transform(resolution.to_grid())
                     .to_matrix()
-                    .to_free()
                     .to_untyped()
                     .cast::<TextureCoordinate>(),
             ),

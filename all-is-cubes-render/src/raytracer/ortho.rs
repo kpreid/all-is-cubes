@@ -256,7 +256,7 @@ impl OrthoCamera {
             Face::PZ => GridRotation::IDENTITY,
         })
         .to_matrix()
-        .to_free();
+        .cast::<f64>();
 
         let transform = Transform3D::translation(0.5, 0.5, 0.0) // pixel centers
             .then_scale(1., -1., 1.) // Y flip

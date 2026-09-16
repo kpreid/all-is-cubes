@@ -309,10 +309,8 @@ impl texture::Plane for GltfTexturePlane {
         // TODO: precompute more of this
         let rot_tc: TilePoint = self
             .rotation
-            .to_rotation_matrix()
-            .to_free()
-            .with_source::<texture::TexelUnit>() // TODO: avoid these unit changes by being able to get Transform3D straight from GridRotation
-            .with_destination::<texture::TexelUnit>()
+            .to_matrix()
+            .cast::<f64>()
             .transform_point3d(tc_in_tile.map(f64::from))
             .none_is_unreachable()
             .map(|c| c as f32);

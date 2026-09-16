@@ -7,17 +7,16 @@
 )]
 use core::ops::Mul;
 
-use euclid::vec3;
+use euclid::{Transform3D, vec3};
 
-use crate::math::{Face, GridCoordinate, GridMatrix, GridSize, GridVector, Gridgid, Vector3D};
+use crate::math::{Face, GridCoordinate, GridSize, GridVector, Gridgid, Vector3D};
 
 #[cfg(doc)]
 use crate::math::GridAab;
 
 /// Represents a discrete (grid-aligned) rotation, or exchange of axes.
 ///
-/// Compared to a [`GridMatrix`], this cannot specify scale, translation, or skew;
-/// it is used for identifying the rotations of blocks.
+/// Its most notable use case is for rotating blocks.
 ///
 /// Each of the variant names specifies the three unit vectors which (*x*, *y*, *z*),
 /// respectively, should be multiplied by to perform the rotation.
@@ -29,7 +28,7 @@ use crate::math::GridAab;
 ///   rotation about that axis.
 ///     * [`Face::clockwise()`] and [`Face::counterclockwise()`] can be used to obtain
 ///       [`GridRotation`] values.
-/// * [`GridMatrix`] is more general, specifying an affine transformation.
+/// * [`Gridgid`] is more general, including translation as well as rotation.
 ///
 #[doc = include_str!("../serde-warning.md")]
 #[rustfmt::skip]
@@ -305,22 +304,18 @@ impl GridRotation {
     /// assert_eq!(b.transform(rotation), Some(b));
     /// ```
     ///
-    /// Such matrices are suitable for rotating the voxels of a block, provided
-    /// that the voxel coordinates are then transformed with [`GridMatrix::transform_cube`],
-    /// *not* [`GridMatrix::transform_point`]
-    /// (due to the lower-corner format of cube coordinates).
+    /// Such transforms are suitable for rotating the voxels of a block within the block’s bounds.
+    ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
     /// # use all_is_cubes::math::{Cube, Face, GridAab, GridRotation};
-    ///
+    /// #
     /// let rotation = Face::PY.clockwise().to_positive_octant_transform(4);
     /// assert_eq!(rotation.transform_cube(Cube::new(0, 0, 0)), Cube::new(3, 0, 0));
     /// assert_eq!(rotation.transform_cube(Cube::new(3, 0, 0)), Cube::new(3, 0, 3));
     /// assert_eq!(rotation.transform_cube(Cube::new(3, 0, 3)), Cube::new(0, 0, 3));
     /// assert_eq!(rotation.transform_cube(Cube::new(0, 0, 3)), Cube::new(0, 0, 0));
     /// ```
-    //
-    // TODO: add tests
     #[inline]
     pub const fn to_positive_octant_transform(self, size: GridCoordinate) -> Gridgid {
         #[inline(always)]
@@ -353,17 +348,13 @@ impl GridRotation {
         }
     }
 
-    /// Expresses this rotation as a matrix without any translation.
-    // TODO: add tests
+    /// Expresses this rotation as a [`Transform3D`] (4×4 matrix) with no translation.
     #[inline]
-    pub fn to_rotation_matrix(self) -> GridMatrix {
-        let basis = self.to_basis();
-        GridMatrix {
-            x: basis.x.normal_vector(),
-            y: basis.y.normal_vector(),
-            z: basis.z.normal_vector(),
-            w: Vector3D::zero(),
-        }
+    pub fn to_matrix<U>(self) -> Transform3D<GridCoordinate, U, U> {
+        self.to_positive_octant_transform(0)
+            .to_matrix()
+            .with_source::<U>()
+            .with_destination::<U>()
     }
 
     /// Rotate the face by this rotation.
@@ -790,7 +781,7 @@ mod tests {
         );
     }
 
-    /// Test that `transform_vector()`, `wrapping_transform_vector()` and `to_rotation_matrix()` do the same thing.
+    /// Test that `transform_vector()`, `wrapping_transform_vector()` and `to_positive_octant_transform()` do the same thing.
     #[test]
     fn equivalent_transforms_and_rotation_matrix() {
         for rot in GridRotation::ALL {
@@ -798,9 +789,9 @@ mod tests {
 
             let tv = rot.transform_vector(point.to_vector()).to_point();
             let wtv = rot.wrapping_transform_vector(point.to_vector()).to_point();
-            let mtp = rot.to_rotation_matrix().transform_point(point);
+            let pot = rot.to_positive_octant_transform(0).transform_point(point);
 
-            assert_eq!(tv, mtp);
+            assert_eq!(tv, pot);
             assert_eq!(tv, wtv);
         }
     }

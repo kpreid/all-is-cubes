@@ -260,7 +260,8 @@ impl lines::Wireframe for Cursor {
         // TODO: This addition is experimental and we may or may not want to keep it.
         // For now, it visualizes the intersection and face information.
         if let Ok(face) = Face::try_from(self.face_entered) {
-            let face_transform_axes_only = face.rotation_from_nz().to_rotation_matrix().to_free();
+            let face_transform_axes_only =
+                face.rotation_from_nz().to_matrix().cast::<FreeCoordinate>();
             output.extend(lines::line_loop(
                 [Face7::PX, Face7::PY, Face7::NX, Face7::NY].map(|f| {
                     let tip: FreeVector =

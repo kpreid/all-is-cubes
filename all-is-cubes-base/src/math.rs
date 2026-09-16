@@ -32,8 +32,6 @@ mod rigid;
 pub use rigid::*;
 mod restricted_number;
 pub use restricted_number::*;
-mod matrix;
-pub use matrix::*;
 mod octant;
 pub use octant::*;
 mod rotation;

@@ -1034,7 +1034,7 @@ async fn sky(mut context: RenderTestContext, face: Face) {
         .sky(sky)
         .filled_with(block)
         .spawn({
-            let transform = face.opposite().face_transform(1).to_matrix().to_free();
+            let transform = face.opposite().face_transform(1).to_matrix().cast::<FreeCoordinate>();
             let mut eye_position = transform.transform_point3d(point3(0.5, 0.5, -1.5)).unwrap();
             // tilt the view a little
             if face.axis() == Axis::Y {

@@ -2,9 +2,11 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use descriptive_unwrap::OptionExt as _;
+
 use all_is_cubes::block::{self, Block, Primitive, Resolution};
-use all_is_cubes::euclid::Size3D;
-use all_is_cubes::math::{GridAab, GridMatrix, GridPoint, GridSizeCoord, GridVector};
+use all_is_cubes::euclid::{Scale, Size3D, Transform3D, Translation3D};
+use all_is_cubes::math::{Cube, GridAab, GridPoint, GridSizeCoord, GridVector};
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::universe::StrongHandle;
 
@@ -88,19 +90,28 @@ impl vui::Widget for Voxels {
         // which the low-corner voxels should start.
 
         let block_to_voxels_transform = {
-            // Apply gravity and the translation that was requested
-            GridMatrix::from_translation(
-                self.region.lower_bounds().to_vector() - gravity_offset_in_voxels)
-            // Scale up from blocks to voxels
-            * GridMatrix::from_scale(self.scale.into())
             // Subtract the absolute position to get relative position
-            * GridMatrix::from_translation(-position.bounds.lower_bounds().to_vector())
+            Transform3D::from(Translation3D::from(
+                -position.bounds.lower_bounds().to_vector(),
+            ))
+            // Scale up from blocks to voxels
+            .then(&Transform3D::from_scale(Scale::<i32, Cube, Cube>::new(
+                self.scale.into(),
+            )))
+            // Apply gravity and the translation that was requested
+            .then(&Transform3D::from(Translation3D::from(
+                self.region.lower_bounds().to_vector() - gravity_offset_in_voxels,
+            )))
         };
 
         let mut txn = SpaceTransaction::default();
         for cube in position.bounds.interior_iter() {
             let mut block = Block::from_primitive(Primitive::Recur {
-                offset: block_to_voxels_transform.transform_cube(cube).lower_bounds(),
+                offset: cube
+                    .transform_corners_by(|p| {
+                        block_to_voxels_transform.transform_point3d(p).none_is_unreachable()
+                    })
+                    .lower_bounds(),
                 resolution: self.scale,
                 space: self.space.clone().into(),
             });

@@ -17,8 +17,10 @@
     * `linking::InGenError::Handle` variant and its corresponding `From<HandleError>` implementation.
     * `math::Aab::expand_or_shrink()`
     * `math::Aab::face_coordinate_on_axis()`, a non-negating version of `face_coordinate()`.
+    * `math::Cube::transform_corners_by()`
     * `math::FaceMap::{as_array, as_array_mut}()`
     * `math::GridAab::clamp_cube()`.
+    * `math::GridRotation::to_matrix()`.
     * `math::Octant::cube_adjacent_to()`
     * `math::OctantMask::{any, count, from_face, from_octant, into_iter, is_uniform_on, shift_copy}()`
     * `math::PositiveSign` and `math::ZeroOne` have many more arithmetic overloads, many of which return the corresponding unrestricted numeric type instead of the restricted type. This will reduce the need to call `.into_inner()` to obtain a `f32` or `f64` value before doing arithmetic.
@@ -62,6 +64,7 @@
     * `Handle::<BlockDef>::read()` no longer returns a `&BlockDef`, but a separate `Read` type.
     * `chunking::point_to_chunk()` now returns `None` in case of out-of-range input instead of panicking.
     * `inv::InvInBlock::new()` now enforces invariants about its input.
+    * `math::Gridgid::to_matrix()` now returns `euclid::Transform3D` instead of `GridMatrix`.
     * `math::Aab::expand()` now takes `PositiveSign<f64>` instead of `f64` and cannot be used to shrink the box.
       Use `Aab::expand_or_shrink()` instead.
     * `universe::Universe` no longer implements `Default` and `Deserialize`; instead, `Box<Universe>` does.
@@ -94,6 +97,8 @@
         * Implementations of the `DrawTarget`, `OriginDimensions`, and `PixelColor` traits.
     * `block::BlockDef` no longer implements `AsRef<Block>`.
     * `block::Modifier::Attributes` has been replaced by `SetAttribute`.
+    * `math::GridMatrix` has been removed.
+      Use `Gridgid` (for rigid transformations) or `euclid::Transform3D` (for matrices) instead.
     * `space::PackedLight` no longer implements `From<Rgb>`. There is currently no replacement.
 
 * `all-is-cubes-port` library:

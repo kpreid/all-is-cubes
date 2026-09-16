@@ -3,9 +3,12 @@ use core::fmt;
 use euclid::Vector3D;
 use manyfmt::Refmt;
 
+use crate::math::{Cube, GridCoordinate, GridPoint, GridRotation, GridVector};
+
 #[cfg(doc)]
 use crate::math::GridAab;
-use crate::math::{Cube, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector};
+
+// -------------------------------------------------------------------------------------------------
 
 /// A [rigid transformation] that is composed of a [`GridRotation`] followed by an
 /// integer-valued translation.
@@ -65,8 +68,19 @@ impl Gridgid {
 
     /// Returns the equivalent matrix.
     #[inline]
-    pub fn to_matrix(self) -> GridMatrix {
-        GridMatrix::from_translation(self.translation) * self.rotation.to_rotation_matrix()
+    pub fn to_matrix(self) -> euclid::Transform3D<GridCoordinate, Cube, Cube> {
+        fn a4(v: GridVector, w: GridCoordinate) -> [GridCoordinate; 4] {
+            [v.x, v.y, v.z, w]
+        }
+
+        let basis = self.rotation.to_basis();
+
+        euclid::Transform3D::from_arrays([
+            a4(basis.x.normal_vector(), 0),
+            a4(basis.y.normal_vector(), 0),
+            a4(basis.z.normal_vector(), 0),
+            a4(self.translation, 1),
+        ])
     }
 
     /// Applies this transform to the given point.
@@ -149,10 +163,7 @@ impl Gridgid {
     /// [`GridAab::single_cube`]: crate::math::GridAab::single_cube
     #[inline]
     pub fn transform_cube(&self, cube: Cube) -> Cube {
-        Cube::from(
-            self.transform_point(cube.lower_bounds())
-                .min(self.transform_point(cube.upper_bounds())),
-        )
+        cube.transform_corners_by(|point| self.transform_point(point))
     }
 
     /// Identical to [`Gridgid::transform_cube`] except that in the event of numeric overflow,
@@ -199,13 +210,6 @@ impl From<GridRotation> for Gridgid {
     #[inline]
     fn from(value: GridRotation) -> Self {
         Self::from_rotation_about_origin(value)
-    }
-}
-
-impl From<Gridgid> for GridMatrix {
-    #[inline]
-    fn from(value: Gridgid) -> Self {
-        value.to_matrix()
     }
 }
 
@@ -260,22 +264,22 @@ mod tests {
     }
 
     #[test]
-    fn equivalent_transform() {
+    fn equivalent_transform_to_matrix() {
         let mut rng = Xoshiro256Plus::seed_from_u64(2897358920346590823);
         for _ in 0..RANDOM_CASES {
-            let m = random_gridgid(&mut rng);
-            dbg!(m, m.to_matrix());
+            let rigid = random_gridgid(&mut rng);
+            dbg!(rigid, rigid.to_matrix());
             assert_eq!(
-                m.transform_point(GridPoint::new(2, 300, 40000)),
-                m.to_matrix().transform_point(GridPoint::new(2, 300, 40000)),
+                Some(rigid.transform_point(GridPoint::new(2, 300, 40000))),
+                rigid.to_matrix().transform_point3d(GridPoint::new(2, 300, 40000)),
             );
             assert_eq!(
-                m.transform_point(GridPoint::new(2, 300, 40000)),
-                m.wrapping_transform_point(GridPoint::new(2, 300, 40000)),
+                rigid.transform_point(GridPoint::new(2, 300, 40000)),
+                rigid.wrapping_transform_point(GridPoint::new(2, 300, 40000)),
             );
             assert_eq!(
-                m.transform_cube(Cube::new(2, 300, 40000)),
-                m.wrapping_transform_cube(Cube::new(2, 300, 40000)),
+                rigid.transform_cube(Cube::new(2, 300, 40000)),
+                rigid.wrapping_transform_cube(Cube::new(2, 300, 40000)),
             );
         }
     }
@@ -286,7 +290,7 @@ mod tests {
         for _ in 0..RANDOM_CASES {
             let t1 = random_gridgid(&mut rng);
             let t2 = random_gridgid(&mut rng);
-            assert_eq!((t1 * t2).to_matrix(), t1.to_matrix() * t2.to_matrix());
+            assert_eq!((t1 * t2).to_matrix(), t2.to_matrix().then(&t1.to_matrix()));
         }
     }
 
@@ -295,10 +299,7 @@ mod tests {
         let mut rng = Xoshiro256Plus::seed_from_u64(5933089223468901296);
         for _ in 0..RANDOM_CASES {
             let t = random_gridgid(&mut rng);
-            assert_eq!(
-                t.inverse().to_matrix(),
-                t.to_matrix().inverse_transform().unwrap(),
-            );
+            assert_eq!(t.inverse().to_matrix(), t.to_matrix().inverse().unwrap());
         }
     }
 }

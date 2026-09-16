@@ -12,6 +12,11 @@ use crate::math::{
 use crate::resolution::Resolution;
 use crate::util::ConciseDebug;
 
+#[cfg(doc)]
+use crate::math::Gridgid;
+
+// -------------------------------------------------------------------------------------------------
+
 /// “A cube”, in this documentation, is a unit cube whose corners' coordinates are integers.
 /// This type identifies such a cube by the coordinates of its most negative corner.
 ///
@@ -215,6 +220,25 @@ impl Cube {
             y: f(self.y),
             z: f(self.z),
         }
+    }
+
+    /// Transforms this cube using a function which transforms points.
+    ///
+    /// For the result to be valid, the function must not perform any scaling;
+    /// that is, if the input differs by 1, the output must also differ by 1
+    /// (but not necessarily in the same direction).
+    ///
+    /// This function is equivalent to functions like [`Gridgid::transform_cube()`],
+    /// but may be more easily used on transform representations that are not part of
+    /// All is Cubes’s math library.
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`self.upper_bounds()`][Cube::upper_bounds] would panic.
+    #[inline]
+    #[must_use]
+    pub fn transform_corners_by(self, transformation: impl Fn(GridPoint) -> GridPoint) -> Self {
+        Cube::from(transformation(self.lower_bounds()).min(transformation(self.upper_bounds())))
     }
 }
 
