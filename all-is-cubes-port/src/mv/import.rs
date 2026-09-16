@@ -166,8 +166,8 @@ pub(crate) async fn dot_vox_data_to_universe(
                 mv::scene::scene_to_space(
                     view_progress,
                     data,
-                    universe.read_ticket(),
-                    model_space_handles,
+                    &universe.read_ticket(),
+                    &model_space_handles,
                 )
                 .await?,
             )

@@ -25,8 +25,8 @@ fn get_with_u32<T>(slice: &[T], index: u32) -> Option<&T> {
 pub(crate) async fn scene_to_space(
     mut progress: YieldProgress,
     data: Arc<dot_vox::DotVoxData>,
-    read_ticket: ReadTicket<'_>,
-    imported_models: Vec<Handle<Space>>,
+    read_ticket: &ReadTicket<'_>,
+    imported_models: &[Handle<Space>],
 ) -> Result<Space, mv::DotVoxConversionError> {
     progress.set_label("Processing scene graph");
     progress.progress(0.0).await;
@@ -34,33 +34,38 @@ pub(crate) async fn scene_to_space(
     let mut leaves: Vec<SceneElement<'_>> = Vec::new();
     walk_scene_graph(&data, 0, Gridgid::IDENTITY, None, &mut leaves)?;
 
-    let scene_voxel_bounding_box: GridAab = leaves
-        .iter()
-        .filter_map(SceneElement::bounding_box_in_aic_scene_coordinates)
-        .reduce(GridAab::union_cubes)
-        .unwrap_or(GridAab::ORIGIN_EMPTY);
-
     // TODO: optimize the scale and a global translation so that the scene content lines up
-    // well with the cube grid.
+    // well with our cube grid.
     let scale_to_blocks = Resolution::R16;
-    let scene_block_bounding_box = scene_voxel_bounding_box.divide(scale_to_blocks.into());
 
-    // TODO: This is an arbitrary limit to avoid consuming unbounded memory.
-    // It should be configurable / check in with the user ("Loading will require XXX MB. Continue?")
-    if scene_block_bounding_box.volume_f64() > 16_000_000.0 {
-        return Err(mv::DotVoxConversionError::SceneTooLarge(
-            scene_block_bounding_box,
-        ));
-    }
+    let mut space = {
+        let scene_bounding_box_in_voxels: GridAab = leaves
+            .iter()
+            .filter_map(SceneElement::bounding_box_in_aic_scene_coordinates)
+            .reduce(GridAab::union_cubes)
+            .unwrap_or(GridAab::ORIGIN_EMPTY);
 
-    let mut space = Space::builder(scene_block_bounding_box)
-        .spawn({
-            let mut spawn = Spawn::looking_at_space(scene_block_bounding_box, vec3(-1., 1., 1.));
-            spawn.set_inventory(free_editing_starter_inventory(true));
-            spawn
-        })
-        .try_build()
-        .map_err(|e| mv::DotVoxConversionError::Unexpected(InGenError::from(e)))?;
+        let scene_bounding_box_in_blocks =
+            scene_bounding_box_in_voxels.divide(scale_to_blocks.into());
+
+        // TODO: This is an arbitrary limit to avoid consuming unbounded memory.
+        // It should be configurable / check in with the user ("Loading will require XXX MB. Continue?")
+        if scene_bounding_box_in_blocks.volume_f64() > 16_000_000.0 {
+            return Err(mv::DotVoxConversionError::SceneTooLarge(
+                scene_bounding_box_in_blocks,
+            ));
+        }
+
+        Space::builder(scene_bounding_box_in_blocks)
+            .spawn({
+                let mut spawn =
+                    Spawn::looking_at_space(scene_bounding_box_in_blocks, vec3(-1., 1., 1.));
+                spawn.set_inventory(free_editing_starter_inventory(true));
+                spawn
+            })
+            .try_build()
+            .map_err(|e| mv::DotVoxConversionError::Unexpected(InGenError::from(e)))?
+    };
 
     for (leaf_index, leaf, mut leaf_progress) in
         izip!(0.., &leaves, progress.split_evenly(leaves.len()))
@@ -71,11 +76,11 @@ pub(crate) async fn scene_to_space(
         let (transform_in_blocks, remainder_of_transform) = leaf.div_rem_transform(scale_to_blocks);
 
         let model_id = leaf.shape_model.model_id;
-        let imported_model: Handle<Space> = get_with_u32(&imported_models, model_id)
+        let imported_model: Handle<Space> = get_with_u32(imported_models, model_id)
             .ok_or_else(|| mv::DotVoxConversionError::MissingModel(model_id))?
             .clone();
         space
-            .mutate(read_ticket, |m| -> Result<(), InGenError> {
+            .mutate(*read_ticket, |m| -> Result<(), InGenError> {
                 for (rel_cube, block_for_this_model) in model_space_to_blocks(
                     leaf.model,
                     imported_model,
