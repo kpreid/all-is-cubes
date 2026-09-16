@@ -638,6 +638,9 @@ macro_rules! member_enums_and_impls {
         /// Queries for reading members, sometimes used by [`Handle::read()`].
         /// Contains one `QueryState` per member type, whose `QueryData` is that member's
         /// `UniverseMember::Read`.
+        ///
+        /// To use this in a system, use the system parameter
+        /// [`ecs::Local<MemberReadQueryStates>`][ecs::Local].
         #[derive(ecs::FromWorld)]
         #[macro_rules_attribute::derive($crate::universe::ecs_details::derive_manual_query_bundle!)]
         pub(crate) struct MemberReadQueryStates {
@@ -811,23 +814,6 @@ where
 {
     fn eq(&self, other: &AnyHandle) -> bool {
         *other == *self
-    }
-}
-
-// TODO: we can get rid of this if we arrange to have a version of `MemberReadQueryStates` that carries `Query` instead of `QueryState`
-impl bevy_ecs::system::ExclusiveSystemParam for &mut MemberReadQueryStates {
-    type State = MemberReadQueryStates;
-    type Item<'s> = &'s mut MemberReadQueryStates;
-
-    fn init(world: &mut ecs::World, _: &mut bevy_ecs::system::SystemMeta) -> Self::State {
-        <MemberReadQueryStates as bevy_ecs::world::FromWorld>::from_world(world)
-    }
-
-    fn get_param<'s>(
-        state: &'s mut Self::State,
-        _: &bevy_ecs::system::SystemMeta,
-    ) -> Result<Self::Item<'s>, bevy_ecs::system::SystemParamValidationError> {
-        Ok(state)
     }
 }
 

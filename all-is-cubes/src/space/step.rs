@@ -121,7 +121,7 @@ pub(crate) fn execute_tick_actions_system(
         &universe::Membership,
         <SpaceTransaction as universe::TransactionOnEcs>::WriteQueryData,
     )>,
-    read_queries: &mut universe::MemberReadQueryStates,
+    mut read_queries: ecs::Local<universe::MemberReadQueryStates>,
 ) -> ecs::Result {
     let _lex = rg::LogExecution::from_world(world, "tick_actions", "running");
     let universe_id: UniverseId = *world.resource();
@@ -152,7 +152,7 @@ pub(crate) fn execute_tick_actions_system(
         // and can instead provide a normal read ticket because we’re not mutably borrowing
         // the space.
         let everything_but_read_ticket = unsafe {
-            ReadTicket::everything_but(universe_id, world_cell, space_entity, read_queries)
+            ReadTicket::everything_but(universe_id, world_cell, space_entity, &read_queries)
         };
 
         // Review self.cubes_wanting_ticks, and filter out actions that shouldn't
@@ -455,12 +455,12 @@ pub(crate) fn execute_behavior_transactions_system(
         rg::LogExecutionActive,
     )>,
     world: &mut ecs::World,
-    read_queries: &mut universe::MemberReadQueryStates,
+    mut read_queries: ecs::Local<universe::MemberReadQueryStates>,
 ) {
     lex.set_state("execute");
     // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
     for t in transactions {
-        if let Err(e) = t.execute_on_world(world, read_queries) {
+        if let Err(e) = t.execute_on_world(world, &mut read_queries) {
             // TODO: Need to report these failures back to the source
             // ... and perhaps in the UniverseStepInfo
             log::info!("Transaction failure: {e}");
