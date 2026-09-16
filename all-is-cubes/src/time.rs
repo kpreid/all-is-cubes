@@ -352,6 +352,52 @@ pub(crate) mod schedule {
 
 // -------------------------------------------------------------------------------------------------
 
+/// A sub-tick time offset, used for interpolation to render frames synchronized to the display
+/// refresh rate rather than the step rate.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RenderOffset {
+    /// Interpolation coefficient from 0 (before most recent step) to 1 (after most recent step).
+    ///
+    /// Design note: `f64` precision is massive overkill for the task,
+    /// but we always use it with `f64` arithmetic, so there is little point in making it smaller.
+    alpha: f64,
+}
+
+impl RenderOffset {
+    /// Offset of zero, or “now”.
+    ///
+    /// This designates the most recent available state.
+    pub const LATEST: Self = Self { alpha: 0.0 };
+
+    /// Construct a [`RenderOffset`] value.
+    ///
+    /// * `schedule` should be the [`Clock::schedule()`] of the [`Universe::clock()`] of
+    ///   the universe to be rendered.
+    /// * `accumulated_step_time` should be the amount of real time that has passed that
+    ///   has *not yet* been accounted for by performing a [`Universe::step()`].
+    ///   It should be no more than one step period, and will be clamped otherwise.
+    ///
+    pub fn new(schedule: &TickSchedule, accumulated_step_time: Duration) -> Self {
+        let accumulated_step_time = accumulated_step_time.as_secs_f64();
+        let tick_dt = schedule.delta_t().as_secs_f64();
+        let alpha = (accumulated_step_time / tick_dt).clamp(0.0, 1.0);
+
+        Self { alpha }
+    }
+
+    pub(crate) const fn get_alpha(self) -> f64 {
+        self.alpha
+    }
+}
+
+impl Default for RenderOffset {
+    fn default() -> Self {
+        Self::LATEST
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;

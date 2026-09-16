@@ -8,6 +8,7 @@ use std::time::Duration;
 use anyhow::Context;
 
 use all_is_cubes::listen::{self, Listen as _};
+use all_is_cubes::time;
 use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
 use all_is_cubes_port::{self as port, ExportSet, Format};
@@ -167,10 +168,13 @@ impl Recorder {
                 RecorderInner::Mesh(write_gltf::MeshRecorder::new(cameras, tex, scene_sender))
             }
             RecordFormat::Export(export_format) => {
-                cameras.update(Layers {
-                    world: universe.read_ticket(),
-                    ui: ReadTicket::stub(),
-                });
+                cameras.update(
+                    Layers {
+                        world: universe.read_ticket(),
+                        ui: ReadTicket::stub(),
+                    },
+                    time::RenderOffset::LATEST,
+                );
 
                 // TODO: better rule than this special case. AicJson doesn't strictly require
                 // all of the universe, but it does require the transitive closure, and this is the
@@ -226,6 +230,7 @@ impl Recorder {
                             world: read_ticket,
                             ui: ReadTicket::stub(),
                         },
+                        time::RenderOffset::LATEST,
                         None,
                     )
                     .unwrap();

@@ -22,6 +22,7 @@ use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::{Box2D, point2, point3, vec2, vec3};
 use all_is_cubes::listen;
 use all_is_cubes::math::{self, OpacityCategory, VectorOps as _, range_len};
+use all_is_cubes::time;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::{ConciseDebug, Refmt};
 use all_is_cubes_render::camera::{
@@ -259,13 +260,14 @@ impl RaytraceToTexture {
     pub fn update(
         &mut self,
         read_tickets: Layers<ReadTicket<'_>>,
+        time_offset: time::RenderOffset,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
         let state_option = &mut *self.worker.0.mutex.lock().expect("worker not poisoned");
         let worker_state: &mut State = Option::as_mut(state_option).expect("worker not cleared");
         if worker_state.update_strategy.incremental() || self.may_start_next_frame {
             self.may_start_next_frame = false;
-            self.worker.update_inputs(worker_state, read_tickets, cursor)?;
+            self.worker.update_inputs(worker_state, read_tickets, time_offset, cursor)?;
         }
         Ok(())
     }
@@ -614,9 +616,10 @@ impl WorkerOwner {
         &self,
         locked_state: &mut State,
         read_tickets: Layers<ReadTicket<'_>>,
+        time_offset: time::RenderOffset,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
-        if locked_state.rtr.update(read_tickets, cursor)? {
+        if locked_state.rtr.update(read_tickets, time_offset, cursor)? {
             self.dirty(locked_state);
         }
         Ok(())

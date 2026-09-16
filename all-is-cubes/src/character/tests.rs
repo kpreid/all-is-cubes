@@ -120,10 +120,14 @@ fn view_transform_and_eye_displacement() {
         .unwrap();
 
     assert_eq!(
-        Character::view(&character_handle, universe.read_ticket())
-            .unwrap()
-            .1
-            .translation,
+        Character::view(
+            &character_handle,
+            universe.read_ticket(),
+            time::RenderOffset::LATEST
+        )
+        .unwrap()
+        .1
+        .translation,
         initial_body_position.to_vector(),
         "view translation initial state",
     );
@@ -131,11 +135,15 @@ fn view_transform_and_eye_displacement() {
     universe.step(false, time::Deadline::Whenever);
 
     let new_body_position = character_handle.read(universe.read_ticket()).unwrap().body.position();
-    let new_eye_position = Character::view(&character_handle, universe.read_ticket())
-        .unwrap()
-        .1
-        .translation
-        .to_point();
+    let new_eye_position = Character::view(
+        &character_handle,
+        universe.read_ticket(),
+        time::RenderOffset::LATEST,
+    )
+    .unwrap()
+    .1
+    .translation
+    .to_point();
     dbg!(new_body_position, new_eye_position);
     assert_ne!(
         new_body_position, initial_body_position,

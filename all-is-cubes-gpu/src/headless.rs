@@ -10,6 +10,7 @@ use futures_core::future::BoxFuture;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen;
 use all_is_cubes::math::ps32;
+use all_is_cubes::time;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::Executor;
 use all_is_cubes_render::camera::{ImageSize, Layers, StandardCameras, Viewport};
@@ -185,6 +186,7 @@ impl RendererImpl {
             &self.queue,
             cursor,
             &FrameBudget::PRACTICALLY_INFINITE,
+            time::RenderOffset::LATEST,
         )?;
         Ok(())
     }

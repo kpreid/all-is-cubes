@@ -432,13 +432,14 @@ impl WebSession {
         let should_draw = inner.session.frame_clock.request_frame(delta);
 
         if should_draw {
+            let render_time_offset = inner.session.frame_clock.render_offset();
             let viewport = self.gui_helpers.canvas_helper().viewport();
             if viewport != self.viewport_cell.get() {
                 self.viewport_cell.set(viewport);
             }
             match &mut inner.renderer {
                 WebRenderer::Wgpu(renderer) => {
-                    renderer.update_world_camera(inner.session.read_tickets());
+                    renderer.update_world_camera(inner.session.read_tickets(), render_time_offset);
                     inner.session.update_cursor(renderer.cameras());
                 }
             }
@@ -460,6 +461,7 @@ impl WebSession {
                             inner.session.read_tickets(),
                             inner.session.cursor_result(),
                             &gpu::FrameBudget::SIXTY_FPS, // TODO: try to estimate real refresh rate
+                            render_time_offset,
                             |_| String::new(),
                             || {},
                         )

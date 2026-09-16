@@ -112,8 +112,12 @@ impl SurfaceRenderer {
     /// TODO: This is a kludge which ought to be replaced with some architecture that
     /// doesn't require a very specific "do this before this"...
     #[doc(hidden)]
-    pub fn update_world_camera(&mut self, read_tickets: Layers<ReadTicket<'_>>) {
-        self.everything.cameras.update(read_tickets);
+    pub fn update_world_camera(
+        &mut self,
+        read_tickets: Layers<ReadTicket<'_>>,
+        time_offset: time::RenderOffset,
+    ) {
+        self.everything.cameras.update(read_tickets, time_offset);
     }
 
     /// Returns the [`StandardCameras`] which control what is rendered by this renderer.
@@ -135,11 +139,17 @@ impl SurfaceRenderer {
         read_tickets: Layers<ReadTicket<'_>>,
         cursor_result: Option<&Cursor>,
         frame_budget: &FrameBudget,
+        time_offset: time::RenderOffset,
         info_text_fn: impl FnOnce(&RenderInfo) -> String,
         about_to_present: impl FnOnce(),
     ) -> Result<RenderInfo, RenderError> {
-        let update_info =
-            self.everything.update(read_tickets, &self.queue, cursor_result, frame_budget)?;
+        let update_info = self.everything.update(
+            read_tickets,
+            &self.queue,
+            cursor_result,
+            frame_budget,
+            time_offset,
+        )?;
 
         if self.need_surface_reconfiguration.get_and_clear() {
             // Test because wgpu insists on nonzero values -- we'd rather be inconsistent

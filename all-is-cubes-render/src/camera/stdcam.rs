@@ -5,6 +5,7 @@ use all_is_cubes::character::{Character, Cursor, cursor_raycast};
 use all_is_cubes::listen;
 use all_is_cubes::math::{FreeCoordinate, Rgba};
 use all_is_cubes::space::Space;
+use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, HandleError, ReadTicket, StrongHandle, Universe};
 
 use crate::camera::{Camera, GraphicsOptions, NdcPoint2, ViewTransform, Viewport};
@@ -170,10 +171,13 @@ impl StandardCameras {
             listen::constant(universe.get_default_character().map(StrongHandle::new)),
             listen::constant(Default::default()),
         );
-        new_self.update(Layers {
-            world: universe.read_ticket(),
-            ui: ReadTicket::stub(),
-        });
+        new_self.update(
+            Layers {
+                world: universe.read_ticket(),
+                ui: ReadTicket::stub(),
+            },
+            time::RenderOffset::LATEST,
+        );
         new_self
     }
 
@@ -185,7 +189,11 @@ impl StandardCameras {
     /// Returns whether any values actually changed.
     /// (This does not include tracking changes to space content — only which part of which spaces
     /// are being looked at.)
-    pub fn update(&mut self, read_tickets: Layers<ReadTicket<'_>>) -> bool {
+    pub fn update(
+        &mut self,
+        read_tickets: Layers<ReadTicket<'_>>,
+        time_offset: time::RenderOffset,
+    ) -> bool {
         let mut anything_changed = false;
 
         let options_dirty = self.graphics_options_dirty.get_and_clear();
@@ -235,7 +243,7 @@ impl StandardCameras {
         }
 
         if let Some(character_handle) = &self.character {
-            match Character::view(character_handle, read_tickets.world) {
+            match Character::view(character_handle, read_tickets.world, time_offset) {
                 Ok((space_handle, view_transform, exposure)) => {
                     if view_transform != self.cameras.world.view_transform() {
                         anything_changed = true;
@@ -471,6 +479,8 @@ impl Default for UiViewState {
 mod tests {
     use super::*;
 
+    const RZERO: time::RenderOffset = time::RenderOffset::LATEST;
+
     #[test]
     fn cameras_follow_character_and_world() {
         let character_cell = listen::Cell::new(None);
@@ -480,7 +490,7 @@ mod tests {
             character_cell.as_source(),
             listen::constant(Arc::new(UiViewState::default())),
         );
-        cameras.update(Layers::splat(ReadTicket::stub()));
+        cameras.update(Layers::splat(ReadTicket::stub()), RZERO);
 
         let world_source = cameras.world_space();
         let world_flag = listen::Flag::listening(false, &world_source);
@@ -488,7 +498,7 @@ mod tests {
 
         // No redundant notification when world is absent
         {
-            let changed = cameras.update(Layers::splat(ReadTicket::stub()));
+            let changed = cameras.update(Layers::splat(ReadTicket::stub()), RZERO);
             assert_eq!((changed, world_flag.get_and_clear()), (false, false));
         }
 
@@ -506,20 +516,26 @@ mod tests {
         // Now the world_source should be reporting the new space
         {
             assert!(!world_flag.get_and_clear());
-            let changed = cameras.update(Layers {
-                world: universe.read_ticket(),
-                ui: ReadTicket::stub(),
-            });
+            let changed = cameras.update(
+                Layers {
+                    world: universe.read_ticket(),
+                    ui: ReadTicket::stub(),
+                },
+                RZERO,
+            );
             assert_eq!((changed, world_flag.get_and_clear()), (true, true));
             assert_eq!(world_source.get().as_ref(), Some(&space_handle));
         }
 
         // No redundant notification when world is present
         {
-            let changed = cameras.update(Layers {
-                world: universe.read_ticket(),
-                ui: ReadTicket::stub(),
-            });
+            let changed = cameras.update(
+                Layers {
+                    world: universe.read_ticket(),
+                    ui: ReadTicket::stub(),
+                },
+                RZERO,
+            );
             assert_eq!((changed, world_flag.get_and_clear()), (false, false));
         }
 
@@ -535,9 +551,9 @@ mod tests {
             listen::constant(None),
             listen::constant(Arc::new(UiViewState::default())),
         );
-        cameras.update(Layers::splat(ReadTicket::stub()));
+        cameras.update(Layers::splat(ReadTicket::stub()), RZERO);
         let mut cameras2 = cameras.clone_unupdated();
-        cameras2.update(Layers::splat(ReadTicket::stub()));
+        cameras2.update(Layers::splat(ReadTicket::stub()), RZERO);
 
         let default_o = GraphicsOptions::default();
         let mut different_o = default_o.clone();
@@ -547,10 +563,10 @@ mod tests {
         // Each `StandardCameras` has independent updating from the same data sources.
         assert_eq!(cameras.cameras().world.options(), &default_o);
         assert_eq!(cameras2.cameras().world.options(), &default_o);
-        cameras.update(Layers::splat(ReadTicket::stub()));
+        cameras.update(Layers::splat(ReadTicket::stub()), RZERO);
         assert_eq!(cameras.cameras().world.options(), &different_o);
         assert_eq!(cameras2.cameras().world.options(), &default_o);
-        cameras2.update(Layers::splat(ReadTicket::stub()));
+        cameras2.update(Layers::splat(ReadTicket::stub()), RZERO);
         assert_eq!(cameras.cameras().world.options(), &different_o);
         assert_eq!(cameras2.cameras().world.options(), &different_o);
     }

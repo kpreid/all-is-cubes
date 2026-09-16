@@ -334,12 +334,13 @@ impl EverythingRenderer {
         queue: &wgpu::Queue,
         cursor_result: Option<&Cursor>,
         frame_budget: &FrameBudget,
+        time_offset: time::RenderOffset,
     ) -> Result<UpdateInfo, RenderError> {
         let start_frame_time = time::Instant::now();
 
         // This updates camera matrices and graphics options which we are going to consult
         // or copy to the GPU.
-        self.cameras.update(read_tickets);
+        self.cameras.update(read_tickets, time_offset);
 
         // Recompile shaders if needed.
         // Note this must happen before the viewport update
@@ -420,7 +421,7 @@ impl EverythingRenderer {
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
 
         let space_infos: Layers<SpaceUpdateInfo> = if should_raytrace(&self.cameras) {
-            self.rt.update(read_tickets, cursor_result)?;
+            self.rt.update(read_tickets, time_offset, cursor_result)?;
             // TODO: convey update info instead of zeroes
             Layers::default()
         } else {

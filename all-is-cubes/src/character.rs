@@ -24,6 +24,7 @@ use crate::rerun_glue as rg;
 use crate::save::schema;
 use crate::sound;
 use crate::space::Space;
+use crate::time;
 use crate::transaction::{self, Equal, Merge, Transaction, Transactional};
 use crate::universe::{
     self, Handle, HandleError, HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles,
@@ -245,6 +246,9 @@ impl Character {
     /// In addition to the transform it also returns the [`Space`] to be viewed and the
     /// automatic exposure value.
     ///
+    /// `time_offset` specifies an amount of time by which the view should be displaced
+    /// into the past for interpolation between steps.
+    ///
     /// TODO: This return value should really be a struct, but we are somewhat in the middle of
     /// refactoring how [`Character`] is built and this particular tuple is an interim measure.
     ///
@@ -257,11 +261,13 @@ impl Character {
     pub fn view<'t>(
         handle: &Handle<Self>,
         read_ticket: ReadTicket<'t>,
+        time_offset: time::RenderOffset,
     ) -> Result<(&'t Handle<Space>, ViewTransform, f32), HandleError> {
         let body = handle.query::<Body>(read_ticket)?;
         let space = &handle.query::<ParentSpace>(read_ticket)?.0;
         let eye = handle.query::<eye::CharacterEye>(read_ticket)?; // TODO(ecs): need to distinguish "missing component"
-        let transform = eye.view_transform(body);
+        let prev = handle.query::<eye::PreviousBodyState>(read_ticket)?;
+        let transform = eye.view_transform(body, prev, time_offset);
         Ok((
             space,
             transform,

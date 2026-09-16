@@ -332,7 +332,7 @@ impl Session {
             self.character(),
             self.ui_view(),
         );
-        c.update(self.read_tickets());
+        c.update(self.read_tickets(), self.frame_clock.render_offset());
         c
     }
 
@@ -1406,7 +1406,7 @@ impl MainTaskContext {
                 shuttle.game_character.as_source(),
                 shuttle.ui_view(),
             );
-            c.update(shuttle.read_tickets());
+            c.update(shuttle.read_tickets(), time::RenderOffset::LATEST);
             c
         })
     }
@@ -1757,7 +1757,9 @@ mod tests {
                 ctx.set_universe(new_universe);
                 eprintln!("main task: have set new universe");
 
-                ctx.with_read_tickets(|read_tickets| cameras.update(read_tickets));
+                ctx.with_read_tickets(|read_tickets| {
+                    cameras.update(read_tickets, time::RenderOffset::LATEST)
+                });
                 assert!(cameras.character().is_some(), "has character");
 
                 // Now try noticing steps

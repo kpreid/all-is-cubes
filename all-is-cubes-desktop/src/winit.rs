@@ -10,9 +10,8 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::window::{CursorGrabMode, Window};
 
 use all_is_cubes::euclid::{Point2D, Size2D};
-use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_gpu::{FrameBudget, SurfaceRenderer};
-use all_is_cubes_render::camera::{self, Layers, StandardCameras};
+use all_is_cubes_render::camera::{self, StandardCameras};
 
 use all_is_cubes_ui::apps::InputProcessor;
 
@@ -399,7 +398,7 @@ fn handle_window_event<Ren: RendererToWinit>(
                 return;
             }
 
-            dsession.renderer.update_world_camera(dsession.session.read_tickets());
+            dsession.renderer.update_world_camera(&dsession.session);
             dsession.session.update_cursor(dsession.renderer.cameras());
             dsession
                 .window
@@ -537,7 +536,7 @@ fn handle_window_event<Ren: RendererToWinit>(
 #[expect(clippy::module_name_repetitions)]
 pub trait RendererToWinit: crate::glue::Renderer + 'static {
     #[doc(hidden)]
-    fn update_world_camera(&mut self, read_tickets: Layers<ReadTicket<'_>>);
+    fn update_world_camera(&mut self, session: &Session);
     #[doc(hidden)]
     fn cameras(&self) -> &StandardCameras;
     #[doc(hidden)]
@@ -547,8 +546,8 @@ pub trait RendererToWinit: crate::glue::Renderer + 'static {
 }
 
 impl RendererToWinit for SurfaceRenderer {
-    fn update_world_camera(&mut self, read_tickets: Layers<ReadTicket<'_>>) {
-        self.update_world_camera(read_tickets)
+    fn update_world_camera(&mut self, session: &Session) {
+        self.update_world_camera(session.read_tickets(), session.frame_clock.render_offset())
     }
 
     fn cameras(&self) -> &StandardCameras {
@@ -568,6 +567,7 @@ impl RendererToWinit for SurfaceRenderer {
                 session.read_tickets(),
                 session.cursor_result(),
                 &frame_budget,
+                session.frame_clock.render_offset(),
                 |render_info| format!("{}", session.info_text(render_info)),
                 || window.pre_present_notify(),
             )

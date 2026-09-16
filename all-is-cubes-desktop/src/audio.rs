@@ -17,6 +17,7 @@ use rand::{RngExt as _, SeedableRng as _};
 
 use all_is_cubes::listen;
 use all_is_cubes::sound::{Band, SoundDef, SpatialAmbient};
+use all_is_cubes::time;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_render::camera::{self, Camera, Layers, StandardCameras};
 use all_is_cubes_ui::apps::{
@@ -98,7 +99,7 @@ impl AudioTask {
     }
 
     pub(crate) fn update_listener(&mut self, read_tickets: Layers<ReadTicket<'_>>) {
-        self.cameras_for_audio.update(read_tickets);
+        self.cameras_for_audio.update(read_tickets, time::RenderOffset::LATEST);
         Self::set_listener_state(
             &mut self.world_spatial_listener,
             &self.cameras_for_audio.cameras().world,

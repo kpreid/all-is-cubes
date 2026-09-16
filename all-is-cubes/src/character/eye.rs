@@ -38,7 +38,7 @@ use crate::universe;
 ///   around it.
 /// * Ambient sound derived from surrounding blocks.
 #[derive(Clone, Default, ecs::Component)]
-#[require(exposure::State, character::ambient_sound::State, PreviousBodyVelocity)]
+#[require(exposure::State, character::ambient_sound::State, PreviousBodyState)]
 pub(crate) struct CharacterEye {
     /// Offset to be added to the body position to produce the drawn eye (camera) position.
     pub(super) displacement_pos: Vector3D<FreeCoordinate, Cube>,
@@ -46,21 +46,53 @@ pub(crate) struct CharacterEye {
     displacement_vel: Vector3D<FreeCoordinate, Velocity>,
 }
 
-/// Records velocity from the previous step as an input to [`CharacterEye`] displacement.
+/// State of the entity’s [`Body`] at the end of the previous step.
 ///
-/// TODO(ecs): figure out how we want to handle computing delta-v/impulse and put this in a more appropriate place
+/// The value of this is captured from the current step during [`time::Schedule::BeforeStep`].
+///
+/// This component is used for interpolated view transforms and as an input to eye position
+/// dynamics. Its default value represents no steps having occurred yet.
 #[derive(Clone, Copy, Debug, Default, ecs::Component)]
-struct PreviousBodyVelocity(Vector3D<FreeCoordinate, Velocity>);
+pub(crate) struct PreviousBodyState {
+    /// [`None`] only when the body has not been stepped yet.
+    view_transform: Option<ViewTransform>,
+
+    velocity: Vector3D<FreeCoordinate, Velocity>,
+}
 
 // -------------------------------------------------------------------------------------------------
 
 impl CharacterEye {
     /// Computes the transform that should be used for rendering the view from this character’s
     /// eyes.
-    pub(in crate::character) fn view_transform(&self, body: &Body) -> ViewTransform {
-        let mut transform = body.view_transform_without_eye_displacement();
-        transform.translation += self.displacement_pos;
-        transform
+    ///
+    /// `time_offset` specifies the amount of time that should have been assumed to have passed
+    /// beyond the last [`universe::Universe::step()`]; this is used in order to extrapolate a
+    /// future camera position.
+    /// (TODO: We need this to be a signed value so that we have the option of interpolating
+    /// instead of extrapolating.)
+    pub(in crate::character) fn view_transform(
+        &self,
+        body: &Body,
+        prev: &PreviousBodyState,
+        time_offset: time::RenderOffset,
+    ) -> ViewTransform {
+        // let dt_vel = euclid::Scale::<f64, Velocity, Cube>::new(time_offset.get_delta_time());
+        let new_transform = body.view_transform_without_eye_displacement();
+
+        let mut interpolated_transform = if let Some(old_transform) = prev.view_transform {
+            let alpha = time_offset.get_alpha();
+            ViewTransform {
+                translation: old_transform.translation.lerp(new_transform.translation, alpha),
+                rotation: old_transform.rotation.slerp(&new_transform.rotation, alpha),
+            }
+        } else {
+            new_transform
+        };
+
+        interpolated_transform.translation +=
+            self.displacement_pos /* + (body.velocity() + self.displacement_vel) * dt_vel */;
+        interpolated_transform
     }
 }
 
@@ -83,9 +115,10 @@ pub(crate) fn add_eye_systems(world: &mut ecs::World) {
     );
 }
 
-fn record_previous_velocity(query: ecs::Query<'_, '_, (&Body, &mut PreviousBodyVelocity)>) {
+fn record_previous_velocity(query: ecs::Query<'_, '_, (&Body, &mut PreviousBodyState)>) {
     for (body, mut pbv) in query {
-        pbv.0 = body.velocity();
+        pbv.view_transform = Some(body.view_transform_without_eye_displacement());
+        pbv.velocity = body.velocity();
     }
 }
 
@@ -93,12 +126,20 @@ fn record_previous_velocity(query: ecs::Query<'_, '_, (&Body, &mut PreviousBodyV
 fn step_eye_position(
     lex: rg::LogExecution,
     current_step: ecs::Res<'_, universe::CurrentStep>,
-    characters: ecs::Query<'_, '_, (&Body, &PreviousBodyVelocity, &mut CharacterEye)>,
+    characters: ecs::Query<'_, '_, (&Body, &PreviousBodyState, &mut CharacterEye)>,
 ) -> ecs::Result {
     let _lex = lex.name("eye_position", "-");
     let tick = current_step.get()?.tick;
     let dt = tick.delta_t_f64();
-    for (body, &PreviousBodyVelocity(previous_body_velocity), mut eye) in characters {
+    for (
+        body,
+        &PreviousBodyState {
+            velocity: previous_body_velocity,
+            ..
+        },
+        mut eye,
+    ) in characters
+    {
         let eye = &mut *eye;
 
         // Apply accelerations on the body inversely to the eye displacement.
@@ -146,7 +187,11 @@ fn step_exposure(
         let Ok(space) = space_handle.read_from_query(*universe_id, &spaces) else {
             continue;
         };
-        let view_transform = eye.view_transform(body);
+        let view_transform = eye.view_transform(
+            body,
+            &PreviousBodyState::default(),
+            time::RenderOffset::LATEST,
+        );
 
         exposure.step(&space, view_transform, dt);
     }
@@ -178,7 +223,11 @@ fn step_ambient_sound(
         let Ok(space) = space_handle.read_from_query(*universe_id, &spaces) else {
             continue;
         };
-        let view_transform = eye.view_transform(body);
+        let view_transform = eye.view_transform(
+            body,
+            &PreviousBodyState::default(),
+            time::RenderOffset::LATEST,
+        );
 
         exposure.step(&space, view_transform, dt);
     }

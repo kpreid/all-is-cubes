@@ -1,5 +1,5 @@
 use all_is_cubes::math::{PositiveSign, ZeroOne, zo64};
-use all_is_cubes::time::{Duration, Instant, TickSchedule};
+use all_is_cubes::time::{Duration, Instant, RenderOffset, TickSchedule};
 #[cfg(doc)]
 use all_is_cubes::universe::Universe;
 
@@ -47,6 +47,15 @@ impl FrameClock {
 
     fn step_length(&self) -> Duration {
         self.schedule.delta_t()
+    }
+
+    /// Returns the time offset to be used for interpolating simulation state
+    /// when rendering frames more frequent than, or out of sync with, steps.
+    ///
+    /// Using this offset will result in a latency for interpolated quantities
+    /// (such as the eye position) which varies between zero and one step period.
+    pub fn render_offset(&self) -> RenderOffset {
+        RenderOffset::new(&self.schedule, self.accumulated_step_time)
     }
 }
 

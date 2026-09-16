@@ -36,6 +36,7 @@
     * `text::FontDef`
     * `text::Measurement`
     * `time::Clock::phase()`, returns the clock’s phase, which was previously only obtainable through `Tick`.
+    * `time::RenderOffset`
     * `time::Tick::{delta_t_f64, delta_t_ps64}()`, convenience for common conversions.
     * `universe::Type`, for working with the closed set of types universe members can have.
     * `universe::TypeError`
@@ -58,9 +59,14 @@
     * `camera::Viewport::scale()`
 
 * `all-is-cubes-ui` library:
+    * `apps::FrameClock::render_offset()`
     * `settings::TypedKey::incrementer()`
 
 ### Changed
+
+* Graphics:
+    * Interpolation of camera positions (and in the future, other continuous positions) is now supported.
+      Relevant functions take an additional parameter of type `all_is_cubes::time::RenderOffset`, and `FrameClock` can provide the offset value.
 
 * `all-is-cubes` library:
     * `block::BlockDefTransaction`’s constructors now take `impl Into<Animation>` instead of `Block`.

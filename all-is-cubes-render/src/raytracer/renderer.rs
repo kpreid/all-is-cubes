@@ -11,6 +11,7 @@ use all_is_cubes::listen::{self, Source as _};
 use all_is_cubes::math::{Rgba, Srgba8, ZeroOne};
 use all_is_cubes::space::Space;
 use all_is_cubes::text;
+use all_is_cubes::time;
 use all_is_cubes::universe::{self, Handle, ReadTicket};
 use all_is_cubes::util::StatusText;
 
@@ -96,13 +97,14 @@ where
     pub fn update(
         &mut self,
         read_tickets: Layers<ReadTicket<'_>>,
+        time_offset: time::RenderOffset,
         cursor: Option<&Cursor>,
     ) -> Result<bool, RenderError> {
         let mut anything_changed = false;
 
         // TODO: raytracer needs to implement drawing the cursor
         self.had_cursor = cursor.is_some();
-        anything_changed |= self.cameras.update(read_tickets);
+        anything_changed |= self.cameras.update(read_tickets, time_offset);
         self.custom_options_cache = self.custom_options.get();
 
         fn sync_space<D>(
@@ -341,7 +343,7 @@ impl HeadlessRenderer for RtRenderer<()> {
         read_tickets: Layers<ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
-        let _anything_changed = self.update(read_tickets, cursor)?;
+        let _anything_changed = self.update(read_tickets, time::RenderOffset::LATEST, cursor)?;
         Ok(())
     }
 
@@ -763,6 +765,7 @@ mod tests {
                     world: universe.read_ticket(),
                     ui: ReadTicket::stub(),
                 },
+                time::RenderOffset::LATEST,
                 None,
             )
             .unwrap();
