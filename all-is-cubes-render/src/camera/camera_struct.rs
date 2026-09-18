@@ -144,7 +144,20 @@ impl Camera {
     /// Besides controlling rendering, this is used to determine world coordinates for purposes
     /// of [`view_position()`](Self::view_position) and
     /// [`project_ndc_into_world()`](Self::project_ndc_into_world).
+    ///
+    /// # Panics
+    ///
+    /// Panics if any element of `eye_to_world_transform` is NaN.
+    #[track_caller]
     pub fn set_view_transform(&mut self, eye_to_world_transform: ViewTransform) {
+        #[allow(clippy::eq_op)]
+        if eye_to_world_transform != eye_to_world_transform {
+            // Contains NaN somewhere
+            panic!(
+                "Camera::set_view_transform() given NaN in transform: {eye_to_world_transform:?}"
+            );
+        }
+
         if eye_to_world_transform.to_untyped() == self.eye_to_world_transform.to_untyped() {
             return;
         }
