@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
 use core::iter::FusedIterator;
+use core::num::Saturating;
 use core::range::RangeTo;
 
 use bevy_platform::sync::Mutex;
@@ -440,20 +441,33 @@ fn depth_sort_key(&chunk: &Ccv) -> (Distance, [i32; 3]) {
 
 fn chunk_distance_squared_for_view(chunk: Ccv) -> Distance {
     let chunk = chunk.map(i32::unsigned_abs);
-    // By subtracting 1 from all coordinates, we include the chunks intersecting
+
+    // By subtracting 1 (saturating) from all coordinates, we include the chunks intersecting
     // the view sphere centered on the _farthest corner point_ of the
     // viewpoint-containing chunk. The shape formed (after mirroring) is the
     // Minkowski sum of the view sphere and the chunk cube.
     // The max(0) includes the axis-aligned span of chunks that form the
     // Minkowski-sum-expanded cube faces.
+    let one_less = chunk.map(
+        #[inline(always)]
+        |s| Saturating(s) - Saturating(1),
+    );
+
+    // Compute the squared distance with saturating arithmetic.
+    // This means that excessive input will saturate rather than panicking or wrapping, which
+    // is desirable because it means that the application will not crash in rendering and
+    // distant chunks will never be incorrectly treated as close-by ones.
+    //
+    // (Note that these saturating additions and multiplications do not have the same motivation
+    // as the saturating subtraction above. It just happens that we want both, and so using the
+    // `Saturating` type is quite convenient here.)
+    let Saturating(nearest_approach_squared) = one_less.square_length();
+
+    let off_plane_count = u8::from(chunk.x > 0) + u8::from(chunk.y > 0) + u8::from(chunk.z > 0);
+
     Distance {
-        nearest_approach_squared: chunk
-            .map(
-                #[inline(always)]
-                |s| s.saturating_sub(1),
-            )
-            .square_length(),
-        off_plane_count: u8::from(chunk.x > 0) + u8::from(chunk.y > 0) + u8::from(chunk.z > 0),
+        nearest_approach_squared,
+        off_plane_count,
     }
 }
 
@@ -607,6 +621,18 @@ mod tests {
     #[ignore = "unimplemented"]
     fn min_distance_squared_consistent_with_chart() {
         todo!("implement check that min_distance_squared_from matches ChunkChart");
+    }
+
+    /// Check that absurd numbers don’t cause the distance calculation to overflow.
+    /// The distance values won’t make sense, but that’s okay because chunks this distant will
+    /// definitely be out of view.
+    #[test]
+    fn distance_overflow_saturates() {
+        const CS: GridCoordinate = 1; // doesn’t matter
+        let big = 0x1000_0000_i32;
+        let _ = ChunkPos::<CS>::new(0, 0, 0).distance(ChunkPos::new(big, 0, 0));
+        let _ = ChunkPos::<CS>::new(0, 0, 0).distance(ChunkPos::new(big, big, 0));
+        let _ = ChunkPos::<CS>::new(0, 0, 0).distance(ChunkPos::new(big, big, big));
     }
 
     // TODO: test for point_to_chunk
