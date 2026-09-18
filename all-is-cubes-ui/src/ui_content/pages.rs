@@ -211,6 +211,7 @@ pub(super) fn new_about_page(
       Right mouse  use selected toolbar item
            P       toggle pause
         Escape     toggle pause; exit menu
+          Tab      inventory
     "};
 
     let about_text = String::from(indoc::indoc! {r#"
