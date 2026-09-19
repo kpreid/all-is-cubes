@@ -103,7 +103,7 @@ jobs:
 
     steps:
     # Free some disk space so our largest builds can complete reliably.
-    - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+    - uses: jlumbroso/free-disk-space@3f13feab2962a87273d379ebc36ea159527e6cc9 # v1.3.2
       background: true # should outpace the rate at which we consume disk, so no need to wait
       if: ${{ matrix.os == 'ubuntu' }}
       with:
@@ -367,7 +367,7 @@ jobs:
 
     steps:
     # Free some disk space so our largest builds can complete reliably.
-    - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+    - uses: jlumbroso/free-disk-space@3f13feab2962a87273d379ebc36ea159527e6cc9 # v1.3.2
       with:
         large-packages: false # slow
         swap-storage: false
@@ -431,7 +431,7 @@ jobs:
 
     steps:
     # Free some disk space so our largest builds can complete reliably.
-    - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+    - uses: jlumbroso/free-disk-space@3f13feab2962a87273d379ebc36ea159527e6cc9 # v1.3.2
       with:
         large-packages: false # slow
         swap-storage: false
