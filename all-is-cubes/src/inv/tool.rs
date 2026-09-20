@@ -80,6 +80,8 @@ pub enum Tool {
         op: Operation,
         /// Icon for the tool.
         icon: Block,
+        /// How to rotate the operation before applying it.
+        rotation_rule: block::RotationPlacementRule,
     },
 }
 
@@ -232,9 +234,17 @@ impl Tool {
                 Some(Self::Jetpack { active: !active }),
                 UniverseTransaction::default(),
             )),
-            Self::Custom { ref op, icon: _ } => Ok((
+            Self::Custom {
+                ref op,
+                icon: _,
+                rotation_rule,
+            } => Ok((
                 Some(self.clone()),
-                input.apply_operation(op, GridRotation::IDENTITY, false)?,
+                input.apply_operation(
+                    &op.clone().rotate(rotation_rule.apply(input.cursor()?)),
+                    GridRotation::IDENTITY,
+                    false,
+                )?,
             )),
         }
     }
@@ -293,9 +303,11 @@ impl Tool {
             }
             // We don’t trust the provided icon not to cause trouble, so it is quoted even
             // though it is meant to be an icon.
-            Self::Custom { icon, op: _ } => {
-                Cow::Owned(icon.clone().with_modifier(block::Quote::default()))
-            }
+            Self::Custom {
+                icon,
+                op: _,
+                rotation_rule: _,
+            } => Cow::Owned(icon.clone().with_modifier(block::Quote::default())),
         }
     }
 
@@ -311,7 +323,11 @@ impl Tool {
             Tool::EditBlock => None,
             Tool::PushPull => None,
             Tool::Jetpack { .. } => None,
-            Tool::Custom { op: _, icon } => Some(icon),
+            Tool::Custom {
+                op: _,
+                icon,
+                rotation_rule: _,
+            } => Some(icon),
         }
     }
 
@@ -344,9 +360,14 @@ impl VisitHandles for Tool {
             Tool::EditBlock => {}
             Tool::PushPull => {}
             Tool::Jetpack { active: _ } => {}
-            Tool::Custom { op, icon } => {
+            Tool::Custom {
+                op,
+                icon,
+                rotation_rule,
+            } => {
                 op.visit_handles(visitor);
                 icon.visit_handles(visitor);
+                rotation_rule.visit_handles(visitor);
             }
         }
     }

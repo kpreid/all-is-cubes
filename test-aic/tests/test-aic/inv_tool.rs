@@ -502,7 +502,7 @@ fn use_copy_from_space() {
 }
 
 #[test]
-fn use_custom_success() {
+fn use_custom_simple() {
     // TODO: also test an operation that cares about the existing block
 
     let mut universe = Universe::new();
@@ -511,6 +511,7 @@ fn use_custom_success() {
     let tool = Tool::Custom {
         op: Operation::Become(placed.clone()),
         icon,
+        rotation_rule: block::RotationPlacementRule::Never,
     };
     let mut tester = ToolTester::new(&mut universe, |m| {
         m.set([1, 0, 0], &existing).unwrap();
@@ -522,5 +523,37 @@ fn use_custom_success() {
         transaction,
         SpaceTransaction::set_cube([1, 0, 0], Some(existing), Some(placed))
             .bind(tester.space_handle)
+    );
+}
+
+#[test]
+fn use_custom_with_rotation_rule() {
+    let mut universe = Universe::new();
+    // non-atom blocks to check (lack of) rotation behavior
+    let [existing, icon, placed] = make_some_voxel_blocks(&mut universe);
+    let tool = Tool::Custom {
+        op: Operation::Become(placed.clone()),
+        icon,
+        rotation_rule: block::RotationPlacementRule::Attach { by: Face::NY },
+    };
+    let mut tester = ToolTester::new(&mut universe, |m| {
+        m.set([1, 0, 0], &existing).unwrap();
+    });
+
+    let transaction = tester.equip_and_use_tool(tool).unwrap();
+
+    assert_eq!(
+        transaction,
+        SpaceTransaction::set_cube(
+            [1, 0, 0],
+            Some(existing),
+            // This rotation rotates the NY face (per attachment) to become the
+            // PX face, which is the opposite of the face hit by the raycast.
+            // (Note that RotationPlacementRule::Attach really isn’t the
+            // best fit for tools that manipulate existing blocks, but it’s
+            // the only rule we have to test with for now.)
+            Some(placed.rotate(Face::PZ.counterclockwise()))
+        )
+        .bind(tester.space_handle)
     );
 }

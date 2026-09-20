@@ -316,8 +316,8 @@ impl DemoTheme {
 
         Tool::Custom {
             op: unlock,
-
             icon: self.blocks[Key].clone(),
+            rotation_rule: block::RotationPlacementRule::Never,
         }
     }
 }

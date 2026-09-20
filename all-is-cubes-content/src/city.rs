@@ -389,6 +389,7 @@ impl<'u> State<'u> {
                         .color(rgba_const!(0.0, 0.5, 0.0, 1.0))
                         .display_name("Rotate")
                         .build(),
+                    rotation_rule: block::RotationPlacementRule::Never, // TODO: reconsider?
                 },
             ]
             .into_iter()

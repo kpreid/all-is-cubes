@@ -552,9 +552,14 @@ mod inv {
                 Tool::EditBlock => schema::ToolSer::EditBlockV1 {},
                 Tool::PushPull => schema::ToolSer::PushPullV1 {},
                 Tool::Jetpack { active } => schema::ToolSer::JetpackV1 { active },
-                Tool::Custom { ref op, ref icon } => schema::ToolSer::CustomV1 {
+                Tool::Custom {
+                    ref op,
+                    ref icon,
+                    rotation_rule,
+                } => schema::ToolSer::CustomV1 {
                     op: op.clone(),
                     icon: icon.clone(),
+                    rotation_rule: rotation_rule.into(),
                 },
             }
             .serialize(serializer)
@@ -575,7 +580,15 @@ mod inv {
                 schema::ToolSer::EditBlockV1 {} => Tool::EditBlock,
                 schema::ToolSer::PushPullV1 {} => Tool::PushPull,
                 schema::ToolSer::JetpackV1 { active } => Tool::Jetpack { active },
-                schema::ToolSer::CustomV1 { op, icon } => Tool::Custom { op, icon },
+                schema::ToolSer::CustomV1 {
+                    op,
+                    icon,
+                    rotation_rule,
+                } => Tool::Custom {
+                    op,
+                    icon,
+                    rotation_rule: rotation_rule.into(),
+                },
             })
         }
     }
