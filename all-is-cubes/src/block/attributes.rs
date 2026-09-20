@@ -551,6 +551,24 @@ pub enum RotationPlacementRule {
     },
 }
 
+impl RotationPlacementRule {
+    /// Calculate how this rule should rotate a block placed by the given cursor.
+    pub(crate) fn apply(self, cursor: &crate::character::Cursor) -> GridRotation {
+        match self {
+            RotationPlacementRule::Never => GridRotation::IDENTITY,
+            RotationPlacementRule::Attach { by: attached_face } => {
+                let world_cube_face: Face =
+                    cursor.face_selected().opposite().try_into().unwrap_or(Face::NZ);
+                // TODO: RotationPlacementRule should control the "up" axis choices
+                GridRotation::from_to(attached_face, world_cube_face, Face::PY)
+                    .or_else(|| GridRotation::from_to(attached_face, world_cube_face, Face::PX))
+                    .or_else(|| GridRotation::from_to(attached_face, world_cube_face, Face::PZ))
+                    .unwrap_or(GridRotation::IDENTITY)
+            }
+        }
+    }
+}
+
 impl BlRotate for RotationPlacementRule {
     fn rotationally_symmetric(&self) -> bool {
         match self {

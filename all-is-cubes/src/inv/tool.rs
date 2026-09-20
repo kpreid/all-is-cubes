@@ -6,7 +6,7 @@ use alloc::string::{String, ToString};
 
 use descriptive_unwrap::ResultExt as _;
 
-use crate::block::{self, AIR, Block, Primitive, RotationPlacementRule};
+use crate::block::{self, AIR, Block, Primitive};
 use crate::character::{self, Character, CharacterTransaction, Cursor};
 use crate::fluff::Fluff;
 use crate::inv::{self, Icons, InventoryTransaction, StackLimit};
@@ -409,19 +409,7 @@ impl<'ticket> ToolInput<'ticket> {
         let new_ev = new_block
             .evaluate(self.read_ticket)
             .map_err(|e| ToolError::Internal(e.to_string()))?;
-
-        let rotation = match new_ev.attributes().rotation_rule {
-            RotationPlacementRule::Never => GridRotation::IDENTITY,
-            RotationPlacementRule::Attach { by: attached_face } => {
-                let world_cube_face: Face =
-                    cursor.face_selected().opposite().try_into().unwrap_or(Face::NZ);
-                // TODO: RotationPlacementRule should control the "up" axis choices
-                GridRotation::from_to(attached_face, world_cube_face, Face::PY)
-                    .or_else(|| GridRotation::from_to(attached_face, world_cube_face, Face::PX))
-                    .or_else(|| GridRotation::from_to(attached_face, world_cube_face, Face::PZ))
-                    .unwrap_or(GridRotation::IDENTITY)
-            }
-        };
+        let rotation = new_ev.attributes().rotation_rule.apply(cursor);
 
         if let Some(ref action) = new_ev.attributes().placement_action {
             let &block::PlacementAction {
