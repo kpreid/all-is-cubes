@@ -18,26 +18,23 @@ use all_is_cubes::{space, transaction};
 use all_is_cubes_render::raytracer::print_space;
 
 #[derive(Debug)]
-struct ToolTester {
-    universe: Box<Universe>,
+struct ToolTester<'u> {
+    universe: &'u mut Universe,
     character_handle: Handle<Character>,
     space_handle: Handle<Space>,
 }
-impl ToolTester {
+impl<'u> ToolTester<'u> {
     /// The provided function should modify the space to contain the blocks to operate on,
     /// given a cursor ray along the line of cubes from the origin in the +X direction.
-    fn new<F: FnOnce(&mut space::Mutation<'_, '_>)>(f: F) -> Self {
-        let mut universe = Universe::new();
+    fn new<F: FnOnce(&mut space::Mutation<'_, '_>)>(universe: &'u mut Universe, f: F) -> Self {
         let mut space = Space::empty_positive(6, 4, 4);
         space.mutate(universe.read_ticket(), f);
         let space_handle = universe.insert("ToolTester/space".into(), space).unwrap();
-        let read_ticket = universe.read_ticket();
-
         Self {
             character_handle: universe
                 .insert(
                     "ToolTester/character".into(),
-                    Character::spawn_default(read_ticket, space_handle.clone()).unwrap(),
+                    Character::spawn_default(universe.read_ticket(), space_handle.clone()).unwrap(),
                 )
                 .unwrap(),
             space_handle,
@@ -88,7 +85,7 @@ impl ToolTester {
     fn equip_use_commit(&mut self, stack: impl Into<Slot>) -> Result<(), EucError> {
         let transaction = self.equip_and_use_tool(stack).map_err(EucError::Use)?;
         transaction
-            .execute(&mut self.universe, (), &mut transaction::no_outputs)
+            .execute(self.universe, (), &mut transaction::no_outputs)
             .map_err(EucError::Commit)?;
         Ok(())
     }
@@ -130,8 +127,9 @@ async fn icon_activate() {
 
 #[test]
 fn use_activate_on_behavior() {
+    let mut universe = Universe::new();
     let [existing] = make_some_blocks();
-    let mut tester = ToolTester::new(|m| {
+    let mut tester = ToolTester::new(&mut universe, |m| {
         m.set([1, 0, 0], &existing).unwrap();
     });
     assert_eq!(
@@ -147,13 +145,14 @@ fn use_activate_on_behavior() {
 
 #[test]
 fn use_activate_on_block_action() {
+    let mut universe = Universe::new();
     let after = Block::builder().color(Rgba::WHITE).display_name("after").build();
     let before = Block::builder()
         .color(Rgba::WHITE)
         .display_name("before")
         .activation_action(Operation::Become(after.clone()))
         .build();
-    let mut tester = ToolTester::new(|m| {
+    let mut tester = ToolTester::new(&mut universe, |m| {
         m.set([1, 0, 0], &before).unwrap();
     });
 
@@ -182,8 +181,9 @@ fn use_remove_block(
     #[case(keep = true)]
     keep: bool,
 ) {
+    let mut universe = Universe::new();
     let [existing] = make_some_blocks();
-    let mut tester = ToolTester::new(|m| {
+    let mut tester = ToolTester::new(&mut universe, |m| {
         m.set([1, 0, 0], &existing).unwrap();
     });
     let actual_transaction = tester.equip_and_use_tool(Tool::RemoveBlock { keep }).unwrap();
@@ -205,14 +205,15 @@ fn use_remove_block(
     }
     assert_eq!(actual_transaction, expected_delete);
 
-    actual_transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
+    actual_transaction.execute(tester.universe, (), &mut drop).unwrap();
     print_space(&tester.space(), [-1., 1., 1.]);
     assert_eq!(&tester.space()[[1, 0, 0]], &AIR);
 }
 
 #[test]
 fn use_remove_block_without_target() {
-    let mut tester = ToolTester::new(|_| {});
+    let mut universe = Universe::new();
+    let mut tester = ToolTester::new(&mut universe, |_| {});
     assert_eq!(
         tester.equip_and_use_tool(Tool::RemoveBlock { keep: true }),
         Err(ToolError::NothingSelected)
@@ -239,11 +240,12 @@ fn use_block(
     #[case(infinite_blocks = Tool::InfiniteBlocks)]
     tool_ctor: fn(Block) -> Tool,
 ) {
+    let mut universe = Universe::new();
     let [existing, tool_block] = make_some_blocks();
     let tool = tool_ctor(tool_block.clone());
     let expect_consume = matches!(tool, Tool::Block(_));
 
-    let mut tester = ToolTester::new(|m| {
+    let mut tester = ToolTester::new(&mut universe, |m| {
         m.set([1, 0, 0], &existing).unwrap();
     });
     let transaction = tester.equip_and_use_tool(tool.clone()).unwrap();
@@ -266,7 +268,7 @@ fn use_block(
     }
     assert_eq!(transaction, expected_cube_transaction);
 
-    transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
+    transaction.execute(tester.universe, (), &mut drop).unwrap();
     print_space(&tester.space(), [-1., 1., 1.]);
     assert_eq!(&tester.space()[[1, 0, 0]], &existing);
     assert_eq!(&tester.space()[[0, 0, 0]], &tool_block);
@@ -275,13 +277,14 @@ fn use_block(
 /// TODO: Expand this test to exhaustively test all rotation placement rules?
 #[test]
 fn use_block_automatic_rotation() {
+    let mut universe = Universe::new();
     let [existing] = make_some_blocks();
-    let mut tester = ToolTester::new(|m| {
+    let mut tester = ToolTester::new(&mut universe, |m| {
         m.set([1, 0, 0], &existing).unwrap();
     });
 
     // Make a block with a rotation rule
-    let [mut tool_block] = make_some_voxel_blocks(&mut tester.universe);
+    let [mut tool_block] = make_some_voxel_blocks(tester.universe);
     tool_block
         .modifiers_mut()
         .push(block::Modifier::from(block::SetAttribute::RotationRule(
@@ -307,8 +310,9 @@ fn use_block_automatic_rotation() {
 
 #[test]
 fn use_block_with_inventory_config() {
+    let mut universe = Universe::new();
     let [existing] = make_some_blocks();
-    let mut tester = ToolTester::new(|m| {
+    let mut tester = ToolTester::new(&mut universe, |m| {
         m.set([1, 0, 0], &existing).unwrap();
     });
 
@@ -345,6 +349,7 @@ fn use_block_which_has_placement_action(
     #[case(in_front = true)]
     in_front: bool,
 ) {
+    let mut universe = Universe::new();
     let [existing_target] = make_some_blocks();
     let modifier_to_add: block::Modifier =
         block::SetAttribute::DisplayName(literal!("modifier_to_add")).into();
@@ -367,7 +372,7 @@ fn use_block_which_has_placement_action(
         existing_affected_block.clone().with_modifier(modifier_to_add.clone());
 
     dbg!(&tool);
-    let mut tester = ToolTester::new(|m| {
+    let mut tester = ToolTester::new(&mut universe, |m| {
         m.set([1, 0, 0], &existing_target).unwrap();
     });
     let transaction = tester.equip_and_use_tool(tool.clone()).unwrap();
@@ -401,7 +406,7 @@ fn use_block_which_has_placement_action(
         "actual transaction ≠ expected transaction"
     );
 
-    transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
+    transaction.execute(tester.universe, (), &mut drop).unwrap();
     print_space(&tester.space(), [-1., 1., 1.]);
     assert_eq!(
         (&tester.space()[[1, 0, 0]], &tester.space()[[0, 0, 0]]),
@@ -418,11 +423,12 @@ fn use_block_which_has_placement_action(
 /// than the tool.
 #[test]
 fn use_block_stack_decrements() {
+    let mut universe = Universe::new();
     let [existing, tool_block] = make_some_blocks();
     let stack_2 = Slot::stack(2, Tool::Block(tool_block.clone()));
     let stack_1 = Slot::stack(1, Tool::Block(tool_block));
 
-    let mut tester = ToolTester::new(|m| {
+    let mut tester = ToolTester::new(&mut universe, |m| {
         // This must be far enough along +X for the blocks we're placing to not run out of space.
         m.set([4, 0, 0], &existing).unwrap();
     });
@@ -438,9 +444,10 @@ fn use_block_with_obstacle(
     #[case(infinite_blocks = Tool::InfiniteBlocks)]
     tool_ctor: fn(Block) -> Tool,
 ) {
+    let mut universe = Universe::new();
     let [existing, tool_block, obstacle] = make_some_blocks();
     let tool = tool_ctor(tool_block);
-    let mut tester = ToolTester::new(|m| {
+    let mut tester = ToolTester::new(&mut universe, |m| {
         m.set([1, 0, 0], &existing).unwrap();
     });
     // Place the obstacle after the raycast
@@ -464,9 +471,10 @@ fn use_block_without_target(
     #[case(infinite_blocks = Tool::InfiniteBlocks)]
     tool_ctor: fn(Block) -> Tool,
 ) {
+    let mut universe = Universe::new();
     let [tool_block] = make_some_blocks();
     let tool = tool_ctor(tool_block);
-    let mut tester = ToolTester::new(|_| {});
+    let mut tester = ToolTester::new(&mut universe, |_| {});
     assert_eq!(
         tester.equip_and_use_tool(tool),
         Err(ToolError::NothingSelected)
@@ -475,8 +483,9 @@ fn use_block_without_target(
 
 #[test]
 fn use_copy_from_space() {
+    let mut universe = Universe::new();
     let [existing] = make_some_blocks();
-    let mut tester = ToolTester::new(|m| {
+    let mut tester = ToolTester::new(&mut universe, |m| {
         m.set([1, 0, 0], &existing).unwrap();
     });
     let transaction = tester.equip_and_use_tool(Tool::CopyFromSpace).unwrap();
@@ -487,7 +496,7 @@ fn use_copy_from_space() {
         )]))
         .bind(tester.character_handle.clone())
     );
-    transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
+    transaction.execute(tester.universe, (), &mut drop).unwrap();
     // Space is unmodified
     assert_eq!(&tester.space()[[1, 0, 0]], &existing);
 }
@@ -496,12 +505,13 @@ fn use_copy_from_space() {
 fn use_custom_success() {
     // TODO: also test an operation that cares about the existing block
 
+    let mut universe = Universe::new();
     let [existing, icon, placed] = make_some_blocks();
     let tool = Tool::Custom {
         op: Operation::Become(placed.clone()),
         icon,
     };
-    let mut tester = ToolTester::new(|m| {
+    let mut tester = ToolTester::new(&mut universe, |m| {
         m.set([0, 0, 0], &existing).unwrap();
     });
 
