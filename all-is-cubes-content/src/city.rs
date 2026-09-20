@@ -383,13 +383,13 @@ impl<'u> State<'u> {
                 Tool::PushPull,
                 Tool::Custom {
                     op: Operation::AddModifiers(
-                        [block::Modifier::Rotate(Face::PY.clockwise())].into(),
+                        [block::Modifier::Rotate(Face::PZ.clockwise())].into(),
                     ),
                     icon: block::Block::builder()
                         .color(rgba_const!(0.0, 0.5, 0.0, 1.0))
-                        .display_name("Rotate")
+                        .display_name("Rotate Block")
                         .build(),
-                    rotation_rule: block::RotationPlacementRule::Never, // TODO: reconsider?
+                    rotation_rule: block::RotationPlacementRule::Attach { by: Face::NZ },
                 },
             ]
             .into_iter()
