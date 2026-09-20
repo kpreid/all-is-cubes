@@ -1,5 +1,5 @@
-// Note that the interpretation of this color (premultiplied or not, etc) is entirely determined by
-// the render pass state and not by this shader.
+/// Note that the interpretation of this color (premultiplied or not, etc) is entirely determined by
+/// the render pass state and not by this shader.
 @group(0) @binding(0) var<uniform> uniform_color: vec4f;
 
 @vertex

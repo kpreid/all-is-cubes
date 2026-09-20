@@ -1,17 +1,17 @@
 // --- Interface declarations --------------------------------------------------
 
 struct PostprocessUniforms {
-    // Scale factors transforming from the viewport extent in 0.0..1.0 coordinates
-    // to `info_text_texture` sampling coordinates.
-    //
-    // These factors are not simple because `info_text_texture`’s size is in character cells,
-    // which are to be some exact multiple of framebuffer pixels.
+    /// Scale factors transforming from the viewport extent in 0.0..1.0 coordinates
+    /// to `info_text_texture` sampling coordinates.
+    ///
+    /// These factors are not simple because `info_text_texture`’s size is in character cells,
+    /// which are to be some exact multiple of framebuffer pixels.
     info_text_coordinate_scale: vec2f,
-    // Position of the top-left corner of the info text’s top-left character cell,
-    // in 0.0..1.0 coordinates.
+    /// Position of the top-left corner of the info text’s top-left character cell,
+    /// in 0.0..1.0 coordinates.
     info_text_origin: vec2f,
     // --- 16-byte aligned point ---
-    // Size of a single character cell in `font_texture`.
+    /// Size of a single character cell in `font_texture`.
     font_cell_size: vec2u,
     font_cell_margin: u32,
     tone_mapping_id: i32,
@@ -19,23 +19,23 @@ struct PostprocessUniforms {
     color_space_id: i32,
     maximum_intensity: f32,
     bloom_intensity: f32,
-    // Adjust this as needed to make a multiple of 16 bytes
+    /// Adjust this as needed to make a multiple of 16 bytes
     _padding: i32,
 }
 
 // Group 0 is named postprocess_bind_group_layout on the Rust side.
 @group(0) @binding(0) var<uniform> camera: PostprocessUniforms;
-// Not-yet-postprocessed scene rendering.
+/// Not-yet-postprocessed scene rendering.
 @group(0) @binding(1) var linear_scene_texture: texture_2d<f32>;
 @group(0) @binding(2) var scene_sampler: sampler;
-// Text overlay, as 8-bit ISO-8859-1 character codes in each texel
+/// Text overlay, as 8-bit ISO-8859-1 character codes in each texel
 @group(0) @binding(3) var text_texture: texture_2d<u32>;
 @group(0) @binding(4) var text_sampler: sampler;
-// Output of bloom calculation, to be blended with the scene.
+/// Output of bloom calculation, to be blended with the scene.
 @group(0) @binding(5) var bloom_texture: texture_2d<f32>;
-// Sampler to be used for reading the bloom texture.
+/// Sampler to be used for reading the bloom texture.
 @group(0) @binding(6) var bloom_sampler: sampler;
-// Font atlas used for rendering the info text.
+/// Font atlas used for rendering the info text.
 @group(0) @binding(7) var font_texture: texture_2d<f32>;
 
 // --- Vertex shader -----------------------------------------------------------
@@ -67,8 +67,8 @@ fn postprocess_vertex(
 
 // --- Color conversion functions ----------------------------------------------
 
-// Convert linear sRGB to linear Display P3.
-// Both color spaces use the S64 white point.
+/// Convert linear sRGB to linear Display P3.
+/// Both color spaces use the S64 white point.
 fn linear_srgb_to_linear_display_p3(srgb_color: vec3f) -> vec3f {
     // TODO: Prove that the values in this matrix are correct.
     return mat3x3<f32>(
@@ -78,10 +78,10 @@ fn linear_srgb_to_linear_display_p3(srgb_color: vec3f) -> vec3f {
     ) * srgb_color;
 }
 
-// Apply the sRGB encoding curve.
-//
-// The input and output are bgoth in the 0-1 range (or the HDR extended version thereof),
-// not 0-255.
+/// Apply the sRGB encoding curve.
+///
+/// The input and output are bgoth in the 0-1 range (or the HDR extended version thereof),
+/// not 0-255.
 fn encode_srgb(linear: vec3f) -> vec3f {
     // TODO: write test for this encoding function comparing it to the CPU-side encoder
     return mix(
@@ -111,9 +111,9 @@ fn tone_map(linear_rgb: vec3<f32>) -> vec3<f32> {
     }
 }
 
-// Perform color space conversion.
-//
-// No clamping is done on the input or the output.
+/// Perform color space conversion.
+///
+/// No clamping is done on the input or the output.
 fn convert_to_output_color_space(linear_srgb: vec3<f32>) -> vec3<f32> {
     switch camera.color_space_id {
         default: { // or case 0
@@ -135,8 +135,8 @@ fn convert_to_output_color_space(linear_srgb: vec3<f32>) -> vec3<f32> {
     }
 }
 
-// Fetch scene pixel, if scene texture is present.
-// (It may be absent because there might have been nothing to draw in previous stages.)
+/// Fetch scene pixel, if scene texture is present.
+/// (It may be absent because there might have been nothing to draw in previous stages.)
 fn scene_pixel(texcoord: vec2<f32>) -> vec4<f32> {
     let scene_color = textureSampleLevel(
         linear_scene_texture,
@@ -193,12 +193,12 @@ fn render_text(in: VertexOutput) -> vec4f {
     );
 }
 
-// Given an already picked character cell, returns the part of it in this fragment.
-//
-// `cell` is the coordinates of a character cell, or equivalently, a texel in `text_texture`.
-// `position_in_cell` is coordinates for the position of this fragment relative to that cell,
-// which are in the 0-1 range if the fragment is actually inside that cell, or outside it if
-// we are rendering neighboring outlines.
+/// Given an already picked character cell, returns the part of it in this fragment.
+///
+/// `cell` is the coordinates of a character cell, or equivalently, a texel in `text_texture`.
+/// `position_in_cell` is coordinates for the position of this fragment relative to that cell,
+/// which are in the 0-1 range if the fragment is actually inside that cell, or outside it if
+/// we are rendering neighboring outlines.
 fn render_character_cell(cell: vec2i, position_in_cell: vec2f) -> vec4f {
     if cell.x < 0 || cell.y < 0 {
         // avoid out of bounds reads of text_texture, which are undefined per WGSL
@@ -245,9 +245,9 @@ fn render_character_cell(cell: vec2i, position_in_cell: vec2f) -> vec4f {
     return textureLoad(font_texture, font_atlas_tc, 0);
 }
 
-// Blend the scene texture and text, and apply tonemapping.
-// The result is always linear sRGB with premultiplied alpha; it may or may not be HDR, depending
-// on tone mapping configuration and other factors.
+/// Blend the scene texture and text, and apply tonemapping.
+/// The result is always linear sRGB with premultiplied alpha; it may or may not be HDR, depending
+/// on tone mapping configuration and other factors.
 @fragment
 fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     // Scene without text overlay, in linear HDR sRGB color.

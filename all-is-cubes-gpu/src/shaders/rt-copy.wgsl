@@ -3,27 +3,27 @@
 // --- Interface declarations --------------------------------------------------
 
 struct ReprojectionUniforms {
-    // Matrix transforming points in the old camera's clip space to the new camera's clip space.
+    /// Matrix transforming points in the old camera's clip space to the new camera's clip space.
     reprojection_matrix: mat4x4<f32>,
-    // Inverse of the current projection matrix, used for transforming depths.
-    // (In principle we should be passing the old projection matrix and new projection matrix,
-    // but that's overkill.
+    /// Inverse of the current projection matrix, used for transforming depths.
+    /// (In principle we should be passing the old projection matrix and new projection matrix,
+    /// but that's overkill.
     inverse_projection: mat4x4<f32>,
-    // Scale factors which scale texels in the input textures, the raytracing buffer textures,
-    // into the viewport of the render target. Inverse of what `raytracer_size_policy()` did.
+    /// Scale factors which scale texels in the input textures, the raytracing buffer textures,
+    /// into the viewport of the render target. Inverse of what `raytracer_size_policy()` did.
     output_pixel_scale: vec2<f32>,
-    // Adjust this as needed to make a multiple of 16 bytes
+    /// Adjust this as needed to make a multiple of 16 bytes
     _padding: vec2<f32>,
 }
 
 // This group is named rt_copy_layout in the code.
 @group(0) @binding(0) var input_color_texture: texture_2d<f32>;
-// Note: The "depth" texture is not in a depth texture format because
-// float depth textures cannot be copied to and because we are using negative values specially.
+/// Note: The "depth" texture is not in a depth texture format because
+/// float depth textures cannot be copied to and because we are using negative values specially.
 @group(0) @binding(1) var input_depth_texture: texture_2d<f32>;
 @group(0) @binding(2) var input_sampler: sampler;
 
-// Used for reprojection but not straight copying
+/// Used for reprojection but not straight copying
 @group(0) @binding(3) var<uniform> reprojection: ReprojectionUniforms;
 
 struct FragmentOutput {
@@ -95,8 +95,8 @@ struct ReprojectVertexOutput {
     @location(1) triangle_vertex_position: vec2<f32>,
 }
 
-// This vertex shader is called with one triangle per pixel in the raytracer output buffer,
-// and reprojects those pixels from the camera they were traced in to the current camera.
+/// This vertex shader is called with one triangle per pixel in the raytracer output buffer,
+/// and reprojects those pixels from the camera they were traced in to the current camera.
 @vertex
 fn rt_reproject_vertex(
     @builtin(vertex_index) vertex_index: u32,

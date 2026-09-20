@@ -2,7 +2,7 @@
 
 // --- Interface declarations --------------------------------------------------
 
-// Mirrors `struct RerunCopyCamera` on the Rust side.
+/// Mirrors `struct RerunCopyCamera` on the Rust side.
 struct RerunCopyCamera {
     inverse_projection: mat4x4<f32>,
 }

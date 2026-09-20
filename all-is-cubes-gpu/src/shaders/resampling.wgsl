@@ -66,8 +66,8 @@ fn full_image_vertex(
 
 // --- General fragment shading helpers ------------------------------------------------------------
 
-// Fetch from input image (scene texture or previous downsampling stage),
-// with an offset in units of output fragments.
+/// Fetch from input image (scene texture or previous downsampling stage),
+/// with an offset in units of output fragments.
 fn input_pixel(in: VertexOutput, offset: vec2<f32>) -> vec4<f32> {
     return textureSampleLevel(
         previous_stage_input,
