@@ -506,7 +506,8 @@ fn use_custom_success() {
     // TODO: also test an operation that cares about the existing block
 
     let mut universe = Universe::new();
-    let [existing, icon, placed] = make_some_blocks();
+    // non-atom blocks to check (lack of) rotation behavior
+    let [existing, icon, placed] = make_some_voxel_blocks(&mut universe);
     let tool = Tool::Custom {
         op: Operation::Become(placed.clone()),
         icon,
@@ -519,11 +520,7 @@ fn use_custom_success() {
 
     assert_eq!(
         transaction,
-        SpaceTransaction::set_cube(
-            [0, 0, 0],
-            Some(existing),
-            Some(placed.rotate(Face::PY.clockwise())),
-        )
-        .bind(tester.space_handle)
+        SpaceTransaction::set_cube([0, 0, 0], Some(existing), Some(placed))
+            .bind(tester.space_handle)
     );
 }
