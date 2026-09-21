@@ -71,14 +71,14 @@ fn main() -> Result<(), ActionError> {
     // but neatly avoids borrow conflicts.
     let (time_log_tx, time_log_rx) = std::sync::mpsc::channel::<Timing>();
 
-    let (config, command) = {
+    let (context, command) = {
         let XtaskArgs {
             command,
             scope,
             timings,
             quiet,
         } = <XtaskArgs as clap::Parser>::parse();
-        let config = Config {
+        let context = Context {
             sh,
             cargo_timings: timings,
             cargo_quiet: quiet,
@@ -88,12 +88,12 @@ fn main() -> Result<(), ActionError> {
             main_metadata,
             time_log_tx,
         };
-        (config, command)
+        (context, command)
     };
 
-    run_command(&config, command)?;
+    run_command(&context, command)?;
 
-    let Config { time_log_quiet, .. } = { config }; // closes time_log_tx
+    let Context { time_log_quiet, .. } = { context }; // closes time_log_tx
     if !time_log_quiet {
         for t in time_log_rx {
             eprintln!("{t}");
@@ -103,15 +103,15 @@ fn main() -> Result<(), ActionError> {
     Ok(())
 }
 
-fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionError> {
+fn run_command(context: &Context<'_>, command: XtaskCommand) -> Result<(), ActionError> {
     match command {
         XtaskCommand::Init {
             overwrite,
             quiet_tasks,
         } => {
-            development_files::write_development_files(config, overwrite, quiet_tasks)?;
-            if config.scope.includes_main_workspace() {
-                build_web(config, Profile::Dev)?; // includes installing wasm tools
+            development_files::write_development_files(context, overwrite, quiet_tasks)?;
+            if context.scope.includes_main_workspace() {
+                build_web(context, Profile::Dev)?; // includes installing wasm tools
             }
         }
         XtaskCommand::SystemPackages { package_command } => {
@@ -140,8 +140,8 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
                         }
                     }
                     args::SystemPackagesCommand::SudoInstall => {
-                        cmd!(config.sh, "sudo apt-get update").run()?;
-                        cmd!(config.sh, "sudo apt-get -y install").args(SYS_PACKAGES).run()?;
+                        cmd!(context.sh, "sudo apt-get update").run()?;
+                        cmd!(context.sh, "sudo apt-get -y install").args(SYS_PACKAGES).run()?;
                     }
                 }
             } else {
@@ -149,9 +149,9 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             }
         }
         XtaskCommand::Test { no_run } => {
-            print_revision(config, false);
+            print_revision(context, false);
             do_for_all_packages(
-                config,
+                context,
                 if no_run {
                     TestOrCheck::BuildTests
                 } else {
@@ -161,9 +161,9 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             )?;
         }
         XtaskCommand::TestMore { no_run } => {
-            print_revision(config, false);
+            print_revision(context, false);
             exhaustive_test(
-                config,
+                context,
                 if no_run {
                     TestOrCheck::BuildTests
                 } else {
@@ -172,20 +172,20 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             )?;
         }
         XtaskCommand::Lint => {
-            print_revision(config, false);
-            do_for_all_packages(config, TestOrCheck::Lint, Features::Default)?;
+            print_revision(context, false);
+            do_for_all_packages(context, TestOrCheck::Lint, Features::Default)?;
 
             // Build docs to verify that there are no broken doc links.
             // This applies to the main workspace & target only, because there are no
             // libraries with docs elsewhere.
-            if config.scope.includes_main_workspace() {
-                build_documentation(config)?;
+            if context.scope.includes_main_workspace() {
+                build_documentation(context)?;
             }
         }
         XtaskCommand::CheckFeatures => {
-            print_revision(config, false);
+            print_revision(context, false);
             do_for_all_packages(
-                config,
+                context,
                 // No Clippy for better throughput; pragmatically we care about "does it build"
                 // much more than the more pedantic lints, and this will still give us dead code
                 // and unused imports warnings.
@@ -195,24 +195,24 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             )?;
         }
         XtaskCommand::Doc => {
-            assert!(config.scope.includes_main_workspace());
-            build_documentation(config)?;
+            assert!(context.scope.includes_main_workspace());
+            build_documentation(context)?;
         }
         XtaskCommand::Fmt => {
-            config.do_for_all_workspaces(|_| {
-                config.cargo().arg("fmt").run()?;
+            context.do_for_all_workspaces(|_| {
+                context.cargo().arg("fmt").run()?;
                 Ok(())
             })?;
         }
         XtaskCommand::Clean => {
-            config.do_for_all_workspaces(|_| {
-                config.cargo().arg("clean").run()?;
+            context.do_for_all_workspaces(|_| {
+                context.cargo().arg("clean").run()?;
                 Ok(())
             })?;
             // TODO: also remove all-is-cubes-wasm/{dist,pkg}, but do it with more sanity checks
         }
         XtaskCommand::Fuzz { duration } => {
-            assert!(config.scope.includes_fuzz_workspace());
+            assert!(context.scope.includes_fuzz_workspace());
 
             let metadata = cargo_metadata::MetadataCommand::new()
                 .manifest_path("fuzz/Cargo.toml")
@@ -240,7 +240,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
                     _ => 5,
                 };
 
-                cmd!(config.sh, "cargo +nightly fuzz run")
+                cmd!(context.sh, "cargo +nightly fuzz run")
                     .env("RUST_BACKTRACE", "1")
                     .arg(&target.name)
                     .arg("--")
@@ -250,8 +250,8 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             }
         }
         XtaskCommand::Miri { nextest_args } => {
-            assert!(config.scope.includes_main_workspace());
-            print_revision(config, false);
+            assert!(context.scope.includes_main_workspace());
+            print_revision(context, false);
 
             for features in [
                 // Test our std-using configuration.
@@ -261,7 +261,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
                 // doesn’t understand.
                 "bevy_platform/std",
             ] {
-                cmd!(config.sh, "cargo +nightly miri nextest run")
+                cmd!(context.sh, "cargo +nightly miri nextest run")
                     .args(["--features", features])
                     // All tests in all-is-cubes-base.
                     .args([
@@ -279,15 +279,15 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
         }
         XtaskCommand::BinSize => {
             // force print revision because we want --quiet to still be informative
-            print_revision(config, true);
-            measure_binary_sizes(config)?;
+            print_revision(context, true);
+            measure_binary_sizes(context)?;
         }
         XtaskCommand::RunGameServer { server_args } => {
-            build_web(config, Profile::Dev)?;
+            build_web(context, Profile::Dev)?;
 
-            let mut cmd = std::process::Command::new(config.cargo_path());
+            let mut cmd = std::process::Command::new(context.cargo_path());
             cmd.arg("run")
-                .args(config.cargo_build_args())
+                .args(context.cargo_build_args())
                 .arg("--bin=aic-server")
                 .arg("--features=embed")
                 .arg("--")
@@ -306,12 +306,12 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             }
         }
         XtaskCommand::BuildWebRelease => {
-            print_revision(config, false);
+            print_revision(context, false);
 
             // We only generate the license file in release builds, to save time.
-            generate_wasm_licenses_file(config)?;
+            generate_wasm_licenses_file(context)?;
 
-            build_web(config, Profile::Release)?;
+            build_web(context, Profile::Release)?;
         }
         XtaskCommand::Update {
             to,
@@ -329,17 +329,17 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
                     eprintln!("Doing nothing because update type is {to:?}.");
                 }
                 UpdateTo::Latest => {
-                    config.do_for_all_workspaces(|_| {
+                    context.do_for_all_workspaces(|_| {
                         // Note: The `fuzz` workspace lock file is ignored in version control.
                         // But we do want to occasionally update it anyway.
-                        config.cargo().arg("update").args(&cargo_update_args).run()?;
+                        context.cargo().arg("update").args(&cargo_update_args).run()?;
                         Ok(())
                     })?;
                 }
                 UpdateTo::Minimal => {
-                    config.do_for_all_workspaces(|_| {
+                    context.do_for_all_workspaces(|_| {
                         // can't use cargo() to invoke rustup
-                        cmd!(config.sh, "cargo +nightly")
+                        cmd!(context.sh, "cargo +nightly")
                             .args(["update", "-Zdirect-minimal-versions"])
                             .args(&cargo_update_args)
                             .run()?;
@@ -349,17 +349,17 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             }
         }
         XtaskCommand::CheckDeps => {
-            print_revision(config, false);
+            print_revision(context, false);
             // Note when changing this command set: .github/workflows/ci.yml performs the same
             // operations but broken out into separate jobs.
-            config.do_for_all_workspaces(|ws| {
+            context.do_for_all_workspaces(|ws| {
                 if ws != Workspace::Fuzz {
-                    config.cargo().args(["deny", "check"]).run()?;
+                    context.cargo().args(["deny", "check"]).run()?;
                 }
                 Ok(())
             })?;
             run_command(
-                config,
+                context,
                 XtaskCommand::Update {
                     to: UpdateTo::Minimal,
                     dry_run: true,
@@ -384,7 +384,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
                 }
             }
 
-            assert_eq!(config.scope, Scope::All);
+            assert_eq!(context.scope, Scope::All);
 
             let new_version_value: toml_edit::Item = toml_edit::value(version.as_str());
             for manifest_dir in ALL_NONTEST_PACKAGES.into_iter().chain(["."]) {
@@ -434,10 +434,10 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
             );
         }
         XtaskCommand::PublishAll { for_real } => {
-            assert_eq!(config.scope, Scope::All);
-            print_revision(config, true);
+            assert_eq!(context.scope, Scope::All);
+            print_revision(context, true);
 
-            exhaustive_test(config, TestOrCheck::Test)?;
+            exhaustive_test(context, TestOrCheck::Test)?;
 
             let maybe_dry = if for_real { vec![] } else { vec!["--dry-run"] };
 
@@ -450,7 +450,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
                 })
                 .map(|p| format!("--package={p}"));
 
-            config
+            context
                 .cargo()
                 .arg("publish")
                 .args(maybe_dry.iter().copied())
@@ -473,7 +473,7 @@ fn run_command(config: &Config<'_>, command: XtaskCommand) -> Result<(), ActionE
 ///
 /// TODO: fetch this list (or at least cross-check it) using `cargo metadata`.
 ///
-/// See also [`Config::do_for_all_workspaces`].
+/// See also [`Context::do_for_all_workspaces`].
 const ALL_NONTEST_PACKAGES: [&str; 11] = [
     "all-is-cubes-base",
     "all-is-cubes",
@@ -492,12 +492,12 @@ const TARGET_WASM: &str = "--target=wasm32-unknown-unknown";
 
 // Test all combinations of situations (that we've bothered to program test
 // setup for).
-fn exhaustive_test(config: &Config<'_>, op: TestOrCheck) -> Result<(), ActionError> {
-    assert!(config.scope.includes_main_workspace());
+fn exhaustive_test(context: &Context<'_>, op: TestOrCheck) -> Result<(), ActionError> {
+    assert!(context.scope.includes_main_workspace());
 
-    build_web(config, Profile::Dev)?;
+    build_web(context, Profile::Dev)?;
 
-    do_for_all_packages(config, op, Features::AllAndNothing)?;
+    do_for_all_packages(context, op, Features::AllAndNothing)?;
     Ok(())
 }
 
@@ -508,34 +508,34 @@ fn static_web_app_out_dir(profile: Profile) -> PathBuf {
 /// Build the WASM and other 'client' files that the web server might need.
 /// Needed for build whenever `all-is-cubes-server` is being tested/run with
 /// the `embed` feature; needed to run the server regardless.
-fn build_web(config: &Config<'_>, profile: Profile) -> Result<(), ActionError> {
+fn build_web(context: &Context<'_>, profile: Profile) -> Result<(), ActionError> {
     // Currently, wasm is considered part of the main workspace scope,
     // even though it is actually a separate workspace. This is a bug.
     // <https://github.com/kpreid/all-is-cubes/issues/270>
     // <https://github.com/kpreid/all-is-cubes/issues/410>
-    assert!(config.scope.includes_main_workspace());
+    assert!(context.scope.includes_main_workspace());
 
     let wasm_package_dir: &Path = &PROJECT_DIR.join("all-is-cubes-wasm");
 
-    ensure_wasm_tools_installed(config)?;
+    ensure_wasm_tools_installed(context)?;
 
     // Run the compilation if needed, which ensures that the wasm binary is fresh.
     // We do this explicitly because wasm-pack release builds run `wasm-opt` unconditionally,
     // and we want to do modification time checks instead.
     {
-        let _t = config.capture_time(format!("wasm cargo build --{profile}"));
+        let _t = context.capture_time(format!("wasm cargo build --{profile}"));
 
         // Change directory so the `.cargo/config.toml` file takes effect
         // (--manifest-path is not sufficient).
-        let _d = config.sh.push_dir(wasm_package_dir);
+        let _d = context.sh.push_dir(wasm_package_dir);
 
-        config
+        context
             .cargo()
             .arg("build")
             .arg("--profile")
             .arg(<&str>::from(profile))
             .arg(TARGET_WASM)
-            .args(config.cargo_build_args())
+            .args(context.cargo_build_args())
             .run()?;
     }
 
@@ -558,14 +558,14 @@ fn build_web(config: &Config<'_>, profile: Profile) -> Result<(), ActionError> {
         ])],
         [wasm_pack_out_dir.join("all_is_cubes_wasm.js")],
     ) {
-        let _t = config.capture_time(format!("wasm-pack build --{profile}"));
+        let _t = context.capture_time(format!("wasm-pack build --{profile}"));
 
         // Change directory so the `.cargo/config.toml` file takes effect
         // (--manifest-path is not sufficient).
-        let _d = config.sh.push_dir(wasm_package_dir);
+        let _d = context.sh.push_dir(wasm_package_dir);
 
-        let mut cmd = cmd!(config.sh, "wasm-pack")
-            .args(config.cargo_quiet.then_some("--quiet"))
+        let mut cmd = cmd!(context.sh, "wasm-pack")
+            .args(context.cargo_quiet.then_some("--quiet"))
             .args(["build", "--target=web"])
             .arg("--out-dir")
             .arg(
@@ -574,7 +574,7 @@ fn build_web(config: &Config<'_>, profile: Profile) -> Result<(), ActionError> {
                     .with_context(|| wasm_pack_out_dir.display().to_string())?,
             )
             .arg(format!("--{profile}"));
-        cmd.set_quiet(config.cargo_quiet);
+        cmd.set_quiet(context.cargo_quiet);
         cmd.run()?;
     }
 
@@ -638,28 +638,28 @@ fn build_web(config: &Config<'_>, profile: Profile) -> Result<(), ActionError> {
 
 /// Run check or tests for all targets.
 fn do_for_all_packages(
-    config: &Config<'_>,
+    context: &Context<'_>,
     op: TestOrCheck,
     features: Features,
 ) -> Result<(), ActionError> {
-    if config.scope.includes_main_workspace() {
-        ensure_wasm_tools_installed(config)?;
+    if context.scope.includes_main_workspace() {
+        ensure_wasm_tools_installed(context)?;
 
         // Ensure all-is-cubes-server build that might be looking for the web client files will
         // succeed, but don't rebuild it if we're not actually testing its behavior.
         if !(static_web_app_out_dir(Profile::Dev).exists() && op == TestOrCheck::Lint) {
-            build_web(config, Profile::Dev)?;
+            build_web(context, Profile::Dev)?;
         }
     }
 
     // Test everything we can with default features and target.
     // But if we're linting, then the below --all-targets run will handle that.
-    if config.scope.includes_main_workspace() {
+    if context.scope.includes_main_workspace() {
         match features {
             Features::Default => {
                 {
-                    let _t = config.capture_time(format!("{op:?}"));
-                    op.cargo_cmd(config).run()?;
+                    let _t = context.capture_time(format!("{op:?}"));
+                    op.cargo_cmd(context).run()?;
                 }
 
                 {
@@ -669,8 +669,8 @@ fn do_for_all_packages(
                     //
                     // TODO: Replace this one-off list of packages with something more centralized,
                     // and shared with the CI that actually builds a no_std target.
-                    let _t = config.capture_time("check aic no_std");
-                    config
+                    let _t = context.capture_time("check aic no_std");
+                    context
                         .cargo()
                         .arg(op.non_build_check_subcmd())
                         .args([
@@ -687,8 +687,8 @@ fn do_for_all_packages(
 
             Features::AllAndNothing => {
                 {
-                    let _t = config.capture_time(format!("{op:?} --all-features"));
-                    op.cargo_cmd(config).args(["--all-targets", "--all-features"]).run()?;
+                    let _t = context.capture_time(format!("{op:?} --all-features"));
+                    op.cargo_cmd(context).args(["--all-targets", "--all-features"]).run()?;
                 }
 
                 // To test with limited features, we need to run commands separately for each
@@ -700,8 +700,8 @@ fn do_for_all_packages(
                         continue;
                     }
 
-                    let _t = config.capture_time(format!("{op:?} --package {package_name}"));
-                    op.cargo_cmd(config)
+                    let _t = context.capture_time(format!("{op:?} --package {package_name}"));
+                    op.cargo_cmd(context)
                         .args([
                             "--package",
                             package_name,
@@ -715,7 +715,7 @@ fn do_for_all_packages(
             Features::Powerset => {
                 // Note: this skips the wasm and fuzz workspaces.
                 // Those currently have no feature combinations to test.
-                for package in &config.main_metadata.workspace_packages() {
+                for package in &context.main_metadata.workspace_packages() {
                     // TODO: This could be more efficient if it looked at feature dependencies
                     // and skipped equivalent sets.
                     for feature_set in itertools::Itertools::powerset(
@@ -727,10 +727,10 @@ fn do_for_all_packages(
                         let package_name: &str = &package.name;
                         let feature_set_commas: String = feature_set.join(",");
 
-                        let _t = config.capture_time(format!(
+                        let _t = context.capture_time(format!(
                             "{op:?} --package={package_name} --features={feature_set_commas}"
                         ));
-                        op.cargo_cmd(config)
+                        op.cargo_cmd(context)
                             .args([
                                 &format!("--package={package_name}"),
                                 "--all-targets",
@@ -745,8 +745,8 @@ fn do_for_all_packages(
     }
 
     // Run wasm tests.
-    if config.scope.includes_main_workspace() {
-        let _t = config.capture_time(format!("{op:?} all-is-cubes-wasm (browser)"));
+    if context.scope.includes_main_workspace() {
+        let _t = context.capture_time(format!("{op:?} all-is-cubes-wasm (browser)"));
         match op {
             TestOrCheck::Test => {
                 // TODO: more general control over choice of browser / autodetection, and
@@ -760,57 +760,57 @@ fn do_for_all_packages(
                     "--firefox"
                 };
 
-                cmd!(config.sh, "wasm-pack test --headless")
+                cmd!(context.sh, "wasm-pack test --headless")
                     .arg(browser_arg)
                     .arg("all-is-cubes-wasm/")
                     .run()?;
             }
             TestOrCheck::BuildTests | TestOrCheck::Lint | TestOrCheck::Check => {
-                let _pushd = config.sh.push_dir("all-is-cubes-wasm");
+                let _pushd = context.sh.push_dir("all-is-cubes-wasm");
                 // Build the tests that `wasm-pack test` will test.
-                op.cargo_cmd(config).arg(TARGET_WASM).run()?;
+                op.cargo_cmd(context).arg(TARGET_WASM).run()?;
             }
         }
     }
 
     // Check everything else in the workspace, so non-test targets are checked for compile errors.
     // TODO: may be redundant now
-    if config.scope.includes_main_workspace() {
-        let _t = config.capture_time("check --all-targets");
-        config
+    if context.scope.includes_main_workspace() {
+        let _t = context.capture_time("check --all-targets");
+        context
             .cargo()
             .arg(op.non_build_check_subcmd())
-            .args(config.cargo_build_args())
+            .args(context.cargo_build_args())
             .arg("--all-targets")
             .run()?;
     }
 
     // Check fuzz targets that are not in the main workspace
-    if config.scope.includes_fuzz_workspace() {
-        let _t = config.capture_time("check fuzz");
-        let _pushd = config.sh.push_dir("fuzz");
-        config
+    if context.scope.includes_fuzz_workspace() {
+        let _t = context.capture_time("check fuzz");
+        let _pushd = context.sh.push_dir("fuzz");
+        context
             .cargo()
             .arg(op.non_build_check_subcmd())
-            .args(config.cargo_build_args())
+            .args(context.cargo_build_args())
             .run()?;
     }
 
     Ok(())
 }
 
-fn build_documentation(config: &Config<'_>) -> Result<(), ActionError> {
-    let _t = config.capture_time("doc");
-    config
+fn build_documentation(context: &Context<'_>) -> Result<(), ActionError> {
+    let _t = context.capture_time("doc");
+    context
         .cargo()
         .arg("doc")
         .arg("--config=build.warnings='deny'")
-        .args(config.cargo_build_args())
+        .args(context.cargo_build_args())
         .run()?;
     Ok(())
 }
 
-fn measure_binary_sizes(config: &Config<'_>) -> Result<(), ActionError> {
+fn measure_binary_sizes(context: &Context<'_>) -> Result<(), ActionError> {
     fn measure(relative_path: &str) -> Result<(), ActionError> {
         let path = PROJECT_DIR.join(relative_path);
         let size = fs::metadata(&path)?.len();
@@ -824,7 +824,7 @@ fn measure_binary_sizes(config: &Config<'_>) -> Result<(), ActionError> {
     }
 
     // Build
-    config
+    context
         .cargo()
         .quiet()
         .args([
@@ -833,9 +833,9 @@ fn measure_binary_sizes(config: &Config<'_>) -> Result<(), ActionError> {
             "--bin=all-is-cubes",
             "--bin=aic-server",
         ])
-        .args(config.cargo_build_args())
+        .args(context.cargo_build_args())
         .run()?;
-    build_web(config, Profile::Release)?;
+    build_web(context, Profile::Release)?;
 
     // Print
     measure("target/release/all-is-cubes")?;
@@ -846,15 +846,15 @@ fn measure_binary_sizes(config: &Config<'_>) -> Result<(), ActionError> {
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn ensure_wasm_tools_installed(config: &Config<'_>) -> Result<(), ActionError> {
-    assert!(config.scope.includes_main_workspace());
+fn ensure_wasm_tools_installed(context: &Context<'_>) -> Result<(), ActionError> {
+    assert!(context.scope.includes_main_workspace());
 
     // TODO: check that wasm-pack is installed
 
     Ok(())
 }
 
-fn generate_wasm_licenses_file(config: &Config<'_>) -> Result<(), ActionError> {
+fn generate_wasm_licenses_file(context: &Context<'_>) -> Result<(), ActionError> {
     let web_ws_path = PROJECT_DIR.join("all-is-cubes-wasm");
     let license_html_path = PROJECT_DIR.join("all-is-cubes-wasm/static/third-party-licenses.html");
     let license_template_path = PROJECT_DIR.join("tools/about.hbs");
@@ -862,9 +862,9 @@ fn generate_wasm_licenses_file(config: &Config<'_>) -> Result<(), ActionError> {
         [&web_ws_path.join("Cargo.lock"), &license_template_path],
         [&license_html_path],
     ) {
-        let _t = config.capture_time("cargo about generate");
+        let _t = context.capture_time("cargo about generate");
         // TODO: also ensure cargo-about is installed and has at least the expected version
-        config
+        context
             .cargo()
             .args([
                 "about",
@@ -907,8 +907,8 @@ static PROJECT_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
 });
 
 /// Print the Git state, as a reminder of what the command was run on, to stderr.
-fn print_revision(config: &Config<'_>, force: bool) {
-    if config.cargo_quiet && !force {
+fn print_revision(context: &Context<'_>, force: bool) {
+    if context.cargo_quiet && !force {
         // TODO: use separate flag for this than cargo_quiet? or unify them all?
         return;
     }

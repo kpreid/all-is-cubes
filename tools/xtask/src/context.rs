@@ -1,4 +1,4 @@
-//! Configuration/context used by xtask operations.
+//! Global context used by xtask operations.
 
 use anyhow::Error as ActionError;
 use xshell::{Cmd, Shell};
@@ -8,22 +8,36 @@ use crate::reporting::{CaptureTime, Timing};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Configuration which is passed down through everything.
+/// Configuration for this run of `xtask` which is passed down through all operations.
 #[derive(Debug)]
-pub struct Config<'a> {
+pub struct Context<'a> {
     /// For executing commands.
     pub sh: &'a Shell,
+
+    /// Pass `--timings` to Cargo.
     pub cargo_timings: bool,
+
+    /// Pass `--quiet` to Cargo, and also don’t print version control status.
     pub cargo_quiet: bool,
+
+    /// Don’t print timing logs.
     pub time_log_quiet: bool,
+
     /// Whether to use `RUSTFLAGS=-Dwarnings` instead of Cargo `build.warnings="deny"`.
     pub use_rustflags_to_deny_warnings: bool,
+
+    /// What parts of the project should be acted on.
     pub scope: Scope,
+
+    /// Metadata of the root workspace.
     pub main_metadata: cargo_metadata::Metadata,
+
+    /// Records time log entries, which are used to summarize which commands took the most time
+    /// overall.
     pub time_log_tx: std::sync::mpsc::Sender<Timing>,
 }
 
-impl Config<'_> {
+impl Context<'_> {
     /// Start a [`Cmd`] with the cargo command we should use.
     /// Currently, this doesn’t actually depend on the configuration, just the Shell
     pub fn cargo(&self) -> Cmd<'_> {
@@ -98,7 +112,7 @@ pub(crate) enum TestOrCheck {
 }
 
 impl TestOrCheck {
-    pub fn cargo_cmd<'a>(self, config: &'a Config<'_>) -> Cmd<'a> {
+    pub fn cargo_cmd<'a>(self, config: &'a Context<'_>) -> Cmd<'a> {
         let mut rustflags_deny_warnings = false;
 
         let mut cmd = config

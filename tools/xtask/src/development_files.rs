@@ -7,7 +7,7 @@ use std::path::Path;
 use anyhow::Context as _;
 use serde_json::{Value, json};
 
-use crate::context::Config;
+use crate::context::Context;
 use crate::{ActionError, PROJECT_DIR};
 
 // -------------------------------------------------------------------------------------------------
@@ -15,7 +15,7 @@ use crate::{ActionError, PROJECT_DIR};
 /// Create files which may be useful for development in the workspace but for which
 /// constant, version controlled contents are not adequate.
 pub(crate) fn write_development_files(
-    config: &Config<'_>,
+    context: &Context<'_>,
     overwrite: bool,
     quiet_tasks: bool,
 ) -> Result<(), ActionError> {
@@ -42,7 +42,7 @@ pub(crate) fn write_development_files(
     {
         let tasks_data = format!(
             "{:#}",
-            generate_vscode_tasks(&config.main_metadata, quiet_tasks)
+            generate_vscode_tasks(&context.main_metadata, quiet_tasks)
         );
         check_or_overwrite_file(
             &PROJECT_DIR.join(".vscode/tasks.json"),
