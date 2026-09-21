@@ -19,6 +19,8 @@ pub(crate) fn write_development_files(
     overwrite: bool,
     quiet_tasks: bool,
 ) -> Result<(), ActionError> {
+    crate::config::create_user_config_if_not_present(&context.original_config)?;
+
     // .desktop file, used by Linux desktop application launchers to describe how to run
     // our executable. It needs to have an absolute path to the file.
     // The file is also required to be encoded in UTF-8, so non-UTF-8 paths cannot be

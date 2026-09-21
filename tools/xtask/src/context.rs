@@ -11,8 +11,14 @@ use crate::reporting::{CaptureTime, Timing};
 /// Configuration for this run of `xtask` which is passed down through all operations.
 #[derive(Debug)]
 pub struct Context<'a> {
+    /// Persistent rather than per-session configuration.
+    /// Don’t use this field directly unless you are manipulating the config itself.
+    pub original_config: crate::config::Config,
+
     /// For executing commands.
     pub sh: &'a Shell,
+
+    pub browser: crate::config::Browser,
 
     /// Pass `--timings` to Cargo.
     pub cargo_timings: bool,

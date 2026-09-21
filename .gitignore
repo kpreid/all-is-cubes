@@ -6,6 +6,9 @@
 /all-is-cubes-wasm/dist
 /all-is-cubes-wasm/pkg
 
+# User configuration files
+/tools/xtask-config.toml
+
 # Generated file (by xtask)
 /.vscode/tasks.json
 /all-is-cubes-wasm/static/third-party-licenses.html

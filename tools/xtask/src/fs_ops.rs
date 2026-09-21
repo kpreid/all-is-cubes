@@ -119,6 +119,7 @@ mod tests {
                     "Cargo.toml",
                     "src",
                     "src/args.rs",
+                    "src/config.rs",
                     "src/context.rs",
                     "src/development_files.rs",
                     "src/fs_ops.rs",

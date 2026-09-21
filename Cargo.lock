@@ -8146,6 +8146,7 @@ dependencies = [
  "cargo_metadata",
  "clap",
  "itertools 0.15.0",
+ "serde",
  "serde_json",
  "strum 0.28.0",
  "toml_edit",

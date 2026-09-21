@@ -9,6 +9,15 @@ This file contains information on the project’s development practices
 which may be useful when preparing a patch/PR.
 See also the [design principles](doc/design-principles.md) document.
 
+Building
+--------
+
+The project will fail to build if you do not run `cargo xtask init` first.
+
+`cargo xtask init` also creates a configuration file located at `tools/xtask-config.toml`.
+This file may be edited to configure behaviors of the `xtask` tool, such as which web browser
+is used by tests that need one.
+
 Testing
 -------
 

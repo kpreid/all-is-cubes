@@ -33,6 +33,8 @@ use xshell::{Shell, cmd};
 mod args;
 use args::{Profile, Scope, UpdateTo, XtaskArgs, XtaskCommand};
 
+mod config;
+
 mod context;
 use context::*;
 
@@ -52,6 +54,11 @@ const CI: bool = option_env!("CI").is_some();
 
 fn main() -> Result<(), ActionError> {
     let sh = &Shell::new()?;
+
+    let config @ config::Config {
+        browser,
+        verbosity: config::Verbosity {},
+    } = config::load_user_config()?;
 
     let main_metadata = cargo_metadata::MetadataCommand::new()
         .manifest_path(PROJECT_DIR.join("Cargo.toml"))
@@ -79,7 +86,9 @@ fn main() -> Result<(), ActionError> {
             quiet,
         } = <XtaskArgs as clap::Parser>::parse();
         let context = Context {
+            original_config: config,
             sh,
+            browser,
             cargo_timings: timings,
             cargo_quiet: quiet,
             time_log_quiet: quiet,
@@ -758,30 +767,24 @@ fn do_for_all_packages(
 
     // Run wasm tests.
     if context.scope.includes_main_workspace() {
-        let _t = context.capture_time(format!("{op:?} all-is-cubes-wasm (browser)"));
-        match op {
-            TestOrCheck::Test => {
-                // TODO: more general control over choice of browser / autodetection, and
-                // run tests on *all* available browsers.
-
-                let browser_arg = if option_env!("CI").is_some() && cfg!(target_os = "macos") {
-                    // 2024-04: GitHub's new Apple Silicon macOS CI images don't have Firefox,
-                    // only Chrome and Safari.
-                    "--chrome"
-                } else {
-                    "--firefox"
-                };
-
-                cmd!(context.sh, "wasm-pack test --headless")
-                    .arg(browser_arg)
-                    .arg("all-is-cubes-wasm/")
-                    .run()?;
+        if let Some(browser_arg) = context.browser.to_wasm_pack_argument() {
+            let _t = context.capture_time(format!("{op:?} all-is-cubes-wasm (browser)"));
+            match op {
+                TestOrCheck::Test => {
+                    // TODO: option to run tests on *all* available browsers.
+                    cmd!(context.sh, "wasm-pack test --headless")
+                        .arg(browser_arg)
+                        .arg("all-is-cubes-wasm/")
+                        .run()?;
+                }
+                TestOrCheck::BuildTests | TestOrCheck::Lint | TestOrCheck::Check => {
+                    let _pushd = context.sh.push_dir("all-is-cubes-wasm");
+                    // Build the tests that `wasm-pack test` will test.
+                    op.cargo_cmd(context, &[TARGET_WASM]).run()?;
+                }
             }
-            TestOrCheck::BuildTests | TestOrCheck::Lint | TestOrCheck::Check => {
-                let _pushd = context.sh.push_dir("all-is-cubes-wasm");
-                // Build the tests that `wasm-pack test` will test.
-                op.cargo_cmd(context, &[TARGET_WASM]).run()?;
-            }
+        } else {
+            eprintln!("[xtask] note: skipping browser tests due to configuration");
         }
     }
 
