@@ -48,7 +48,7 @@ impl<'u> ToolTester<'u> {
             read_ticket: self.universe.read_ticket(),
             cursor: cursor_raycast(
                 self.universe.read_ticket(),
-                Ray::new([0., 0.5, 0.5], [1., 0., 0.]),
+                Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]),
                 &self.space_handle,
                 FreeCoordinate::INFINITY,
             )
@@ -513,14 +513,14 @@ fn use_custom_success() {
         icon,
     };
     let mut tester = ToolTester::new(&mut universe, |m| {
-        m.set([0, 0, 0], &existing).unwrap();
+        m.set([1, 0, 0], &existing).unwrap();
     });
 
     let transaction = tester.equip_and_use_tool(tool).unwrap();
 
     assert_eq!(
         transaction,
-        SpaceTransaction::set_cube([0, 0, 0], Some(existing), Some(placed))
+        SpaceTransaction::set_cube([1, 0, 0], Some(existing), Some(placed))
             .bind(tester.space_handle)
     );
 }
