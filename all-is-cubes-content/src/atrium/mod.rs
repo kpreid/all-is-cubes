@@ -393,7 +393,7 @@ fn map_text_block(
             )
         }
         b'T' => block::Composite::new(
-            blocks[AtriumBlocks::Molding].clone().rotate(Face::PY.clockwise()),
+            blocks[AtriumBlocks::Cornice].clone().rotate(Face::PY.clockwise()),
             block::CompositeOperator::Over,
         )
         .with_disassemblable()

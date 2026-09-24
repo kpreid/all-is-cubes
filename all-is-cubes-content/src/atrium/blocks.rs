@@ -50,7 +50,7 @@ pub(in crate::atrium) enum AtriumBlocks {
     GroundColumn,
     SquareColumn,
     SmallColumn,
-    Molding,
+    Cornice,
 
     /// Base banner color and shape
     Banner(BannerColor),
@@ -92,7 +92,7 @@ impl fmt::Display for AtriumBlocks {
             AtriumBlocks::GroundColumn => write!(f, "ground-column"),
             AtriumBlocks::SquareColumn => write!(f, "square-column"),
             AtriumBlocks::SmallColumn => write!(f, "small-column"),
-            AtriumBlocks::Molding => write!(f, "molding"),
+            AtriumBlocks::Cornice => write!(f, "cornice"),
 
             AtriumBlocks::Banner(c) => write!(f, "banner/{c}"),
             AtriumBlocks::BannerBottomAccent => write!(f, "banner/bottom-accent"),
@@ -190,7 +190,7 @@ pub(in crate::atrium) async fn install_atrium_blocks(
             stone_base_array[p]
         }
     };
-    let molding_fn = |p: Cube| {
+    let cornice_fn = |p: Cube| {
         let shape: [GridCoordinate; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 2, 3, 4, 4, 3];
         if p.x < shape[p.y as usize] {
             brick_pattern(p, false)
@@ -377,10 +377,10 @@ pub(in crate::atrium) async fn install_atrium_blocks(
                     }
                 })?
                 .build_txn(txn),
-            AtriumBlocks::Molding => Block::builder()
-                .display_name("Atrium Top Edge Molding")
+            AtriumBlocks::Cornice => Block::builder()
+                .display_name("Atrium Cornice")
                 // TODO: rotation rule
-                .voxels_fn(RESOLUTION, molding_fn)?
+                .voxels_fn(RESOLUTION, cornice_fn)?
                 .build_txn(txn),
 
             AtriumBlocks::Banner(color) => banner_shape
