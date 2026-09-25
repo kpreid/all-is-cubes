@@ -369,10 +369,7 @@ mod tests {
 
     #[test]
     fn test_list_is_complete() {
-        assert_eq!(
-            Vec::from(RS),
-            Resolution::exhaust().collect::<Vec<Resolution>>()
-        );
+        assert_eq!(Vec::from(RS), Vec::from_iter(Resolution::exhaust()));
     }
 
     #[test]
@@ -447,8 +444,8 @@ mod tests {
     #[test]
     fn iter_in_range() {
         assert_eq!(
-            Resolution::iter_in_range(R2..=R32).collect::<Vec<Resolution>>(),
+            Vec::from_iter(Resolution::iter_in_range(R2..=R32)),
             vec![R2, R4, R8, R16, R32]
-        )
+        );
     }
 }

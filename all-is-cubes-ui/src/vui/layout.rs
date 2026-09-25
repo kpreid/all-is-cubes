@@ -652,7 +652,7 @@ mod tests {
         let grant = LayoutGrant::new(GridAab::from_lower_size([10, 10, 10], [10, 10, 10]));
         let stack_gravity = vec3(Align::Low, Align::Center, Align::Center);
         assert_eq!(
-            tree.perform_layout(grant).unwrap().leaves().collect::<Vec<_>>(),
+            Vec::from_iter(tree.perform_layout(grant).unwrap().leaves()),
             vec![
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),
@@ -694,7 +694,7 @@ mod tests {
         let grant = LayoutGrant::new(GridAab::from_lower_size([10, 10, 10], [10, 10, 10]));
         let stack_gravity = vec3(Align::Low, Align::Center, Align::Center);
         assert_eq!(
-            tree.perform_layout(grant).unwrap().leaves().collect::<Vec<_>>(),
+            Vec::from_iter(tree.perform_layout(grant).unwrap().leaves()),
             vec![
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),

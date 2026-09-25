@@ -334,7 +334,7 @@ fn no_passing_through_blocks() {
             //     iterations < 5000,
             //     "didn't terminate after {:?} iterations; reached {:#?}",
             //     iterations,
-            //     position_history.iter().rev().collect::<Vec<_>>(),
+            //     Vec::from_iter(position_history.iter().rev()),
             // );
             if iterations >= 5000 {
                 return;

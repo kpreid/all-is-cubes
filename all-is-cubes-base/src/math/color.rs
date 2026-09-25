@@ -1168,7 +1168,7 @@ mod tests {
     use alloc::vec::Vec;
     use exhaust::Exhaust as _;
     use itertools::Itertools as _;
-    use std::{eprintln, format, print, println, vec};
+    use std::{eprintln, format, print, println};
 
     // TODO: Add more tests of the color not-NaN mechanisms in other cases than new().
 
@@ -1264,23 +1264,22 @@ mod tests {
         let srgb_figures = [
             0x00, 0x05, 0x10, 0x22, 0x33, 0x44, 0x55, 0x77, 0x7f, 0xDD, 0xFF,
         ];
-        let results = srgb_figures
-            .iter()
-            .cartesian_product(srgb_figures.iter())
-            .map(|(&r, &a)| {
+        let results = Vec::from_iter(
+            srgb_figures.iter().cartesian_product(srgb_figures.iter()).map(|(&r, &a)| {
                 let srgb = [r, 0, 0, a];
                 let color = Rgba::from_srgb8(srgb);
                 (srgb, color, color.to_srgb8())
-            })
-            .collect::<Vec<_>>();
+            }),
+        );
         // Print all the results before asserting
         eprintln!("{results:#?}");
         // Filter out correct roundtrip results.
-        let bad = results
-            .into_iter()
-            .filter(|&(o, _, r)| o.into_iter().zip(r).any(|(a, b)| a != b))
-            .collect::<Vec<_>>();
-        assert_eq!(bad, vec![]);
+        let bad = Vec::from_iter(
+            results
+                .into_iter()
+                .filter(|&(o, _, r)| o.into_iter().zip(r).any(|(a, b)| a != b)),
+        );
+        assert_eq!(bad, []);
     }
 
     #[test]

@@ -515,20 +515,20 @@ impl GridRotation {
     ///
     /// // The identity rotation remains itself when iterated.
     /// assert_eq!(
-    ///     GridRotation::IDENTITY.iterate().collect::<Vec<_>>(),
+    ///     Vec::from_iter(GridRotation::IDENTITY.iterate()),
     ///     vec![GridRotation::IDENTITY],
     /// );
     ///
     /// // Any reflection or 180° rotation will produce itself and the identity.
     /// let x_reflection = GridRotation::from_basis([NX, PY, PZ]);
     /// assert_eq!(
-    ///     x_reflection.iterate().collect::<Vec<_>>(),
+    ///     Vec::from_iter(x_reflection.iterate()),
     ///     vec![GridRotation::IDENTITY, x_reflection],
     /// );
     ///
     /// // Any 90° rotation produces four distinct rotations.
     /// assert_eq!(
-    ///     PY.clockwise().iterate().collect::<Vec<_>>(),
+    ///     Vec::from_iter(PY.clockwise().iterate()),
     ///     vec![
     ///         GridRotation::IDENTITY,
     ///         PY.clockwise(),

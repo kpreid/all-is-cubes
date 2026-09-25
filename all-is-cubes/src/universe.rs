@@ -500,7 +500,7 @@ impl Universe {
     /// found_blocks.sort_by_key(|(name, _)| name.to_string());
     /// assert_eq!(
     ///     found_blocks,
-    ///     vec![Name::from("b1"), Name::from("b2")].into_iter()
+    ///     [Name::from("b1"), Name::from("b2")].into_iter()
     ///         .zip(vec![block_1, block_2])
     ///         .collect::<Vec<_>>(),
     /// );

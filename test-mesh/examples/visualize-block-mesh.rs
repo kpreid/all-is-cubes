@@ -26,7 +26,7 @@ use mesh::testing::NoTextureMt as Mt;
 use all_is_cubes::{arcstr, rerun_glue as rg};
 
 fn main() {
-    let args = std::env::args().collect::<Vec<String>>();
+    let args = Vec::from_iter(std::env::args());
     let filter: Option<&str> = match args.as_slice() {
         [_, f] => Some(f),
         [_] => None,

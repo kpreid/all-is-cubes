@@ -929,9 +929,8 @@ mod tests {
         // The clone should be consistent internally and with the space data.
         cloned.consistency_check(space.contents.as_linear());
 
-        let extract = |p: &Palette| {
-            p.entries().iter().map(|e| (e.block.clone(), e.count)).collect::<Vec<_>>()
-        };
+        let extract =
+            |p: &Palette| Vec::from_iter(p.entries().iter().map(|e| (e.block.clone(), e.count)));
         assert_eq!(extract(&cloned), extract(&space.palette));
 
         // TODO: also check evaluation and block change tracking

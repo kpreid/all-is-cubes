@@ -605,7 +605,7 @@ mod tests {
             ],
         );
         assert_eq!(
-            iib.icon_positions(999).take(100).collect::<Vec<_>>(),
+            Vec::from_iter(iib.icon_positions(999).take(100)),
             vec![
                 (0, cubic_aab(R4, 1, 1, 1)),
                 (1, cubic_aab(R4, 6, 1, 1)),
@@ -642,7 +642,7 @@ mod tests {
             ])),
         };
         assert_eq!(
-            iib.icon_positions(3).take(100).collect::<Vec<_>>(),
+            Vec::from_iter(iib.icon_positions(3).take(100)),
             vec![
                 (0, cubic_aab(R4, 0, 0, 0)),
                 (1, cubic_aab(R4, 5, 0, 0)),
@@ -669,7 +669,7 @@ mod tests {
 
         assert_eq!(iib.icon_size_in_resolution(), R2, "assumption check");
         assert_eq!(
-            iib.icon_positions(999).take(100).collect::<Vec<_>>(),
+            Vec::from_iter(iib.icon_positions(999).take(100)),
             vec![
                 // we skip slot 0 at -4..-2, slot 1 at -3..-1, and slot 2 at -2..0
                 (3, cubic_aab(R2, -1, 0, 0)),

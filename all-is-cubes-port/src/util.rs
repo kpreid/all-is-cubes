@@ -59,13 +59,12 @@ pub(crate) async fn maybe_parallelize<T: Send, U: Send + 'static>(
 
         spawn_blocking(move || {
             let split_p = progress.split_evenly_concurrent(items.len());
-            let items_and_progresses = iter::zip(items, split_p)
-                .map(|(item, mut p)| {
+            let items_and_progresses =
+                Vec::from_iter(iter::zip(items, split_p).map(|(item, mut p)| {
                     p.set_label(label_function(&item));
                     p.progress_without_yield(0.0); // cause label to be published
                     (item, p)
-                })
-                .collect::<Vec<_>>();
+                }));
             items_and_progresses
                 .into_par_iter()
                 .map(move |(item, p)| {

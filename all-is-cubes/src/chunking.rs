@@ -643,7 +643,7 @@ mod tests {
     fn chunk_chart_zero_size() {
         let chart = ChunkChart::<16>::new(0.0);
         let chunk = ChunkPos::new(1, 2, 3);
-        assert_eq!(chart.chunks(chunk, OctantMask::ALL).collect::<Vec<_>>(), []);
+        assert_eq!(Vec::from_iter(chart.chunks(chunk, OctantMask::ALL)), []);
         assert_eq!(chart.count_all(), 0);
     }
 
@@ -652,7 +652,7 @@ mod tests {
     fn chunk_chart_epsilon_size() {
         let chart = ChunkChart::<16>::new(0.00001);
         assert_eq!(
-            chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>(),
+            Vec::from_iter(chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)),
             vec![
                 ChunkPos::new(0, 0, 0),
                 // Face meetings.
@@ -694,13 +694,11 @@ mod tests {
     fn chunk_chart_masked() {
         let chart = ChunkChart::<16>::new(0.00001);
         assert_eq!(
-            chart
-                .chunks(
-                    ChunkPos::new(0, 0, 0),
-                    // Include three octants: [+x +y +z], [+x, +y, -z], and [+x, -y, -z]
-                    OctantMask::from_iter([Octant::Ppp, Octant::Ppn, Octant::Pnn])
-                )
-                .collect::<Vec<_>>(),
+            Vec::from_iter(chart.chunks(
+                ChunkPos::new(0, 0, 0),
+                // Include three octants: [+x +y +z], [+x, +y, -z], and [+x, -y, -z]
+                OctantMask::from_iter([Octant::Ppp, Octant::Ppn, Octant::Pnn])
+            )),
             vec![
                 ChunkPos::new(0, 0, 0),
                 // Face meetings. No -X for this mask.
@@ -789,8 +787,8 @@ mod tests {
     fn chunk_chart_reverse_iteration() {
         let chart = ChunkChart::<16>::new(7. * 16.);
         let p = ChunkPos::new(10, 3, 100);
-        let forward = chart.chunks(p, OctantMask::ALL).collect::<Vec<_>>();
-        let mut reverse = chart.chunks(p, OctantMask::ALL).rev().collect::<Vec<_>>();
+        let forward = Vec::from_iter(chart.chunks(p, OctantMask::ALL));
+        let mut reverse = Vec::from_iter(chart.chunks(p, OctantMask::ALL).rev());
         reverse.reverse();
         assert_eq!(forward, reverse);
     }
@@ -832,8 +830,8 @@ mod tests {
         chart2.resize_if_needed(20.0);
 
         assert_eq!(
-            chart1.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>(),
-            chart2.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>()
+            Vec::from_iter(chart1.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)),
+            Vec::from_iter(chart2.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL))
         );
     }
 
@@ -873,8 +871,8 @@ mod tests {
 
             // Check the public interface
             assert_eq!(
-                enlarged.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>(),
-                shrunk.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>(),
+                Vec::from_iter(enlarged.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)),
+                Vec::from_iter(shrunk.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)),
                 "enlarged.chunks() == shrunk.chunks()",
             );
         }
@@ -891,12 +889,11 @@ mod tests {
         for size in 0..200 {
             let new_chart = ChunkChart::<16>::new(f64::from(size));
 
-            let old_chunks: Vec<_> =
-                old_chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect();
-            let limited_new_chunks: Vec<_> = new_chart
-                .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
-                .take(old_chunks.len())
-                .collect();
+            let old_chunks =
+                Vec::from_iter(old_chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL));
+            let limited_new_chunks = Vec::from_iter(
+                new_chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).take(old_chunks.len()),
+            );
 
             assert_eq!(old_chunks, limited_new_chunks);
 

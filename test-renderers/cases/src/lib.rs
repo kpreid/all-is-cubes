@@ -1466,18 +1466,16 @@ async fn light_on_slab_test_universe() -> Arc<Universe> {
     let bounds = GridAab::from_lower_size([-10, -10, -1], [20, 20, 5]);
     let mut universe = Universe::new();
 
-    let slabs = (1i32..=16)
-        .map(|height| {
-            let position = height - 1;
-            let cube = Cube::new(
-                -3 + position.rem_euclid(4) * 2,
-                -3 + position.div_euclid(4) * 2,
-                0,
-            );
-            let slab = content::make_slab(&mut universe, height, R16).rotate(GridRotation::RXZy);
-            (cube, slab)
-        })
-        .collect::<Vec<_>>();
+    let slabs = Vec::from_iter((1i32..=16).map(|height| {
+        let position = height - 1;
+        let cube = Cube::new(
+            -3 + position.rem_euclid(4) * 2,
+            -3 + position.div_euclid(4) * 2,
+            0,
+        );
+        let slab = content::make_slab(&mut universe, height, R16).rotate(GridRotation::RXZy);
+        (cube, slab)
+    }));
 
     let space = Space::builder(bounds)
         .spawn({

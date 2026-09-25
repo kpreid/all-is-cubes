@@ -545,31 +545,29 @@ fn demo_blocks_generator(
 
             Clock => {
                 let bounds = GridAab::from_lower_size([0, 0, 0], [16, 16, 1]);
-                let frames = (0..60)
-                    .map(|phase: time::Phase| {
-                        let space = Space::builder(bounds)
-                            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-                            .build_and_mutate(|m| {
-                                m.fill(bounds, |cube| {
-                                    Some(crate::animation::paint_clock(phase, cube))
-                                })
+                let frames = Vec::from_iter((0..60).map(|phase: time::Phase| {
+                    let space = Space::builder(bounds)
+                        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+                        .build_and_mutate(|m| {
+                            m.fill(bounds, |cube| {
+                                Some(crate::animation::paint_clock(phase, cube))
                             })
-                            .unwrap();
-                        (
-                            phase,
-                            Block::builder()
-                                .display_name(literal!("Clock"))
-                                .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ })
-                                // TODO: Ideally, animated BlockDefs would automatically set the
-                                // animation hint.
-                                .animation_hint(AnimationHint::redefinition(
-                                    block::AnimationChange::ColorSameCategory,
-                                ))
-                                .voxels_handle(R16, txn.insert_anonymous(space))
-                                .build(),
-                        )
-                    })
-                    .collect::<Vec<_>>();
+                        })
+                        .unwrap();
+                    (
+                        phase,
+                        Block::builder()
+                            .display_name(literal!("Clock"))
+                            .rotation_rule(RotationPlacementRule::Attach { by: Face::NZ })
+                            // TODO: Ideally, animated BlockDefs would automatically set the
+                            // animation hint.
+                            .animation_hint(AnimationHint::redefinition(
+                                block::AnimationChange::ColorSameCategory,
+                            ))
+                            .voxels_handle(R16, txn.insert_anonymous(space))
+                            .build(),
+                    )
+                }));
 
                 let block_def = BlockDef::new_animated(txn.read_ticket(), frames);
                 // TODO: it would be more efficient to return an animated BlockDef directly,

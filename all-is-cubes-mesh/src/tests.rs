@@ -339,10 +339,7 @@ fn space_mesh_equals_block_mesh() {
     // Compare the contents of the space mesh and block mesh.
     assert_eq!(
         space_rendered.vertices().0.to_vec(),
-        block_meshes[0]
-            .all_sub_meshes()
-            .flat_map(|sm| sm.vertices.0.clone())
-            .collect::<Vec<_>>()
+        Vec::from_iter(block_meshes[0].all_sub_meshes().flat_map(|sm| sm.vertices.0.clone())),
     );
     assert_eq!(tex.count_allocated(), 1); // for striped faces
 

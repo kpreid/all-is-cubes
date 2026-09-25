@@ -1374,7 +1374,6 @@ mod tests {
     use crate::util::MultiFailure;
     use alloc::format;
     use alloc::string::String;
-    use alloc::vec;
     use alloc::vec::Vec;
     use exhaust::Exhaust;
     use pretty_assertions::assert_eq;
@@ -1521,11 +1520,10 @@ mod tests {
 
     #[test]
     fn face_map_debug_cmp() {
-        let strings =
-            FaceMap::<bool>::exhaust().map(|fm| format!("{fm:?}")).collect::<Vec<String>>();
+        let strings = Vec::from_iter(FaceMap::<bool>::exhaust().map(|fm| format!("{fm:?}")));
         assert_eq!(
-            strings.iter().map(String::as_str).collect::<Vec<_>>(),
-            vec![
+            Vec::from_iter(strings.iter().map(String::as_str)),
+            [
                 "{all: false}",
                 "{−x: false, −y: false, −z: false, +x: false, +y: false, +z: true}",
                 "{−x: false, −y: false, −z: false, +x: false, +y: true, +z: false}",
@@ -1603,20 +1601,17 @@ mod tests {
         // FaceMap::iter()
         assert_eq!(
             expected_both,
-            map.iter().map(|(k, &v)| (k, v)).collect::<Vec<_>>(),
+            Vec::from_iter(map.iter().map(|(k, &v)| (k, v))),
         );
 
         // FaceMap::iter_mut()
         assert_eq!(
             expected_both,
-            map.iter_mut().map(|(k, &mut v)| (k, v)).collect::<Vec<_>>(),
+            Vec::from_iter(map.iter_mut().map(|(k, &mut v)| (k, v))),
         );
 
         // FaceMap::values()
-        assert_eq!(
-            Face::ALL.to_vec(),
-            map.values().copied().collect::<Vec<_>>(),
-        );
+        assert_eq!(Face::ALL.to_vec(), Vec::from_iter(map.values().copied()),);
 
         // FaceMap::into_values()
         assert_eq!(Face::ALL, map.into_values());

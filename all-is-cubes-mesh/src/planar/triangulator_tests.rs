@@ -52,10 +52,7 @@ fn run(vertices: &[planar::Vertex]) -> Vec<[u8; 3]> {
         "\n{}\n",
         planar::svg::WriteSvg {
             vertices,
-            loops: &actual_triangles
-                .iter()
-                .map(|byte_arr| byte_arr.map(u32::from))
-                .collect::<Vec<[u32; 3]>>(),
+            loops: &Vec::from_iter(actual_triangles.iter().map(|byte_arr| byte_arr.map(u32::from))),
             scale: 20.0,
             show_vertices: true,
             standalone_xml: true,
@@ -78,14 +75,10 @@ fn check(vertices: &[planar::Vertex], expected_triangles: &[&[u8; 3]]) {
 
     // convert to &str for helpful printing
     pretty_assertions::assert_eq!(
-        actual_triangles
-            .iter()
-            .map(|byte_arr| str::from_utf8(byte_arr).unwrap())
-            .collect::<Vec<&str>>(),
-        expected_triangles
-            .iter()
-            .map(|&byte_arr| str::from_utf8(byte_arr).unwrap())
-            .collect::<Vec<&str>>(),
+        Vec::from_iter(actual_triangles.iter().map(|byte_arr| str::from_utf8(byte_arr).unwrap())),
+        Vec::from_iter(
+            expected_triangles.iter().map(|&byte_arr| str::from_utf8(byte_arr).unwrap())
+        ),
         "actual triangles != expected triangles"
     );
 }

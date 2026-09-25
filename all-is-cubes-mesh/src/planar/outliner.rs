@@ -868,14 +868,10 @@ mod tests {
 
         // convert to &str for helpful printing
         pretty_assertions::assert_eq!(
-            actual_paths
-                .iter()
-                .map(|byte_arr| str::from_utf8(byte_arr).unwrap())
-                .collect::<Vec<&str>>(),
-            expected_paths
-                .iter()
-                .map(|&byte_arr| str::from_utf8(byte_arr).unwrap())
-                .collect::<Vec<&str>>(),
+            Vec::from_iter(actual_paths.iter().map(|byte_arr| str::from_utf8(byte_arr).unwrap())),
+            Vec::from_iter(
+                expected_paths.iter().map(|&byte_arr| str::from_utf8(byte_arr).unwrap())
+            ),
             "actual paths != expected paths"
         );
     }

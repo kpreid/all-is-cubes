@@ -291,7 +291,7 @@ fn insert_pending_becomes_anonym_direct() {
     let mut u = Universe::new();
     u.insert(Name::Pending, BlockDef::new(u.read_ticket(), AIR)).unwrap();
     assert_eq!(
-        u.iter_by_type::<BlockDef>().map(|(name, _)| name).collect::<Vec<_>>(),
+        Vec::from_iter(u.iter_by_type::<BlockDef>().map(|(name, _)| name)),
         vec![Name::Anonym(0)]
     );
 }
@@ -302,7 +302,7 @@ fn insert_pending_becomes_anonym_via_txn() {
     let (_, txn) = UniverseTransaction::insert(Name::Pending, BlockDef::new(u.read_ticket(), AIR));
     txn.execute(&mut u, (), &mut drop).unwrap();
     assert_eq!(
-        u.iter_by_type::<BlockDef>().map(|(name, _)| name).collect::<Vec<_>>(),
+        Vec::from_iter(u.iter_by_type::<BlockDef>().map(|(name, _)| name)),
         vec![Name::Anonym(0)]
     );
 }

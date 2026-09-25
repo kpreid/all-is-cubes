@@ -166,14 +166,13 @@ impl FusedIterator for GridIter {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec;
     use alloc::vec::Vec;
     use std::println;
 
     #[test]
     fn zero_items() {
         fn assert_no_items(b: GridAab) {
-            assert_eq!(b.interior_iter().collect::<Vec<_>>(), vec![], "{b:?}");
+            assert_eq!(Vec::from_iter(b.interior_iter()), [], "{b:?}");
         }
 
         assert_no_items(GridAab::from_lower_size([0, 0, 0], [0, 0, 0]));
@@ -213,7 +212,7 @@ mod tests {
         assert_eq!(b.volume(), Some(8));
 
         assert_eq!(
-            b.interior_iter().collect::<Vec<Cube>>(),
+            Vec::from_iter(b.interior_iter()),
             [
                 Cube::new(i32::MIN, i32::MIN, i32::MIN),
                 Cube::new(i32::MIN, i32::MIN, i32::MIN + 1),
@@ -234,7 +233,7 @@ mod tests {
         assert_eq!(b.volume(), Some(8));
 
         assert_eq!(
-            b.interior_iter().collect::<Vec<Cube>>(),
+            Vec::from_iter(b.interior_iter()),
             [
                 Cube::new(i32::MAX - 2, i32::MAX - 2, i32::MAX - 2),
                 Cube::new(i32::MAX - 2, i32::MAX - 2, i32::MAX - 1),

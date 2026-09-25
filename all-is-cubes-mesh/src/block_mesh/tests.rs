@@ -74,11 +74,12 @@ fn voxel_opacity_mask_not_set_with_voxel_colors() {
     // Check our setup is correct: the mesh has only vertex colors.
     assert!(!mesh.is_empty());
     assert_eq!(
-        mesh.all_sub_meshes()
-            .flat_map(|sub_mesh| sub_mesh.vertices.0.iter())
-            .filter(|vertex| matches!(vertex.coloring, Coloring::Texture { .. }))
-            .copied()
-            .collect::<Vec<_>>(),
+        Vec::from_iter(
+            mesh.all_sub_meshes()
+                .flat_map(|sub_mesh| sub_mesh.vertices.0.iter())
+                .filter(|vertex| matches!(vertex.coloring, Coloring::Texture { .. }))
+                .copied()
+        ),
         Vec::<BlockVertex<_>>::new(),
         "expected no textured vertices, only colored ones"
     );

@@ -889,7 +889,7 @@ mod tests {
         let t2 = SpaceTransaction::set_cube([1, 0, 0], Some(b1.clone()), Some(b3.clone()));
         let t3 = t1.clone().merge(t2.clone()).unwrap();
         assert_eq!(
-            t3.cubes.into_iter().collect::<Vec<_>>(),
+            Vec::from_iter(t3.cubes),
             vec![
                 (
                     [0, 0, 0],

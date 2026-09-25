@@ -24,16 +24,13 @@ mod behavior {
     {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             schema::BehaviorSetSer::BehaviorSetV1 {
-                behaviors: self
-                    .iter()
-                    .filter_map(|entry| {
-                        let Persistence(behavior) = entry.behavior.persistence()?;
-                        Some(schema::BehaviorSetEntryV1Ser {
-                            attachment: entry.attachment.clone(),
-                            behavior,
-                        })
+                behaviors: Vec::from_iter(self.iter().filter_map(|entry| {
+                    let Persistence(behavior) = entry.behavior.persistence()?;
+                    Some(schema::BehaviorSetEntryV1Ser {
+                        attachment: entry.attachment.clone(),
+                        behavior,
                     })
-                    .collect::<Vec<schema::BehaviorSetEntryV1Ser<H::Attachment>>>(),
+                })),
             }
             .serialize(serializer)
         }

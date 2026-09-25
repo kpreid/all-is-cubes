@@ -405,15 +405,16 @@ impl GridAab {
     ///
     /// let b = GridAab::from_lower_size([10, 20, 30], [1, 2, 3]);
     /// assert_eq!(
-    ///     b.interior_iter().collect::<Vec<Cube>>(),
-    ///     &[
+    ///     Vec::from_iter(b.interior_iter()),
+    ///     [
     ///         Cube::new(10, 20, 30),
     ///         Cube::new(10, 20, 31),
     ///         Cube::new(10, 20, 32),
     ///         Cube::new(10, 21, 30),
     ///         Cube::new(10, 21, 31),
     ///         Cube::new(10, 21, 32),
-    ///     ])
+    ///     ],
+    /// );
     /// ```
     #[inline]
     pub fn interior_iter(self) -> GridIter {

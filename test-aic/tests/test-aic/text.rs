@@ -371,7 +371,7 @@ fn read_glyphs() {
         "all of ISO-8859-1 except for C0 and C1, which are 40 in total"
     );
 
-    assert_eq!(glyphs[0].pixels().collect::<Vec<_>>(), [], "space is empty");
+    assert_eq!(Vec::from_iter(glyphs[0].pixels()), [], "space is empty");
 
     // Read out one glyph fully.
     let mut image = imgref::ImgVec::<u8>::new(

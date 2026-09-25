@@ -570,7 +570,7 @@ mod tests {
         let ray = Ray::new([0.25, -0.5, 0.25], [0., 1., 0.]);
 
         assert_eq!(
-            SurfaceIterR::new(&rt, ray).collect::<Vec<TraceStep<'_, ()>>>(),
+            Vec::from_iter(SurfaceIterR::new(&rt, ray)),
             vec![
                 Invisible { t_distance: 0.5 }, // Cube [0, 0, 0] is empty
                 EnterSurface(Surface {
@@ -623,7 +623,7 @@ mod tests {
 
         // DepthIter is built on SurfaceIter, so it makes sense to test together and second
         assert_eq!(
-            DepthIter::new(SurfaceIterR::new(&rt, ray)).collect::<Vec<DepthStep<'_, ()>>>(),
+            Vec::from_iter(DepthIter::new(SurfaceIterR::new(&rt, ray))),
             vec![
                 DepthStep::Invisible,
                 DepthStep::Invisible,
@@ -689,8 +689,10 @@ mod tests {
         let rt = SpaceRaytracer::<()>::new(&space.read(), GraphicsOptions::default(), ());
 
         assert_eq!(
-            SurfaceIterR::new(&rt, Ray::new([-0.5, 0.5, 0.5], [1., 0., 0.]))
-                .collect::<Vec<TraceStep<'_, ()>>>(),
+            Vec::from_iter(SurfaceIterR::new(
+                &rt,
+                Ray::new([-0.5, 0.5, 0.5], [1., 0., 0.])
+            )),
             vec![
                 EnterSurface(Surface {
                     block_data: &(),
@@ -722,7 +724,7 @@ mod tests {
         let ray = Ray::new([-0.5, 0.75, 0.25], [1., 0., 0.]);
 
         assert_eq!(
-            SurfaceIterR::new(&rt, ray).collect::<Vec<TraceStep<'_, ()>>>(),
+            Vec::from_iter(SurfaceIterR::new(&rt, ray)),
             vec![
                 EnterBlock {
                     t_distance: 0.5,
@@ -733,7 +735,7 @@ mod tests {
         );
 
         assert_eq!(
-            DepthIter::new(SurfaceIterR::new(&rt, ray)).collect::<Vec<DepthStep<'_, ()>>>(),
+            Vec::from_iter(DepthIter::new(SurfaceIterR::new(&rt, ray))),
             vec![
                 // TODO: This step isn't, I think, really necessary for anything, and removing
                 // it could increase performance.
@@ -780,7 +782,7 @@ mod tests {
         let ray = Ray::new([0.25, -0.5, 0.25], [0., 1., 0.]);
 
         assert_eq!(
-            SurfaceIterR::new(&rt, ray).collect::<Vec<TraceStep<'_, ()>>>(),
+            Vec::from_iter(SurfaceIterR::new(&rt, ray)),
             vec![
                 Invisible { t_distance: 0.5 }, // Cube [0, 0, 0] is empty
                 EnterBlock {
