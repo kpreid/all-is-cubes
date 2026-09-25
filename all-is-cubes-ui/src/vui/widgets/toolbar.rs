@@ -26,6 +26,8 @@ use crate::ui_content::{CueMessage, CueNotifier, hud::HudBlocks};
 use crate::vui::widgets::{ToolbarButtonState, WidgetBlocks};
 use crate::vui::{self, LayoutRequest, Layoutable};
 
+// -------------------------------------------------------------------------------------------------
+
 /// Widget that displays inventory contents in toolbar format.
 ///
 /// TODO: We may or may not want to expand this to handle general inventory viewing
@@ -369,16 +371,20 @@ impl listen::Store<CueMessage> for ToolbarTodo {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use all_is_cubes::character::Character;
     use all_is_cubes::euclid::Vector3D;
+    use all_is_cubes::inv;
     use all_is_cubes::math::Face;
+    use all_is_cubes::space;
     use all_is_cubes::space::Space;
+    use all_is_cubes::time;
     use all_is_cubes::universe::{StrongHandle, Universe, UniverseTransaction};
     use all_is_cubes::util::yield_progress_for_testing;
-    use all_is_cubes::{inv, space, time};
     use std::vec;
 
     /// Test that [`Toolbar`] will not panic if given inventory slot ranges exceeding the size of

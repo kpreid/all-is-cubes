@@ -8,14 +8,17 @@ use descriptive_unwrap::ResultExt as _;
 use rand::{RngExt as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
+use all_is_cubes::behavior;
 use all_is_cubes::block::{self, AIR, Block, BlockCollision};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{Cube, GridAab, GridRotation, GridVector, Rgba, Vol, rgba_const};
+use all_is_cubes::op;
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::time;
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{HandleVisitor, UniverseTransaction, VisitHandles};
-use all_is_cubes::{behavior, op};
+
+// -------------------------------------------------------------------------------------------------
 
 /// A [`Behavior`] which animates a recursive block by periodically recomputing all of its
 /// voxels.

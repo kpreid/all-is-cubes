@@ -17,6 +17,8 @@ use all_is_cubes::universe;
 use crate::vui;
 use crate::vui::widgets::{BoxStyle, WidgetTheme};
 
+// -------------------------------------------------------------------------------------------------
+
 /// Widget which draws a progress bar.
 #[derive(Clone, Debug)]
 pub struct ProgressBar {
@@ -231,13 +233,15 @@ impl universe::VisitHandles for ProgressBarController {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use all_is_cubes::space::{self, SpacePhysics};
-    use all_is_cubes::transaction::Transaction as _;
+    use all_is_cubes::transaction::{self, Transaction as _};
+    use all_is_cubes::universe;
     use all_is_cubes::util::yield_progress_for_testing;
-    use all_is_cubes::{transaction, universe};
     use alloc::string::String;
     use alloc::vec::Vec;
 

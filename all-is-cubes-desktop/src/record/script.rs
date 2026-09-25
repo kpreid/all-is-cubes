@@ -9,14 +9,14 @@ use std::time::Duration;
 
 use anyhow::Context as _;
 
+use all_is_cubes::behavior;
 use all_is_cubes::character::{self, Character};
 use all_is_cubes::euclid::{Point3D, Vector3D, num::One, num::Zero as _};
 use all_is_cubes::listen;
 use all_is_cubes::math::{Cube, NotNan};
 use all_is_cubes::physics::BodyTransaction;
 use all_is_cubes::transaction::Merge as _;
-use all_is_cubes::universe::ReadTicket;
-use all_is_cubes::{behavior, universe};
+use all_is_cubes::universe::{self, ReadTicket};
 use all_is_cubes_render::{
     Flaws,
     camera::{Layers, StandardCameras},

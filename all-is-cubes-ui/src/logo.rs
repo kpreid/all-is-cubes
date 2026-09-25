@@ -4,15 +4,16 @@ use alloc::sync::Arc;
 
 use descriptive_unwrap::ResultExt as _;
 
-use all_is_cubes::{
-    arcstr::literal,
-    block::{self, Block},
-    content::palette,
-    text, universe,
-};
+use all_is_cubes::arcstr::literal;
+use all_is_cubes::block::{self, Block};
+use all_is_cubes::content::palette;
+use all_is_cubes::text;
+use all_is_cubes::universe;
 
 use crate::vui;
 
+// -------------------------------------------------------------------------------------------------
+//
 /// Returns the logo font.
 /// Someday we may have a unique font.
 fn logo_font() -> text::Font {

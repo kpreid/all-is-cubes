@@ -7,11 +7,12 @@ use indicatif::ProgressBar;
 use rand::RngExt as _;
 
 use all_is_cubes::arcstr::literal;
+use all_is_cubes::character;
 use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes::math::{FreePoint, FreeVector, NotNan};
 use all_is_cubes::physics::BodyTransaction;
+use all_is_cubes::space;
 use all_is_cubes::universe::Universe;
-use all_is_cubes::{character, space};
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 use all_is_cubes_ui::notification::{self, Notification};
 use all_is_cubes_ui::vui::widgets::ProgressBarState;

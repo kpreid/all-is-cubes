@@ -3,24 +3,22 @@
 use core::num::NonZero;
 
 use hashbrown::HashMap;
-use itertools::Itertools;
+use itertools::Itertools as _;
 
-use all_is_cubes::block::BlockDef;
+use all_is_cubes::block::{
+    self, Block, BlockDef,
+    Resolution::{R4, R32},
+};
 use all_is_cubes::euclid::{point3, vec3};
-use all_is_cubes::math::{Cube, Face, GridCoordinate, GridRotation};
+use all_is_cubes::inv;
+use all_is_cubes::math::{Cube, Face, GridAab, GridCoordinate, GridRotation};
 use all_is_cubes::op::Operation;
 use all_is_cubes::time;
 use all_is_cubes::universe::UniverseTransaction;
-use all_is_cubes::{
-    block::{
-        self, Block,
-        Resolution::{R4, R32},
-    },
-    inv,
-    math::GridAab,
-};
 
 use crate::{BoxPart, BoxStyle};
+
+// -------------------------------------------------------------------------------------------------
 
 /// A pipe block and definition of what connections it has.
 ///
