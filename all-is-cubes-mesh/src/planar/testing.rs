@@ -122,6 +122,17 @@ pub(crate) fn vertices_from_ascii_art<const W: usize, const H: usize>(
     output
 }
 
+/// Collect every `[u8]` triangle or path as a string, for readable assertions of the results
+/// of processing [`vertices_from_ascii_art()`].
+#[track_caller]
+pub(crate) fn bytes_to_strs<'a, T: AsRef<[u8]> + 'a>(
+    byteses: impl IntoIterator<Item = &'a T>,
+) -> Vec<&'a str> {
+    Vec::from_iter(byteses.into_iter().map(|bytes| {
+        str::from_utf8(bytes.as_ref()).expect("vertices should be labeled with ASCII")
+    }))
+}
+
 mod tests {
     use super::*;
 
