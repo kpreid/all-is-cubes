@@ -370,12 +370,10 @@ mod tests {
     fn clock_phase_advance() {
         let mut clock = Clock::new(TickSchedule::per_second(3), 0);
         assert_eq!(
-            std::iter::repeat_with(|| {
+            Vec::from_fn(10, |_| {
                 let tick = clock.advance(false);
                 (tick.prev_phase(), tick.next_phase())
-            })
-            .take(10)
-            .collect::<Vec<_>>(),
+            }),
             [
                 (0, 1),
                 (1, 2),
@@ -402,12 +400,10 @@ mod tests {
         let mut clock = Clock::new(TickSchedule::per_second(8), 0);
         let schedule = Schedule::from_period(NonZeroU16::new(4).unwrap());
         assert_eq!(
-            std::iter::repeat_with(|| {
+            Vec::from_fn(16, |_| {
                 let tick = clock.advance(false);
                 schedule.contains(tick)
-            })
-            .take(16)
-            .collect::<Vec<bool>>(),
+            }),
             [
                 true, false, false, false, //
                 true, false, false, false, //
