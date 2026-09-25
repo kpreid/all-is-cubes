@@ -212,7 +212,7 @@ fn set_updates_evaluated_and_notifies_on_replaced_block() {
     // Confirm expected notifications
     assert_eq!(
         log.drain(),
-        vec![
+        [
             SpaceChange::BlockIndex(0),
             SpaceChange::CubeLight { cube },
             SpaceChange::CubeBlock {
@@ -251,26 +251,26 @@ fn removed_blocks_are_forgotten() {
     let pt1 = GridPoint::new(0, 0, 0);
     let pt2 = GridPoint::new(1, 0, 0);
     // TODO: This test depends on block allocation order. distinct_blocks() ought to be stable or explicitly return a HashSet or something.
-    assert_eq!(space.distinct_blocks(), vec![AIR.clone()], "step 1");
+    assert_eq!(space.distinct_blocks(), [AIR], "step 1");
     space.mutate(ReadTicket::stub(), |m| m.set(pt1, &block_0)).unwrap();
     space.consistency_check();
     assert_eq!(
         space.distinct_blocks(),
-        vec![AIR.clone(), block_0.clone()],
+        [AIR.clone(), block_0.clone()],
         "step 2"
     );
     space.mutate(ReadTicket::stub(), |m| m.set(pt2, &block_1)).unwrap();
     space.consistency_check();
     assert_eq!(
         space.distinct_blocks(),
-        vec![block_1.clone(), block_0.clone()],
+        [block_1.clone(), block_0.clone()],
         "step 3"
     );
     space.mutate(ReadTicket::stub(), |m| m.set(pt1, &block_2)).unwrap();
     space.consistency_check();
     assert_eq!(
         space.distinct_blocks(),
-        vec![block_1.clone(), block_2.clone()],
+        [block_1.clone(), block_2.clone()],
         "step 4"
     );
 
@@ -279,7 +279,7 @@ fn removed_blocks_are_forgotten() {
     space.consistency_check();
     assert_eq!(
         space.distinct_blocks(),
-        vec![block_0.clone(), block_2.clone()],
+        [block_0.clone(), block_2.clone()],
         "step 4"
     );
 }
@@ -315,7 +315,7 @@ fn change_listener_simple() {
         Ok(false),
         space.mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block))
     );
-    assert_eq!(log.drain(), vec![]);
+    assert_eq!(log.drain(), []);
 }
 
 #[test]
@@ -330,7 +330,7 @@ fn fluff_listener() {
 
     assert_eq!(
         log.drain(),
-        vec![SpaceFluff {
+        [SpaceFluff {
             position: Cube::ORIGIN,
             fluff: Fluff::Happened,
         }]
@@ -421,7 +421,7 @@ fn fill_uniform_entire_space() {
         m.fill_uniform(bounds, &block).unwrap()
     });
 
-    assert_eq!(log.drain(), vec![SpaceChange::EveryBlock]);
+    assert_eq!(log.drain(), [SpaceChange::EveryBlock]);
 
     space.consistency_check();
     for cube in bounds.interior_iter() {
@@ -465,7 +465,7 @@ fn listens_to_block_changes() {
     let log = Log::new();
     space.listen(log.listener());
     let space = universe.insert("space".into(), space).unwrap();
-    assert_eq!(log.drain(), vec![]);
+    assert_eq!(log.drain(), []);
 
     // Now mutate the block def.
     let new_block = block::from_color!(Rgba::BLACK);
@@ -476,11 +476,11 @@ fn listens_to_block_changes() {
 
     // This does not result in an outgoing notification, because we don't want
     // computations like reevaluation to happen during the notification process.
-    assert_eq!(log.drain(), vec![]);
+    assert_eq!(log.drain(), []);
     // Instead, it only happens the next time the space is stepped.
     universe.step(false, time::Deadline::Whenever);
     // Now we should see a notification and the evaluated block data having changed.
-    assert_eq!(log.drain(), vec![SpaceChange::BlockEvaluation(0)]);
+    assert_eq!(log.drain(), [SpaceChange::BlockEvaluation(0)]);
     assert_eq!(
         *space.read(universe.read_ticket()).unwrap().get_evaluated([0, 0, 0]),
         block::EvaluatedBlockEq::from(new_evaluated)
@@ -522,7 +522,7 @@ fn indirect_becomes_evaluation_error() {
     universe.step(false, time::Deadline::Whenever);
 
     // Now we should see a notification and the evaluated block data having changed.
-    assert_eq!(log.drain(), vec![SpaceChange::BlockEvaluation(0)]);
+    assert_eq!(log.drain(), [SpaceChange::BlockEvaluation(0)]);
     assert_eq!(
         *space.read(universe.read_ticket()).unwrap().get_evaluated([0, 0, 0]),
         block::EvaluatedBlockEq::from(
@@ -703,13 +703,13 @@ fn set_physics_notification() {
     space.listen(log.listener());
 
     space.set_physics(space.physics.clone());
-    assert_eq!(log.drain(), vec![]);
+    assert_eq!(log.drain(), []);
 
     space.set_physics(SpacePhysics {
         gravity: Vector3D::zero(),
         ..SpacePhysics::default()
     });
-    assert_eq!(log.drain(), vec![SpaceChange::Physics]);
+    assert_eq!(log.drain(), [SpaceChange::Physics]);
 }
 
 #[test]
@@ -873,7 +873,7 @@ fn block_tick_action_conflict() {
     universe.step(false, time::Deadline::Whenever);
 
     {
-        assert_eq!(fluff_log.drain(), vec![]);
+        assert_eq!(fluff_log.drain(), []);
 
         let space = space.read(universe.read_ticket()).unwrap();
         assert_eq!(

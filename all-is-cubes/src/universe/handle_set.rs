@@ -117,7 +117,6 @@ mod tests {
     use super::*;
     use crate::block;
     use crate::universe::{ErasedHandle, Name};
-    use alloc::vec;
 
     fn test_block_def() -> block::BlockDef {
         block::BlockDef::new(universe::ReadTicket::stub(), block::AIR)
@@ -134,9 +133,9 @@ mod tests {
         let mut handle_set = HandleSet::all_of(&universe);
 
         let blocks = handle_set.extract_type::<block::BlockDef>();
-        assert_eq!(blocks, vec![foo]);
+        assert_eq!(blocks, [foo]);
         let tags = handle_set.extract_type::<crate::tag::TagDef>();
-        assert_eq!(tags, vec![bar]);
+        assert_eq!(tags, [bar]);
         assert!(handle_set.is_empty());
     }
 
@@ -149,7 +148,7 @@ mod tests {
         // Also check the contents
         assert_eq!(
             names(&handle_set),
-            vec![
+            [
                 Name::Builtin(universe::Builtin::Beep),
                 Name::Builtin(universe::Builtin::Thump)
             ]
@@ -169,7 +168,7 @@ mod tests {
 
         assert_eq!(
             names(&handle_set),
-            vec![foo.name(), Name::Builtin(universe::Builtin::Beep)]
+            [foo.name(), Name::Builtin(universe::Builtin::Beep)]
         );
     }
 
@@ -186,7 +185,7 @@ mod tests {
 
         assert_eq!(
             names(&handle_set),
-            vec![foo.name(), Name::Builtin(universe::Builtin::Beep)]
+            [foo.name(), Name::Builtin(universe::Builtin::Beep)]
         );
     }
 

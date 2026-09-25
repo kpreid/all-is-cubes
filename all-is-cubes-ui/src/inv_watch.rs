@@ -244,7 +244,6 @@ mod tests {
     use all_is_cubes::space::Space;
     use all_is_cubes::universe::{Handle, Universe};
     use alloc::boxed::Box;
-    use alloc::vec;
 
     struct Tester {
         universe: Box<Universe>,
@@ -290,9 +289,9 @@ mod tests {
     fn basic_and_changed_slot_in_character() {
         let mut t = Tester::new();
         // Run redundant update -- should see no effect
-        assert_eq!(t.log.drain(), vec![]);
+        assert_eq!(t.log.drain(), []);
         t.update();
-        assert_eq!(t.log.drain(), vec![]);
+        assert_eq!(t.log.drain(), []);
 
         assert_eq!(t.watcher.character().unwrap(), &t.character);
 
@@ -305,9 +304,9 @@ mod tests {
                 ])),
             )
             .unwrap();
-        assert_eq!(t.log.drain(), vec![WatcherChange::NeedsUpdate]);
+        assert_eq!(t.log.drain(), [WatcherChange::NeedsUpdate]);
         t.update();
-        assert_eq!(t.log.drain(), vec![WatcherChange::Inventory]);
+        assert_eq!(t.log.drain(), [WatcherChange::Inventory]);
     }
 
     #[test]
@@ -331,6 +330,6 @@ mod tests {
         assert_eq!(t.watcher.character().unwrap(), &t.character);
         t.update();
         assert_eq!(t.watcher.character().unwrap(), &new_character);
-        assert_eq!(t.log.drain(), vec![WatcherChange::Inventory]);
+        assert_eq!(t.log.drain(), [WatcherChange::Inventory]);
     }
 }

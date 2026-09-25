@@ -356,7 +356,6 @@ pub(crate) mod schedule {
 mod tests {
     use super::*;
     use alloc::format;
-    use alloc::vec;
     use alloc::vec::Vec;
 
     #[test]
@@ -377,7 +376,7 @@ mod tests {
             })
             .take(10)
             .collect::<Vec<_>>(),
-            vec![
+            [
                 (0, 1),
                 (1, 2),
                 (2, 0),
@@ -409,7 +408,7 @@ mod tests {
             })
             .take(16)
             .collect::<Vec<bool>>(),
-            vec![
+            [
                 true, false, false, false, //
                 true, false, false, false, //
                 true, false, false, false, //

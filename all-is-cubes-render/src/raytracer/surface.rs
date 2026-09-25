@@ -534,7 +534,7 @@ mod tests {
     use all_is_cubes::space::Space;
     use all_is_cubes::universe::Universe;
     use pretty_assertions::assert_eq;
-    use std::{vec, vec::Vec};
+    use alloc::vec::Vec;
 
     type SurfaceIterR<'a> = SurfaceIter<'a, (), raycast::Raycaster>;
 
@@ -571,7 +571,7 @@ mod tests {
 
         assert_eq!(
             Vec::from_iter(SurfaceIterR::new(&rt, ray)),
-            vec![
+            [
                 Invisible { t_distance: 0.5 }, // Cube [0, 0, 0] is empty
                 EnterSurface(Surface {
                     block_data: &(),
@@ -624,7 +624,7 @@ mod tests {
         // DepthIter is built on SurfaceIter, so it makes sense to test together and second
         assert_eq!(
             Vec::from_iter(DepthIter::new(SurfaceIterR::new(&rt, ray))),
-            vec![
+            [
                 DepthStep::Invisible,
                 DepthStep::Invisible,
                 DepthStep::Span(Span {
@@ -693,7 +693,7 @@ mod tests {
                 &rt,
                 Ray::new([-0.5, 0.5, 0.5], [1., 0., 0.])
             )),
-            vec![
+            [
                 EnterSurface(Surface {
                     block_data: &(),
                     diffuse_color: solid_test_color,
@@ -725,7 +725,7 @@ mod tests {
 
         assert_eq!(
             Vec::from_iter(SurfaceIterR::new(&rt, ray)),
-            vec![
+            [
                 EnterBlock {
                     t_distance: 0.5,
                     block_data: &()
@@ -736,7 +736,7 @@ mod tests {
 
         assert_eq!(
             Vec::from_iter(DepthIter::new(SurfaceIterR::new(&rt, ray))),
-            vec![
+            [
                 // TODO: This step isn't, I think, really necessary for anything, and removing
                 // it could increase performance.
                 // But if we remove it we're making `EnterBlock` mean more. Think carefully.
@@ -783,7 +783,7 @@ mod tests {
 
         assert_eq!(
             Vec::from_iter(SurfaceIterR::new(&rt, ray)),
-            vec![
+            [
                 Invisible { t_distance: 0.5 }, // Cube [0, 0, 0] is empty
                 EnterBlock {
                     // Cube [0, 1, 0]
@@ -809,7 +809,7 @@ mod tests {
         // DepthIter is built on SurfaceIter, so it makes sense to test together and second
         assert_eq!(
             DepthIter::new(SurfaceIterR::new(&rt, ray)).collect::<Vec<DepthStep<'_, ()>>>(),
-            vec![
+            [
                 DepthStep::Invisible,
                 DepthStep::Invisible,
                 DepthStep::EnterBlock {

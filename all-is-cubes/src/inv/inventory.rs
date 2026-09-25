@@ -627,11 +627,9 @@ mod tests {
     #[test]
     fn txn_identity_no_notification() {
         InventoryTransaction::default()
-            .execute(
-                &mut Inventory::from_slots(vec![Slot::Empty]),
-                (),
-                &mut |_| unreachable!("shouldn't notify"),
-            )
+            .execute(&mut Inventory::from_slots([Slot::Empty]), (), &mut |_| {
+                unreachable!("shouldn't notify")
+            })
             .unwrap()
     }
 
@@ -655,7 +653,7 @@ mod tests {
     #[test]
     fn txn_insert_success() {
         let occupied_slot: Slot = Tool::CopyFromSpace.into();
-        let mut inventory = Inventory::from_slots(vec![
+        let mut inventory = Inventory::from_slots([
             occupied_slot.clone(),
             occupied_slot.clone(),
             Slot::Empty,
@@ -672,7 +670,7 @@ mod tests {
 
         assert_eq!(
             outputs,
-            vec![InventoryChange {
+            [InventoryChange {
                 slots: Arc::new([2])
             }]
         );
@@ -702,7 +700,7 @@ mod tests {
         let [this, other] = make_some_blocks();
         let this = Tool::Block(this);
         let other = Tool::Block(other);
-        let mut inventory = Inventory::from_slots(vec![
+        let mut inventory = Inventory::from_slots([
             Slot::stack(10, other.clone()),
             Slot::stack(10, this.clone()),
             Slot::stack(10, other.clone()),
@@ -776,10 +774,10 @@ mod tests {
                     Ok(())
                 },
             )
-            .target(|| Inventory::from_slots(vec![]))
-            .target(|| Inventory::from_slots(vec![Slot::Empty]))
-            .target(|| Inventory::from_slots(vec![Slot::Empty; 10]))
-            .target(|| Inventory::from_slots(vec![Slot::from(old_item.clone()), Slot::Empty]))
+            .target(|| Inventory::from_slots([]))
+            .target(|| Inventory::from_slots([Slot::Empty]))
+            .target(|| Inventory::from_slots([const { Slot::Empty }; 10]))
+            .target(|| Inventory::from_slots([Slot::from(old_item.clone()), Slot::Empty]))
             .test(());
     }
 

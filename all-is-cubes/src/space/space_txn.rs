@@ -890,7 +890,7 @@ mod tests {
         let t3 = t1.clone().merge(t2.clone()).unwrap();
         assert_eq!(
             Vec::from_iter(t3.cubes),
-            vec![
+            [
                 (
                     [0, 0, 0],
                     CubeTransaction {

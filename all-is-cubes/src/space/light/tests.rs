@@ -1,6 +1,5 @@
 //! Tests for the behavior of light in a [`Space`].
 
-use alloc::vec;
 use std::dbg;
 
 use pretty_assertions::assert_eq;
@@ -204,7 +203,7 @@ fn set_cube_opaque_notification() {
     assert_eq!(space.get_light([0, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(
         log.drain(),
-        vec![SpaceChange::CubeLight {
+        [SpaceChange::CubeLight {
             cube: Cube::new(0, 0, 0)
         }]
     );

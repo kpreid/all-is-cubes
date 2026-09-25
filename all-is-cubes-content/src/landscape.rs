@@ -506,7 +506,6 @@ pub(crate) fn sky_with_grass(sky_color: Rgb) -> Sky {
 mod tests {
     use super::*;
     use all_is_cubes::space::Space;
-    use alloc::vec;
     use alloc::vec::Vec;
     use pretty_assertions::assert_eq;
 
@@ -536,7 +535,7 @@ mod tests {
             space
                 .extract::<Vec<Block>, _>(bounds, |e| e.block_data().block().clone())
                 .as_linear(),
-            vec![
+            [
                 blocks[Base(Dirt)].clone(),                       // [0, 100, 0]
                 blocks[Base(Grass)].clone(),                      // [0, 101, 0]
                 blocks[Base(GrassBlades { height: H1 })].clone(), // [0, 102, 0]

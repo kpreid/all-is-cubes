@@ -1525,7 +1525,7 @@ mod tests {
     use all_is_cubes::util::assert_send_sync;
     use core::sync::atomic::{AtomicUsize, Ordering};
     use futures_channel::oneshot;
-    use std::{eprintln, vec};
+    use std::eprintln;
 
     fn advance_time(session: &mut Session) {
         session.frame_clock.advance_by(session.universe().clock().schedule().delta_t());
@@ -1558,7 +1558,7 @@ mod tests {
 
         // Try some fluff with the initial state (we haven't even stepped the session)
         session.universe_mut().execute_1(&space1, st.clone()).unwrap();
-        assert_eq!(log.drain(), vec![Fluff::Happened]);
+        assert_eq!(log.drain(), [Fluff::Happened]);
 
         // Change spaces
         session
@@ -1572,9 +1572,9 @@ mod tests {
 
         // Check we're now listening to the new space only
         session.universe_mut().execute_1(&space1, st.clone()).unwrap();
-        assert_eq!(log.drain(), vec![]);
+        assert_eq!(log.drain(), []);
         session.universe_mut().execute_1(&space2, st).unwrap();
-        assert_eq!(log.drain(), vec![Fluff::Happened]);
+        assert_eq!(log.drain(), [Fluff::Happened]);
     }
 
     #[macro_rules_attribute::apply(smol_macros::test)]

@@ -548,7 +548,7 @@ mod tests {
     use super::*;
     use crate::block::Resolution::*;
     use alloc::format;
-    use alloc::{vec, vec::Vec};
+    use alloc::vec::Vec;
     use euclid::{point3, vec3};
     use pretty_assertions::assert_eq;
 
@@ -558,7 +558,7 @@ mod tests {
             9,
             R4,
             R16,
-            vec![
+            [
                 IconRow::new(0..3, point3(1, 1, 1), vec3(5, 0, 0)),
                 IconRow::new(3..6, point3(1, 1, 6), vec3(5, 0, 0)),
                 IconRow::new(6..9, point3(1, 1, 11), vec3(5, 0, 0)),
@@ -598,7 +598,7 @@ mod tests {
             9,
             R4,
             R16,
-            vec![
+            [
                 IconRow::new(0..3, point3(1, 1, 1), vec3(5, 0, 0)),
                 IconRow::new(3..6, point3(1, 1, 6), vec3(5, 0, 0)),
                 IconRow::new(6..9, point3(1, 1, 11), vec3(5, 0, 0)),
@@ -606,7 +606,7 @@ mod tests {
         );
         assert_eq!(
             Vec::from_iter(iib.icon_positions(999).take(100)),
-            vec![
+            [
                 (0, cubic_aab(R4, 1, 1, 1)),
                 (1, cubic_aab(R4, 6, 1, 1)),
                 (2, cubic_aab(R4, 11, 1, 1)),
@@ -643,7 +643,7 @@ mod tests {
         };
         assert_eq!(
             Vec::from_iter(iib.icon_positions(3).take(100)),
-            vec![
+            [
                 (0, cubic_aab(R4, 0, 0, 0)),
                 (1, cubic_aab(R4, 5, 0, 0)),
                 (2, cubic_aab(R4, 10, 0, 0)),
@@ -670,7 +670,7 @@ mod tests {
         assert_eq!(iib.icon_size_in_resolution(), R2, "assumption check");
         assert_eq!(
             Vec::from_iter(iib.icon_positions(999).take(100)),
-            vec![
+            [
                 // we skip slot 0 at -4..-2, slot 1 at -3..-1, and slot 2 at -2..0
                 (3, cubic_aab(R2, -1, 0, 0)),
                 (4, cubic_aab(R2, 0, 0, 0)),

@@ -219,7 +219,6 @@ mod tests {
     use super::*;
     use crate::math::GridCoordinate;
     use crate::raycast::{Ray, Raycaster};
-    use alloc::vec;
     use alloc::vec::Vec;
     use std::dbg;
 
@@ -282,7 +281,7 @@ mod tests {
             )
             .take(10)
             .collect::<Vec<Cube>>(),
-            vec![Cube::new(1, 1, 1), Cube::new(2, 1, 1), Cube::new(3, 1, 1)]
+            [Cube::new(1, 1, 1), Cube::new(2, 1, 1), Cube::new(3, 1, 1)]
         );
     }
 
@@ -296,7 +295,7 @@ mod tests {
             )
             .take(10)
             .collect::<Vec<Cube>>(),
-            vec![
+            [
                 Cube::new(0, 1, 1),
                 Cube::new(1, 1, 1),
                 Cube::new(2, 1, 1),
@@ -315,7 +314,7 @@ mod tests {
             )
             .take(10)
             .collect::<Vec<Cube>>(),
-            vec![
+            [
                 Cube::new(2, 1, 1),
                 Cube::new(1, 1, 1),
                 Cube::new(0, 1, 1),
@@ -335,7 +334,7 @@ mod tests {
             )
             .take(10)
             .collect::<Vec<Cube>>(),
-            vec![]
+            []
         );
     }
     #[test]
@@ -348,7 +347,7 @@ mod tests {
             )
             .take(10)
             .collect::<Vec<Cube>>(),
-            vec![]
+            []
         );
     }
 
@@ -362,7 +361,7 @@ mod tests {
             )
             .take(10)
             .collect::<Vec<Cube>>(),
-            vec![
+            [
                 Cube::new(GridCoordinate::MAX - 3, 10, 20),
                 Cube::new(GridCoordinate::MAX - 2, 10, 20),
                 Cube::new(GridCoordinate::MAX - 1, 10, 20),
@@ -381,7 +380,7 @@ mod tests {
             )
             .take(10)
             .collect::<Vec<Cube>>(),
-            vec![
+            [
                 Cube::new(GridCoordinate::MIN + 2, 10, 20),
                 Cube::new(GridCoordinate::MIN + 1, 10, 20),
                 Cube::new(GridCoordinate::MIN, 10, 20),

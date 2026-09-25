@@ -357,7 +357,6 @@ static PACKED_LIGHT_SCALAR_LOOKUP_TABLE: [PositiveSign<f32>; 256] = [
 mod tests {
     use super::*;
     use crate::math::ps32;
-    use alloc::vec;
     use alloc::vec::Vec;
     use core::iter::once;
     use std::{print, println};
@@ -365,7 +364,7 @@ mod tests {
     fn packed_light_test_values() -> impl Iterator<Item = PackedLight> {
         (PackedLightScalar::MIN..PackedLightScalar::MAX)
             .flat_map(|s| {
-                vec![
+                [
                     PackedLight {
                         value: Vector3D::new(s, 0, 0),
                         status: LightStatus::Visible,
@@ -383,7 +382,6 @@ mod tests {
                         status: LightStatus::Visible,
                     },
                 ]
-                .into_iter()
             })
             .chain(once(PackedLight::OPAQUE))
             .chain(once(PackedLight::NO_RAYS))

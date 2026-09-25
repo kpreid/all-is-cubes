@@ -4,7 +4,6 @@
 //! Note in particular that [`super::eval::tests`] contains tests for the results of evaluation.
 
 use alloc::format;
-use alloc::vec;
 use core::assert_matches;
 
 use pretty_assertions::assert_eq;
@@ -99,7 +98,7 @@ fn listen_atom() {
     let log = Log::new();
 
     listen(&universe, &block, log.listener()).unwrap();
-    assert_eq!(log.drain(), vec![]);
+    assert_eq!(log.drain(), []);
     // No notifications are possible, so nothing more to test.
 }
 
@@ -113,7 +112,7 @@ fn listen_indirect_atom() {
     let indirect = Block::from(block_def_handle.clone());
     let log = Log::new();
     listen(&universe, &indirect, log.listener()).unwrap();
-    assert_eq!(log.drain(), vec![]);
+    assert_eq!(log.drain(), []);
 
     // Now mutate it and we should see a notification.
     universe
@@ -150,8 +149,8 @@ fn listen_indirect_double() {
     let log2 = Log::new();
     listen(&universe, &indirect1, log1.listener()).unwrap();
     listen(&universe, &indirect2, log2.listener()).unwrap();
-    assert_eq!(log1.drain(), vec![]);
-    assert_eq!(log2.drain(), vec![]);
+    assert_eq!(log1.drain(), []);
+    assert_eq!(log2.drain(), []);
 
     // Mutate the first BlockDef and we should see a notification for it alone.
     universe
@@ -181,7 +180,7 @@ fn listen_indirect_double() {
             BlockDefTransaction::overwrite(block::from_color!(Rgba::WHITE)),
         )
         .unwrap();
-    assert_eq!(log2.drain(), vec![]);
+    assert_eq!(log2.drain(), []);
 }
 
 /// Test that changes to a `Space` propagate to block listeners.
@@ -193,7 +192,7 @@ fn listen_recur() {
     let block = Block::builder().voxels_handle(R1, space_handle.clone()).build();
     let log = Log::new();
     listen(&universe, &block, log.listener()).unwrap();
-    assert_eq!(log.drain(), vec![]);
+    assert_eq!(log.drain(), []);
 
     // Now mutate the space and we should see a notification.
     universe
@@ -213,7 +212,7 @@ fn listen_recur() {
             SpaceTransaction::set_cube([1, 0, 0], None, Some(block_1)),
         )
         .unwrap();
-    assert_eq!(log.drain(), vec![]);
+    assert_eq!(log.drain(), []);
 }
 
 #[test]
@@ -367,7 +366,7 @@ mod txn {
         let indirect = Block::from(block_def_handle.clone());
         let log = Log::new();
         listen(&universe, &indirect, log.listener()).unwrap();
-        assert_eq!(log.drain(), vec![]);
+        assert_eq!(log.drain(), []);
 
         // Now mutate it and we should see a notification.
         universe

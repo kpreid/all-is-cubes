@@ -1,6 +1,5 @@
 //! Tests for the mesh system as a whole.
 
-use alloc::vec;
 use alloc::vec::Vec;
 use std::{dbg, println};
 
@@ -394,7 +393,7 @@ fn shrunken_box_has_no_extras() {
     assert_eq!(tex.count_allocated(), 1);
     assert_eq!(
         space_rendered.vertices().0,
-        vec![
+        [
             v_t([0.250, 0.250, 0.250], NX, resolution, [2.5, 2.0, 2.0]),
             v_t([0.250, 0.250, 0.750], NX, resolution, [2.5, 2.0, 6.0]),
             v_t([0.250, 0.750, 0.250], NX, resolution, [2.5, 6.0, 2.0]),
@@ -462,7 +461,7 @@ fn shrunken_box_uniform_color() {
     assert_eq!(tex.count_allocated(), 0, "should have no texture");
     assert_eq!(
         space_rendered.vertices().0.to_vec(),
-        vec![
+        [
             v_c([0.250, 0.250, 0.250], NX, [0.0, 1.0, 0.5, 1.0]),
             v_c([0.250, 0.250, 0.750], NX, [0.0, 1.0, 0.5, 1.0]),
             v_c([0.250, 0.750, 0.250], NX, [0.0, 1.0, 0.5, 1.0]),

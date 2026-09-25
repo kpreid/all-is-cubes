@@ -377,7 +377,6 @@ mod tests {
     use crate::make_some_blocks;
     use Resolution::*;
     use all_is_cubes::math::Face7;
-    use alloc::vec;
     use itertools::Itertools as _;
 
     #[test]
@@ -420,24 +419,24 @@ mod tests {
         use Face7::*;
         let start = Cube::new(1, 2, 3);
 
-        assert_eq!(walk(start, start).collect_vec(), vec![]);
+        assert_eq!(walk(start, start).collect_vec(), []);
         assert_eq!(
             walk(start, Cube::new(1, 3, 3)).collect_vec(),
-            vec![CubeFace {
+            [CubeFace {
                 cube: start,
                 face: PY
             }]
         );
         assert_eq!(
             walk(start, Cube::new(1, 1, 3)).collect_vec(),
-            vec![CubeFace {
+            [CubeFace {
                 cube: start,
                 face: NY
             }]
         );
         assert_eq!(
             walk(start, Cube::new(0, 4, 0)).collect_vec(),
-            vec![
+            [
                 CubeFace {
                     cube: start,
                     face: PY

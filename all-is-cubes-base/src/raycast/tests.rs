@@ -1,5 +1,4 @@
 use alloc::format;
-use alloc::vec;
 use alloc::vec::Vec;
 
 use euclid::{Point3D, Vector3D, point3, vec3};
@@ -68,12 +67,12 @@ fn assert_steps_have_prefix<T: IntoIterator<Item = TestStep>>(r: &mut Raycaster,
 }
 #[track_caller]
 fn assert_only_one_step(r: &mut Raycaster, step: TestStep) {
-    assert_steps_option(r, vec![Some(step), None, None]);
+    assert_steps_option(r, [Some(step), None, None]);
 }
 
 #[track_caller]
 fn assert_no_steps(mut raycaster: Raycaster) {
-    assert_steps_option(&mut raycaster, vec![None, None]);
+    assert_steps_option(&mut raycaster, [None, None]);
 }
 
 /// Helper to construct steps
@@ -97,7 +96,7 @@ fn simple_almost_1d() {
     // Testing all six directions to ensure the axis selection logic picks the correct one
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(0.01, 0.0001, 0.0001)),
-        vec![
+        [
             step(10, 20, 30, Face7::Within, 0.0),
             step(11, 20, 30, Face7::NX, 50.0),
             step(12, 20, 30, Face7::NX, 150.0),
@@ -105,7 +104,7 @@ fn simple_almost_1d() {
     );
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(-0.01, 0.0001, 0.0001)),
-        vec![
+        [
             step(10, 20, 30, Face7::Within, 0.0),
             step(9, 20, 30, Face7::PX, 50.0),
             step(8, 20, 30, Face7::PX, 150.0),
@@ -113,7 +112,7 @@ fn simple_almost_1d() {
     );
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(0.0001, 0.01, 0.0001)),
-        vec![
+        [
             step(10, 20, 30, Face7::Within, 0.0),
             step(10, 21, 30, Face7::NY, 50.0),
             step(10, 22, 30, Face7::NY, 150.0),
@@ -121,7 +120,7 @@ fn simple_almost_1d() {
     );
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(0.0001, -0.01, 0.0001)),
-        vec![
+        [
             step(10, 20, 30, Face7::Within, 0.0),
             step(10, 19, 30, Face7::PY, 50.0),
             step(10, 18, 30, Face7::PY, 150.0),
@@ -129,7 +128,7 @@ fn simple_almost_1d() {
     );
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(0.0001, 0.0001, 0.01)),
-        vec![
+        [
             step(10, 20, 30, Face7::Within, 0.0),
             step(10, 20, 31, Face7::NZ, 50.0),
             step(10, 20, 32, Face7::NZ, 150.0),
@@ -137,7 +136,7 @@ fn simple_almost_1d() {
     );
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(0.0001, 0.0001, -0.01)),
-        vec![
+        [
             step(10, 20, 30, Face7::Within, 0.0),
             step(10, 20, 29, Face7::PZ, 50.0),
             step(10, 20, 28, Face7::PZ, 150.0),
@@ -150,7 +149,7 @@ fn simple_exactly_1d() {
     // Not testing all six directions because other tests cover that
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(0.01, 0.0, 0.0)),
-        vec![
+        [
             step(10, 20, 30, Face7::Within, 0.0),
             step(11, 20, 30, Face7::NX, 50.0),
             step(12, 20, 30, Face7::NX, 150.0),
@@ -158,7 +157,7 @@ fn simple_exactly_1d() {
     );
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.5, 20.5, 30.5), vec3(-0.01, 0.0, 0.0)),
-        vec![
+        [
             step(10, 20, 30, Face7::Within, 0.0),
             step(9, 20, 30, Face7::PX, 50.0),
             step(8, 20, 30, Face7::PX, 150.0),
@@ -200,7 +199,7 @@ fn start_on_cube_edge_parallel() {
     // Positive origin, positive direction
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.0, 20.5, 30.5), vec3(2.0, 0.1, 0.1)),
-        vec![
+        [
             step(10, 20, 30, Face7::Within, 0.0),
             step(11, 20, 30, Face7::NX, 0.5),
             step(12, 20, 30, Face7::NX, 1.0),
@@ -209,7 +208,7 @@ fn start_on_cube_edge_parallel() {
     // Positive origin, negative direction
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.0, 20.5, 30.5), vec3(-2.0, 0.1, 0.1)),
-        vec![
+        [
             step(10, 20, 30, Face7::Within, 0.0),
             step(9, 20, 30, Face7::PX, 0.5),
             step(8, 20, 30, Face7::PX, 1.0),
@@ -218,7 +217,7 @@ fn start_on_cube_edge_parallel() {
     // Negative origin, positive direction
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(-10.0, 20.5, 30.5), vec3(2.0, 0.1, 0.1)),
-        vec![
+        [
             step(-10, 20, 30, Face7::Within, 0.0),
             step(-9, 20, 30, Face7::NX, 0.5),
             step(-8, 20, 30, Face7::NX, 1.0),
@@ -227,7 +226,7 @@ fn start_on_cube_edge_parallel() {
     // Negative origin, negative direction
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(-10.0, 20.5, 30.5), vec3(-2.0, 0.1, 0.1)),
-        vec![
+        [
             step(-10, 20, 30, Face7::Within, 0.0),
             step(-11, 20, 30, Face7::PX, 0.5),
             step(-12, 20, 30, Face7::PX, 1.0),
@@ -242,7 +241,7 @@ fn start_on_cube_edge_perpendicular() {
     // Positive origin, positive direction
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.0, 20.5, 30.5), vec3(0.125, 1.0, 0.0)),
-        vec![
+        [
             step(10, 20, 30, Face7::Within, 0.0),
             step(10, 21, 30, Face7::NY, 0.5),
             step(10, 22, 30, Face7::NY, 1.5),
@@ -251,7 +250,7 @@ fn start_on_cube_edge_perpendicular() {
     // Positive origin, negative direction
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.0, 20.5, 30.5), vec3(-0.125, -1.0, 0.0)),
-        vec![
+        [
             step(10, 20, 30, Face7::Within, 0.0),
             step(10, 19, 30, Face7::PY, 0.5),
             step(10, 18, 30, Face7::PY, 1.5),
@@ -260,7 +259,7 @@ fn start_on_cube_edge_perpendicular() {
     // Negative origin, positive direction
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(-10.0, -20.5, 30.5), vec3(0.125, 1.0, 0.0)),
-        vec![
+        [
             step(-10, -21, 30, Face7::Within, 0.0),
             step(-10, -20, 30, Face7::NY, 0.5),
             step(-10, -19, 30, Face7::NY, 1.5),
@@ -269,7 +268,7 @@ fn start_on_cube_edge_perpendicular() {
     // Negative origin, negative direction
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(-10.0, -20.5, 30.5), vec3(-0.125, -1.0, 0.0)),
-        vec![
+        [
             step(-10, -21, 30, Face7::Within, 0.0),
             step(-10, -22, 30, Face7::PY, 0.5),
             step(-10, -23, 30, Face7::PY, 1.5),
@@ -334,7 +333,7 @@ fn exiting_integer_limit_positive() {
             [0.5, 0.5, FreeCoordinate::from(highest) - 0.5],
             [0.0, 0.0, 1.0],
         ),
-        vec![
+        [
             Some(step(0, 0, highest - 1, Face7::Within, 0.0)),
             Some(step(0, 0, highest, Face7::NZ, 0.5)),
             None,
@@ -350,7 +349,7 @@ fn exiting_integer_limit_negative() {
             [0.5, 0.5, FreeCoordinate::from(lowest) + 1.5],
             [0.0, 0.0, -1.0],
         ),
-        vec![
+        [
             Some(step(0, 0, lowest + 1, Face7::Within, 0.0)),
             Some(step(0, 0, lowest, Face7::PZ, 0.5)),
             None,
@@ -371,7 +370,7 @@ fn within_bounds(
     );
     assert_steps_option(
         &mut r,
-        vec![
+        [
             Some(step(2, 1, 1, Face7::NX, 2.0)),
             Some(step(2, 2, 1, Face7::NY, 2.25)),
             Some(step(2, 2, 2, Face7::NZ, 2.5)),
@@ -398,7 +397,7 @@ fn regression_test_1() {
             point3(4.833333333333334, 4.666666666666666, -3.0),
             vec3(0.0, 0.0, 10.0),
         ),
-        vec![
+        [
             step(4, 4, -3, Face7::Within, 0.0),
             step(4, 4, -2, Face7::NZ, 0.1),
             step(4, 4, -1, Face7::NZ, 0.2),
@@ -421,7 +420,7 @@ fn regression_test_2(
             vec3(0.0, 0.0, 16.0),
         )
         .within(bounds, include_exit),
-        vec![None],
+        [None],
     );
 }
 
@@ -444,7 +443,7 @@ fn regression_long_distance_fast_forward() {
             GridAab::from_lower_upper([-10, -20, -30], [10, 20, 30]),
             true,
         ),
-        vec![step(0, 0, -30, Face7::NZ, 0.010000000000000002)],
+        [step(0, 0, -30, Face7::NZ, 0.010000000000000002)],
     );
 }
 
@@ -533,7 +532,7 @@ fn recursive_simple() {
     assert_eq!(inner_ray, Ray::new([-4., 0.5, 0.5], [1.0, 0.0, 0.0]));
     assert_steps_option(
         &mut inner_raycaster,
-        vec![
+        [
             Some(step(0, 0, 0, Face7::NX, 4.0)), // entry step
             Some(step(1, 0, 0, Face7::NX, 5.0)),
             Some(step(2, 0, 0, Face7::NX, 6.0)),

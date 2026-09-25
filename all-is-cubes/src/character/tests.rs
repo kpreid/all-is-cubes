@@ -166,7 +166,7 @@ fn inventory_transaction() {
     // Check notification
     assert_eq!(
         log.drain(),
-        vec![CharacterChange::Inventory(InventoryChange {
+        [CharacterChange::Inventory(InventoryChange {
             slots: Arc::new([0])
         })],
     );
@@ -399,12 +399,12 @@ fn selected_slot_notification() {
 
     character.set_selected_slot(0, 2);
 
-    assert_eq!(log.drain(), vec![CharacterChange::Selections]);
+    assert_eq!(log.drain(), [CharacterChange::Selections]);
 
     // no change
     character.set_selected_slot(0, 2);
 
-    assert_eq!(log.drain(), vec![]);
+    assert_eq!(log.drain(), []);
 }
 
 // TODO: more tests

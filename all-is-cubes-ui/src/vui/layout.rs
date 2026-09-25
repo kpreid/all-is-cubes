@@ -653,7 +653,7 @@ mod tests {
         let stack_gravity = vec3(Align::Low, Align::Center, Align::Center);
         assert_eq!(
             Vec::from_iter(tree.perform_layout(grant).unwrap().leaves()),
-            vec![
+            [
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),
                     position: LayoutGrant {
@@ -695,7 +695,7 @@ mod tests {
         let stack_gravity = vec3(Align::Low, Align::Center, Align::Center);
         assert_eq!(
             Vec::from_iter(tree.perform_layout(grant).unwrap().leaves()),
-            vec![
+            [
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),
                     position: LayoutGrant {

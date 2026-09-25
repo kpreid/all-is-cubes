@@ -191,14 +191,14 @@ mod tests {
 
     #[test]
     fn basic_collection() {
-        let c = InstanceCollector::from_iter(vec![
+        let c = InstanceCollector::from_iter([
             (0, vec![cube(0, 0, 0), cube(0, 0, 1)]),
             (1, vec![cube(1, 0, 0), cube(1, 1, 1)]),
             (0, vec![cube(0, 0, 2), cube(99, 0, 3)]),
         ]);
         assert_eq!(
             collect_collector(&c),
-            vec![
+            [
                 (0, vec![[0, 0, 0], [0, 0, 1], [0, 0, 2], [99, 0, 3]]),
                 (1, vec![[1, 0, 0], [1, 1, 1]]),
             ]

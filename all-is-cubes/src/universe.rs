@@ -501,7 +501,7 @@ impl Universe {
     /// assert_eq!(
     ///     found_blocks,
     ///     [Name::from("b1"), Name::from("b2")].into_iter()
-    ///         .zip(vec![block_1, block_2])
+    ///         .zip([block_1, block_2])
     ///         .collect::<Vec<_>>(),
     /// );
     /// ```

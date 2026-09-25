@@ -1,12 +1,11 @@
 use alloc::boxed::Box;
-use alloc::vec;
 use core::assert_matches;
-use itertools::Itertools;
 use std::collections::VecDeque;
 use std::{dbg, print, println};
 
 use bevy_ecs::prelude as ecs;
 use euclid::{Vector3D, point3, vec3};
+use itertools::Itertools as _;
 use ordered_float::NotNan;
 use rand::prelude::IndexedRandom as _;
 use rand::{RngExt as _, SeedableRng as _};
@@ -169,7 +168,7 @@ fn falling_collision() {
     );
     assert_eq!(
         contacts.into_iter().collect_vec(),
-        vec![Contact::Block(CubeFace::new([0, 0, 0], Face7::PY))]
+        [Contact::Block(CubeFace::new([0, 0, 0], Face7::PY))]
     );
 }
 
@@ -266,7 +265,7 @@ fn push_out_simple() {
     );
     assert_eq!(tester.body().velocity(), Vector3D::zero());
     // TODO: push out should create and report contacts just like normal collision
-    // assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face7::PY)]);
+    // assert_eq!(contacts, [CubeFace::new((0, 0, 0), Face7::PY)]);
 }
 
 #[test]
@@ -296,7 +295,7 @@ fn push_out_voxels() {
     );
     assert_eq!(tester.body().velocity(), Vector3D::zero());
     // TODO: push out should create and report contacts just like normal collision
-    // assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face7::PY)]);
+    // assert_eq!(contacts, [CubeFace::new((0, 0, 0), Face7::PY)]);
 }
 
 #[test]

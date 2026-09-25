@@ -769,7 +769,7 @@ mod tests {
                 .unwrap()
                 .map(|e| e.unwrap().file_name().into_string().unwrap())
                 .collect::<Vec<String>>(),
-            vec!["filetest-reflectance.png"],
+            ["filetest-reflectance.png"],
         );
     }
 }

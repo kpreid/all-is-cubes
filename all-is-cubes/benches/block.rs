@@ -76,7 +76,10 @@ fn evaluate_bench(c: &mut Criterion) {
         let blocks: [Block; BLOCK_COUNT] =
             make_some_voxel_blocks(&mut universe).map(|mut block| {
                 let m = block.modifiers_mut();
-                m.extend(vec![Modifier::Rotate(Face::PY.clockwise()); 100]);
+                m.extend(std::iter::repeat_n(
+                    Modifier::Rotate(Face::PY.clockwise()),
+                    100,
+                ));
                 block
             });
 

@@ -185,7 +185,7 @@ fn block_atom_with_all_attributes() {
                 1,
                 Resolution::R4,
                 Resolution::R16,
-                vec![
+                [
                     inv::IconRow::new(0..3, point3(1, 1, 1), vec3(5, 0, 0)),
                     inv::IconRow::new(3..6, point3(1, 1, 6), vec3(5, 0, 0)),
                     inv::IconRow::new(6..9, point3(1, 1, 11), vec3(5, 0, 0)),
@@ -804,7 +804,7 @@ fn space_with_sparse_indices() {
     // but will invalidate this particular test.
     assert_eq!(
         Vec::from_iter(space.block_data().iter().map(|d| d.block())),
-        vec![&AIR, &block0, &AIR, &block2],
+        [&AIR, &block0, &AIR, &block2],
     );
 
     let space2: Space = from_value(to_value(space.read()).unwrap()).unwrap();

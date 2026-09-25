@@ -1,6 +1,5 @@
 use alloc::format;
 use alloc::string::ToString;
-use alloc::vec;
 use alloc::vec::Vec;
 use core::any::TypeId;
 
@@ -292,7 +291,7 @@ fn insert_pending_becomes_anonym_direct() {
     u.insert(Name::Pending, BlockDef::new(u.read_ticket(), AIR)).unwrap();
     assert_eq!(
         Vec::from_iter(u.iter_by_type::<BlockDef>().map(|(name, _)| name)),
-        vec![Name::Anonym(0)]
+        [Name::Anonym(0)]
     );
 }
 
@@ -303,7 +302,7 @@ fn insert_pending_becomes_anonym_via_txn() {
     txn.execute(&mut u, (), &mut drop).unwrap();
     assert_eq!(
         Vec::from_iter(u.iter_by_type::<BlockDef>().map(|(name, _)| name)),
-        vec![Name::Anonym(0)]
+        [Name::Anonym(0)]
     );
 }
 
@@ -467,10 +466,7 @@ fn gc_allows_builtins() {
 
 #[test]
 fn visit_handles_block_def_no_handle() {
-    assert_eq!(
-        list_handles(&BlockDef::new(ReadTicket::stub(), AIR)),
-        vec![]
-    );
+    assert_eq!(list_handles(&BlockDef::new(ReadTicket::stub(), AIR)), []);
 }
 
 #[test]
@@ -481,7 +477,7 @@ fn visit_handles_block_def_space() {
         u.read_ticket(),
         Block::builder().voxels_handle(Resolution::R1, space_handle).build(),
     );
-    assert_eq!(list_handles(&block_def), vec!["s".into()]);
+    assert_eq!(list_handles(&block_def), ["s".into()]);
 }
 
 #[test]
@@ -490,7 +486,7 @@ fn visit_handles_block_def_indirect() {
     let b1 = BlockDef::new(u.read_ticket(), AIR);
     let b1_handle = u.insert("destination".into(), b1).unwrap();
     let b2 = BlockDef::new(u.read_ticket(), Block::from(b1_handle));
-    assert_eq!(list_handles(&b2), vec!["destination".into()]);
+    assert_eq!(list_handles(&b2), ["destination".into()]);
 }
 
 #[test]
@@ -501,7 +497,7 @@ fn visit_handles_block_tick_action() {
         .color(Rgba::WHITE)
         .tick_action(Some(TickAction::from(Operation::Become(Block::from(b1)))))
         .build();
-    assert_eq!(list_handles(&b2), vec!["foo".into()]);
+    assert_eq!(list_handles(&b2), ["foo".into()]);
 }
 
 #[test]
@@ -521,10 +517,7 @@ fn visit_handles_character() {
     .execute(&mut character, u.read_ticket(), &mut drop)
     .unwrap();
 
-    assert_eq!(
-        list_handles(&character),
-        vec!["space".into(), "block".into()]
-    );
+    assert_eq!(list_handles(&character), ["space".into(), "block".into()]);
 }
 
 #[test]
@@ -540,5 +533,5 @@ fn visit_handles_space() {
         .build();
 
     // TODO: Also add a behavior and a spawn inventory item containing handles and check those
-    assert_eq!(list_handles(&space), vec![block_def_handle.name().clone()]);
+    assert_eq!(list_handles(&space), [block_def_handle.name().clone()]);
 }

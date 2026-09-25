@@ -1021,7 +1021,7 @@ mod tests {
             Vec::from_iter(
                 character.behaviors().query::<SelfModifyingBehavior>().map(|qi| qi.behavior)
             ),
-            vec![&SelfModifyingBehavior {
+            [&SelfModifyingBehavior {
                 foo: 3,
                 then: Then::Step,
             }]
@@ -1085,13 +1085,13 @@ mod tests {
         // Type-specific query should find one
         assert_eq!(
             Vec::from_iter(set.query::<NoopBehavior<Expected>>().map(|qi| qi.behavior)),
-            vec![&NoopBehavior(Expected)],
+            [&NoopBehavior(Expected)],
         );
 
         // General query should find both
         assert_eq!(
             Vec::from_iter(set.query_any(None).map(|qi| core::ptr::from_ref(qi.behavior))),
-            vec![
+            [
                 Arc::as_ptr(&arc_qe) as *const dyn Behavior<Character>,
                 Arc::as_ptr(&arc_qu) as *const dyn Behavior<Character>
             ],
@@ -1151,7 +1151,7 @@ mod tests {
             BehaviorSetTransaction::<Space>::insert(attachment, Arc::new(NoopBehavior(1)));
         assert_eq!(
             Vec::from_iter(transaction.attachments_affected()),
-            vec![&attachment]
+            [&attachment]
         );
     }
 
@@ -1178,7 +1178,7 @@ mod tests {
         );
         assert_eq!(
             Vec::from_iter(transaction.attachments_affected()),
-            vec![&attachment1, &attachment2]
+            [&attachment1, &attachment2]
         );
     }
 

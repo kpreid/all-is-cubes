@@ -758,7 +758,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             results,
-            vec![
+            [
                 (point3(0, 0, 0), [tr, tr, tr, tr, tr, tr, tr, red]),
                 (point3(0, 0, 1), [tr, tr, tr, tr, tr, tr, red, tr]),
                 (point3(0, 1, 0), [tr, tr, tr, tr, tr, red, tr, tr]),
@@ -939,7 +939,7 @@ mod tests {
 
         assert_eq!(
             Vec::from_iter(analysis.vertices().iter().map(|v| v.position)),
-            vec![
+            [
                 point3(0, 0, 0),
                 point3(0, 0, 1),
                 point3(0, 1, 0),
@@ -953,7 +953,7 @@ mod tests {
 
         assert_eq!(
             edges,
-            vec![
+            [
                 // Fun fact: In a cube wireframe/graph with this numbering, every edge is
                 // between two vertices which differ in exactly one bit.
                 [0b000, 0b001],

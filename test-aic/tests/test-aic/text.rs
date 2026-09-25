@@ -163,7 +163,7 @@ fn single_line_text_smoke_test() {
 
     assert_eq!(
         plane_to_text(ev.voxels()),
-        vec![
+        [
             ".......##....",
             ".......##....",
             ".......##....",
@@ -195,7 +195,7 @@ fn multiple_line() {
 
     assert_eq!(
         plane_to_text(block.evaluate(universe.read_ticket()).unwrap().voxels()),
-        vec![
+        [
             ".......##................##",
             ".......##................##",
             ".......##................##",
@@ -384,7 +384,7 @@ fn read_glyphs() {
     }
     assert_eq!(
         image.into_buf(),
-        vec![
+        [
             0, 0, 0, 0, 0, 0, 0, //
             0, 0, 0, 0, 0, 0, 0, //
             0, 0, 0, 0, 0, 0, 0, //

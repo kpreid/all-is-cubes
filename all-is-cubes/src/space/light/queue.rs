@@ -389,7 +389,7 @@ mod tests {
         assert_eq!(queue.len(), 7);
         assert_eq!(
             drain(&mut queue),
-            vec![
+            [
                 r([0, 0, 2], 200),
                 r([0, 0, 1], 100),
                 r([4, 0, 0], 40),
@@ -426,7 +426,7 @@ mod tests {
         assert_eq!(queue.len(), 6);
         assert_eq!(
             drain(&mut queue),
-            vec![
+            [
                 // Higher priority than sweep
                 r([0, 101, 0], 101),
                 // Equal priority explicit elements win

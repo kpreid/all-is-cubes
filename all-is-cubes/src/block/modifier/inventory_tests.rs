@@ -3,8 +3,6 @@
 //! The modifier implementation itself is in [`super::composite`] because the modifier’s own
 //! evaluation logic is about rendering icons which is done using the compositing tools.
 
-use alloc::vec;
-
 use pretty_assertions::assert_eq;
 
 use crate::arcstr::literal;
@@ -37,7 +35,7 @@ fn inventory_preserves_attributes() {
         1,
         R2,
         R2,
-        vec![inv::IconRow::new(0..1, point3(0, 0, 0), vec3(0, 0, 0))],
+        [inv::IconRow::new(0..1, point3(0, 0, 0), vec3(0, 0, 0))],
     );
     let inventory_block = Block::builder()
         .display_name("Inventory")

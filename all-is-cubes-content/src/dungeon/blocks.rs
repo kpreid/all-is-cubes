@@ -1,6 +1,5 @@
 #![expect(unused_qualifications, reason = "derive macro false positive")]
 
-use alloc::vec;
 use core::f64::consts::TAU;
 
 /// Acts as polyfill for float methods
@@ -260,7 +259,7 @@ pub(crate) async fn install_dungeon_blocks(
                             R2,
                             R32, // to allow a shrunk R16 tool icon
                             // Bottom middle.
-                            vec![inv::IconRow::new(
+                            [inv::IconRow::new(
                                 0..1,
                                 point3(8, 1 + y as i32, 8),
                                 vec3(0, 0, 0),

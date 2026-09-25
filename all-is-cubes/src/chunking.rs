@@ -529,7 +529,6 @@ impl FusedIterator for AxisMirrorIter {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec;
     use pretty_assertions::assert_eq;
     use rand::{RngExt as _, SeedableRng as _};
     use std::collections::HashSet;
@@ -653,7 +652,7 @@ mod tests {
         let chart = ChunkChart::<16>::new(0.00001);
         assert_eq!(
             Vec::from_iter(chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)),
-            vec![
+            [
                 ChunkPos::new(0, 0, 0),
                 // Face meetings.
                 ChunkPos::new(0, 0, -1),
@@ -699,7 +698,7 @@ mod tests {
                 // Include three octants: [+x +y +z], [+x, +y, -z], and [+x, -y, -z]
                 OctantMask::from_iter([Octant::Ppp, Octant::Ppn, Octant::Pnn])
             )),
-            vec![
+            [
                 ChunkPos::new(0, 0, 0),
                 // Face meetings. No -X for this mask.
                 ChunkPos::new(0, 0, -1),

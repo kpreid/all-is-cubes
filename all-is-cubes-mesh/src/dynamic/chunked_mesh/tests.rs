@@ -42,7 +42,7 @@ fn read_todo_chunks(todo: &CsmTodo<CHUNK_SIZE>) -> Vec<(ChunkPos<CHUNK_SIZE>, Ch
 #[test]
 fn update_adjacent_chunk_positive() {
     let mut todo: CsmTodo<CHUNK_SIZE> = Default::default();
-    todo.chunks.extend(vec![
+    todo.chunks.extend([
         (ChunkPos::new(-1, 0, 0), ChunkTodo::CLEAN),
         (ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN),
         (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
@@ -54,7 +54,7 @@ fn update_adjacent_chunk_positive() {
     }]);
     assert_eq!(
         read_todo_chunks(&todo),
-        vec![
+        [
             (ChunkPos::new(-1, 0, 0), ChunkTodo::CLEAN),
             (
                 ChunkPos::new(0, 0, 0),
@@ -77,7 +77,7 @@ fn update_adjacent_chunk_positive() {
 #[test]
 fn update_adjacent_chunk_negative() {
     let mut todo: CsmTodo<CHUNK_SIZE> = Default::default();
-    todo.chunks.extend(vec![
+    todo.chunks.extend([
         (ChunkPos::new(-1, 0, 0), ChunkTodo::CLEAN),
         (ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN),
         (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
@@ -89,7 +89,7 @@ fn update_adjacent_chunk_negative() {
     }]);
     assert_eq!(
         read_todo_chunks(&todo),
-        vec![
+        [
             (
                 ChunkPos::new(-1, 0, 0),
                 ChunkTodo {
@@ -120,7 +120,7 @@ fn todo_ignores_absent_chunks() {
         old_block_index: 0,
         new_block_index: 0,
     }]);
-    assert_eq!(read_todo_chunks(&todo), vec![]);
+    assert_eq!(read_todo_chunks(&todo), []);
     // ...until the chunk exists in the table already.
     todo.chunks.insert(ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN);
     todo.receive(&[SpaceChange::CubeBlock {
@@ -130,7 +130,7 @@ fn todo_ignores_absent_chunks() {
     }]);
     assert_eq!(
         read_todo_chunks(&todo),
-        vec![(
+        [(
             ChunkPos::new(0, 0, 0),
             ChunkTodo {
                 state: dynamic::chunk::ChunkTodoState::DirtyMeshAndInstances,
@@ -455,7 +455,7 @@ fn instances_grouped_by_block() {
 
     assert_eq!(
         tester.instances(),
-        vec![
+        [
             // index 0 is air
             (1, vec![[0, 0, 0], [CHUNK_SIZE + 0, 0, 0]]),
             (2, vec![[1, 0, 0], [CHUNK_SIZE + 1, 0, 0]]),
@@ -489,7 +489,7 @@ fn instances_for_animated() {
     let mut tester: CsmTester<1000> = CsmTester::new(Universe::new(), space, LARGE_VIEW_DISTANCE);
     tester.update(dynamic::noop_render_data_updater);
 
-    assert_eq!(tester.instances(), vec![(index_of_anim, vec![[1, 0, 0]])]);
+    assert_eq!(tester.instances(), [(index_of_anim, vec![[1, 0, 0]])]);
 }
 
 /// When block meshes are merged into chunk meshes, the chunk meshes need to be updated when the
@@ -573,7 +573,7 @@ fn instances_dont_dirty_mesh_when_space_changes() {
     // Check initial state
     assert_eq!(
         tester.instances(),
-        vec![(index_of_anim, vec![[1, 0, 0], [2, 0, 0]])]
+        [(index_of_anim, vec![[1, 0, 0], [2, 0, 0]])]
     );
 
     // Make a change to the space...
@@ -590,7 +590,7 @@ fn instances_dont_dirty_mesh_when_space_changes() {
         panic!("unwanted render data update: {rdu:#?}");
     });
 
-    assert_eq!(tester.instances(), vec![(index_of_anim, vec![[2, 0, 0]]),]);
+    assert_eq!(tester.instances(), [(index_of_anim, vec![[2, 0, 0]]),]);
 }
 
 #[test]

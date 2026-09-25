@@ -106,7 +106,7 @@ fn light_texture_write_read(
         let volume = space.bounds().volume().unwrap();
         assert_eq!(
             wrong_texels,
-            vec![],
+            [],
             "out of {volume}, {len} were wrong and {nonzero} were not (correctly both zero)",
             len = wrong_texels.len(),
             nonzero = volume - count_both_zero,

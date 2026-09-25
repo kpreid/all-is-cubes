@@ -1,5 +1,4 @@
 use alloc::boxed::Box;
-use alloc::vec;
 use core::iter;
 
 use either::Either;
@@ -73,16 +72,10 @@ async fn binary_fractal(
             })
             .spawn({
                 let mut spawn = Spawn::looking_at_space(space_bounds, [0., 0.5, 1.]);
-                spawn.set_inventory(
-                    [
-                        free_editing_starter_inventory(true),
-                        vec![
-                            Tool::InfiniteBlocks(demo_blocks[DemoBlocks::Lamp(true)].clone())
-                                .into(),
-                        ],
-                    ]
-                    .concat(),
-                );
+                let mut inventory = free_editing_starter_inventory(true);
+                inventory
+                    .push(Tool::InfiniteBlocks(demo_blocks[DemoBlocks::Lamp(true)].clone()).into());
+                spawn.set_inventory(inventory);
                 spawn
             })
             .build()

@@ -1,4 +1,3 @@
-use alloc::vec;
 use core::fmt;
 
 use descriptive_unwrap::ResultExt as _;
@@ -133,10 +132,8 @@ impl Icons {
                             // TODO: Figure out abstractions to not need so much fiddly custom code
                             let bcolor = Block::from(Rgba::from_srgb8(color));
                             match color {
-                                [0, 0, 0, 255] => VoxelBrush::new(vec![([0, 15, 0], dots(0))]),
-                                [0x85, 0x85, 0x85, 255] => {
-                                    VoxelBrush::new(vec![([0, 0, 0], dots(0))])
-                                }
+                                [0, 0, 0, 255] => VoxelBrush::new([([0, 15, 0], dots(0))]),
+                                [0x85, 0x85, 0x85, 255] => VoxelBrush::new([([0, 0, 0], dots(0))]),
                                 [0, 127, 0, 255] => ybrush(&dots),
                                 [0, 255, 0, 255] => ybrush(|y| dots(y + 1)),
                                 [255, 0, 0, 255] => ybrush(|_| bcolor.clone()),

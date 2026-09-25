@@ -593,7 +593,6 @@ mod tests {
     use crate::math::lines::Wireframe as _;
     use crate::math::ps64;
     use alloc::format;
-    use alloc::vec;
     use alloc::vec::Vec;
     use euclid::point3;
 
@@ -758,7 +757,7 @@ mod tests {
     fn corner_points() {
         assert_eq!(
             Vec::from_iter(Cube::new(10, 20, 30).aab().corner_points()),
-            vec![
+            [
                 point3(10., 20., 30.),
                 point3(11., 20., 30.),
                 point3(10., 21., 30.),

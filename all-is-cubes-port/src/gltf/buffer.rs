@@ -819,7 +819,7 @@ mod tests {
         assert_eq!(buffer_object.uri.as_deref(), Some("basepath.glbin"));
         assert_eq!(
             fs::read(temp_dir.path().join("basepath.glbin")).unwrap(),
-            vec![1, 2, 3, 0, 4, 0, 0, 0, 5]
+            [1, 2, 3, 0, 4, 0, 0, 0, 5]
         );
     }
 
@@ -861,7 +861,7 @@ mod tests {
         temp_file.seek(io::SeekFrom::Start(0)).unwrap();
         let mut contents_of_temp_file = Vec::new();
         temp_file.read_to_end(&mut contents_of_temp_file).unwrap();
-        assert_eq!(contents_of_temp_file, vec![1, 2, 3, 0, 4]);
+        assert_eq!(contents_of_temp_file, [1, 2, 3, 0, 4]);
     }
 
     #[test]
