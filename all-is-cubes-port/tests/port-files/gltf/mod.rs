@@ -57,7 +57,7 @@ fn gltf_smoke_test() {
     let mesh_index = mesh_index.unwrap();
     writer.add_frame(
         None,
-        &[MeshInstance {
+        vec![MeshInstance {
             mesh: mesh_index,
             translation: [0, 0, 0],
         }],

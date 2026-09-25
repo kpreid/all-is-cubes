@@ -177,7 +177,7 @@ pub(super) fn start_gltf_writing(
                     MeshRecordMsg::FinishFrame(frame_number, camera, meshes) => {
                         let flaws = writer.add_frame(
                             Some(&camera),
-                            &meshes
+                            meshes
                                 .into_iter()
                                 .filter_map(|(index_cell, translation)| {
                                     let opt_mesh =
@@ -190,7 +190,7 @@ pub(super) fn start_gltf_writing(
                                         translation: translation.into(),
                                     })
                                 })
-                                .collect::<Vec<_>>(),
+                                .collect(),
                         );
                         status_notifier.notify(&super::Status {
                             frame_number,

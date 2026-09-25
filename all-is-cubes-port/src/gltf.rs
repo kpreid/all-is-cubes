@@ -195,7 +195,7 @@ impl GltfWriter {
     pub fn add_frame(
         &mut self,
         our_camera: Option<&Camera>,
-        visible_meshes: &[MeshInstance],
+        visible_mesh_instances: Vec<MeshInstance>,
     ) -> Flaws {
         // Create camera if and only if one was given and we didn't have one.
         if self.camera.is_none()
@@ -204,12 +204,12 @@ impl GltfWriter {
             self.camera = Some(self.root.push(convert_camera(None, our_camera)));
         }
 
+        self.any_time_visible_mesh_instances.extend(visible_mesh_instances.iter());
         self.frame_states.push(FrameState {
-            visible_mesh_instances: visible_meshes.to_vec(),
+            visible_mesh_instances,
             camera_transform: our_camera
                 .map_or_else(ViewTransform::identity, |camera| camera.view_transform()),
         });
-        self.any_time_visible_mesh_instances.extend(visible_meshes.iter());
 
         // TODO: report only flaws from this frame
         self.flaws
