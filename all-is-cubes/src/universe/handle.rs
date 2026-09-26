@@ -666,6 +666,13 @@ impl<T: 'static> Handle<T> {
     }
 }
 
+// In the event that a handle’s state is corrupted by unexpected unwinding (which shouldn’t happen
+// unless we have a bug), it is very unlikely that keeping it from crossing an unwind boundary will
+// improve the situation. Therefore, always implement *UnwindSafe even if the state mutex provided
+// by `bevy_platform` doesn’t support poisoning.
+impl<T> core::panic::UnwindSafe for Handle<T> {}
+impl<T> core::panic::RefUnwindSafe for Handle<T> {}
+
 impl<T: fmt::Debug + 'static> fmt::Debug for Handle<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO: Maybe print dead handles differently?
