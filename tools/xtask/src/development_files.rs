@@ -314,7 +314,7 @@ fn generate_vscode_tasks(metadata: &cargo_metadata::Metadata, quiet_tasks: bool)
                     .unwrap_or_else(|| panic!("failed to find package {package_name:?}"))
                     .targets
                     .iter()
-                    .any(|t| t.is_bench())
+                    .any(cargo_metadata::Target::is_bench)
             })
             .cloned()
             .collect();

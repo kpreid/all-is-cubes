@@ -113,8 +113,8 @@ pub(crate) async fn install_dungeon_blocks(
                             .shrink(FaceMap::symmetric([2, 0, 2]))
                             .unwrap(),
                             |p| {
-                                let mid =
-                                    (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
+                                let mid = (p.lower_bounds() * 2 - center_point_doubled)
+                                    .map(GridCoordinate::abs);
                                 if mid.x.max(mid.z) + (mid.y / 2) < resolution_g {
                                     Some(&body_block)
                                 } else {

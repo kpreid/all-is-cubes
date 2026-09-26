@@ -79,7 +79,7 @@ pub fn install(
         let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes")
             .default_enabled(true)
             .with_blueprint(rg::create_blueprint(
-                &mut kinds.iter().flat_map(|kind| kind.stems()),
+                &mut kinds.iter().flat_map(RerunDataKind::stems),
             ))
             .connect_grpc()
             .unwrap_or_else(|e| {

@@ -182,7 +182,9 @@ impl FpsCounter {
             .and_then(|duration| PositiveSign::try_from(duration.as_secs_f64()).ok());
         if let Some(this_seconds) = this_seconds {
             self.average_frame_time_seconds = Some(
-                if let Some(previous) = self.average_frame_time_seconds.filter(|v| v.is_finite()) {
+                if let Some(previous) =
+                    self.average_frame_time_seconds.filter(PositiveSign::is_finite)
+                {
                     const MIX: ZeroOne<f64> = zo64(1.0 / 8.0);
                     this_seconds * MIX + previous * MIX.complement()
                 } else {

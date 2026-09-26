@@ -170,7 +170,7 @@ fn build_ttf(font: &FontDef, font_name: &str) -> Result<Vec<u8>, ExportError> {
     let max_glyph_bounding_box = glyph_contours
         .iter()
         .filter(|g| !g.is_empty())
-        .map(|g| g.control_box())
+        .map(kurbo::BezPath::control_box)
         .reduce(|a, b| a.union(b))
         .unwrap_or(kurbo::Rect::default());
 

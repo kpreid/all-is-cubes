@@ -293,6 +293,10 @@ mod tests {
     }
 
     #[test]
+    #[allow(
+        clippy::redundant_closure_for_method_calls,
+        reason = "https://github.com/rust-lang/rust-clippy/issues/9335"
+    )]
     fn updating_is_equivalent() {
         let mut universe = Universe::new();
         let mut space = Space::empty_positive(3, 2, 3);

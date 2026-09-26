@@ -198,7 +198,7 @@ impl<const MBM: usize> CsmTester<MBM> {
         let mut by_block: Vec<_> = self
             .csm
             .iter_chunks()
-            .flat_map(|chunk| chunk.block_instances())
+            .flat_map(dynamic::ChunkMesh::block_instances)
             .collect::<dynamic::InstanceCollector>()
             .iter()
             .map(|(block_index, cubes)| {

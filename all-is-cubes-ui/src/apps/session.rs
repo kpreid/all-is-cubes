@@ -735,7 +735,7 @@ impl Shuttle {
     /// Implementation of click interpretation logic, called by [`Self::click`].
     /// TODO: This function needs tests.
     fn click_impl(&mut self, button: usize) -> Result<(), ToolError> {
-        let cursor_space = self.cursor_result.as_ref().map(|c| c.space());
+        let cursor_space = self.cursor_result.as_ref().map(Cursor::space);
         // TODO: A better condition for this would be "is one of the spaces in the UI universe"
         if let Some(ui) = self
             .ui
@@ -1402,7 +1402,7 @@ impl MainTaskContext {
     /// any reason. If it is successful, the future never resolves. It is not necessary to poll
     /// the future if the result value is not wanted.
     pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static + use<> {
-        self.with_ref(|shuttle| shuttle.quit())
+        self.with_ref(Shuttle::quit)
     }
 
     /// Add a custom command button, which will be displayed in the pause menu.

@@ -15,7 +15,7 @@ use all_is_cubes::universe::{self, Handle, Universe};
 use all_is_cubes_render::camera::{self, NdcPoint2, NominalPixel, Viewport};
 
 use crate::settings;
-use crate::ui_content::ignore_command_channel_closure;
+use crate::ui_content::{Vui, ignore_command_channel_closure};
 use crate::{apps::ControlMessage, settings::Settings};
 
 type MousePoint = Point2D<f64, NominalPixel>;
@@ -314,7 +314,7 @@ impl InputProcessor {
         // TODO: this should be done *after* a session step in addition to before, for lower
         // latency / immediate effects -- but currently this is the only place we have
         // `InputTargets` available.
-        if ui.is_some_and(|ui| ui.should_focus_on_ui()) && self.mouselook_mode.get() {
+        if ui.is_some_and(Vui::should_focus_on_ui) && self.mouselook_mode.get() {
             self.mouselook_mode.set(false)
         }
 
@@ -519,7 +519,7 @@ pub(crate) struct InputTargets<'a> {
     // TODO: replace cells with control channel?
     // TODO: make the control channel a type alias?
     pub control_channel: Option<&'a flume::Sender<ControlMessage>>,
-    pub ui: Option<&'a crate::ui_content::Vui>,
+    pub ui: Option<&'a Vui>,
 }
 
 /// A platform-neutral representation of keyboard keys for [`InputProcessor`].
@@ -605,7 +605,7 @@ mod tests {
         // TODO: This test is both verbose and expensive.
         // We need simpler way to create a cheap Vui for a test, or some abstraction here.
         let (cctx, _) = flume::bounded(1);
-        let mut ui = crate::ui_content::Vui::new(crate::ui_content::UiTargets {
+        let mut ui = Vui::new(crate::ui_content::UiTargets {
             mouselook_mode: listen::constant(false),
             character_source: listen::constant(None),
             paused: paused.as_source(),

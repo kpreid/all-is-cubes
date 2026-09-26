@@ -491,7 +491,7 @@ mod inv {
             S: Serializer,
         {
             schema::InventorySer::InventoryV1 {
-                slots: self.slots.iter().map(|slot| slot.into()).collect(),
+                slots: self.slots.iter().map(Into::into).collect(),
             }
             .serialize(serializer)
         }
@@ -504,7 +504,7 @@ mod inv {
         {
             match schema::InventorySer::deserialize(deserializer)? {
                 schema::InventorySer::InventoryV1 { slots } => Ok(Inventory {
-                    slots: slots.into_iter().map(|s| s.into()).collect(),
+                    slots: slots.into_iter().map(Into::into).collect(),
                 }),
             }
         }

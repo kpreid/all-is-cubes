@@ -345,7 +345,8 @@ pub(in crate::atrium) async fn install_atrium_blocks(
                 .display_name("Large Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(RESOLUTION, |p| {
-                    let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
+                    let mid =
+                        (p.lower_bounds() * 2 - center_point_doubled).map(GridCoordinate::abs);
                     if mid.x + mid.z < RESOLUTION_G * 6 / 4 {
                         bottom_grout_pattern(p)
                     } else {
@@ -357,7 +358,8 @@ pub(in crate::atrium) async fn install_atrium_blocks(
                 .display_name("Square Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(RESOLUTION, |p| {
-                    let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
+                    let mid =
+                        (p.lower_bounds() * 2 - center_point_doubled).map(GridCoordinate::abs);
                     if mid.x.max(p.z) < RESOLUTION_G * 6 / 4 {
                         bottom_grout_pattern(p)
                     } else {
@@ -369,7 +371,8 @@ pub(in crate::atrium) async fn install_atrium_blocks(
                 .display_name("Round Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
                 .voxels_fn(RESOLUTION, |p| {
-                    let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
+                    let mid =
+                        (p.lower_bounds() * 2 - center_point_doubled).map(GridCoordinate::abs);
                     if mid.x.pow(2) + mid.z.pow(2) < (RESOLUTION_G * 3 / 4).pow(2) {
                         bottom_grout_pattern(p)
                     } else {
@@ -428,8 +431,8 @@ pub(in crate::atrium) async fn install_atrium_blocks(
                                 [RESOLUTION_G, RESOLUTION_G / 2, RESOLUTION_G],
                             ),
                             |p| {
-                                let mid =
-                                    (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
+                                let mid = (p.lower_bounds() * 2 - center_point_doubled)
+                                    .map(GridCoordinate::abs);
                                 if mid.x.max(mid.z) + (mid.y / 2) < RESOLUTION_G + 4 {
                                     Some(&body_block)
                                 } else {

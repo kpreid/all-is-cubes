@@ -370,7 +370,7 @@ fn try_array_from_fn<T, E, const N: usize>(
     function: impl FnMut(usize) -> Result<T, E>,
 ) -> Result<[T; N], E> {
     let array_of_results: [Result<T, E>; N] = core::array::from_fn(function);
-    if array_of_results.iter().any(|result| result.is_err()) {
+    if array_of_results.iter().any(Result::is_err) {
         Err(array_of_results.into_iter().find_map(Result::err).none_is_unreachable())
     } else {
         Ok(array_of_results.map(|result| match result {

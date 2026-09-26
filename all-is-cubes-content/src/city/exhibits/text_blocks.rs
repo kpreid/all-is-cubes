@@ -114,7 +114,7 @@ fn TEXT(ctx: Context<'_>) {
                 .rendering_bounding_blocks()
                 .translate(ex.offset)
         })
-        .reduce(|a, b| a.union_box(b))
+        .reduce(GridAab::union_box)
         .unwrap();
 
     let mut space = Space::builder(bounds_for_text).build();

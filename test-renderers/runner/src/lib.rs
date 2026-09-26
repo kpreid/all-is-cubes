@@ -47,7 +47,7 @@ pub fn initialize_logging(args: &HarnessArgs) {
             use io::Write as _;
 
             if self.enabled(record.metadata()) {
-                let test_id: Option<TestId> = TEST_ID.try_with(|id| id.clone()).ok();
+                let test_id: Option<TestId> = TEST_ID.try_with(Clone::clone).ok();
                 let mut lock = io::stderr().lock();
                 _ = time::OffsetDateTime::now_utc().to_offset(time::UtcOffset::UTC).format_into(
                     &mut lock,

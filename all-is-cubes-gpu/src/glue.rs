@@ -344,7 +344,7 @@ impl ResizingBuffer {
         descriptor: &wgpu::BufferDescriptor<'_>,
     ) {
         let new_size = descriptor.size;
-        if self.buffer.as_ref().map_or(0, |b| b.size()) >= new_size {
+        if self.buffer.as_ref().map_or(0, wgpu::Buffer::size) >= new_size {
             // Already sufficient size
         } else {
             // Explicitly destroy the old buffer, because we know it will not be used any more

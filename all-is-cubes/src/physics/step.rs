@@ -4,8 +4,6 @@
     reason = "Bevy systems"
 )]
 
-#[cfg(feature = "rerun")]
-use alloc::vec::Vec;
 use core::fmt;
 
 /// Acts as polyfill for float methods
@@ -45,6 +43,15 @@ use crate::space::{self, Space};
 use crate::time::{self, Tick};
 use crate::universe;
 use crate::util::{ConciseDebug, NoAlternateDebug};
+
+#[cfg(feature = "rerun")]
+use {
+    crate::content::palette,
+    crate::math::ps64,
+    alloc::format,
+    alloc::{vec, vec::Vec},
+    euclid::Point3D,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -454,11 +461,6 @@ pub(crate) fn step_one_body(
 
     #[cfg(feature = "rerun")]
     {
-        use crate::content::palette;
-        use crate::math::ps64;
-        use alloc::format;
-        use alloc::vec;
-
         // Log step info as text.
         rerun_destination.log(
             &rg::entity_path!["step_info"],
@@ -549,7 +551,7 @@ pub(crate) fn step_one_body(
 
         // Our movement arrows shall be logged relative to all collision box corners
         // for legibility of how they interact with things.
-        let arrow_offsets = || body.collision_box.corner_points().map(|p| p.to_vector());
+        let arrow_offsets = || body.collision_box.corner_points().map(Point3D::to_vector);
 
         // Log push_out operation
         // TODO: should this be just a maybe-fourth movement arrow?

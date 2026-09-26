@@ -213,7 +213,7 @@ impl AicDesktopArgs {
 static GRAPHICS_HELP_LONG: LazyLock<String> = LazyLock::new(|| {
     let pv_iter = GraphicsType::value_variants()
         .iter()
-        .filter_map(|v| v.to_possible_value())
+        .filter_map(ValueEnum::to_possible_value)
         .filter(|pv| !pv.is_hide_set());
 
     let max_width = pv_iter.clone().map(|pv| pv.get_name().len()).max().unwrap_or(0);

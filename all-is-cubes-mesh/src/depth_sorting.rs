@@ -396,7 +396,7 @@ pub(crate) fn store_transparent_indices<M: MeshTypes>(
 ) -> Result<(), TooComplex> {
     let input_index_count = transparent_indices_in.map_ref(|_, iv| iv.len()).sum();
 
-    if !M::Vertex::WANTS_DEPTH_SORTING || transparent_indices_in.values().all(|v| v.is_empty()) {
+    if !M::Vertex::WANTS_DEPTH_SORTING || transparent_indices_in.values().all(IndexVec::is_empty) {
         // Either there is nothing to sort (and all ranges will be length 0),
         // or the destination doesn't want sorting anyway. In either case, write the
         // indices once and fill out transparent_ranges with copies of that range.

@@ -803,7 +803,7 @@ fn space_with_sparse_indices() {
     // If this assertion fails, then `Space` behavior has changed, which may not be wrong
     // but will invalidate this particular test.
     assert_eq!(
-        Vec::from_iter(space.block_data().iter().map(|d| d.block())),
+        Vec::from_iter(space.block_data().iter().map(space::SpaceBlockData::block)),
         [&AIR, &block0, &AIR, &block2],
     );
 

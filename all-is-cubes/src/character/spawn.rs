@@ -131,9 +131,9 @@ impl serde::Serialize for Spawn {
 
         schema::SpawnSer::SpawnV1 {
             bounds,
-            eye_position: eye_position.map(|p| p.into()),
+            eye_position: eye_position.map(Into::into),
             look_direction: look_direction.into(),
-            inventory: inventory.iter().map(|slot| slot.into()).collect(),
+            inventory: inventory.iter().map(Into::into).collect(),
         }
         .serialize(serializer)
     }
@@ -153,9 +153,9 @@ impl<'de> serde::Deserialize<'de> for Spawn {
                 inventory,
             } => Ok(Spawn {
                 bounds,
-                eye_position: eye_position.map(|p| p.into()),
+                eye_position: eye_position.map(Into::into),
                 look_direction: look_direction.into(),
-                inventory: inventory.into_iter().map(|slot| slot.into()).collect(),
+                inventory: inventory.into_iter().map(Into::into).collect(),
             }),
         }
     }

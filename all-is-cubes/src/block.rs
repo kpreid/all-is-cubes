@@ -408,7 +408,7 @@ impl Block {
         // other applications might care not whether it is *currently* symmetric but whether
         // it can ever change to be asymmetric, for which this is the actual right answer.
         self.primitive().rotationally_symmetric()
-            && self.modifiers().iter().all(|m| m.does_not_introduce_asymmetry())
+            && self.modifiers().iter().all(Modifier::does_not_introduce_asymmetry)
     }
 
     /// Rotates this block by the specified rotation.

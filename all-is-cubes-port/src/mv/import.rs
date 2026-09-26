@@ -132,6 +132,10 @@ pub(crate) async fn dot_vox_data_to_universe(
                 &models_yoked.get()[model_index],
                 mode.treat_models_as_blocks(),
             )?;
+            #[allow(
+                clippy::redundant_closure_for_method_calls,
+                reason = "https://github.com/rust-lang/rust-clippy/issues/9335"
+            )]
             space.mutate(ReadTicket::stub(), |m| m.fast_evaluate_light());
             Ok(space)
         },

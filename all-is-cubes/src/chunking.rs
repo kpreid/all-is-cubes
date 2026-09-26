@@ -804,7 +804,7 @@ mod tests {
             for &q in &seen {
                 assert!(
                     // Either it's the same point mirrored,
-                    p.lower_bounds().map(|s| s.abs()) == q.lower_bounds().map(|s| s.abs())
+                    p.lower_bounds().map(i32::abs) == q.lower_bounds().map(i32::abs)
                         // or it has at least one greater coordinate.
                         || p.x.abs() > q.x.abs()
                         || p.y.abs() > q.y.abs()

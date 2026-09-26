@@ -187,7 +187,7 @@ fn walk_scene_graph<'data>(
                     <[i32; 3]>::try_from(
                         t_string
                             .split(' ')
-                            .map(|s| s.parse::<i32>())
+                            .map(str::parse::<i32>)
                             .collect::<Result<Vec<i32>, _>>()
                             .map_err(|_| mv::DotVoxConversionError::SceneAttributeParse {
                                 scene_index,

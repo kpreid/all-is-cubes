@@ -208,7 +208,7 @@ impl GltfWriter {
         self.frame_states.push(FrameState {
             visible_mesh_instances,
             camera_transform: our_camera
-                .map_or_else(ViewTransform::identity, |camera| camera.view_transform()),
+                .map_or_else(ViewTransform::identity, Camera::view_transform),
         });
 
         // TODO: report only flaws from this frame

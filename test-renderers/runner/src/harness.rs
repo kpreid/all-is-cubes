@@ -255,7 +255,7 @@ where
         // Find if any of the image comparisons failed.
         // TODO: Distinguish “overwritten” from failures.
         let comparison_failure: Option<String> =
-            comparisons.iter().find_map(|entry| entry.describe_failure());
+            comparisons.iter().find_map(ComparisonRecord::describe_failure);
 
         // Print out outcome of test
         match format {

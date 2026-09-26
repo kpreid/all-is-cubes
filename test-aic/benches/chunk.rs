@@ -159,7 +159,7 @@ fn dump_frustum_culling() {
                         camera.aab_in_view(chunk.bounds().into())
                             && chunked_bounds.contains_cube(chunk.0)
                     })
-                    .map(|chunk| chunk.bounds()),
+                    .map(ChunkPos::bounds),
             )
             .with_fill_mode(rg::components::FillMode::TransparentFillMajorWireframe),
         )

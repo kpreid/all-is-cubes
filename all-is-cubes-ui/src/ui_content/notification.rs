@@ -2,7 +2,7 @@
 
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::listen;
@@ -116,7 +116,7 @@ impl Notification {
 
     /// Replace the existing content of the notification.
     pub fn set_content(&self, content: NotificationContent) {
-        *self.shared.content.lock().unwrap_or_else(|poison| poison.into_inner()) = content;
+        *self.shared.content.lock().unwrap_or_else(PoisonError::into_inner) = content;
         self.shared.notifier.notify(&());
     }
 

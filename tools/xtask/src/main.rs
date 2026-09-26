@@ -322,7 +322,7 @@ fn run_command(context: &Context<'_>, command: XtaskCommand) -> Result<(), Actio
             if dry_run {
                 cargo_update_args.push("--dry-run");
             }
-            cargo_update_args.extend(additional_args.iter().map(|s| s.as_str()));
+            cargo_update_args.extend(additional_args.iter().map(String::as_str));
 
             match to {
                 UpdateTo::Locked => {

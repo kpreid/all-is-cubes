@@ -338,7 +338,7 @@ impl Text {
                                 outlined,
                             )
                             .intersection_cubes(bounds_in_this_block)
-                            .map(|aab| aab.interior_iter())
+                            .map(GridAab::interior_iter)
                     {
                         // Draw the glyph’s bounds.
                         for cube in glyph_bounds_intersecting_block {

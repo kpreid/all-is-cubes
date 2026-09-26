@@ -171,7 +171,7 @@ impl SpaceRenderer {
     }
 
     pub(crate) fn space(&mut self) -> Option<&Handle<Space>> {
-        self.csm.as_ref().map(|csm| csm.space())
+        self.csm.as_ref().map(ChunkedSpaceMesh::space)
     }
 
     /// Replace the space being rendered, while preserving some of the resources used to render it.
@@ -188,7 +188,7 @@ impl SpaceRenderer {
         read_ticket: ReadTicket<'_>,
         space: Option<&Handle<Space>>,
     ) -> Result<(), HandleError> {
-        if self.csm.as_ref().map(|csm| csm.space()) == space {
+        if self.space() == space {
             // No change.
             return Ok(());
         }
@@ -798,7 +798,7 @@ impl SpaceRenderer {
     }
 
     pub fn particle_lines(&self) -> impl Iterator<Item = [WgpuLinesVertex; 2]> + '_ {
-        self.particle_sets.iter().flat_map(|p| p.lines())
+        self.particle_sets.iter().flat_map(ParticleSet::lines)
     }
 
     /// Updates the camera buffer in the same way [`Self::draw()`] does,

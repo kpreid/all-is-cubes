@@ -312,7 +312,7 @@ impl EvaluatedBlock {
                 contents.into_iter(),
                 core::iter::repeat_n(inv::Slot::Empty, usize::from(config.inventory_size())),
             )
-            .map(|z| z.into_left())
+            .map(itertools::EitherOrBoth::into_left)
             .collect::<Box<[inv::Slot]>>(),
         );
         self.block.with_modifier(inventory)

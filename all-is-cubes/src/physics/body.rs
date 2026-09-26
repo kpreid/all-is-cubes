@@ -172,7 +172,7 @@ impl Body {
             velocity: Vector3D::zero(),
             collision_box,
             // TODO: should be able to translate by NotNan
-            occupying: collision_box.translate(position.map(|c| c.into_inner()).to_vector()),
+            occupying: collision_box.translate(position.map(NotNan::into_inner).to_vector()),
             flying: false,
             noclip: false,
             yaw: 0.0,

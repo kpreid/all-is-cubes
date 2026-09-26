@@ -182,7 +182,7 @@ impl Character {
             INVISIBLE_SLOT,
         ];
 
-        let look_direction = spawn.look_direction.map(|c| c.into_inner());
+        let look_direction = spawn.look_direction.map(NotNan::into_inner);
         let yaw = f64::atan2(look_direction.x, -look_direction.z).to_degrees();
         let pitch =
             f64::atan2(-look_direction.y, look_direction.z.hypot(look_direction.x)).to_degrees();

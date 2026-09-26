@@ -565,8 +565,8 @@ impl State {
         self.param.step != Vector3D::zero()
         // Also check if we had some kind of arithmetic problem in the state.
         // But permit some positive infinity, because that's just an axis-aligned ray.
-        && !vec_iter(self.t_max).any(|t| t.is_nan())
-        && vec_iter(self.t_max).any(|t| t.is_finite())
+        && !vec_iter(self.t_max).any(f64::is_nan)
+        && vec_iter(self.t_max).any(f64::is_finite)
     }
 
     /// Determine the axis to step on and move in the appropriate direction along that axis.
