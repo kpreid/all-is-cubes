@@ -375,17 +375,19 @@ impl ToneMappingOperator {
 /// [`ToneMappingOperator`].
 ///
 #[doc = include_str!("serde-warning.md")]
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Default, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum ExposureOption {
     /// Constant exposure; light values in the scene are multiplied by this value
     /// before the tone mapping operator is applied.
     Fixed(PositiveSign<f32>),
+
     /// Exposure adjusts to compensate for the actual brightness of the scene.
     ///
     /// Note: If [`GraphicsOptions::lighting_display`] is disabled,
     /// then this currently will act as `Fixed(1.0)`.
+    #[default]
     Automatic,
 }
 
@@ -404,12 +406,6 @@ impl ExposureOption {
             ExposureOption::Fixed(value) => value,
             ExposureOption::Automatic => PositiveSign::<f32>::ONE,
         }
-    }
-}
-
-impl Default for ExposureOption {
-    fn default() -> Self {
-        ExposureOption::Fixed(PositiveSign::<f32>::ONE)
     }
 }
 
@@ -608,7 +604,7 @@ mod tests {
                     fov_y: 90.0,
                     tone_mapping: Clamp,
                     maximum_intensity: inf,
-                    exposure: Fixed(1),
+                    exposure: Automatic,
                     bloom_intensity: 0.125,
                     view_distance: 200.0,
                     lighting_display: Linear,
