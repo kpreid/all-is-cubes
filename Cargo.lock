@@ -64,6 +64,7 @@ dependencies = [
  "macro_rules_attribute",
  "manyfmt",
  "mutants 0.0.4",
+ "non_structural_derive",
  "nosy",
  "num-traits",
  "ordered-float 5.5.0",
@@ -220,6 +221,7 @@ dependencies = [
  "log",
  "macro_rules_attribute",
  "naga-rust-embed",
+ "non_structural_derive",
  "num-traits",
  "pollster",
  "pretty_assertions",
@@ -376,6 +378,7 @@ dependencies = [
  "log",
  "macro_rules_attribute",
  "mutants 0.0.4",
+ "non_structural_derive",
  "num-traits",
  "paste",
  "pretty_assertions",
@@ -3943,6 +3946,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df9761775871bdef83bee530e60050f7e54b1105350d6884eb0fb4f46c2f9405"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "non_structural_derive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aed7569875af28b9afd5a1345c46e0783fb089513900e82b9e9772655052e06b"
+dependencies = [
+ "non_structural_derive_macro",
+]
+
+[[package]]
+name = "non_structural_derive_macro"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31f21ad3edbb941ca9c7b62117ecc8da48b2052d905f9fb206256543c6341506"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+ "synstructure",
 ]
 
 [[package]]

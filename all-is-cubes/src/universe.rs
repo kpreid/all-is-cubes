@@ -126,6 +126,7 @@ mod tests;
 /// [various types]: UniverseMember
 ///
 #[doc = include_str!("save/serde-warning.md")]
+#[non_structural_derive::non_structural_derive(Send, Sync, Unpin)]
 pub struct Universe {
     /// ECS storage for most of the data of the universe.
     ///

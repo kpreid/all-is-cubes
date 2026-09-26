@@ -71,6 +71,7 @@ hashbrown = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 naga-rust-embed = { workspace = true }
+non_structural_derive = { workspace = true }
 num-traits = { workspace = true }
 # Used to implement start_polling() on non-Wasm targets, and in the `rerun` support.
 pollster = { workspace = true }

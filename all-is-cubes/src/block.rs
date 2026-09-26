@@ -91,6 +91,7 @@ mod tests;
 ///
 #[doc = include_str!("save/serde-warning.md")]
 #[derive(Clone)]
+#[non_structural_derive::non_structural_derive(Send, Sync, Unpin, UnwindSafe, RefUnwindSafe)]
 pub struct Block(BlockPtr);
 
 /// Pointer to data of a [`Block`] value.

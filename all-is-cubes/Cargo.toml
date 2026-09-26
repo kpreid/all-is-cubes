@@ -140,6 +140,7 @@ log = { workspace = true }
 macro_rules_attribute = { workspace = true }
 manyfmt = { workspace = true }
 mutants = { workspace = true }
+non_structural_derive = { workspace = true }
 nosy = { workspace = true, features = ["async", "spin-sync"] }
 num-traits = { workspace = true }
 ordered-float = { workspace = true }

@@ -51,6 +51,7 @@ const SHUTTLE_PANIC_MSG: &str = "Shuttle not returned to Session; \
 ///
 /// Once we have multiplayer / client-server support, this will become the client-side
 /// structure.
+#[non_structural_derive::non_structural_derive(Send, Sync, Unpin)]
 pub struct Session {
     /// Determines the timing of simulation and drawing. The caller must arrange
     /// to advance time in the clock.
@@ -1262,6 +1263,7 @@ enum Event {
 }
 
 /// Given to the task of a [`Session::set_main_task()`] to allow manipulating the session.
+#[non_structural_derive::non_structural_derive(Send, Sync, Unpin)]
 pub struct MainTaskContext {
     shuttle: Arc<RwLock<Option<Box<Shuttle>>>>,
     session_event_notifier: Weak<listen::Notifier<Event>>,

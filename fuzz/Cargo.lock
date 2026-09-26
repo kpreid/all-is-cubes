@@ -36,6 +36,7 @@ dependencies = [
  "macro_rules_attribute",
  "manyfmt",
  "mutants 0.0.4",
+ "non_structural_derive",
  "nosy",
  "num-traits",
  "ordered-float",
@@ -107,6 +108,7 @@ dependencies = [
  "itertools",
  "log",
  "naga-rust-embed",
+ "non_structural_derive",
  "num-traits",
  "pollster",
  "rand 0.10.2",
@@ -1223,6 +1225,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "non_structural_derive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aed7569875af28b9afd5a1345c46e0783fb089513900e82b9e9772655052e06b"
+dependencies = [
+ "non_structural_derive_macro",
+]
+
+[[package]]
+name = "non_structural_derive_macro"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31f21ad3edbb941ca9c7b62117ecc8da48b2052d905f9fb206256543c6341506"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+ "synstructure",
+]
+
+[[package]]
 name = "nonmax"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1778,6 +1801,17 @@ name = "sync_wrapper"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bf256ce5efdfa370213c1dabab5935a12e49f2c58d15e9eac2870d3b4f27263"
+
+[[package]]
+name = "synstructure"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
 
 [[package]]
 name = "tempfile"

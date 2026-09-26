@@ -26,6 +26,11 @@ use {crate::RerunFilter, all_is_cubes::rerun_glue as rg};
 /// If you wish to render to an image rather than a surface, use [`headless`][crate::headless]
 /// instead.
 #[derive(Debug)]
+#[cfg_attr(
+    not(target_family = "wasm"),
+    non_structural_derive::non_structural_derive(Send, Sync)
+)]
+#[non_structural_derive::non_structural_derive(Unpin)]
 pub struct SurfaceRenderer {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,

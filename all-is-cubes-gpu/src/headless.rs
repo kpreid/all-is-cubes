@@ -23,6 +23,11 @@ use crate::init;
 /// The builder owns a `wgpu::Device`; all created renderers will share this device.
 /// If the device is lost, a new `Builder` must be created.
 #[derive(Clone, Debug)]
+#[cfg_attr(
+    not(target_family = "wasm"),
+    non_structural_derive::non_structural_derive(Send, Sync)
+)]
+#[non_structural_derive::non_structural_derive(Unpin)]
 pub struct Builder {
     executor: Arc<dyn Executor>,
     pub(crate) adapter: wgpu::Adapter,
@@ -119,6 +124,11 @@ pub struct Renderer {
 
 /// Internals of [`Renderer`] to actually do the rendering.
 #[derive(Debug)]
+#[cfg_attr(
+    not(target_family = "wasm"),
+    non_structural_derive::non_structural_derive(Send, Sync)
+)]
+#[non_structural_derive::non_structural_derive(Unpin)]
 struct RendererImpl {
     adapter_info: wgpu::AdapterInfo,
     device: wgpu::Device,
