@@ -51,7 +51,7 @@ resolver = "2"
 # When changing any of these values, be sure to also update the non-workspace packages
 # as listed above, if applicable.
 edition = "2024"
-rust-version = "1.100"
+rust-version = "1.101"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 # TODO: add homepage = "..." when we have one
 repository = "https://github.com/kpreid/all-is-cubes"
@@ -155,7 +155,6 @@ smallvec = { version = "1.15.2", default-features = false, features = ["union", 
 smol-macros = { version = "0.1.1" } # keep in sync with `smol`, `async-*`
 snapbox = "1.2.2" # keep in sync with `trycmd`
 strum = { version = "0.28.0", default-features = false, features = ["derive"] }
-sync_wrapper = { version = "1.0.2", default-features = false }
 tempfile = { version = "3.27.0", default-features = false }
 time = { version = "0.3.55", default-features = false }
 # Used for HTML templating and escaping.
