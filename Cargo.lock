@@ -233,7 +233,6 @@ dependencies = [
  "send_wrapper",
  "smol-macros",
  "strum 0.28.0",
- "sync_wrapper",
  "visibility",
  "wasm-bindgen-futures",
  "web-sys",
@@ -386,7 +385,6 @@ dependencies = [
  "serde",
  "smol-macros",
  "strum 0.28.0",
- "sync_wrapper",
 ]
 
 [[package]]
