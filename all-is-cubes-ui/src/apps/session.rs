@@ -4,12 +4,12 @@ use alloc::sync::{Arc, Weak};
 use core::fmt;
 use core::mem;
 use core::pin::Pin;
+use core::sync::SyncView;
 use core::task::{Context, Poll, Waker};
 use std::sync::RwLock;
 
 use flume::TryRecvError;
 use futures_core::future::BoxFuture;
-use sync_wrapper::SyncWrapper;
 
 use all_is_cubes::arcstr::{self, ArcStr, literal};
 use all_is_cubes::character::{self, Character, Cursor};
@@ -70,10 +70,10 @@ pub struct Session {
     /// If present, a future that is polled at the beginning of stepping,
     /// which may read or write parts of the session state via the context it was given.
     ///
-    /// The `SyncWrapper` ensures that `Session: Sync` even though this future need not be
+    /// The `SyncView` ensures that `Session: Sync` even though this future need not be
     /// (which is sound because the future is only polled with `&mut Session`).
     ///
-    main_task: Option<SyncWrapper<BoxFuture<'static, ExitMainTask>>>,
+    main_task: Option<SyncView<BoxFuture<'static, ExitMainTask>>>,
 
     /// Jointly owned by the main task.
     /// The `Option` is filled only when the main task is executing.
@@ -274,7 +274,7 @@ impl Session {
             shuttle: self.task_context_inner.clone(),
             session_event_notifier: Arc::downgrade(&self.shuttle().session_event_notifier),
         };
-        self.main_task = Some(SyncWrapper::new(Box::pin(task_ctor(context))));
+        self.main_task = Some(SyncView::new(Box::pin(task_ctor(context))));
     }
 
     /// Returns the current game universe owned by this session.
@@ -469,7 +469,7 @@ impl Session {
             });
 
             let future: Pin<&mut dyn Future<Output = ExitMainTask>> =
-                sync_wrapped_future.get_mut().as_mut();
+                sync_wrapped_future.as_mut().as_mut();
             match future.poll(&mut Context::from_waker(Waker::noop())) {
                 Poll::Pending => {}
                 Poll::Ready(ExitMainTask) => {
