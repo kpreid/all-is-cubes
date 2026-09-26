@@ -109,6 +109,6 @@ pub fn device_descriptor(
 
 /// Use this type when storing a future inside of the renderer, to ensure that the renderer
 /// implements `Sync` despite containing futures that it would poll that need not be `Sync`.
-pub(crate) type SyncBoxFuture<T> = sync_wrapper::SyncFuture<
+pub(crate) type SyncBoxFuture<T> = core::sync::SyncView<
     core::pin::Pin<alloc::boxed::Box<dyn Future<Output = T> + Send + 'static>>,
 >;
