@@ -79,6 +79,7 @@ rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }
 resource = "0.6.0"
 strum = { workspace = true }
+sync_wrapper = { workspace = true }
 visibility = { workspace = true, optional = true }
 web-time = { workspace = true }
 # std feature is needed for `wgpu::util::StagingBelt`

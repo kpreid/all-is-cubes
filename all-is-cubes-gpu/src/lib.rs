@@ -104,3 +104,11 @@ pub fn device_descriptor(
 ) -> wgpu::DeviceDescriptor<'_> {
     EverythingRenderer::device_descriptor(label, available_limits, available_features)
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Use this type when storing a future inside of the renderer, to ensure that the renderer
+/// implements `Sync` despite containing futures that it would poll that need not be `Sync`.
+pub(crate) type SyncBoxFuture<T> = sync_wrapper::SyncFuture<
+    core::pin::Pin<alloc::boxed::Box<dyn Future<Output = T> + Send + 'static>>,
+>;

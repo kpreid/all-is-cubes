@@ -5,15 +5,14 @@ use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
+use core::pin::Pin;
 use core::task;
 use std::sync::LazyLock as Lazy;
 
-use futures_core::future::BoxFuture;
-
 use all_is_cubes::listen;
 
-use crate::Identified;
 use crate::reloadable::{Reloadable, reloadable_str};
+use crate::{Identified, SyncBoxFuture};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -95,7 +94,7 @@ pub(crate) struct ReloadableShader {
     source: listen::DynSource<Arc<str>>,
     dirty: listen::Flag,
     current_module: Identified<wgpu::ShaderModule>,
-    next_module: Option<BoxFuture<'static, Result<wgpu::ShaderModule, wgpu::Error>>>,
+    next_module: Option<SyncBoxFuture<Result<wgpu::ShaderModule, wgpu::Error>>>,
 }
 
 impl ReloadableShader {
@@ -145,12 +144,12 @@ impl ReloadableShader {
             #[cfg(target_family = "wasm")]
             let module_future = send_wrapper::SendWrapper::new(module_future);
 
-            self.next_module = Some(Box::pin(module_future));
+            self.next_module = Some(SyncBoxFuture::new(Box::pin(module_future)));
         }
 
         if let Some(f) = self.next_module.as_mut()
             && let task::Poll::Ready(result) =
-                f.as_mut().poll(&mut task::Context::from_waker(task::Waker::noop()))
+                Pin::new(f).poll(&mut task::Context::from_waker(task::Waker::noop()))
         {
             self.next_module = None;
             match result {

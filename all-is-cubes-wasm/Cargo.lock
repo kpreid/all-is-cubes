@@ -120,6 +120,7 @@ dependencies = [
  "resource",
  "send_wrapper",
  "strum",
+ "sync_wrapper",
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",

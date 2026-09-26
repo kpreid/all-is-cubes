@@ -3,17 +3,15 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use futures_core::future::BoxFuture;
-
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes_render::camera::{Camera, ImageSize, Viewport};
 
 use crate::camera::ShaderSpaceCamera;
 use crate::common::Memo;
 use crate::glue::{buffer_size_of, size2d_to_extent};
-use crate::init;
 use crate::pipelines::Pipelines;
 use crate::shaders::rerun_copy::RerunCopyCamera;
+use crate::{SyncBoxFuture, init};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -21,7 +19,7 @@ pub(crate) struct RerunImageExport {
     device: wgpu::Device,
 
     destination: rg::Destination,
-    image_copy_future: Option<BoxFuture<'static, RerunImageCopyOutput>>,
+    image_copy_future: Option<SyncBoxFuture<RerunImageCopyOutput>>,
 
     /// Intermediate textures used for format conversions.
     /// The texture ID is of the scene color texture we need to read.
@@ -259,7 +257,7 @@ fn perform_image_copy(
     srgb_scene_texture: &wgpu::Texture,
     depth_texture: &wgpu::Texture,
     camera: &Camera,
-) -> BoxFuture<'static, RerunImageCopyOutput> {
+) -> SyncBoxFuture<RerunImageCopyOutput> {
     let color_future = init::get_texels_from_gpu::<u8>(device, queue, srgb_scene_texture, 4);
     let depth_future = init::get_texels_from_gpu::<f32>(device, queue, depth_texture, 1);
     let size = srgb_scene_texture.size();
@@ -275,7 +273,7 @@ fn perform_image_copy(
         camera.view_distance().into_inner(),
     ]);
 
-    Box::pin(async move {
+    SyncBoxFuture::new(Box::pin(async move {
         let color_data: Vec<u8> = color_future.await;
         let depth_data: Vec<f32> = depth_future.await;
 
@@ -295,7 +293,7 @@ fn perform_image_copy(
             pinhole,
             transform,
         )
-    })
+    }))
 }
 
 /// Policy about how to downsample the scene to produce a sane amount of Rerun data.
