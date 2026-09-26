@@ -162,6 +162,7 @@ where
         .collect();
 
     // Find all unique universe_futures.
+    #[allow(clippy::mutable_key_type)]
     let universe_future_set: HashSet<UniverseFuture> = filtered_test_table
         .values()
         .filter_map(|test_case| test_case.universe_source.clone())
