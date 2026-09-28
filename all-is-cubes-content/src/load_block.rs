@@ -27,12 +27,15 @@ use alloc::format;
 use alloc::vec::Vec;
 
 use all_is_cubes::block::{self, Resolution};
-use all_is_cubes::content::load_image::{LazyImage, block_from_image};
+use all_is_cubes::content::load_image::block_from_image;
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Rgba};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
+
+// for convenience, incorporate key items from of `load_image`
+pub use all_is_cubes::content::load_image::{LazyImage, include_image};
 
 #[cfg(doc)]
 use crate::load_block; // self, for documentation
@@ -87,18 +90,24 @@ pub enum PrimitiveOrSuch {
 pub struct Vox {
     // TODO: support specifying emission mapping (instead of color or duplicated, and scale factor)
     pub collision: block::BlockCollision,
+
+    /// If `Some`, then pretend the pixel color is the given color, ignoring all components
+    /// including alpha.
+    pub replace_color: Option<Rgba>,
 }
 
 impl Vox {
     /// The values which are also the values used by `Block as From<Rgba>`.
     pub const DEFAULT: Self = Self {
         collision: block::BlockCollision::Hard,
+        replace_color: None,
     };
 
     /// When these atom attributes are specified, [`block::AIR`] is used instead of a newly
     /// defined block, if the color is transparent.
     pub const DENOTES_AIR: Self = Self {
         collision: block::Evoxel::AIR.collision,
+        replace_color: None,
     };
 }
 
@@ -180,8 +189,10 @@ impl Context<'_> {
                 // Stub ticket is OK because all blocks used have no indirection.
                 block_from_image(ReadTicket::stub(), image, rotation, &|pixel: [u8; 4]| {
                     let is_invisible = pixel[3] == 0;
-                    let voxel_config @ &Vox { collision } =
-                        if is_invisible { &invisible } else { &visible };
+                    let voxel_config @ &Vox {
+                        collision,
+                        replace_color,
+                    } = if is_invisible { &invisible } else { &visible };
 
                     // If the provided `invisible` value is equivalent to what `AIR` would be,
                     // then make the brush empty to save work and also to use `AIR` in those places.
@@ -191,7 +202,7 @@ impl Context<'_> {
                         VoxelBrush::EMPTY_REF.clone()
                     } else {
                         let atom = block::Block::from(block::Atom {
-                            color: Rgba::from_srgb8(pixel),
+                            color: replace_color.unwrap_or_else(|| Rgba::from_srgb8(pixel)),
                             emission: Rgb::ZERO,
                             collision,
                         });

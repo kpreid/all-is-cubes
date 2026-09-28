@@ -22,7 +22,6 @@ use all_is_cubes::block::{
     self, AIR, AnimationHint, Block, BlockCollision, BlockDef, Resolution::*,
     RotationPlacementRule, TickAction,
 };
-use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{Vector3D, point3};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
@@ -34,13 +33,13 @@ use all_is_cubes::op::Operation;
 use all_is_cubes::sound;
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::time;
-use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
+use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
 
 use crate::alg::{gradient_lookup, scale_color, square_radius};
 use crate::landscape::install_landscape_blocks;
 use crate::load_block as lb;
-use crate::load_image::{block_from_image, default_srgb, include_image, space_from_image};
+use crate::load_image::{default_srgb, include_image, space_from_image};
 use crate::palette;
 
 // -------------------------------------------------------------------------------------------------
@@ -730,22 +729,39 @@ fn demo_blocks_generator(
                 .build_txn(txn),
 
             Greebly => {
-                let image = include_image!("blocks/greeble.png");
-                let carve_block = block_from_image(
-                    ReadTicket::stub(),
-                    image,
-                    GridRotation::IDENTITY,
-                    // cover the entire bounds of the image, ignoring color
-                    &|_| VoxelBrush::single(block::from_color!(Rgba::WHITE)),
-                )?
-                .build_txn(txn);
-                let image_block = block_from_image(
-                    ReadTicket::stub(),
-                    image,
-                    GridRotation::IDENTITY,
-                    &default_srgb,
-                )?
-                .build_txn(txn);
+                const DEFS: [lb::Block; 2] = {
+                    let image = lb::include_image!("blocks/greeble.png");
+                    let white = lb::Vox {
+                        collision: BlockCollision::Hard,
+                        replace_color: Some(Rgba::WHITE),
+                    };
+                    [
+                        lb::Block {
+                            primitive: lb::PrimitiveOrSuch::Image {
+                                image,
+                                rotation: GridRotation::IDENTITY,
+                                extrusion: &[0..1],
+                                // cover the entire bounds of the image, ignoring color
+                                visible: white,
+                                invisible: white,
+                            },
+                            modifiers: &[],
+                        },
+                        lb::Block {
+                            primitive: lb::PrimitiveOrSuch::Image {
+                                image,
+                                rotation: GridRotation::IDENTITY,
+                                extrusion: &[0..1],
+                                visible: lb::Vox::DEFAULT,
+                                invisible: lb::Vox::DENOTES_AIR,
+                            },
+                            modifiers: &[],
+                        },
+                    ]
+                };
+                let [carve_block, image_block] = DEFS;
+                let carve_block = carve_block.load(txn)?;
+                let image_block = image_block.load(txn)?;
 
                 compose_block_from_faces(
                     Block::builder()
