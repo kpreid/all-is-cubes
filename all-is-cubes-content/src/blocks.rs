@@ -772,7 +772,7 @@ fn demo_blocks_generator(
                             primitive: lb::PrimitiveOrSuch::Image {
                                 image,
                                 rotation: GridRotation::IDENTITY,
-                                extrusion: &[0..1],
+                                expansion: lb::Expansion::Extrude(&[0..1]),
                                 // cover the entire bounds of the image, ignoring color
                                 visible: white,
                                 invisible: white,
@@ -783,7 +783,7 @@ fn demo_blocks_generator(
                             primitive: lb::PrimitiveOrSuch::Image {
                                 image,
                                 rotation: GridRotation::IDENTITY,
-                                extrusion: &[0..1],
+                                expansion: lb::Expansion::Extrude(&[0..1]),
                                 visible: lb::Vox::DEFAULT,
                                 invisible: lb::Vox::DENOTES_AIR,
                             },

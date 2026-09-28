@@ -149,7 +149,7 @@ pub(crate) async fn install_dungeon_blocks(
                     primitive: lb::PrimitiveOrSuch::Image {
                         image: include_image!("floor.png"),
                         rotation: GridRotation::RXZY,
-                        extrusion: &[0..32], // TODO: "same as image resolution" should be an option
+                        expansion: lb::Expansion::Extrude(&[0..32]), // TODO: "same as image resolution" should be an option
                         visible: lb::Vox::DEFAULT,
                         invisible: lb::Vox::DEFAULT,
                     },
@@ -178,7 +178,7 @@ pub(crate) async fn install_dungeon_blocks(
                     primitive: lb::PrimitiveOrSuch::Image {
                         image: include_image!("fence.png"),
                         rotation: GridRotation::RXyZ,
-                        extrusion: &[7..9],
+                        expansion: lb::Expansion::Extrude(&[7..9]),
                         visible: lb::Vox::DEFAULT,
                         // selectable collidable transparent blocks,
                         // so it is impossible to reach through the gate.
@@ -196,7 +196,7 @@ pub(crate) async fn install_dungeon_blocks(
                     primitive: lb::PrimitiveOrSuch::Image {
                         image: include_image!("fence-pocket.png"),
                         rotation: GridRotation::RXyZ,
-                        extrusion: &[6..7, 9..10],
+                        expansion: lb::Expansion::Extrude(&[6..7, 9..10]),
                         visible: lb::Vox::DEFAULT,
                         // selectable collidable transparent blocks,
                         // so it is impossible to reach through the gate.
@@ -214,7 +214,7 @@ pub(crate) async fn install_dungeon_blocks(
                     primitive: lb::PrimitiveOrSuch::Image {
                         image: include_image!("gate-lock.png"),
                         rotation: GridRotation::RXyZ,
-                        extrusion: &[5..11],
+                        expansion: lb::Expansion::Extrude(&[5..11]),
                         visible: lb::Vox::DEFAULT,
                         invisible: lb::Vox::DENOTES_AIR,
                     },
@@ -230,7 +230,7 @@ pub(crate) async fn install_dungeon_blocks(
                     primitive: lb::PrimitiveOrSuch::Image {
                         image: include_image!("key.png"),
                         rotation: GridRotation::RXyZ,
-                        extrusion: &[7..9],
+                        expansion: lb::Expansion::Extrude(&[7..9]),
                         visible: lb::Vox::DEFAULT,
                         invisible: lb::Vox::DENOTES_AIR,
                     },

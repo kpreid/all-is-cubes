@@ -67,14 +67,19 @@ pub enum PrimitiveOrSuch {
     Atom(block::Atom),
 
     /// Use the image file that was provided separately.
+    ///
+    /// The resolution of the block is taken from the image.
     Image {
         image: &'static LazyImage,
 
+        /// After the image is expanded into a 3D shape, rotate or reflect it this way.
+        ///
+        /// In many cases, this should be [`GridRotation::RXyZ`] in order to convert from
+        /// Y-down coordinates to Y-up.
         rotation: GridRotation,
 
-        /// Specifies how the image is extruded to the depth axis, as a list of ranges.
-        // TODO: switch to core::range::Range when the range syntax for it is stable
-        extrusion: &'static [core::ops::Range<GridCoordinate>],
+        /// How to expand the 2D image into a 3D voxel shape.
+        expansion: Expansion,
 
         /// Voxel properties to use for image pixels whose alpha is not 0.
         visible: Vox,
@@ -82,6 +87,13 @@ pub enum PrimitiveOrSuch {
         /// Voxel properties to use for image pixels whose alpha is 0.
         invisible: Vox,
     },
+}
+
+/// How to expand a 2D image into a 3D voxel shape.
+pub enum Expansion {
+    /// Extrude the image on the depth axis, possibly discontiguously, within the given ranges.
+    // TODO: switch to core::range::Range when the range syntax for it is stable
+    Extrude(&'static [core::ops::Range<GridCoordinate>]),
 }
 
 /// Specifies the properties of each voxel in the block, except for the color taken from the
@@ -142,7 +154,7 @@ impl Context<'_> {
             PrimitiveOrSuch::Image {
                 image,
                 rotation,
-                extrusion,
+                expansion: Expansion::Extrude(extrusion),
                 visible,
                 invisible,
             } => {
@@ -274,7 +286,7 @@ mod tests {
             primitive: lb::PrimitiveOrSuch::Image {
                 image: IMAGE_2X2,
                 rotation: GridRotation::IDENTITY,
-                extrusion: &[0..2],
+                expansion: lb::Expansion::Extrude(&[0..2]),
                 visible: lb::Vox::DEFAULT,
                 invisible,
             },
@@ -315,7 +327,7 @@ mod tests {
             primitive: lb::PrimitiveOrSuch::Image {
                 image: IMAGE_2X2,
                 rotation: GridRotation::IDENTITY,
-                extrusion: &[0..3],
+                expansion: lb::Expansion::Extrude(&[0..3]),
                 visible: lb::Vox::DEFAULT,
                 invisible: lb::Vox::DEFAULT,
             },

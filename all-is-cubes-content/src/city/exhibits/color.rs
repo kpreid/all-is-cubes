@@ -110,7 +110,9 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
             primitive: lb::PrimitiveOrSuch::Image {
                 image: include_image!("color-card.png"),
                 rotation: GridRotation::RXyZ,
-                extrusion: &[WALL_RESOLUTION.to_grid() - 1..WALL_RESOLUTION.to_grid()],
+                expansion: lb::Expansion::Extrude(&[
+                    WALL_RESOLUTION.to_grid() - 1..WALL_RESOLUTION.to_grid()
+                ]),
                 visible: lb::Vox::DEFAULT,
                 invisible: lb::Vox::DEFAULT,
             },

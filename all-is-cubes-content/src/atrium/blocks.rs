@@ -249,7 +249,7 @@ pub(in crate::atrium) async fn install_atrium_blocks(
             primitive: lb::PrimitiveOrSuch::Image {
                 image: include_image!("banner-shape.png"),
                 rotation: GridRotation::RXZY,
-                extrusion: &[0..RESOLUTION_G],
+                expansion: lb::Expansion::Extrude(&[0..RESOLUTION_G]),
                 visible: lb::Vox::DEFAULT,
                 invisible: lb::Vox::DENOTES_AIR,
             },
@@ -401,7 +401,7 @@ pub(in crate::atrium) async fn install_atrium_blocks(
                     primitive: lb::PrimitiveOrSuch::Image {
                         image: include_image!("banner-trim.png"),
                         rotation: GridRotation::RXyZ,
-                        extrusion: &[0..RESOLUTION_G],
+                        expansion: lb::Expansion::Extrude(&[0..RESOLUTION_G]),
                         visible: lb::Vox::DEFAULT,
                         invisible: lb::Vox::DENOTES_AIR,
                     },
