@@ -27,7 +27,7 @@ use alloc::format;
 use alloc::vec::Vec;
 
 use all_is_cubes::block::{self, Resolution};
-use all_is_cubes::content::load_image::{PngAdapter, block_from_image};
+use all_is_cubes::content::load_image::PngAdapter;
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{Point2D, point2, vec3};
 use all_is_cubes::linking::InGenError;
@@ -157,6 +157,9 @@ impl Context<'_> {
     }
 
     fn build_primitive(&mut self, input: PrimitiveOrSuch) -> Result<block::Block, InGenError> {
+        // Stub ticket is OK because all blocks used have no indirection.
+        let read_ticket = ReadTicket::stub();
+
         Ok(match input {
             PrimitiveOrSuch::Atom(atom) => block::Block::from(atom),
 
@@ -198,6 +201,8 @@ impl Context<'_> {
                     }
                 };
 
+                let block_builder = block::Block::builder().read_ticket(read_ticket);
+
                 // TODO: Make these different modes share more of their logic.
                 match expansion {
                     Expansion::Extrude(extrusion) => {
@@ -237,20 +242,23 @@ impl Context<'_> {
                             ));
                         }
 
-                        // Actually build the block.
-                        // Stub ticket is OK because all blocks used have no indirection.
-                        block_from_image(ReadTicket::stub(), image, rotation, &|pixel: [u8; 4]| {
-                            if let Some(block) = pixel_color_to_voxel(pixel) {
-                                VoxelBrush::new(
-                                    extrusion_cubes.iter().map(|&cube| {
+                        let space = all_is_cubes::content::load_image::space_from_image(
+                            read_ticket,
+                            image,
+                            rotation,
+                            &|pixel: [u8; 4]| {
+                                if let Some(block) = pixel_color_to_voxel(pixel) {
+                                    VoxelBrush::new(extrusion_cubes.iter().map(|&cube| {
                                         (cube.lower_bounds().to_vector(), block.clone())
-                                    }),
-                                )
-                            } else {
-                                VoxelBrush::EMPTY_REF.clone()
-                            }
-                        })?
-                        .build_txn(self.txn)
+                                    }))
+                                } else {
+                                    VoxelBrush::EMPTY_REF.clone()
+                                }
+                            },
+                        )?;
+                        let space_handle = self.txn.insert_anonymous(space);
+
+                        block_builder.voxels_handle(resolution, space_handle).build()
                     }
                     Expansion::Stack => {
                         let expected_image_height = u32::from(resolution).pow(2);
@@ -278,8 +286,7 @@ impl Context<'_> {
                         // TODO: dubious whether we should be using voxels_fn rather than starting
                         // from the image pixels. This way we get voxels_fn()'s empty space
                         // shrinking, but arguably that should be done some other way.
-                        block::Block::builder()
-                            .read_ticket(ReadTicket::stub())
+                        block_builder
                             .voxels_fn(resolution, |cube| {
                                 let cube = transform.transform_cube(cube).lower_bounds();
                                 let image_point: Point2D<i32, ()> =
