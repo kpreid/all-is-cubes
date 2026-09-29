@@ -81,13 +81,14 @@ fn PROJECTILE(ctx: Context<'_>) {
             //     .reversed()
             //     .into()])),
             // ),
-
-            // TODO: Instead of `DestroyTo`, we should have an operation that only
-            // succeeds if there is room to enter empty space here (if the destination
-            // is AIR, for now).
             (
                 Cube::new(0, 1, 0),
-                Operation::DestroyTo(projectile_moving_in),
+                Operation::Replace {
+                    old: AIR,
+                    new: projectile_moving_in,
+                    conserved: false,
+                    optional: false,
+                },
             ),
         ]
         .into(),
