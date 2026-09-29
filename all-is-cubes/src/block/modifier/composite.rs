@@ -408,7 +408,6 @@ struct PaletteBuffer {
     dst_palette: Arc<[Evoxel]>,
 }
 #[allow(
-    unknown_lints, // TODO: after Rust 1.99.0 released (lint is stable), remove unknown_lints and reevaluate what control we want on assert_is_empty
     clippy::assert_is_empty,
     reason = "don’t want to print the whole palette"
 )]
