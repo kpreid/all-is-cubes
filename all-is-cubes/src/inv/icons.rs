@@ -11,7 +11,6 @@ use num_traits::float::FloatCore as _;
 
 use crate::block::{self, AIR, Block, Resolution::*};
 use crate::content::load_image::{block_from_image, default_srgb, include_image};
-use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{FreeCoordinate, GridCoordinate, GridRotation, Rgba, rgb_const, rgba_const};
 use crate::universe::{ReadTicket, UniverseTransaction};
@@ -40,8 +39,6 @@ pub enum Icons {
     CopyFromSpace,
     /// Icon for [`Tool::EditBlock`].
     EditBlock,
-    /// Icon for [`Tool::PushPull`].
-    PushPull,
     /// Icon for [`Tool::Jetpack`].
     Jetpack {
         /// Actually flying?
@@ -63,7 +60,6 @@ impl fmt::Display for Icons {
             Icons::Delete => write!(f, "delete"),
             Icons::CopyFromSpace => write!(f, "copy-from-space"),
             Icons::EditBlock => write!(f, "edit-block"),
-            Icons::PushPull => write!(f, "push"),
             Icons::Jetpack { active } => write!(f, "jetpack/{active}"),
         }
     }
@@ -116,35 +112,6 @@ impl Icons {
                     // TODO: design actual icon
                     .color(Rgba::new(0., 1., 0., 1.))
                     .build(),
-
-                Icons::PushPull => {
-                    let dots = [block::from_color!(Rgba::BLACK), AIR];
-                    let dots = move |y: GridCoordinate| dots[y.rem_euclid(2) as usize].clone();
-                    fn ybrush(mut f: impl FnMut(GridCoordinate) -> Block) -> VoxelBrush<'static> {
-                        VoxelBrush::new((0..16).map(|y| ([0, y, 0], f(y))))
-                    }
-
-                    block_from_image(
-                        ReadTicket::stub(),
-                        include_image!("icons/push.png"),
-                        GridRotation::RXZY,
-                        &|color| {
-                            // TODO: Figure out abstractions to not need so much fiddly custom code
-                            let bcolor = Block::from(Rgba::from_srgb8(color));
-                            match color {
-                                [0, 0, 0, 255] => VoxelBrush::new([([0, 15, 0], dots(0))]),
-                                [0x85, 0x85, 0x85, 255] => VoxelBrush::new([([0, 0, 0], dots(0))]),
-                                [0, 127, 0, 255] => ybrush(&dots),
-                                [0, 255, 0, 255] => ybrush(|y| dots(y + 1)),
-                                [255, 0, 0, 255] => ybrush(|_| bcolor.clone()),
-                                _ => VoxelBrush::new([([0, 0, 0], bcolor)]),
-                            }
-                            .translate([0, 8, 0])
-                        },
-                    )?
-                    .display_name("Push/Pull")
-                    .build_txn(txn)
-                }
 
                 Icons::Jetpack { active } => {
                     let shell_block = block::from_color!(0.5, 0.5, 0.5);

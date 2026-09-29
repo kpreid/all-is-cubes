@@ -11,7 +11,7 @@ use crate::character::{self, Character, CharacterTransaction, Cursor};
 use crate::fluff::Fluff;
 use crate::inv::{self, Icons, InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
-use crate::math::{Cube, Face, GridRotation, Gridgid};
+use crate::math::{Cube, GridRotation, Gridgid};
 use crate::op::{self, Operation};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
@@ -58,9 +58,6 @@ pub enum Tool {
     ///
     /// TODO: This is not yet actually implemented.
     EditBlock,
-
-    /// Push targeted block into adjacent cube.
-    PushPull,
 
     /// Allows flight.
     ///
@@ -196,40 +193,6 @@ impl Tool {
                     Err(handle_err) => Err(ToolError::SpaceHandle(handle_err)),
                 }
             }
-            Self::PushPull => {
-                // TODO: this tool is just a demonstration piece, and so we should
-                // make it possible to express as just a `Tool::Custom`.
-
-                let cursor = input.cursor()?;
-                let direction: Face = cursor
-                    .face_selected()
-                    .opposite()
-                    .try_into()
-                    .map_err(|_| ToolError::NotUsable)?;
-
-                // TODO: Tool should have user-controllable modes for push vs. pull when the
-                // choice is free
-
-                let resolution = block::Resolution::R16;
-                let velocity = 1;
-                let op = Operation::Alt(
-                    [
-                        Operation::StartMove(block::Move::new(direction, resolution, 0, velocity)),
-                        Operation::StartMove(block::Move::new(
-                            direction.opposite(),
-                            resolution,
-                            0,
-                            velocity,
-                        )),
-                    ]
-                    .into(),
-                );
-
-                Ok((
-                    Some(self),
-                    input.apply_operation(&op, GridRotation::IDENTITY, false)?,
-                ))
-            }
             Self::Jetpack { active } => Ok((
                 Some(Self::Jetpack { active: !active }),
                 UniverseTransaction::default(),
@@ -297,7 +260,6 @@ impl Tool {
             }
             Self::CopyFromSpace => Cow::Borrowed(&predefined[Icons::CopyFromSpace]),
             Self::EditBlock => Cow::Borrowed(&predefined[Icons::EditBlock]),
-            Self::PushPull => Cow::Borrowed(&predefined[Icons::PushPull]),
             Self::Jetpack { active } => {
                 Cow::Borrowed(&predefined[Icons::Jetpack { active: *active }])
             }
@@ -321,7 +283,6 @@ impl Tool {
             Tool::InfiniteBlocks(block) => Some(block),
             Tool::CopyFromSpace => None,
             Tool::EditBlock => None,
-            Tool::PushPull => None,
             Tool::Jetpack { .. } => None,
             Tool::Custom {
                 op: _,
@@ -342,7 +303,6 @@ impl Tool {
             Tool::InfiniteBlocks(_) => One,
             Tool::CopyFromSpace => One,
             Tool::EditBlock => One,
-            Tool::PushPull => One,
             Tool::Jetpack { .. } => One,
             Tool::Custom { .. } => One, // TODO: let tool specify
         }
@@ -358,7 +318,6 @@ impl VisitHandles for Tool {
             Tool::InfiniteBlocks(block) => block.visit_handles(visitor),
             Tool::CopyFromSpace => {}
             Tool::EditBlock => {}
-            Tool::PushPull => {}
             Tool::Jetpack { active: _ } => {}
             Tool::Custom {
                 op,

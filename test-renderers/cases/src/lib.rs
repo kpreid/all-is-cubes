@@ -36,7 +36,9 @@ use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::transaction::{self, Merge, Transaction as _};
 use all_is_cubes::universe::{Handle, ReadTicket, StrongHandle, Universe, UniverseTransaction};
 use all_is_cubes::util::yield_progress_for_testing;
-use all_is_cubes_content::{self as content, UniverseTemplate, make_some_voxel_blocks, palette};
+use all_is_cubes_content::{
+    self as content, DemoBlocks, UniverseTemplate, make_some_voxel_blocks, palette,
+};
 use all_is_cubes_render::camera::{
     AntialiasingOption, ExposureOption, FogOption, GraphicsOptions, Layers, LightingOption,
     StandardCameras, ToneMappingOperator, TransparencyOption, UiViewState, ViewTransform, Viewport,
@@ -752,6 +754,9 @@ async fn icons(mut context: RenderTestContext) {
         .unwrap()
         .install(context.universe().read_ticket(), &mut install_txn)
         .unwrap();
+    all_is_cubes_content::install_demo_blocks(&mut install_txn, yield_progress_for_testing())
+        .await
+        .unwrap();
     let widget_theme = WidgetTheme::new(
         context.universe().read_ticket(),
         &mut install_txn,
@@ -770,30 +775,6 @@ async fn icons(mut context: RenderTestContext) {
         let provider = BlockProvider::<E>::using(universe).unwrap();
         keys.into_iter().map(move |key| provider[key].clone())
     }
-
-    let icons = get_blocks(
-        context.universe(),
-        [
-            Icons::Activate,
-            Icons::Delete,
-            Icons::PushPull,
-            Icons::Jetpack { active: false },
-            Icons::Jetpack { active: true },
-        ],
-    );
-
-    let widget_blocks = get_blocks(
-        context.universe(),
-        [
-            WidgetBlocks::Crosshair,
-            WidgetBlocks::ToolbarSlotFrame,
-            WidgetBlocks::ToolbarPointer([
-                ToolbarButtonState::Unmapped,
-                ToolbarButtonState::Mapped,
-                ToolbarButtonState::Pressed,
-            ]),
-        ],
-    );
 
     fn block_from_widget(read_ticket: ReadTicket<'_>, w: &vui::WidgetTree) -> Block {
         let space = w
@@ -837,8 +818,32 @@ async fn icons(mut context: RenderTestContext) {
         )
     });
 
-    let all_blocks: Vec<Block> =
-        icons.chain(widget_blocks).chain(action_widgets).chain(toggle_widgets).collect();
+    // TODO: uncomplicate this ordering when we next have a reason to change the rendered image.
+    // (PushPull used to be in Icons.)
+    let all_blocks: Vec<Block> = get_blocks(context.universe(), [Icons::Activate, Icons::Delete])
+        .chain(get_blocks(context.universe(), [DemoBlocks::PushPull]))
+        .chain(get_blocks(
+            context.universe(),
+            [
+                Icons::Jetpack { active: false },
+                Icons::Jetpack { active: true },
+            ],
+        ))
+        .chain(get_blocks(
+            context.universe(),
+            [
+                WidgetBlocks::Crosshair,
+                WidgetBlocks::ToolbarSlotFrame,
+                WidgetBlocks::ToolbarPointer([
+                    ToolbarButtonState::Unmapped,
+                    ToolbarButtonState::Mapped,
+                    ToolbarButtonState::Pressed,
+                ]),
+            ],
+        ))
+        .chain(action_widgets)
+        .chain(toggle_widgets)
+        .collect();
 
     // Compute layout
     let count = all_blocks.len() as GridCoordinate;

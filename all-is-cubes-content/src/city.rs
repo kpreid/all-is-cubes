@@ -380,21 +380,11 @@ impl<'u> State<'u> {
                 Tool::RemoveBlock { keep: true },
                 Tool::Activate,
                 Tool::Jetpack { active: false },
-                Tool::PushPull,
-                Tool::Custom {
-                    op: Operation::AddModifiers(
-                        [block::Modifier::Rotate(Face::PZ.clockwise())].into(),
-                    ),
-                    icon: block::Block::builder()
-                        .color(rgba_const!(0.0, 0.5, 0.0, 1.0))
-                        .display_name("Rotate Block")
-                        .build(),
-                    rotation_rule: block::RotationPlacementRule::Attach { by: Face::NZ },
-                },
             ]
             .into_iter()
             .map(Slot::from),
         );
+        inventory.extend(demo_tools(demo_blocks));
         for block in [
             &landscape_blocks[LandscapeBlocksAndVariants::Base(LandscapeBlocks::Stone)],
             &demo_blocks[DemoBlocks::Lamp(true)],
@@ -408,6 +398,44 @@ impl<'u> State<'u> {
         spawn.set_inventory(inventory);
         spawn
     }
+}
+
+fn demo_tools(demo_blocks: &BlockProvider<DemoBlocks>) -> impl IntoIterator<Item = Slot> {
+    [
+        // Moves blocks away or towards the clicked face.
+        Tool::Custom {
+            op: {
+                let direction = Face::NZ;
+                let resolution = R16;
+                let velocity = 1;
+                Operation::Alt(
+                    [
+                        Operation::StartMove(block::Move::new(direction, resolution, 0, velocity)),
+                        Operation::StartMove(block::Move::new(
+                            direction.opposite(),
+                            resolution,
+                            0,
+                            velocity,
+                        )),
+                    ]
+                    .into(),
+                )
+            },
+            icon: demo_blocks[DemoBlocks::PushPull].clone(),
+            rotation_rule: block::RotationPlacementRule::Attach { by: Face::NZ },
+        },
+        // Rotates blocks in-place.
+        Tool::Custom {
+            op: Operation::AddModifiers([block::Modifier::Rotate(Face::PZ.clockwise())].into()),
+            // TODO: draw an icon
+            icon: block::Block::builder()
+                .color(rgba_const!(0.0, 0.5, 0.0, 1.0))
+                .display_name("Rotate Block")
+                .build(),
+            rotation_rule: block::RotationPlacementRule::Attach { by: Face::NZ },
+        },
+    ]
+    .map(Slot::from)
 }
 
 async fn place_exhibits_in_city(

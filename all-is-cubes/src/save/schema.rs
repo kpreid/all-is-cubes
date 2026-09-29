@@ -340,7 +340,6 @@ pub(crate) enum ToolSer {
     },
     CopyFromSpaceV1 {},
     EditBlockV1 {},
-    PushPullV1 {},
     JetpackV1 {
         active: bool,
     },
