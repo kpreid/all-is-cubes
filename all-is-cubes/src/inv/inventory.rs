@@ -233,13 +233,14 @@ impl Slot {
         Self::Stack(Self::COUNT_ONE, tool)
     }
 
-    /// Returns the icon to use for this tool in the user interface.
+    /// Returns the icon to use for this tool in the user interface, or [`None`]
+    /// if the slot is empty.
     ///
     /// Note that this is _not_ the same as the block that a [`Tool::Block`] places.
-    pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
+    pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Option<Cow<'a, Block>> {
         match self {
-            Slot::Empty => Cow::Borrowed(&predefined[Icons::EmptySlot]),
-            Slot::Stack(_, tool) => tool.icon(predefined),
+            Slot::Empty => None,
+            Slot::Stack(_, tool) => Some(tool.icon(predefined)),
         }
     }
 

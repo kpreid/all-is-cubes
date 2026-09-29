@@ -98,14 +98,16 @@ impl TooltipState {
                     character.selected_slots().get(1).copied().unwrap_or(inv::Ix::MAX);
                 if let Some(tool) = character.inventory().get(selected_slot).cloned() {
                     // TODO: This logic is redundant with what `InventoryWatcher` does and should be replaced with it.
-                    let icon = tool.icon(icons);
-                    let new_text = match icon
-                        .evaluate(ui_read_ticket.expect_may_fail())
-                        .or_else(|_| icon.evaluate(world_read_ticket.expect_may_fail()))
-                        .ok()
-                    {
-                        Some(ev_block) => ev_block.attributes().display_name.clone(),
+                    let new_text = match tool.icon(icons) {
                         None => literal!(""),
+                        Some(icon) => match icon
+                            .evaluate(ui_read_ticket.expect_may_fail())
+                            .or_else(|_| icon.evaluate(world_read_ticket.expect_may_fail()))
+                            .ok()
+                        {
+                            Some(ev_block) => ev_block.attributes().display_name.clone(),
+                            None => literal!(""),
+                        },
                     };
                     let new_contents = TooltipContents::InventoryItem {
                         source_slot: selected_slot,

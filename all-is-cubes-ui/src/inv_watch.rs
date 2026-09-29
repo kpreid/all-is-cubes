@@ -7,7 +7,7 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use all_is_cubes::block::Block;
+use all_is_cubes::block::{self, Block};
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::inv;
 use all_is_cubes::linking::BlockProvider;
@@ -167,10 +167,13 @@ impl InventoryWatcher {
 
             self.snapshotted_icons.clear();
             self.snapshotted_icons.extend(self.inventory.slots().iter().map(|stack| {
-                vui::quote_and_snapshot_block(
-                    [icons_read_ticket, inventory_read_ticket],
-                    &stack.icon(&self.icon_provider),
-                )
+                match stack.icon(&self.icon_provider) {
+                    Some(icon) => vui::quote_and_snapshot_block(
+                        [icons_read_ticket, inventory_read_ticket],
+                        &icon,
+                    ),
+                    None => block::AIR,
+                }
             }));
         }
         if new_selections != self.selected_slots {

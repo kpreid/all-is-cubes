@@ -29,8 +29,6 @@ use crate::util::YieldProgress;
 #[exhaust(factory_is_self)]
 #[non_exhaustive]
 pub enum Icons {
-    /// Icon for an empty toolbar slot.
-    EmptySlot,
     /// Icon for [`Tool::Activate`],
     Activate,
     /// Icon for [`Tool::RemoveBlock`].
@@ -55,7 +53,6 @@ impl BlockModule for Icons {
 impl fmt::Display for Icons {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Icons::EmptySlot => write!(f, "empty-slot"),
             Icons::Activate => write!(f, "activate"),
             Icons::Delete => write!(f, "delete"),
             Icons::CopyFromSpace => write!(f, "copy-from-space"),
@@ -77,12 +74,6 @@ impl Icons {
 
         BlockProvider::new(p, |key| {
             Ok(match key {
-                Icons::EmptySlot => Block::builder()
-                    .attributes(block::AIR_EVALUATED.attributes().clone())
-                    .display_name("")
-                    .color(Rgba::TRANSPARENT)
-                    .build(),
-
                 Icons::Activate => block_from_image(
                     ReadTicket::stub(),
                     include_image!("icons/hand.png"),
