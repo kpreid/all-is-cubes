@@ -59,7 +59,7 @@ pub use handle::*;
 
 mod handle_set;
 #[doc(hidden)]
-#[expect(clippy::module_name_repetitions, reason = "false positive")]
+#[allow(clippy::module_name_repetitions, reason = "false positive")]
 pub use handle_set::{HandleSet, PartialUniverse};
 
 pub(crate) mod tl;
@@ -863,7 +863,7 @@ impl fmt::Display for DeserializeHandlesError {
 /// a specific need for one of the values.
 #[derive(Clone, Debug, Default, PartialEq, derive_more::AddAssign)]
 #[non_exhaustive]
-#[expect(clippy::module_name_repetitions)] // TODO: consider renaming to StepInfo
+#[allow(clippy::module_name_repetitions)] // TODO: consider renaming to StepInfo
 pub struct UniverseStepInfo {
     #[doc(hidden)]
     pub computation_time: time::Duration,

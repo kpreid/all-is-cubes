@@ -33,7 +33,7 @@ use crate::{
 // -------------------------------------------------------------------------------------------------
 
 mod behaviors;
-#[expect(clippy::module_name_repetitions)] // TODO: consider renaming
+#[allow(clippy::module_name_repetitions)] // TODO: consider renaming
 pub use behaviors::{ActivatableRegion, SpaceBehaviorAttachment};
 
 pub mod builder;

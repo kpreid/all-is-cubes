@@ -27,7 +27,7 @@ pub use hit::{Exception, Hit, Position};
 mod raycast_traits;
 
 mod sr;
-#[expect(clippy::module_name_repetitions)] // TODO: consider renamings of *Raytracer* items
+#[allow(clippy::module_name_repetitions)] // TODO: consider renamings of *Raytracer* items
 pub use sr::{RaytraceInfo, SpaceRaytracer};
 use sr::{TracingBlock, TracingCubeData};
 
