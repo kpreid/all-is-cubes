@@ -22,7 +22,6 @@ use all_is_cubes::block::{
     self, AIR, AnimationHint, Block, BlockCollision, BlockDef, Resolution::*,
     RotationPlacementRule, TickAction,
 };
-use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{Vector3D, point3};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
@@ -34,13 +33,13 @@ use all_is_cubes::op::Operation;
 use all_is_cubes::sound;
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::time;
-use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
+use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
 
 use crate::alg::{gradient_lookup, scale_color, square_radius};
 use crate::landscape::install_landscape_blocks;
 use crate::load_block as lb;
-use crate::load_image::{block_from_image, default_srgb, include_image, space_from_image};
+use crate::load_image::{default_srgb, include_image, space_from_image};
 use crate::palette;
 
 // -------------------------------------------------------------------------------------------------
@@ -166,34 +165,19 @@ fn demo_blocks_generator(
 
     move |provider, txn, key| {
         Ok(match key {
-            PushPull => {
-                let dots = [block::from_color!(Rgba::BLACK), AIR];
-                let dots = move |y: GridCoordinate| dots[y.rem_euclid(2) as usize].clone();
-                fn ybrush(mut f: impl FnMut(GridCoordinate) -> Block) -> VoxelBrush<'static> {
-                    VoxelBrush::new((0..16).map(|y| ([0, y, 0], f(y))))
-                }
-
-                block_from_image(
-                    ReadTicket::stub(),
-                    include_image!("blocks/push.png"),
-                    GridRotation::RXZY,
-                    &|color| {
-                        // TODO: Figure out abstractions to not need so much fiddly custom code
-                        let bcolor = Block::from(Rgba::from_srgb8(color));
-                        match color {
-                            [0, 0, 0, 255] => VoxelBrush::new([([0, 15, 0], dots(0))]),
-                            [0x85, 0x85, 0x85, 255] => VoxelBrush::new([([0, 0, 0], dots(0))]),
-                            [0, 127, 0, 255] => ybrush(&dots),
-                            [0, 255, 0, 255] => ybrush(|y| dots(y + 1)),
-                            [255, 0, 0, 255] => ybrush(|_| bcolor.clone()),
-                            _ => VoxelBrush::new([([0, 0, 0], bcolor)]),
-                        }
-                        .translate([0, 8, 0])
+            PushPull => const {
+                lb::Block {
+                    primitive: lb::PrimitiveOrSuch::Image {
+                        image: include_image!("blocks/push.png"),
+                        rotation: GridRotation::RXZY,
+                        expansion: lb::Expansion::Stack,
+                        visible: lb::Vox::DEFAULT,
+                        invisible: lb::Vox::DENOTES_AIR,
                     },
-                )?
-                .display_name("Push/Pull")
-                .build_txn(txn)
+                    modifiers: &[],
+                }
             }
+            .load(txn)?,
 
             // It's in Rust, gotta have crates ;)
             // TODO: Make this composition of tiles expressible using `load_block`.

@@ -27,9 +27,9 @@ use alloc::format;
 use alloc::vec::Vec;
 
 use all_is_cubes::block::{self, Resolution};
-use all_is_cubes::content::load_image::block_from_image;
+use all_is_cubes::content::load_image::{PngAdapter, block_from_image};
 use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::euclid::vec3;
+use all_is_cubes::euclid::{Point2D, point2, vec3};
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Rgba};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
@@ -91,9 +91,18 @@ pub enum PrimitiveOrSuch {
 
 /// How to expand a 2D image into a 3D voxel shape.
 pub enum Expansion {
-    /// Extrude the image on the depth axis, possibly discontiguously, within the given ranges.
+    /// Extrude the image on the depth (Z before rotation) axis, possibly discontiguously,
+    /// within the given ranges.
+    ///
+    /// The image must be square, and its side length must be some [`Resolution`].
     // TODO: switch to core::range::Range when the range syntax for it is stable
     Extrude(&'static [core::ops::Range<GridCoordinate>]),
+
+    /// Treat the image as a series of slices on the depth (Z before rotation) axis.
+    /// Each slice is assumed to be square, and slices are arranged along the vertical axis,
+    /// so the image must overall have dimensions
+    /// (<var>width</var>, <var>width</var> × <var>slice count</var>).
+    Stack,
 }
 
 /// Specifies the properties of each voxel in the block, except for the color taken from the
@@ -154,79 +163,138 @@ impl Context<'_> {
             PrimitiveOrSuch::Image {
                 image,
                 rotation,
-                expansion: Expansion::Extrude(extrusion),
+                expansion,
                 visible,
                 invisible,
             } => {
                 let path = image.path();
                 let [image_width, image_height] = image.size().into();
                 let Ok(resolution) = Resolution::try_from(image_width) else {
-                    return Err(InGenError::Other(format!(
-                        "image “{path}” has width {image_width}, which is not a valid block resolution"
-                    ).into()));
+                    return Err(InGenError::Other(
+                        format!(
+                            "image “{path}” has width {image_width}, \
+                                which is not a valid block resolution"
+                        )
+                        .into(),
+                    ));
                 };
                 let full_block_bounds = GridAab::for_block(resolution);
 
-                if u32::from(resolution) != image_height {
-                    return Err(InGenError::Other(
-                        format!(
-                            "image “{path}” has height {image_height}, \
-                            which is not the same as its width {image_width}"
-                        )
-                        .into(),
-                    ));
-                }
-
-                // TODO: polishing: make bad data not allocate unbounded memory
-                let extrusion_cubes: Vec<Cube> = extrusion
-                    .iter()
-                    .cloned()
-                    .flatten()
-                    .map(|z| Cube::from(rotation.transform_vector(vec3(0, 0, z)).to_point()))
-                    .collect();
-
-                if let Some(brush_bounds) =
-                    extrusion_cubes.iter().copied().map(Cube::grid_aab).reduce(GridAab::union_cubes)
-                    && !full_block_bounds.contains_box(brush_bounds)
-                {
-                    return Err(InGenError::Other(
-                        format!(
-                            "extrusion bounds {brush_bounds:?} exceeds block resolution {resolution}"
-                        )
-                        .into(),
-                    ));
-                }
-
-                // Actually build the block.
-                // Stub ticket is OK because all blocks used have no indirection.
-                block_from_image(ReadTicket::stub(), image, rotation, &|pixel: [u8; 4]| {
-                    let is_invisible = pixel[3] == 0;
+                let pixel_color_to_voxel = |srgba_color: [u8; 4]| -> Option<block::Block> {
+                    let is_invisible = srgba_color[3] == 0;
                     let voxel_config @ &Vox {
                         collision,
                         replace_color,
                     } = if is_invisible { &invisible } else { &visible };
 
-                    // If the provided `invisible` value is equivalent to what `AIR` would be,
-                    // then make the brush empty to save work and also to use `AIR` in those places.
-                    // TODO: This special rule is a little bit inelegant.
-                    // Figure out how to make `Vox` more expressive in a way that makes this more regular.
                     if is_invisible && *voxel_config == Vox::DENOTES_AIR {
-                        VoxelBrush::EMPTY_REF.clone()
+                        None
                     } else {
-                        let atom = block::Block::from(block::Atom {
-                            color: replace_color.unwrap_or_else(|| Rgba::from_srgb8(pixel)),
+                        Some(block::Block::from(block::Atom {
+                            color: replace_color.unwrap_or_else(|| Rgba::from_srgb8(srgba_color)),
                             emission: Rgb::ZERO,
                             collision,
+                        }))
+                    }
+                };
+
+                // TODO: Make these different modes share more of their logic.
+                match expansion {
+                    Expansion::Extrude(extrusion) => {
+                        if u32::from(resolution) != image_height {
+                            return Err(InGenError::Other(
+                                format!(
+                                    "image “{path}” has height {image_height}, \
+                                    which is not the same as its width {image_width}"
+                                )
+                                .into(),
+                            ));
+                        }
+
+                        // TODO: polishing: make bad data not allocate unbounded memory
+                        let extrusion_cubes: Vec<Cube> = extrusion
+                            .iter()
+                            .cloned()
+                            .flatten()
+                            .map(|z| {
+                                Cube::from(rotation.transform_vector(vec3(0, 0, z)).to_point())
+                            })
+                            .collect();
+
+                        if let Some(brush_bounds) = extrusion_cubes
+                            .iter()
+                            .copied()
+                            .map(Cube::grid_aab)
+                            .reduce(GridAab::union_cubes)
+                            && !full_block_bounds.contains_box(brush_bounds)
+                        {
+                            return Err(InGenError::Other(
+                                format!(
+                                    "extrusion bounds {brush_bounds:?} \
+                                        exceeds block resolution {resolution}"
+                                )
+                                .into(),
+                            ));
+                        }
+
+                        // Actually build the block.
+                        // Stub ticket is OK because all blocks used have no indirection.
+                        block_from_image(ReadTicket::stub(), image, rotation, &|pixel: [u8; 4]| {
+                            if let Some(block) = pixel_color_to_voxel(pixel) {
+                                VoxelBrush::new(
+                                    extrusion_cubes.iter().map(|&cube| {
+                                        (cube.lower_bounds().to_vector(), block.clone())
+                                    }),
+                                )
+                            } else {
+                                VoxelBrush::EMPTY_REF.clone()
+                            }
+                        })?
+                        .build_txn(self.txn)
+                    }
+                    Expansion::Stack => {
+                        let expected_image_height = u32::from(resolution).pow(2);
+                        if image_height != expected_image_height {
+                            return Err(InGenError::Other(
+                                format!(
+                                    "image “{path}” has height {image_height}, \
+                                        but should have the width squared, {expected_image_height}"
+                                )
+                                .into(),
+                            ));
+                        }
+
+                        let transform =
+                            rotation.inverse().to_positive_octant_transform(resolution.into());
+
+                        let adapter = PngAdapter::adapt(image, &|pixel| {
+                            if let Some(block) = pixel_color_to_voxel(pixel) {
+                                VoxelBrush::single(block)
+                            } else {
+                                VoxelBrush::EMPTY_REF.clone()
+                            }
                         });
 
-                        VoxelBrush::new(
-                            extrusion_cubes
-                                .iter()
-                                .map(|&cube| (cube.lower_bounds().to_vector(), atom.clone())),
-                        )
+                        // TODO: dubious whether we should be using voxels_fn rather than starting
+                        // from the image pixels. This way we get voxels_fn()'s empty space
+                        // shrinking, but arguably that should be done some other way.
+                        block::Block::builder()
+                            .read_ticket(ReadTicket::stub())
+                            .voxels_fn(resolution, |cube| {
+                                let cube = transform.transform_cube(cube).lower_bounds();
+                                let image_point: Point2D<i32, ()> =
+                                    point2(cube.x, cube.y + i32::from(resolution) * cube.z);
+
+                                // TODO: make the adapter able to work with single blocks always,
+                                // instead of brushes.
+                                adapter
+                                    .get_brush(image_point.x, image_point.y)
+                                    .origin_block()
+                                    .unwrap_or(&block::AIR)
+                            })?
+                            .build_txn(self.txn)
                     }
-                })?
-                .build_txn(self.txn)
+                }
             }
         })
     }
