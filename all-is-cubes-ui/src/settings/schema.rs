@@ -205,7 +205,7 @@ pub enum Key {
         type = camera::ToneMappingOperator,
         display_name = "Tone mapping",
         default = GraphicsOptions::default().tone_mapping,
-        offered_value_list = [], // TODO
+        offered_value_list = Exhaust::exhaust(),
     )]
     ToneMapping,
 

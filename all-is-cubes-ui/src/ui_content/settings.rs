@@ -89,9 +89,15 @@ pub(crate) fn setting_widget(
             literal!("Fog"),
             settings::FOG,
         )),
-        // TODO: allow setting fov_y, tone_mapping, exposure, view_distance
+        // TODO: allow setting fov_y
         Key::FovY => None,
-        Key::ToneMapping => None,
+        Key::ToneMapping => Some(setting_enum_button(
+            hud_inputs,
+            style,
+            literal!("Tone Mapping"),
+            settings::TONE_MAPPING,
+        )),
+        // TODO: allow setting exposure, view_distance
         Key::MaximumIntensity => None,
         Key::ExposureMode => None,
         Key::Exposure => None,

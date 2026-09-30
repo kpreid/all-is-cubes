@@ -330,7 +330,7 @@ pub enum FogOption {
 /// Choices for [`GraphicsOptions::tone_mapping`].
 ///
 #[doc = include_str!("serde-warning.md")]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum ToneMappingOperator {
