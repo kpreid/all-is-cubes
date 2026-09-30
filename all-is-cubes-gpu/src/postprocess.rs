@@ -319,6 +319,9 @@ impl PostprocessUniforms {
         info_text_coordinate_scale: Vector2D<f32, ()>,
         info_text_font_metrics: &GpuFontMetrics,
     ) -> Self {
+        let maximum_intensity: f32 =
+            options.maximum_intensity.min(surface_maximum_intensity).into_inner();
+
         Self {
             info_text_coordinate_scale: info_text_coordinate_scale.to_array().into(),
             info_text_origin: vec2(5., 5.)
@@ -330,7 +333,7 @@ impl PostprocessUniforms {
             font_cell_size: info_text_font_metrics.atlas_cell_size.to_array().into(),
             font_cell_margin: info_text_font_metrics.cell_margin,
 
-            tone_mapping_id: if options.maximum_intensity.is_finite() {
+            tone_mapping_id: if maximum_intensity.is_finite() {
                 match options.tone_mapping {
                     ToneMappingOperator::Clamp => 0,
                     ToneMappingOperator::Reinhard => 1,
@@ -360,11 +363,7 @@ impl PostprocessUniforms {
             maximum_intensity: {
                 // Remove infinity because, if I understand correctly, GPUs often don't promise
                 // conformant arithmetic on it, and we already disabled the operator above.
-                options
-                    .maximum_intensity
-                    .min(surface_maximum_intensity)
-                    .into_inner()
-                    .min(f32::MAX)
+                maximum_intensity.min(f32::MAX)
             },
 
             bloom_intensity: options.bloom_intensity.into_inner(),
