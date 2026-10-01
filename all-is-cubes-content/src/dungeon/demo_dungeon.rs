@@ -908,6 +908,8 @@ fn generate_dungeon_map(
 
         let corridor_only = is_not_end && must_grant_item.is_none() && rng.random_bool(0.5);
 
+        let can_have_chasm_obstacle = true; // TODO: make jetpack a key item (needs tool icon fix)
+
         // Add features that enlarge the room, if there is space to expand into, either
         // * an unoccupied room, or
         // * space outside the bounds of maze generation, but within `expanded_maze_bounds`.
@@ -933,9 +935,13 @@ fn generate_dungeon_map(
         {
             expanded_room_bounds =
                 expanded_room_bounds.expand(FaceMap::default().with(Face::NY, 1));
-            *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
-                .choose(&mut rng)
-                .unwrap()
+            if can_have_chasm_obstacle {
+                *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
+                    .choose(&mut rng)
+                    .unwrap()
+            } else {
+                FloorKind::Bridge
+            }
         } else {
             FloorKind::Solid
         };
