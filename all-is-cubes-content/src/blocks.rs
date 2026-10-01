@@ -174,7 +174,9 @@ fn demo_blocks_generator(
                         visible: lb::Vox::DEFAULT,
                         invisible: lb::Vox::DENOTES_AIR,
                     },
-                    modifiers: &[],
+                    modifiers: &[block::Modifier::SetAttribute(
+                        block::SetAttribute::DisplayName(literal!("Push/Pull")),
+                    )],
                 }
             }
             .load(txn)?,
