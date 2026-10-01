@@ -52,6 +52,7 @@ use crate::palette;
 pub enum DemoBlocks {
     /// Icon for push/pull custom tool, not a placeable block.
     PushPull,
+    Toolbox,
     Crate,
     GlassBlock,
     Lamp(bool),
@@ -177,6 +178,20 @@ fn demo_blocks_generator(
                     modifiers: &[block::Modifier::SetAttribute(
                         block::SetAttribute::DisplayName(literal!("Push/Pull")),
                     )],
+                }
+            }
+            .load(txn)?,
+
+            Toolbox => const {
+                lb::Block {
+                    primitive: lb::PrimitiveOrSuch::Image {
+                        image: include_image!("blocks/toolbox.png"),
+                        rotation: GridRotation::RXZY,
+                        expansion: lb::Expansion::Stack,
+                        visible: lb::Vox::DEFAULT,
+                        invisible: lb::Vox::DENOTES_AIR,
+                    },
+                    modifiers: &[],
                 }
             }
             .load(txn)?,

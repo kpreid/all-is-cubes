@@ -119,6 +119,10 @@ struct DemoTheme {
     /// TODO: replace window glass with openings that are too small to pass through
     window_glass_block: Block,
     item_pedestal: Block,
+    box_of_cheats_block: Block,
+
+    /// Inventory that the player character starts with.
+    starting_inventory: vec::Vec<inv::Slot>,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -486,16 +490,12 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     )?;
                 }
 
-                // Set spawn.
+                // Set spawn and starting room special features.
                 // TODO: Don't unconditionally override spawn; instead communicate this out.
                 if matches!(room_data.maze_kind, MazeRoomKind::Start) {
                     let mut spawn = Spawn::default_for_new_space(ctx.bounds());
                     spawn.set_bounds(interior);
-                    spawn.set_inventory(vec![
-                        Tool::Activate.into(),
-                        Tool::RemoveBlock { keep: true }.into(),
-                        Tool::Jetpack { active: false }.into(),
-                    ]);
+                    spawn.set_inventory(self.starting_inventory.clone());
 
                     // Orient towards the first room's exit.
                     for face in Face::ALL {
@@ -504,6 +504,12 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                             break;
                         }
                     }
+
+                    // Add the box of optional cheats. This is not a “grants item” because it is
+                    // multiple items and has a special container. TODO: Fix the “grants item” mechanism
+                    // to support that.
+                    let box_position = Cube::from(room_data.extended_bounds.lower_bounds());
+                    ctx.set(box_position, &self.box_of_cheats_block)?;
 
                     Ok(Some(spawn))
                 } else {
@@ -644,7 +650,27 @@ pub(crate) async fn demo_dungeon(
         )),
         window_glass_block: demo_blocks[DemoBlocks::GlassBlock].clone(),
         item_pedestal: demo_blocks[DemoBlocks::Pedestal].clone(),
+        box_of_cheats_block: demo_blocks[DemoBlocks::Toolbox]
+            .clone()
+            // Note: can't put this in the block definition because the Arc is not const
+            // constructible. This is a deficiency in the representation of the attribute.
+            .with_modifier(block::SetAttribute::ActivationAction(Some(Arc::new(
+                op::Operation::TakeInventory {
+                    destroy_if_empty: true,
+                },
+            ))))
+            .with_modifier(block::Modifier::Inventory(inv::Inventory::from_slots([
+                // Inventory items that allow exploring the maze without solving it "fairly".
+                Tool::RemoveBlock { keep: true }.into(),
+            ]))),
         blocks: dungeon_blocks,
+        starting_inventory: vec![
+            Tool::Activate.into(),
+            // TODO: make jetpack an item acquired within the maze.
+            // Currently, it’s one of the items which doesn’t have an icon when displayed by a
+            // block, so doing so would not be playable.
+            Tool::Jetpack { active: false }.into(),
+        ],
     };
     // Random assortment of items to provide
     // TODO: make this things like keys for doors
