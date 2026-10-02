@@ -237,6 +237,7 @@ impl<'u> State<'u> {
     }
 
     #[inline(never)]
+    #[optimize(size)]
     fn place_terrain(&mut self) -> Result<(), InGenError> {
         let height_function = self.terrain_height_function();
         self.space.mutate(self.universe.read_ticket(), |m| {
@@ -254,6 +255,7 @@ impl<'u> State<'u> {
     }
 
     #[inline(never)]
+    #[optimize(size)]
     fn place_logo(&mut self) -> Result<(), InGenError> {
         let widget = vui::leaf_widget(logo_text());
         let r = self.planner.city_radius;
@@ -285,6 +287,7 @@ impl<'u> State<'u> {
         Ok(())
     }
 
+    #[optimize(size)]
     async fn plant_trees(&mut self, progress: YieldProgress) -> Result<(), InGenError> {
         // TODO: This routine can't place trees in `landscape_region()` but it should be able to.
         // Extend the planner to distinguish different kinds of obstruction.
