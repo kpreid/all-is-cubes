@@ -48,7 +48,7 @@ macro_rules! template_tests {
         $(
             $( #[cfg($variant_cfg)] )*
             #[cfg(test)]
-            #[macro_rules_attribute::apply(smol_macros::test)]
+            #[all_is_cubes::util::async_test]
             #[allow(non_snake_case)]
             async fn ${concat(template_, $variant_name, _default_size )} () {
                 tests::check_universe_template_default_size($enum_name::$variant_name).await;
@@ -56,7 +56,7 @@ macro_rules! template_tests {
 
             $( #[cfg($variant_cfg)] )*
             #[cfg(test)]
-            #[macro_rules_attribute::apply(smol_macros::test)]
+            #[all_is_cubes::util::async_test]
             #[allow(non_snake_case)]
             async fn ${concat(template_, $variant_name, _minimum_size )} () {
                 tests::check_universe_template_minimum_size($enum_name::$variant_name).await;
@@ -64,7 +64,7 @@ macro_rules! template_tests {
 
             $( #[cfg($variant_cfg)] )*
             #[cfg(test)]
-            #[macro_rules_attribute::apply(smol_macros::test)]
+            #[all_is_cubes::util::async_test]
             #[allow(non_snake_case)]
             #[ignore = "not implemented yet"]
             async fn ${concat(template_, $variant_name, _too_big )} () {

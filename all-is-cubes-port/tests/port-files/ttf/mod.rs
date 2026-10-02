@@ -6,7 +6,7 @@ use all_is_cubes::universe;
 use all_is_cubes::util::yield_progress_for_testing;
 
 #[cfg(feature = "export")]
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[all_is_cubes::util::async_test]
 async fn export_ttf() {
     // We're exporting a builtin, so this universe isn’t used, but we still need to have one.
     let universe = universe::Universe::new();

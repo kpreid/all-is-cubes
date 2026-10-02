@@ -4,6 +4,7 @@
 #![feature(doc_cfg)]
 #![feature(large_assignments)]
 #![move_size_limit = "2500"] // top offenders: 1. load_dot_vox(); 2. SpaceMesh
+#![feature(macro_attr)]
 
 //! Data import and export between [`all_is_cubes`] types and other data formats.
 //!

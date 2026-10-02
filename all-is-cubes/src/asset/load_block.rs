@@ -445,7 +445,7 @@ mod tests {
 
     const IMAGE_2X2: &asset::LazyImage = asset::include_image!("load_block/test_2x2_0rgb.png");
 
-    #[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+    #[crate::util::cartesian_product_test]
     fn image_simple_extrusion(
         #[case(visible = asset::Vox::DEFAULT)]
         #[case(invisible = asset::Vox::DENOTES_AIR)]
