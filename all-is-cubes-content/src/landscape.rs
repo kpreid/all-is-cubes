@@ -1,5 +1,4 @@
 use alloc::boxed::Box;
-use core::array;
 use core::fmt;
 
 use exhaust::Exhaust;
@@ -246,7 +245,7 @@ pub async fn install_landscape_blocks(
     let blade_noise = noise_functions::OpenSimplex2.seed(0x7af8c181).mul(0.3);
 
     // boxed to avoid the async fn future being huge
-    let stone_points: Box<[_; 240]> = Box::new(array::from_fn(|_| {
+    let stone_points: Box<[_; 240]> = boxed_array_from_fn(|_| {
         (
             Cube::ORIGIN.aab().random_point(rng),
             scale_color(
@@ -255,12 +254,12 @@ pub async fn install_landscape_blocks(
                 0.02,
             ),
         )
-    }));
+    });
     let stone_pattern =
         voronoi_pattern_stretch(resolution, true, vec3(1.0, 2.0, 1.0), &*stone_points);
 
     // TODO: give dirt a palette of varying hue and saturation
-    let dirt_points: Box<[_; 1024]> = Box::new(array::from_fn(|_| {
+    let dirt_points: Box<[_; 1024]> = boxed_array_from_fn(|_| {
         (
             Cube::ORIGIN.aab().random_point(rng),
             scale_color(
@@ -269,7 +268,7 @@ pub async fn install_landscape_blocks(
                 0.02,
             ),
         )
-    }));
+    });
     let dirt_pattern =
         voronoi_pattern_stretch(resolution, true, FreeVector::splat(1.0), &*dirt_points);
 
@@ -355,7 +354,7 @@ pub async fn install_landscape_blocks(
                     [mid + radius, mid + radius, mid + radius],
                 );
                 let color_block = &colors[key];
-                let bark_points: Box<[_; 480]> = Box::new(array::from_fn(|_| {
+                let bark_points: Box<[_; 480]> = boxed_array_from_fn(|_| {
                     (
                         Cube::ORIGIN.aab().random_point(rng),
                         scale_color(
@@ -364,7 +363,7 @@ pub async fn install_landscape_blocks(
                             0.2,
                         ),
                     )
-                }));
+                });
                 let bark_pattern =
                     voronoi_pattern_stretch(resolution, true, vec3(16.0, 4.0, 16.0), &*bark_points);
                 Block::builder()
@@ -519,6 +518,15 @@ pub(crate) fn sky_with_grass(sky_color: Rgb) -> Sky {
         ground, ground, sky_color, sky_color, //
     ])
 }
+
+fn boxed_array_from_fn<T, const N: usize>(f: impl FnMut(usize) -> T) -> Box<[T; N]> {
+    match (0..N).into_iter().map(f).collect::<alloc::vec::Vec<_>>().try_into() {
+        Ok(boxed_array) => boxed_array,
+        Err(_) => unreachable!(),
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
