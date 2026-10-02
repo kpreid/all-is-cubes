@@ -276,7 +276,7 @@ fn start_on_cube_edge_perpendicular() {
     );
 }
 
-#[macro_rules_attribute::apply(crate::cartesian_product_test)]
+#[crate::cartesian_product_test]
 fn start_just_past_bounds(
     #[case(exclude_exit = false)]
     #[case(include_exit = true)]
@@ -308,7 +308,7 @@ fn start_outside_of_integer_range() {
 
 /// Regression test (found by fuzzing) for being outside of integer
 /// range while also using `within()`.
-#[macro_rules_attribute::apply(crate::cartesian_product_test)]
+#[crate::cartesian_product_test]
 fn start_outside_of_integer_range_with_bounds(
     #[case(exclude_exit = false)]
     #[case(include_exit = true)]
@@ -357,7 +357,7 @@ fn exiting_integer_limit_negative() {
     );
 }
 
-#[macro_rules_attribute::apply(crate::cartesian_product_test)]
+#[crate::cartesian_product_test]
 fn within_bounds(
     #[case(exclude_exit = false)]
     #[case(include_exit = true)]
@@ -407,7 +407,7 @@ fn regression_test_1() {
 
 /// `within()` wasn't working for axis-aligned rays that don't intersect the world,
 /// which should produce zero steps.
-#[macro_rules_attribute::apply(crate::cartesian_product_test)]
+#[crate::cartesian_product_test]
 fn regression_test_2(
     #[case(exclude_exit = false)]
     #[case(include_exit = true)]

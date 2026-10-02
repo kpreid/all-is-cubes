@@ -452,7 +452,7 @@ mod tests {
         miri,
         ignore = "Miri adds unrealistic *nondeterministic* error. TODO: Can we avoid the ops in question?"
     )]
-    #[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+    #[crate::util::cartesian_product_test]
     fn solid_block_equivalent_at_any_resolution(
         #[case(black = Rgba::BLACK)]
         #[case(white = Rgba::WHITE)]

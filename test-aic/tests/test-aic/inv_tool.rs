@@ -13,7 +13,7 @@ use all_is_cubes::raycast::Ray;
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::transaction::{Merge as _, Transaction as _};
 use all_is_cubes::universe::{Handle, Universe, UniverseTransaction};
-use all_is_cubes::util::yield_progress_for_testing;
+use all_is_cubes::util::{async_test, yield_progress_for_testing};
 use all_is_cubes::{space, transaction};
 use all_is_cubes_render::raytracer::print_space;
 
@@ -116,7 +116,7 @@ async fn dummy_icons() -> BlockProvider<Icons> {
         .unwrap()
 }
 
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn icon_activate() {
     let dummy_icons = dummy_icons().await;
     assert_eq!(
@@ -166,7 +166,7 @@ fn use_activate_on_block_action() {
     // TODO: Should have another test with a failing `Operation`, but we can't set that up yet.
 }
 
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn icon_remove_block() {
     let dummy_icons = dummy_icons().await;
     assert_eq!(
@@ -175,7 +175,7 @@ async fn icon_remove_block() {
     );
 }
 
-#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+#[all_is_cubes::util::cartesian_product_test]
 fn use_remove_block(
     #[case(discard = false)]
     #[case(keep = true)]
@@ -220,7 +220,7 @@ fn use_remove_block_without_target() {
     );
 }
 
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn icon_place_block() {
     let dummy_icons = dummy_icons().await;
     let [block] = make_some_blocks();
@@ -234,7 +234,7 @@ async fn icon_place_block() {
     );
 }
 
-#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+#[all_is_cubes::util::cartesian_product_test]
 fn use_block(
     #[case(block = Tool::Block)]
     #[case(infinite_blocks = Tool::InfiniteBlocks)]
@@ -340,7 +340,7 @@ fn use_block_with_inventory_config() {
 
 /// If a block has a `placement_action`, then that action is performed instead of the
 /// normal placement. TODO: how this interacts with consumption is not yet worked out.
-#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+#[all_is_cubes::util::cartesian_product_test]
 fn use_block_which_has_placement_action(
     #[case(block = Tool::Block)]
     #[case(infinite_blocks = Tool::InfiniteBlocks)]
@@ -438,7 +438,7 @@ fn use_block_stack_decrements() {
     assert_eq!(tester.character().inventory().slots()[0], Slot::Empty);
 }
 
-#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+#[all_is_cubes::util::cartesian_product_test]
 fn use_block_with_obstacle(
     #[case(block = Tool::Block)]
     #[case(infinite_blocks = Tool::InfiniteBlocks)]
@@ -465,7 +465,7 @@ fn use_block_with_obstacle(
     assert_eq!(&tester.space()[[0, 0, 0]], &obstacle);
 }
 
-#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+#[all_is_cubes::util::cartesian_product_test]
 fn use_block_without_target(
     #[case(block = Tool::Block)]
     #[case(infinite_blocks = Tool::InfiniteBlocks)]

@@ -48,8 +48,8 @@ macro_rules! template_tests {
         $(
             $( #[cfg($variant_cfg)] )*
             #[cfg(test)]
-            #[macro_rules_attribute::apply(smol_macros::test)]
             #[allow(non_snake_case)]
+            #[all_is_cubes::util::async_test]
             async fn ${concat(template_, $variant_name)} () {
                 tests::check_universe_template($enum_name::$variant_name).await;
             }
