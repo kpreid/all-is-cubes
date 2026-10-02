@@ -158,6 +158,7 @@ struct DemoTheme {
 // -------------------------------------------------------------------------------------------------
 
 impl DemoTheme {
+    #[optimize(size)]
     fn new(
         dungeon_grid: &DungeonGrid,
         landscape_blocks: &BlockProvider<LandscapeBlocks>,
@@ -309,6 +310,7 @@ impl DemoTheme {
         }
     }
 
+    #[optimize(size)]
     fn inside_doorway(
         &self,
         ctx: &mut space::Mutation<'_, '_>,
@@ -441,6 +443,7 @@ impl DemoTheme {
 
     // TODO: This should be a definition in the universe, but there's no way to do that with `Tool`
     // yet.
+    #[optimize(size)]
     fn make_key_tool(&self) -> Tool {
         let move_modifier = block::Modifier::Move(block::Move::new(Face::NX, R16, 0, 1));
         let move_gate = op::Operation::AddModifiers([move_modifier.clone()].into());
@@ -484,6 +487,7 @@ impl DemoTheme {
 impl Theme<Option<DemoRoom>> for DemoTheme {
     type Pass = Pass;
 
+    #[optimize(size)]
     fn place_room(
         &self,
         ctx: &mut space::Mutation<'_, '_>,
@@ -819,6 +823,7 @@ pub(crate) const DUNGEON_GRID: DungeonGrid = DungeonGrid {
 };
 
 /// This function is called from `UniverseTemplate`.
+#[optimize(size)]
 pub(crate) async fn demo_dungeon(
     universe: &mut Universe,
     mut progress: YieldProgress,
@@ -968,6 +973,7 @@ pub(crate) async fn demo_dungeon(
 ///
 /// This calls [`generate_maze()`], then elaborates on that process by adding gates, keys,
 /// and random details.
+#[optimize(size)]
 fn generate_dungeon_map(
     seed: u64,
     requested_rooms: GridSize,
@@ -1258,6 +1264,7 @@ fn generate_dungeon_map(
     dungeon_map.map_container(Arc::from)
 }
 
+#[optimize(size)]
 fn choose_key_locations<const N: usize>(
     rng: &mut rand_xoshiro::Xoshiro256Plus,
     maze: &Vol<Box<[MazeRoom]>>,
