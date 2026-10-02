@@ -133,6 +133,7 @@ impl Vui {
     ///
     /// This is an async function for the sake of cancellation and optional cooperative
     /// multitasking. It may safely be blocked on from a synchronous context.
+    #[optimize(size)]
     pub(crate) async fn new(params: UiTargets) -> Box<Self> {
         let UiTargets {
             viewport_source, ..

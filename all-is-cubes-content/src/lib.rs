@@ -6,6 +6,7 @@
 #![feature(macro_derive)]
 #![feature(macro_metavar_expr_concat)]
 #![feature(new_range)]
+#![feature(optimize_attribute)]
 
 //! Demo content for All is Cubes.
 //!
