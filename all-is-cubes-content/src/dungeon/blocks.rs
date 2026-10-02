@@ -13,7 +13,7 @@ use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{point3, vec3};
 use all_is_cubes::inv;
-use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
+use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
     Cube, Face, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Rgb, Rgba, zo32,
 };
@@ -52,6 +52,14 @@ pub(crate) enum DungeonBlocks {
     /// Block which has a 1-slot inventory, displaying an item the player can take.
     ItemHolder,
 
+    /// Partial block to compose above openings in walls to represent structural support.
+    /// Oriented to run along the X axis.
+    Lintel,
+
+    /// Partial block to place beside a `Lintel`.
+    /// Oriented to end a lintel extending in the +X direction; mirror it for the opposite end.
+    LintelEnd,
+
     /// Shape into which to cut blocks [using `CompositeOperator::In`] on the sides of a doorway.
     ///
     /// The +X face of this block should be oriented towards the doorway's interior from the left,
@@ -70,7 +78,7 @@ impl BlockModule for DungeonBlocks {
 pub(crate) async fn install_dungeon_blocks(
     txn: &mut UniverseTransaction,
     progress: YieldProgress,
-) -> Result<(), GenError> {
+) -> Result<(), InGenError> {
     let resolution = R16;
     let resolution_g = GridCoordinate::from(resolution);
     let one_diagonal = GridVector::new(1, 1, 1);
@@ -81,6 +89,20 @@ pub(crate) async fn install_dungeon_blocks(
         .light_emission(Rgb::new(8.0, 7.0, 0.7) * 0.5)
         .build();
     let spike_metal = block::from_color!(palette::STEEL);
+
+    let lintel_space = const {
+        asset::Space::Image {
+            image: include_image!("lintel.png"),
+            // TODO: automatic determination of rotation origin is not well-behaved yet,
+            // so we are making do without a Y-flip.
+            rotation: GridRotation::IDENTITY,
+            expansion: asset::Expansion::Extrude(&[0..8]),
+            visible: asset::Vox::DEFAULT,
+            invisible: asset::Vox::DENOTES_AIR,
+        }
+    }
+    .load(txn)?;
+    let lintel_space = txn.insert_anonymous(lintel_space);
 
     BlockProvider::<DungeonBlocks>::new(progress, |key| {
         Ok(match key {
@@ -274,6 +296,22 @@ pub(crate) async fn install_dungeon_blocks(
                 );
                 Block::from(txn.insert_anonymous(animated_def))
             }
+
+            // TODO: express both of the lintel blocks with `asset`.
+            // (We will need a way to take an existing space as input.)
+            Lintel => Block::from_primitive(block::Primitive::Recur {
+                space: lintel_space.clone(),
+                offset: point3(8, 0, 0),
+                resolution: R8,
+            })
+            .with_modifier(block::SetAttribute::DisplayName(literal!("Lintel"))),
+
+            LintelEnd => Block::from_primitive(block::Primitive::Recur {
+                space: lintel_space.clone(),
+                offset: point3(0, 0, 0),
+                resolution: R8,
+            })
+            .with_modifier(block::SetAttribute::DisplayName(literal!("Lintel End"))),
 
             DoorwaySideMask => Block::builder()
                 .display_name("Doorway Side Mask")

@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec;
 use core::mem;
+use descriptive_unwrap::OptionExt;
 
 use rand::seq::{IndexedRandom as _, IteratorRandom as _};
 use rand::{RngExt as _, SeedableRng as _};
@@ -119,6 +120,7 @@ struct DemoTheme {
     /// TODO: replace window glass with openings that are too small to pass through
     window_glass_block: Block,
     item_pedestal: Block,
+    lintel_with_stone: Block,
     box_of_cheats_block: Block,
 
     /// Inventory that the player character starts with.
@@ -403,18 +405,63 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 for wall in four_walls(interior.expand(FaceMap::splat(1))) {
                     let face = Face::PY.clockwise().transform(wall.counterclockwise_direction); // TODO: make four_walls provide this (which face of the box it is) in a nice name
                     let midpoint = (wall.length / 2).cast_signed();
+                    let window_height = 3;
+                    let mut window_bottom_middle_cube =
+                        wall.bottom_corner + wall.counterclockwise_direction.vector(midpoint);
+                    window_bottom_middle_cube.y = window_y;
 
                     if let WallFeature::Window = room_data.wall_features[face] {
                         for step in WINDOW_PATTERN {
-                            let mut window_pos = wall.bottom_corner
-                                + wall.counterclockwise_direction.vector(midpoint + step);
-                            window_pos.y = window_y;
+                            let window_pos = window_bottom_middle_cube
+                                + wall.counterclockwise_direction.vector(step);
                             if let Some(window_box) =
-                                GridAab::from_lower_size(window_pos, [1, 3, 1])
+                                GridAab::from_lower_size(window_pos, [1, window_height, 1])
                                     .intersection_cubes(wall.bounds_excluding_corners)
                             {
                                 ctx.fill_uniform(window_box, &self.window_glass_block)?;
                             }
+                        }
+                        // Lintel above windows
+                        let lintel_radius = 2;
+                        let lintel_middle_cube =
+                            window_bottom_middle_cube + vec3(0, window_height.cast_signed(), 0);
+                        let lintel_box = GridAab::single_cube(
+                            lintel_middle_cube
+                                + wall.counterclockwise_direction.vector(lintel_radius),
+                        )
+                        .union_cube(
+                            lintel_middle_cube
+                                + wall.counterclockwise_direction.vector(-lintel_radius),
+                        );
+                        ctx.fill_uniform(lintel_box, &self.lintel_with_stone)?;
+                        // Lintel ends
+                        for positive_end in [false, true] {
+                            ctx.fill_uniform(
+                                lintel_box
+                                    .abut(
+                                        if positive_end {
+                                            wall.counterclockwise_direction.opposite()
+                                        } else {
+                                            wall.counterclockwise_direction
+                                        },
+                                        1,
+                                    )
+                                    .unwrap(),
+                                &self.room_style[BoxPart::face(face)]
+                                    .clone()
+                                    .none_is_unreachable()
+                                    .with_modifier(block::Composite::new(
+                                        self.blocks[LintelEnd].clone().rotate(
+                                            GridRotation::from_to(
+                                                if positive_end { Face::PX } else { Face::NX },
+                                                wall.counterclockwise_direction,
+                                                Face::PY,
+                                            )
+                                            .unwrap(),
+                                        ),
+                                        block::CompositeOperator::Over,
+                                    )),
+                            )?;
                         }
                     } else if room_data.lit && !room_data.corridor_only {
                         for step in TORCH_PATTERN {
@@ -566,6 +613,13 @@ pub(crate) async fn demo_dungeon(
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
     let dungeon_blocks = BlockProvider::<DungeonBlocks>::using(universe)?;
+    let lintel_with_stone =
+        landscape_blocks[LandscapeBlocks::Stone]
+            .clone()
+            .with_modifier(block::Composite::new(
+                dungeon_blocks[Lintel].clone(),
+                block::CompositeOperator::Over,
+            ));
     let theme = DemoTheme {
         dungeon_grid: dungeon_grid.clone(),
         room_style: BoxStyle::from_fn(|part| {
@@ -610,8 +664,22 @@ pub(crate) async fn demo_dungeon(
             let on_horizontal_axis = |axis: Axis| {
                 basic_style
                     .clone()
+                    // Cut open the open spaces
                     .with(BoxPart::face(axis.negative_face()), Some(AIR))
                     .with(BoxPart::face(axis.positive_face()), Some(AIR))
+                    // Add lintels
+                    .map(|part, block| {
+                        if part.is_on_face(Face::PY)
+                            && (part.is_on_face(axis.positive_face())
+                                || part.is_on_face(axis.negative_face()))
+                        {
+                            lintel_with_stone.clone()
+                        } else {
+                            block
+                        }
+                    })
+                    // Add vertical DoorwaySideMask blocks for each of the four "sides of a
+                    // dooorway" in this corridor.
                     // TODO: way too repetitive and unclear
                     .with(
                         BoxPart::face(axis.positive_face())
@@ -650,6 +718,7 @@ pub(crate) async fn demo_dungeon(
         )),
         window_glass_block: demo_blocks[DemoBlocks::GlassBlock].clone(),
         item_pedestal: demo_blocks[DemoBlocks::Pedestal].clone(),
+        lintel_with_stone,
         box_of_cheats_block: demo_blocks[DemoBlocks::Toolbox]
             .clone()
             // Note: can't put this in the block definition because the Arc is not const
