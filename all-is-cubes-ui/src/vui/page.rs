@@ -424,7 +424,7 @@ mod tests {
         }
     }
 
-    #[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+    #[all_is_cubes::util::cartesian_product_test]
     fn pageinst_caches_with_or_without_enlargement(
         #[case(small = 5)]
         #[case(large = 6)]
