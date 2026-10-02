@@ -720,6 +720,7 @@ pub(crate) fn ignore_command_channel_closure(_: Result<(), flume::TrySendError<i
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::util::async_test;
     use std::assert_matches;
 
     async fn new_vui_for_test(paused: bool) -> (Box<Vui>, flume::Receiver<ControlMessage>) {
@@ -740,7 +741,7 @@ mod tests {
         (vui, ccrx)
     }
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn back_pause() {
         let (mut vui, control_channel) = new_vui_for_test(false).await;
         vui.back();
@@ -749,7 +750,7 @@ mod tests {
         assert!(control_channel.try_recv().is_err());
     }
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn back_unpause() {
         let (mut vui, control_channel) = new_vui_for_test(true).await;
         vui.set_state(VuiPageState::Paused);
