@@ -49,7 +49,7 @@ macro_rules! exhibit {
         }
     ) => {
         pub(in crate::city) const $name: Exhibit = Exhibit {
-            factory: |$( $args )*| { $( $body )* },
+            factory: {#[optimize(size)] |$( $args )*| { $( $body )* }},
             $( $fields )*
         };
     }
