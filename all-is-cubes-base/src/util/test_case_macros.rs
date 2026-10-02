@@ -1,6 +1,5 @@
 /// Generates a cartesian product of test cases from a test function with parameters.
 ///
-/// Use this macro around a function, or with `macro_rules_attribute::apply`.
 /// The function must have at least one parameter, and
 /// every parameter must be annotated with at least one `#[case(NAME = VALUE)]` attribute.
 /// The `NAME` is the identifier used for this case in the generated test names.
@@ -8,18 +7,18 @@
 /// # Example
 ///
 /// ```
+/// #![feature(macro_attr)]
 /// # use all_is_cubes_base::cartesian_product_test;
-/// cartesian_product_test! {
-///     fn my_test(
-///         #[case(opaque = false)]
-///         #[case(transparent = true)]
-///         transparent: bool,
-///         #[case(still = false)]
-///         #[case(animated = true)]
-///         animated: bool,
-///     ) {
-///         // do something different based on `transparent` and `animated`
-///     }
+/// #[cartesian_product_test]
+/// fn my_test(
+///     #[case(opaque = false)]
+///     #[case(transparent = true)]
+///     transparent: bool,
+///     #[case(still = false)]
+///     #[case(animated = true)]
+///     animated: bool,
+/// ) {
+///     // do something different based on `transparent` and `animated`
 /// }
 /// ```
 ///
@@ -31,7 +30,7 @@
 /// `my_test::transparent::animated`.
 #[macro_export]
 macro_rules! cartesian_product_test {
-    (
+    attr() (
         $(#[doc = $doc:expr])*
         $(#[test])?
         $(#[ignore = $ignore_reason:expr])?

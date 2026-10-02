@@ -8,6 +8,7 @@
 #![feature(impl_restriction)]
 #![feature(large_assignments)]
 #![move_size_limit = "256"]
+#![feature(macro_attr)]
 #![feature(mut_restriction)]
 #![feature(try_blocks)]
 

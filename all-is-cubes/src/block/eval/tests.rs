@@ -265,7 +265,7 @@ fn voxels_checked_individually() {
 /// Test that light emission from voxels doesn't depend on resolution, or rather, the emission
 /// is taken as an intensive property rather than an extensive property.
 #[cfg_attr(miri, ignore = "slow under Miri")]
-#[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+#[crate::util::cartesian_product_test]
 fn voxels_emission_equivalence(
     #[case(no_opacity = Rgba::TRANSPARENT)]
     #[case(half_opacity = Rgba::new(0.0, 0.5, 1.0, 0.5))]

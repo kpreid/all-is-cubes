@@ -846,7 +846,7 @@ mod tests {
     /// the check phase.
     ///
     /// Also test the outcome when there is no such change.
-    #[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+    #[crate::util::cartesian_product_test]
     fn block_changed_between_check_and_commit(
         #[case(no_change = false)]
         #[case(changed = true)]

@@ -845,7 +845,7 @@ mod tests {
     }
 
     #[cfg_attr(miri, ignore = "slow under Miri")]
-    #[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
+    #[crate::util::cartesian_product_test]
     fn aab_raycast_aligned_with_grid(
         #[case(not_reversed = false)]
         #[case(reversed = true)]

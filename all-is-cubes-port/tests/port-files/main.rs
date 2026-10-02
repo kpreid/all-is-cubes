@@ -1,3 +1,5 @@
+#![feature(macro_attr)]
+
 //! Tests for [`all_is_cubes_port`] which import, or compare against, provided data files.
 //!
 //! These tests live in a separate test target so that they can be cleanly excluded from the

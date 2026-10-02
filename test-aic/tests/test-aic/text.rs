@@ -260,7 +260,7 @@ fn bounding_voxels_of_positioning_high() {
 /// “round up” options in that they shouldn’t *change without notice*.
 ///
 /// TODO: this test overlaps with tests in layout.rs. We should keep only one of them, probably.
-#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+#[all_is_cubes::util::cartesian_product_test]
 fn positioning_x(
     #[case(case0 = (PositioningX::Left, false, 0..16, 0..36))]
     #[case(case1 = (PositioningX::Right, false, 0..16, -20..16))]
@@ -334,7 +334,7 @@ fn no_intersection_with_block() {
     assert!(!ev.visible());
 }
 
-#[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+#[all_is_cubes::util::cartesian_product_test]
 fn overflowing_coordinates(
     #[case(min = GridCoordinate::MIN)]
     #[case(max = GridCoordinate::MAX)]
