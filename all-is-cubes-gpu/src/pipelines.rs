@@ -9,7 +9,7 @@ use wgpu::util::DeviceExt;
 use all_is_cubes::content::load_image::include_image;
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::universe;
-use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
+use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption, imgref_size};
 
 use crate::common::Identified;
 use crate::frame_texture::FramebufferTextures;
@@ -800,7 +800,7 @@ impl Pipelines {
                 queue,
                 &wgpu::TextureDescriptor {
                     label: None,
-                    size: size2d_to_extent(image.size()),
+                    size: size2d_to_extent(imgref_size(image)),
                     mip_level_count: 1,
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,
@@ -809,7 +809,7 @@ impl Pipelines {
                     view_formats: &[],
                 },
                 wgpu::util::TextureDataOrder::MipMajor,
-                image.pixels().as_flattened(),
+                image.as_ref().buf().as_flattened(),
             )
         };
 

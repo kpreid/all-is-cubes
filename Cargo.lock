@@ -57,6 +57,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "hashbrown 0.17.1",
+ "imgref",
  "indoc",
  "itertools 0.15.0",
  "libm",

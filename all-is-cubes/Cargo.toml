@@ -134,6 +134,7 @@ exhaust = { workspace = true, default-features = false }
 flate2 = { version = "1.0.35", optional = true }
 futures-core = { workspace = true }
 hashbrown = { workspace = true }
+imgref = { workspace = true }
 itertools = { workspace = true }
 libm = { workspace = true }
 log = { workspace = true }

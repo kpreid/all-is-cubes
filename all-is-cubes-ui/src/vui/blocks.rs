@@ -86,85 +86,89 @@ impl UiBlocks {
                 UiBlocks::BackButtonLabel => make_button_label_block(
                     txn,
                     "Back",
-                    ButtonIcon::Icon(include_image!("icons/button-back.png")),
+                    ButtonIcon::Icon(include_image!("icons/button-back.png").as_ref()),
                 )?,
 
                 UiBlocks::AboutButtonLabel => make_button_label_block(
                     txn,
                     "About",
-                    ButtonIcon::Icon(include_image!("icons/button-help.png")),
+                    ButtonIcon::Icon(include_image!("icons/button-help.png").as_ref()),
                 )?,
 
                 UiBlocks::PauseButtonLabel => make_button_label_block(
                     txn,
                     "Pause",
-                    ButtonIcon::Icon(include_image!("icons/button-pause.png")),
+                    ButtonIcon::Icon(include_image!("icons/button-pause.png").as_ref()),
                 )?,
 
                 UiBlocks::SaveButtonLabel => make_button_label_block(
                     txn,
                     "Save",
-                    ButtonIcon::Icon(include_image!("icons/button-save.png")),
+                    ButtonIcon::Icon(include_image!("icons/button-save.png").as_ref()),
                 )?,
 
                 UiBlocks::SettingsButtonLabel => make_button_label_block(
                     txn,
                     "Options",
-                    ButtonIcon::Icon(include_image!("icons/button-options.png")),
+                    ButtonIcon::Icon(include_image!("icons/button-options.png").as_ref()),
                 )?,
 
                 UiBlocks::MouselookButtonLabel => make_button_label_block(
                     txn,
                     "Mouselook",
-                    ButtonIcon::Icon(include_image!("icons/button-mouselook.png")),
+                    ButtonIcon::Icon(include_image!("icons/button-mouselook.png").as_ref()),
                 )?,
 
                 UiBlocks::FullscreenButtonLabel => make_button_label_block(
                     txn,
                     "Fullscreen",
-                    ButtonIcon::Icon(include_image!("icons/button-fullscreen.png")),
+                    ButtonIcon::Icon(include_image!("icons/button-fullscreen.png").as_ref()),
                 )?,
 
                 UiBlocks::AntialiasButtonLabel => make_button_label_block(
                     txn,
                     "Antialiasing",
-                    ButtonIcon::Icon(include_image!("icons/button-antialias.png")),
+                    ButtonIcon::Icon(include_image!("icons/button-antialias.png").as_ref()),
                 )?,
 
                 UiBlocks::DebugInfoTextButtonLabel => make_button_label_block(
                     txn,
                     "Debug: Show info text",
-                    ButtonIcon::Icon(include_image!("icons/button-debug-info-text.png")),
+                    ButtonIcon::Icon(include_image!("icons/button-debug-info-text.png").as_ref()),
                 )?,
 
                 UiBlocks::DebugChunkBoxesButtonLabel => make_button_label_block(
                     txn,
                     "Debug: Show chunk boxes",
-                    ButtonIcon::Icon(include_image!("icons/button-debug-chunk-boxes.png")),
+                    ButtonIcon::Icon(include_image!("icons/button-debug-chunk-boxes.png").as_ref()),
                 )?,
 
                 UiBlocks::DebugBehaviorsButtonLabel => make_button_label_block(
                     txn,
                     "Debug: Show behaviors",
-                    ButtonIcon::Icon(include_image!("icons/button-debug-behaviors.png")),
+                    ButtonIcon::Icon(include_image!("icons/button-debug-behaviors.png").as_ref()),
                 )?,
 
                 UiBlocks::DebugCollisionBoxesButtonLabel => make_button_label_block(
                     txn,
                     "Debug: Show collision boxes",
-                    ButtonIcon::Icon(include_image!("icons/button-debug-collision-boxes.png")),
+                    ButtonIcon::Icon(
+                        include_image!("icons/button-debug-collision-boxes.png").as_ref(),
+                    ),
                 )?,
 
                 UiBlocks::DebugLightRaysButtonLabel => make_button_label_block(
                     txn,
                     "Debug: Show light rays at cursor",
-                    ButtonIcon::Icon(include_image!("icons/button-debug-light-rays.png")),
+                    ButtonIcon::Icon(include_image!("icons/button-debug-light-rays.png").as_ref()),
                 )?,
 
                 UiBlocks::DebugPixelPerformanceButtonLabel => make_button_label_block(
                     txn,
                     "Debug: Show rendering cost",
-                    ButtonIcon::Icon(include_image!("icons/button-debug-pixel-performance.png")),
+                    ButtonIcon::Icon(
+                        include_image!("icons/button-debug-pixel-performance.png").as_ref(),
+                    ),
                 )?,
             })
         })

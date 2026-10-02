@@ -212,7 +212,7 @@ fn demo_blocks_generator(
                     txn.read_ticket(),
                     include_image!("blocks/crate.png"),
                     GridRotation::IDENTITY,
-                    &default_srgb,
+                    default_srgb,
                 )?;
                 let image_space = txn.insert_anonymous(image_space);
 
@@ -286,8 +286,8 @@ fn demo_blocks_generator(
                 let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3458679152340);
 
                 let palette_image = PngAdapter::adapt(
-                    crate::load_image::include_image!("blocks/road-palette.png"),
-                    &default_srgb,
+                    crate::load_image::include_image!("blocks/road-palette.png").as_ref(),
+                    &mut default_srgb,
                 );
                 let range = 0..palette_image.size().width;
 

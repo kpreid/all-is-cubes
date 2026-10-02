@@ -52,3 +52,15 @@ pub type ImageSize = Size2D<u32, ImagePixel>;
 #[expect(clippy::exhaustive_enums)]
 #[derive(Debug, Eq, PartialEq)]
 pub enum ImagePixel {}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Convert the size of an [`imgref::Img`] into our preferred size type, [`ImageSize`].
+///
+/// (In general, All is Cubes uses `imgref` for images as an alternative to inventing our own
+/// generic image container.)
+pub fn imgref_size<C>(image: &imgref::Img<C>) -> ImageSize {
+    // Despite returning usize, imgref does not actually support images larger than u32,
+    // so this cannot overflow.
+    ImageSize::new(image.width() as u32, image.height() as u32)
+}

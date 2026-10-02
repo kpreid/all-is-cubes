@@ -7,7 +7,9 @@ use all_is_cubes::euclid::Size2D;
 
 // As a workaround for <https://github.com/rust-lang/rust/issues/127445>,
 // we list all items explicitly and avoid cross-crate glob re-exports.
-pub use all_is_cubes::camera::{Eye, ImagePixel, ImageSize, ViewTransform, eye_for_look_at};
+pub use all_is_cubes::camera::{
+    Eye, ImagePixel, ImageSize, ViewTransform, eye_for_look_at, imgref_size,
+};
 
 mod camera_struct;
 pub use camera_struct::{Camera, Ndc, NdcPoint2, NdcPoint3};

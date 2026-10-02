@@ -33,7 +33,7 @@ fn IMAGES(ctx: Context<'_>) {
             ctx.universe.read_ticket(),
             image,
             rotation,
-            &terrain_map_function,
+            terrain_map_function,
         )?
         .display_name(format!("{rotation:?}"))
         .build_txn(&mut txn);

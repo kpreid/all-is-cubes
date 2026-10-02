@@ -1,12 +1,10 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use descriptive_unwrap::OptionExt as _;
 use euclid::{Box2D, Length, Point2D, Size2D, Translation2D, point2, size2, vec2};
 use itertools::iproduct;
 
-use crate::camera::ImagePixel;
-use crate::content::load_image::DecodedPng;
+use crate::camera::{ImagePixel, imgref_size};
 use crate::math::{GridAab, GridCoordinate, Srgba8, u32size};
 use crate::text;
 use crate::transaction;
@@ -282,14 +280,14 @@ pub(crate) struct FontDecl {
 
 impl FontDecl {
     pub(crate) fn load(&self) -> FontDef {
-        let decoded_png = DecodedPng::decode_static(self.png_data, self.png_path);
+        let decoded_png = crate::content::load_image::decode_static(self.png_data, self.png_path);
         assert_eq!(
-            decoded_png.size().width,
-            u32::from(self.metrics.character_size.width) * GLYPHS_PER_ROW
+            decoded_png.width(),
+            u32size(u32::from(self.metrics.character_size.width) * GLYPHS_PER_ROW),
         );
         FontDef {
             metrics: self.metrics.clone(),
-            glyphs: Glyphs::new(&decoded_png, self.metrics.character_size),
+            glyphs: Glyphs::new(decoded_png.as_ref(), self.metrics.character_size),
         }
     }
 }
@@ -361,20 +359,21 @@ fn set_glyph_bits(data: &mut [u8], pixel_index: usize, value: u8) {
 }
 
 impl Glyphs {
-    /// Convert an atlas image provided by [`png_decoder`] into glyphs prepared for rendering.
+    /// Convert an atlas image into glyphs prepared for rendering.
     ///
     /// This involves reorganizing the image from having glyphs arrayed in two dimensions, to
     /// separate blocks of data for each glyph. This is intended to simplify usage and improve
     /// locality of reference.
     ///
     /// It also precalculates which pixels are adjacent to the glyph for outline drawing.
-    fn new(image: &DecodedPng, glyph_size: Size2D<u8, InGlyph>) -> Self {
+    fn new(image: imgref::ImgRef<'_, Srgba8>, glyph_size: Size2D<u8, InGlyph>) -> Self {
+        let image_size = imgref_size(&image);
         let glyph_size_32 = glyph_size.to_u32();
-        let row_count = image.size().height / glyph_size_32.height;
+        let row_count = image_size.height / glyph_size_32.height;
         let glyph_count = row_count * GLYPHS_PER_ROW;
 
         assert_eq!(
-            image.size(),
+            image_size,
             size2(
                 glyph_size_32.width * GLYPHS_PER_ROW,
                 row_count * glyph_size_32.height
@@ -402,9 +401,7 @@ impl Glyphs {
                     .filter(|&position_in_glyph| {
                         let input_position =
                             input_glyph_pixel_offset.transform_point(position_in_glyph.to_u32());
-                        rgba_to_bit(
-                            image.get_pixel(input_position.cast_unit()).none_is_unreachable(),
-                        )
+                        rgba_to_bit(image[<(u32, u32)>::from(input_position)])
                     })
             };
 

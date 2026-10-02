@@ -27,6 +27,7 @@ use alloc::format;
 use alloc::vec::Vec;
 
 use all_is_cubes::block::{self, Resolution};
+use all_is_cubes::camera::imgref_size;
 use all_is_cubes::content::load_image::PngAdapter;
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{Point2D, point2, vec3};
@@ -171,7 +172,7 @@ impl Context<'_> {
                 invisible,
             } => {
                 let path = image.path();
-                let [image_width, image_height] = image.size().into();
+                let [image_width, image_height] = imgref_size(image).into();
                 let Ok(resolution) = Resolution::try_from(image_width) else {
                     return Err(InGenError::Other(
                         format!(
@@ -246,7 +247,7 @@ impl Context<'_> {
                             read_ticket,
                             image,
                             rotation,
-                            &|pixel: Srgba8| {
+                            |pixel: Srgba8| {
                                 if let Some(block) = pixel_color_to_voxel(pixel) {
                                     VoxelBrush::new(extrusion_cubes.iter().map(|&cube| {
                                         (cube.lower_bounds().to_vector(), block.clone())
@@ -275,7 +276,7 @@ impl Context<'_> {
                         let transform =
                             rotation.inverse().to_positive_octant_transform(resolution.into());
 
-                        let adapter = PngAdapter::adapt(image, &|pixel| {
+                        let adapter = PngAdapter::adapt(image.as_ref(), &mut |pixel| {
                             if let Some(block) = pixel_color_to_voxel(pixel) {
                                 VoxelBrush::single(block)
                             } else {

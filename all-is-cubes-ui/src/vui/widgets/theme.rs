@@ -150,7 +150,7 @@ impl WidgetBlocks {
                     ReadTicket::stub(),
                     include_image!("theme/crosshair.png"),
                     GridRotation::RXyZ,
-                    &default_srgb,
+                    default_srgb,
                 )?
                 .display_name("Crosshair")
                 .build_txn(txn),
@@ -165,7 +165,7 @@ impl WidgetBlocks {
                                 include_image!("theme/toolbar-slot.png"),
                                 GridRotation::RXZY,
                                 // TODO: better way to do translations
-                                &|pixel| default_srgb(pixel).translate([0, 16 - 1, 0]),
+                                |pixel| default_srgb(pixel).translate([0, 16 - 1, 0]),
                             )?),
                         )
                         .build()
@@ -181,7 +181,7 @@ impl WidgetBlocks {
                     ReadTicket::stub(),
                     include_image!("theme/toolbar-sel-cursor.png"),
                     GridRotation::RXyZ,
-                    &|color| match color {
+                    |color| match color {
                         // Map placeholder colors to the color for each button's state.
                         [255, 0, 0, 255] => buttons[0].brush(),
                         [0, 255, 0, 255] => buttons[1].brush(),
@@ -199,7 +199,7 @@ impl WidgetBlocks {
                         GridRotation::RXYZ,
                         // place image on the front face (of the R16 individual blocks!)
                         // so it meets the back of the widgets in the dialog.
-                        &|color| default_srgb(color).translate([0, 0, 15]),
+                        |color| default_srgb(color).translate([0, 0, 15]),
                     )?
                     .display_name("Dialog Background")
                     .build_txn(txn)
@@ -216,7 +216,7 @@ impl WidgetBlocks {
                         ReadTicket::stub(),
                         image,
                         GridRotation::IDENTITY,
-                        &default_srgb,
+                        default_srgb,
                     )?
                     .display_name(format!(
                         "Progress Bar {}",
@@ -236,7 +236,7 @@ impl WidgetBlocks {
                             ReadTicket::stub(),
                             include_image!("theme/layout-debug-box-corner.png"),
                             GridRotation::RXyZ,
-                            &default_srgb,
+                            default_srgb,
                         )?),
                     )
                     .build(),
@@ -248,7 +248,7 @@ impl WidgetBlocks {
                             ReadTicket::stub(),
                             include_image!("theme/layout-debug-box-edge.png"),
                             GridRotation::RZYX,
-                            &default_srgb,
+                            default_srgb,
                         )?),
                     )
                     .build(),

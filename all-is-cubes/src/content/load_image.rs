@@ -9,17 +9,15 @@
     reason = "TODO: better, unified handling of coordinate overflows"
 )]
 
-use alloc::vec::Vec;
 use core::fmt;
 
-use euclid::{Point2D, Size2D, size2};
 use hashbrown::HashMap;
+use imgref::{Img, ImgExt as _};
 
 use bevy_platform::sync::OnceLock;
-use png_decoder::PngHeader;
 
 use crate::block::{self, AIR, Block, Resolution};
-use crate::camera::{ImagePixel, ImageSize};
+use crate::camera::{ImageSize, imgref_size};
 use crate::drawing::VoxelBrush;
 use crate::math::{Cube, FaceMap, GridAab, GridCoordinate, GridRotation, Rgba, Srgba8, u32size};
 use crate::space::{self, Space, SpacePhysics};
@@ -27,18 +25,40 @@ use crate::universe::{ReadTicket, UniverseTransaction};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Result of [`include_image!`].
-// TODO: better name
-#[doc(hidden)]
-#[derive(Clone, Debug, PartialEq)]
-pub struct DecodedPng {
-    header: PngHeader,
-    rgba_image_data: Vec<Srgba8>,
+pub use imgref::{ImgRef, ImgVec};
+
+/// Decode data in PNG format.
+///
+/// This function is intended to be used with embedded assets, in a pattern like:
+///
+/// ```
+/// # use all_is_cubes::content::load_image::decode_static;
+/// # drop(
+/// decode_static(include_bytes!("load_image_test.png"), "load_image_test.png")
+/// # );
+/// ```
+///
+/// Ordinarily, you should use [`include_image!`] instead of this function, which provides
+/// lazy loading (memoization of decoding).
+/// This function is provided for cases where built-in memoization is unwanted, such as if
+/// further work is going to be done and the image discarded.
+///
+/// # Panics
+///
+/// Panics if the data is not a valid PNG.
+#[track_caller]
+pub fn decode_static(png_data: &'static [u8], path: &'static str) -> ImgVec<Srgba8> {
+    match png_decoder::decode(png_data) {
+        Ok((header, data)) => ImgVec::new(data, u32size(header.width), u32size(header.height)),
+        Err(error) => panic!("Error loading image asset {path:?}: {error:?}"),
+    }
 }
 
-/// Adapter from [`png_decoder`] decoded images to voxel drawing.
+// -------------------------------------------------------------------------------------------------
+
+/// A color-to-[`VoxelBrush`] mapping for a specific image.
 ///
-/// TODO: Needs a better name now that it is no longer specifically a trait adapter.
+/// TODO: Needs a better name.
 #[doc(hidden)] // still experimental API
 #[expect(missing_debug_implementations)]
 pub struct PngAdapter<'a> {
@@ -49,79 +69,15 @@ pub struct PngAdapter<'a> {
     max_brush: GridAab,
 }
 
-// -------------------------------------------------------------------------------------------------
-
-impl DecodedPng {
-    /// Decode data in PNG format.
-    ///
-    /// This function is intended to be used with embedded assets, in a pattern like:
-    ///
-    /// ```
-    /// # use all_is_cubes::content::load_image::DecodedPng;
-    /// # drop(
-    /// DecodedPng::decode_static(include_bytes!("load_image_test.png"), "load_image_test.png")
-    /// # );
-    /// ```
-    ///
-    /// Ordinarily, you should use [`include_image!`] instead of this function, which provides
-    /// lazy loading (memoization of decoding).
-    /// This function is provided for cases where built-in memoization is unwanted, such as if
-    /// further work is going to be done and the image discarded.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the data is not a valid PNG.
-    #[track_caller]
-    pub fn decode_static(png_data: &'static [u8], path: &'static str) -> Self {
-        match png_decoder::decode(png_data) {
-            Ok((header, data)) => DecodedPng {
-                header,
-                rgba_image_data: data,
-            },
-            Err(error) => panic!("Error loading image asset {path:?}: {error:?}"),
-        }
-    }
-
-    pub fn size(&self) -> ImageSize {
-        size2(self.header.width, self.header.height)
-    }
-
-    pub fn pixels(&self) -> &[Srgba8] {
-        &self.rgba_image_data
-    }
-
-    /// Returns the value of one pixel, or [`None`] for out-of-bounds access.
-    pub fn get_pixel<T: TryInto<u32>>(&self, pixel: Point2D<T, ImagePixel>) -> Option<Srgba8> {
-        let Ok(x) = pixel.x.try_into() else {
-            return None;
-        };
-        let Ok(y) = pixel.y.try_into() else {
-            return None;
-        };
-        if x >= self.header.width || y >= self.header.height {
-            return None;
-        }
-        Some(self.rgba_image_data[u32size(x) + u32size(y) * u32size(self.header.width)])
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
 impl<'a> PngAdapter<'a> {
     #[inline(never)]
-    pub fn adapt<'png: 'a, 'brush: 'a>(
-        png: &'png DecodedPng,
-        // Note: this could be FnMut, at the price of forcing all callers to write `&mut`
-        pixel_function: &dyn Fn(Srgba8) -> VoxelBrush<'brush>,
+    pub fn adapt<'image: 'a, 'brush: 'a>(
+        image: ImgRef<'image, Srgba8>,
+        pixel_function: &mut dyn FnMut(Srgba8) -> VoxelBrush<'brush>,
     ) -> Self {
-        let DecodedPng {
-            header,
-            rgba_image_data,
-        } = png;
-
         let mut color_map: HashMap<Srgba8, VoxelBrush<'a>> = HashMap::new();
         let mut max_brush: Option<GridAab> = None;
-        for &color in rgba_image_data.iter() {
+        for &color in image.buf().iter() {
             let brush = color_map.entry(color).or_insert_with(|| pixel_function(color));
             if let Some(bounds) = brush.bounds() {
                 max_brush = max_brush.map(|m| m.union_box(bounds)).or(Some(bounds));
@@ -129,9 +85,9 @@ impl<'a> PngAdapter<'a> {
         }
 
         Self {
-            width: i32::try_from(header.width).unwrap(),
-            height: i32::try_from(header.height).unwrap(),
-            rgba_image_data,
+            width: i32::try_from(image.width()).unwrap(),
+            height: i32::try_from(image.height()).unwrap(),
+            rgba_image_data: image.buf(),
             color_map,
             max_brush: max_brush.unwrap_or(GridAab::ORIGIN_CUBE),
         }
@@ -140,9 +96,7 @@ impl<'a> PngAdapter<'a> {
     pub fn size(&self) -> euclid::default::Size2D<i32> {
         euclid::default::Size2D::new(self.width, self.height)
     }
-}
 
-impl PngAdapter<'_> {
     #[doc(hidden)] // TODO: ponder good API
     pub fn get_brush(&self, x: i32, y: i32) -> &VoxelBrush<'_> {
         if x < 0 || y < 0 || x >= self.width || y >= self.height {
@@ -158,89 +112,116 @@ impl PngAdapter<'_> {
     }
 }
 
-/// Convert a decoded PNG image into a [`Space`].
+// -------------------------------------------------------------------------------------------------
+
+/// Convert an image into a [`Space`] by mapping each pixel to a [`VoxelBrush`].
 ///
-/// The `block_function` will be memoized.
+/// The image’s dimensions must be no greater than [`i32::MAX`].
 ///
-/// TODO: Allow `space::Builder` controls somehow. Maybe this belongs as a method on it.
-/// TODO: pixel_function should have a Result return
+/// The `pixel_function` will be memoized.
+///
+// TODO: Allow `space::Builder` controls somehow. Maybe this belongs as a method on it.
+// TODO: pixel_function should have a Result return
 #[doc(hidden)] // still experimental API
-#[inline(never)]
+#[inline(always)] // manually polymorphized for code size; inline this adapter function
 pub fn space_from_image<'b>(
     read_ticket: ReadTicket<'_>,
-    png: &DecodedPng,
+    image: &Img<impl AsRef<[Srgba8]>>,
     rotation: GridRotation,
-    // Note: this could be FnMut, at the price of forcing all callers to write `&mut`
-    pixel_function: &dyn Fn(Srgba8) -> VoxelBrush<'b>,
+    mut pixel_function: impl FnMut(Srgba8) -> VoxelBrush<'b>,
 ) -> Result<Space, space::builder::Error> {
-    let header = &png.header;
-    let size: Size2D<i32, ()> = Size2D::new(header.width, header.height).to_i32();
+    #[inline(never)]
+    fn inner<'b>(
+        read_ticket: ReadTicket<'_>,
+        image: ImgRef<'_, Srgba8>,
+        rotation: GridRotation,
+        pixel_function: &mut dyn FnMut(Srgba8) -> VoxelBrush<'b>,
+    ) -> Result<Space, space::builder::Error> {
+        let size = imgref_size(&image);
+        let size_i = size.to_i32();
 
-    // TODO: let caller control the transform offsets (not necessarily positive-octant)
-    let transform = rotation.to_positive_octant_transform(
-        GridCoordinate::try_from(header.width.max(header.height)).unwrap(),
-    );
+        // TODO: let caller control the transform offsets (not necessarily positive-octant)
+        let transform = rotation.to_positive_octant_transform(
+            GridCoordinate::try_from(size.width.max(size.height)).unwrap(),
+        );
 
-    let ia = &PngAdapter::adapt(png, pixel_function);
+        let ia = &PngAdapter::adapt(image.as_ref(), pixel_function);
 
-    // Compute bounds including the brush sizes.
-    // Note: This strategy will overestimate the size in case a brush has X/Y size but is
-    // never used near the edge. To fix that, we could use a dynamically resized Space
-    // instead of this pessimistic choice.
-    let bounds: GridAab = GridAab::from_lower_size([0, 0, 0], [header.width, header.height, 1])
-        .transform(transform)
-        .unwrap()
-        .minkowski_sum(
-            ia.max_brush
-                // account for that a brush of size 1×1×1 is zero expansion of the image
-                .shrink(FaceMap {
-                    nx: 0,
-                    ny: 0,
-                    nz: 0,
-                    px: 1,
-                    py: 1,
-                    pz: 1,
-                })
-                .unwrap_or(GridAab::ORIGIN_EMPTY),
-        )
-        .unwrap();
+        // Compute bounds including the brush sizes.
+        // Note: This strategy will overestimate the size in case a brush has X/Y size but is
+        // never used near the edge. To fix that, we could use a dynamically resized Space
+        // instead of this pessimistic choice.
+        let bounds: GridAab = GridAab::from_lower_size([0, 0, 0], [size.width, size.height, 1])
+            .transform(transform)
+            .unwrap()
+            .minkowski_sum(
+                ia.max_brush
+                    // account for that a brush of size 1×1×1 is zero expansion of the image
+                    .shrink(FaceMap {
+                        nx: 0,
+                        ny: 0,
+                        nz: 0,
+                        px: 1,
+                        py: 1,
+                        pz: 1,
+                    })
+                    .unwrap_or(GridAab::ORIGIN_EMPTY),
+            )
+            .unwrap();
 
-    Space::builder(bounds)
-        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .read_ticket(read_ticket)
-        .build_and_mutate(|m| {
-            for y in 0..(size.height) {
-                for x in 0..(size.width) {
-                    ia.get_brush(x, y).paint(m, transform.transform_cube(Cube::new(x, y, 0)))?;
+        Space::builder(bounds)
+            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+            .read_ticket(read_ticket)
+            .build_and_mutate(|m| {
+                for y in 0..(size_i.height) {
+                    for x in 0..(size_i.width) {
+                        ia.get_brush(x, y)
+                            .paint(m, transform.transform_cube(Cube::new(x, y, 0)))?;
+                    }
                 }
-            }
-            Ok(())
-        })
-}
-
-/// Convert a decoded PNG image into a [`block::Builder`] with voxels (which can then create a
-/// [`Block`]).
-#[doc(hidden)] // still experimental API
-pub fn block_from_image<'b, 'ticket>(
-    read_ticket: ReadTicket<'ticket>,
-    png: &DecodedPng,
-    rotation: GridRotation,
-    pixel_function: &dyn Fn(Srgba8) -> VoxelBrush<'b>,
-) -> Result<block::Builder<'ticket, block::builder::Voxels, UniverseTransaction>, BlockFromImageError>
-{
-    let size = png.size();
-    let resolution =
-        Resolution::try_from(size.width).map_err(|_| BlockFromImageError::Size(size))?;
-    if size.width != size.height {
-        return Err(BlockFromImageError::Size(size));
+                Ok(())
+            })
     }
 
-    // TODO: Implement the same bounds-shrinking feature as `Block::voxels_fn()` has.
-    Ok(Block::builder().read_ticket(read_ticket).voxels_space(
-        resolution,
-        space_from_image(read_ticket, png, rotation, pixel_function)
-            .map_err(BlockFromImageError::Space)?,
-    ))
+    inner(read_ticket, image.as_ref(), rotation, &mut pixel_function)
+}
+
+/// Convert an image into a [`block::Builder`] with voxels (which can then create a [`Block`]).
+/// The image’s dimensions must be square and equal to some [`Resolution`].
+#[doc(hidden)] // still experimental API
+#[inline(always)] // manually polymorphized for code size; inline this adapter function
+pub fn block_from_image<'b, 'ticket>(
+    read_ticket: ReadTicket<'ticket>,
+    image: &Img<impl AsRef<[Srgba8]>>,
+    rotation: GridRotation,
+    mut pixel_function: impl FnMut(Srgba8) -> VoxelBrush<'b>,
+) -> Result<block::Builder<'ticket, block::builder::Voxels, UniverseTransaction>, BlockFromImageError>
+{
+    #[inline(never)] // keep polymorphic and avoid code duplication
+    fn inner<'b, 'ticket>(
+        read_ticket: ReadTicket<'ticket>,
+        image: ImgRef<'_, Srgba8>,
+        rotation: GridRotation,
+        pixel_function: &mut dyn FnMut(Srgba8) -> VoxelBrush<'b>,
+    ) -> Result<
+        block::Builder<'ticket, block::builder::Voxels, UniverseTransaction>,
+        BlockFromImageError,
+    > {
+        let size = imgref_size(&image);
+        let resolution =
+            Resolution::try_from(size.width).map_err(|_| BlockFromImageError::Size(size))?;
+        if size.width != size.height {
+            return Err(BlockFromImageError::Size(size));
+        }
+
+        // TODO: Implement the same bounds-shrinking feature as `Block::voxels_fn()` has.
+        Ok(Block::builder().read_ticket(read_ticket).voxels_space(
+            resolution,
+            space_from_image(read_ticket, &image, rotation, pixel_function)
+                .map_err(BlockFromImageError::Space)?,
+        ))
+    }
+    inner(read_ticket, image.as_ref(), rotation, &mut pixel_function)
 }
 
 /// Simple function for [`space_from_image()`] pixel conversion.
@@ -296,12 +277,13 @@ impl core::error::Error for BlockFromImageError {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Data type produced by [`include_image!`];
-/// dereferences to a [`DecodedPng`].
+/// Data type produced by [`include_image!`].
+///
+/// Dereferences to [`ImgVec`] of [`Srgba8`].
 #[derive(Debug)]
 pub struct LazyImage {
     /// Lazily decoded image data.
-    decoded_data: OnceLock<DecodedPng>,
+    decoded_data: OnceLock<ImgVec<Srgba8>>,
 
     /// PNG image data for decoding.
     encoded_data: &'static [u8],
@@ -332,18 +314,17 @@ impl LazyImage {
 }
 
 impl core::ops::Deref for LazyImage {
-    type Target = DecodedPng;
+    type Target = ImgVec<Srgba8>;
     #[track_caller] // attribute decoding error to the lazy site
     fn deref(&self) -> &Self::Target {
-        self.decoded_data
-            .get_or_init(|| DecodedPng::decode_static(self.encoded_data, self.path))
+        self.decoded_data.get_or_init(|| decode_static(self.encoded_data, self.path))
     }
 }
 
 /// Load an image from a relative path.
 ///
 /// This macro expands to an expression of type [`&'static LazyImage`][LazyImage],
-/// which dereferences to [`DecodedPng`].
+/// which dereferences to [`ImgVec`] of [`Srgba8`].
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _content_load_image_include_image {
@@ -351,7 +332,7 @@ macro_rules! _content_load_image_include_image {
         static IMAGE: $crate::content::load_image::LazyImage =
             $crate::content::load_image::LazyImage::private_include_image_macro_new(
                 $path,
-                include_bytes!($path),
+                ::core::include_bytes!($path),
             );
         &IMAGE
     }};
@@ -364,25 +345,19 @@ pub use _content_load_image_include_image as include_image;
 mod tests {
     use super::*;
     use crate::block;
+    use imgref::ImgRef;
 
-    fn test_image() -> DecodedPng {
-        DecodedPng {
-            header: PngHeader {
-                width: 2,
-                height: 2,
-                bit_depth: png_decoder::BitDepth::Eight,
-                color_type: png_decoder::ColorType::RgbAlpha,
-                compression_method: png_decoder::CompressionMethod::Deflate,
-                filter_method: png_decoder::FilterMethod::Adaptive,
-                interlace_method: png_decoder::InterlaceMethod::None,
-            },
-            rgba_image_data: alloc::vec![
+    fn test_image() -> ImgVec<Srgba8> {
+        ImgVec::new(
+            alloc::vec![
                 [0, 0, 0, 255],
                 [255, 0, 0, 255],
                 [0, 255, 0, 255],
                 [255, 255, 0, 255],
             ],
-        }
+            2,
+            2,
+        )
     }
 
     #[test]
@@ -392,7 +367,7 @@ mod tests {
             ReadTicket::stub(),
             &image,
             GridRotation::IDENTITY,
-            &default_srgb,
+            default_srgb,
         )
         .unwrap();
         assert_eq!(
@@ -405,13 +380,8 @@ mod tests {
     #[test]
     fn basic_image_transformed() {
         let image = test_image();
-        let space = space_from_image(
-            ReadTicket::stub(),
-            &image,
-            GridRotation::RxZY,
-            &default_srgb,
-        )
-        .unwrap();
+        let space =
+            space_from_image(ReadTicket::stub(), &image, GridRotation::RxZY, default_srgb).unwrap();
         assert_eq!(
             space.bounds(),
             GridAab::from_lower_upper([0, 0, 0], [2, 1, 2])
@@ -436,7 +406,7 @@ mod tests {
             ReadTicket::stub(),
             &image,
             GridRotation::IDENTITY,
-            &|pixel| default_srgb(pixel).translate([10, 0, 0]),
+            |pixel| default_srgb(pixel).translate([10, 0, 0]),
         )
         .unwrap();
         assert_eq!(
@@ -452,16 +422,10 @@ mod tests {
         // const context.
         const IMAGE: &LazyImage = include_image!("load_image_test.png");
 
-        let decoded: &DecodedPng = IMAGE;
+        let decoded: &ImgVec<Srgba8> = IMAGE;
         assert_eq!(
-            (
-                decoded.header.width,
-                decoded.header.height,
-                decoded.pixels()
-            ),
-            (
-                3u32,
-                2u32,
+            decoded.as_ref(),
+            ImgRef::new(
                 [
                     [0, 0, 0, 0],
                     [255, 0, 0, 255],
@@ -470,7 +434,9 @@ mod tests {
                     [255, 0, 0, 255],
                     [255, 0, 0, 255]
                 ]
-                .as_slice()
+                .as_slice(),
+                3,
+                2,
             )
         )
     }

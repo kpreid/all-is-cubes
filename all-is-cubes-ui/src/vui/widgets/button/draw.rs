@@ -13,16 +13,17 @@ use all_is_cubes::block::{
     self, Block, Builder,
     Resolution::{self, *},
 };
-use all_is_cubes::content::load_image::{
-    DecodedPng, default_srgb, include_image, space_from_image,
-};
+use all_is_cubes::content::load_image::{ImgRef, default_srgb, include_image, space_from_image};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{Vector2D, vec3};
 use all_is_cubes::linking::{self, InGenError};
-use all_is_cubes::math::{Cube, Face, GridCoordinate, GridRotation, GridSize, GridVector, Rgba};
+use all_is_cubes::math::{
+    Cube, Face, GridCoordinate, GridRotation, GridSize, GridVector, Rgba, Srgba8,
+};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{self, Handle, ReadTicket, UniverseTransaction};
+use all_is_cubes_render::camera::imgref_size;
 
 use crate::vui::{self, Layoutable as _};
 
@@ -147,7 +148,7 @@ impl ButtonLabel {
 }
 
 pub(crate) enum ButtonIcon<'a> {
-    Icon(&'a DecodedPng),
+    Icon(ImgRef<'a, Srgba8>),
 }
 
 /// TODO: document, refine, and make public
@@ -160,13 +161,13 @@ pub(crate) fn make_button_label_block(
 ) -> Result<Block, InGenError> {
     Ok(match icon {
         ButtonIcon::Icon(icon) => {
-            let size = icon.size();
+            let size = imgref_size(&icon);
             let centering = ((Vector2D::splat(theme::RESOLUTION_G) - size.to_vector().to_i32())
                 / 2)
             .extend(0)
             .cast_unit::<Cube>();
 
-            let space = space_from_image(ReadTicket::stub(), icon, GridRotation::RXyZ, &|color| {
+            let space = space_from_image(ReadTicket::stub(), &icon, GridRotation::RXyZ, |color| {
                 default_srgb(color).translate(centering)
             })?;
 
@@ -240,7 +241,7 @@ impl ButtonBase for super::ButtonVisualState {
             txn.insert_anonymous(draw_button_multiblock_from_image(
                 self,
                 self.pressed,
-                include_image!("../theme/button-shape-action.png"),
+                include_image!("../theme/button-shape-action.png").as_ref(),
             )?),
             "Action Button",
         ))
@@ -258,7 +259,7 @@ impl ButtonBase for super::ToggleButtonVisualState {
             txn.insert_anonymous(draw_button_multiblock_from_image(
                 self,
                 self.value,
-                include_image!("../theme/button-shape-toggle.png"),
+                include_image!("../theme/button-shape-toggle.png").as_ref(),
             )?),
             &format!("Toggle Button {self}"),
         ))
@@ -284,7 +285,7 @@ mod image_palette {
 fn draw_button_multiblock_from_image(
     state: &impl ButtonBase,
     active: bool,
-    image: &DecodedPng,
+    image: ImgRef<'_, Srgba8>,
 ) -> Result<Space, InGenError> {
     let label_z = state.button_label_z();
     let illuminate = move |builder: Builder<'static, block::builder::Atom, ()>| {
@@ -305,9 +306,9 @@ fn draw_button_multiblock_from_image(
     let rim_color_block = illuminate(Block::builder().color(theme::rim_lightening(back_color)));
     let space = space_from_image(
         ReadTicket::stub(), // all color blocks are dependency-free
-        image,
+        &image,
         GridRotation::RXyZ,
-        &|color| match color {
+        |color| match color {
             image_palette::OUTSIDE => VoxelBrush::single(AIR),
             image_palette::FRAME => VoxelBrush::single(block::from_color!(palette::BUTTON_FRAME)),
             image_palette::RIM => VoxelBrush::new((0..label_z).map(|z| {

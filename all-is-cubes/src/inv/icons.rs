@@ -78,7 +78,7 @@ impl Icons {
                     ReadTicket::stub(),
                     include_image!("icons/hand.png"),
                     GridRotation::RXyZ,
-                    &default_srgb,
+                    default_srgb,
                 )?
                 .display_name("Activate")
                 .build_txn(txn),
@@ -87,7 +87,7 @@ impl Icons {
                     ReadTicket::stub(),
                     include_image!("icons/placeholder-hammer.png"),
                     GridRotation::RXyZ,
-                    &default_srgb,
+                    default_srgb,
                 )?
                 .display_name("Delete Block")
                 .build_txn(txn),
