@@ -7,7 +7,7 @@ use itertools::iproduct;
 
 use crate::camera::ImagePixel;
 use crate::content::load_image::DecodedPng;
-use crate::math::{GridAab, GridCoordinate, u32size};
+use crate::math::{GridAab, GridCoordinate, Srgba8, u32size};
 use crate::text;
 use crate::transaction;
 use crate::universe;
@@ -556,7 +556,7 @@ impl fmt::Debug for Glyphs {
     }
 }
 
-fn rgba_to_bit([r, _, _, a]: [u8; 4]) -> bool {
+fn rgba_to_bit([r, _, _, a]: Srgba8) -> bool {
     r > 0 && a > 0
 }
 

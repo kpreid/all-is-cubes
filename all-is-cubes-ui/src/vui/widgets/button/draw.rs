@@ -268,10 +268,12 @@ impl ButtonBase for super::ToggleButtonVisualState {
 /// Colors expected in the image passed to [`draw_button_multiblock_from_image`].
 /// These simple colors are chosen to be clearly distinct and will be replaced.
 mod image_palette {
-    pub(super) const OUTSIDE: [u8; 4] = [0, 0, 0, 0];
-    pub(super) const FRAME: [u8; 4] = [0, 0, 0, 255];
-    pub(super) const RIM: [u8; 4] = [255, 255, 255, 255];
-    pub(super) const BACK: [u8; 4] = [0, 255, 255, 255];
+    use all_is_cubes::math::Srgba8;
+
+    pub(super) const OUTSIDE: Srgba8 = [0, 0, 0, 0];
+    pub(super) const FRAME: Srgba8 = [0, 0, 0, 255];
+    pub(super) const RIM: Srgba8 = [255, 255, 255, 255];
+    pub(super) const BACK: Srgba8 = [0, 255, 255, 255];
 }
 
 /// Convert an image into a 3D button block for implementing [`ButtonBase::button_block()`].

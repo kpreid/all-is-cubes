@@ -10,7 +10,7 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Point2D, Scale, Transform3D, point2, vec2, vec3};
 use all_is_cubes::math::{
-    Axis, Cube, Face, FreeVector, GridAab, GridRotation, GridSizeCoord, Gridgid, Rgba,
+    Axis, Cube, Face, FreeVector, GridAab, GridRotation, GridSizeCoord, Gridgid, Rgba, Srgba8,
 };
 use all_is_cubes::raycast;
 use all_is_cubes::space::Space;
@@ -19,8 +19,6 @@ use all_is_cubes::universe::{Handle, ReadTicket};
 use crate::camera::{self, GraphicsOptions, ImagePixel};
 use crate::raytracer::{self, RaytraceInfo};
 use crate::{Flaws, Rendering};
-
-type Pixel = [u8; 4];
 
 /// Special-purpose renderer which uses a pixel-perfect orthographic projection and adapts to the
 /// size of the space input.
@@ -47,7 +45,7 @@ pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -
     // `OrthoCamera` to be more aware of its alignment with the block grid.
 
     #[cfg(feature = "auto-threads")]
-    let (data, info_sum): (Vec<Pixel>, raytracer::rayon_util::ParExtSum<RaytraceInfo>) = (0
+    let (data, info_sum): (Vec<Srgba8>, raytracer::rayon_util::ParExtSum<RaytraceInfo>) = (0
         ..camera.image_size.height)
         .into_par_iter()
         .flat_map(|y| {
@@ -63,7 +61,7 @@ pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -
     let info = info_sum.result();
 
     #[cfg(not(feature = "auto-threads"))]
-    let (data, info): (Vec<Pixel>, RaytraceInfo) = (0..camera.image_size.height)
+    let (data, info): (Vec<Srgba8>, RaytraceInfo) = (0..camera.image_size.height)
         .flat_map(|y| {
             let mut cache = Cache::default();
 
@@ -86,7 +84,7 @@ fn trace_one_pixel_with_cache(
     cache: &mut Cache,
     x: u32,
     y: u32,
-) -> (Pixel, RaytraceInfo) {
+) -> (Srgba8, RaytraceInfo) {
     let (color, info) = match camera.project_pixel_into_world(point2(x, y)) {
         Some(ray) => {
             // Note that this cache key may be nonsense (using the resolution from the wrong cube),

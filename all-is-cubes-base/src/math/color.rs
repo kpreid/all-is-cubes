@@ -170,6 +170,16 @@ pub struct Rgba {
 #[derive(Debug, Eq, PartialEq)]
 pub enum Intensity {}
 
+/// sRGB encoded color, without alpha.
+///
+/// In future major versions of All is Cubes, this may become a newtype.
+pub type Srgb8 = [u8; 3];
+
+/// sRGB encoded color, with non-premultiplied alpha.
+///
+/// In future major versions of All is Cubes, this may become a newtype.
+pub type Srgba8 = [u8; 4];
+
 // -------------------------------------------------------------------------------------------------
 
 // convenience alias
@@ -298,7 +308,7 @@ impl Rgb {
 
     /// Converts sRGB 8-bits-per-component color to the corresponding linear [`Rgb`] value.
     #[inline]
-    pub const fn from_srgb8(rgb: [u8; 3]) -> Self {
+    pub const fn from_srgb8(rgb: Srgb8) -> Self {
         Self(vec3(
             component_from_srgb8_const(rgb[0]).into_ps(),
             component_from_srgb8_const(rgb[1]).into_ps(),
@@ -488,7 +498,7 @@ impl Rgb01 {
     /// Converts this color to sRGB 8-bits-per-component color, rounding to the nearest
     /// representable value.
     #[inline]
-    pub fn to_srgb8(self) -> [u8; 3] {
+    pub fn to_srgb8(self) -> Srgb8 {
         [
             component_to_srgb8(self.red().into_ps()),
             component_to_srgb8(self.green().into_ps()),
@@ -498,7 +508,7 @@ impl Rgb01 {
 
     /// Converts sRGB 8-bits-per-component color to the corresponding linear [`Rgb01`] value.
     #[inline]
-    pub const fn from_srgb8(rgb: [u8; 3]) -> Self {
+    pub const fn from_srgb8(rgb: Srgb8) -> Self {
         Self(vec3(
             component_from_srgb8_const(rgb[0]),
             component_from_srgb8_const(rgb[1]),
@@ -666,7 +676,7 @@ impl Rgba {
 
     /// Converts this color lossily to sRGB 8-bits-per-component color.
     #[inline]
-    pub fn to_srgb8(self) -> [u8; 4] {
+    pub fn to_srgb8(self) -> Srgba8 {
         [
             component_to_srgb8(self.red()),
             component_to_srgb8(self.green()),
@@ -677,7 +687,7 @@ impl Rgba {
 
     /// Converts sRGB 8-bits-per-component color to the corresponding linear [`Rgba`] value.
     #[inline]
-    pub const fn from_srgb8(rgba: [u8; 4]) -> Self {
+    pub const fn from_srgb8(rgba: Srgba8) -> Self {
         Self::new_ps(
             component_from_srgb8_const(rgba[0]).into_ps(),
             component_from_srgb8_const(rgba[1]).into_ps(),
@@ -1332,7 +1342,7 @@ mod tests {
 
     #[test]
     fn check_uniform_luminance() {
-        fn optimize(channel: usize) -> [u8; 4] {
+        fn optimize(channel: usize) -> Srgba8 {
             // Blue is the primary color whose maximum intensity is darkest;
             // therefore it is the standard by which we check the other.
             let reference_luminance = Rgb01::UNIFORM_LUMINANCE_BLUE.luminance();

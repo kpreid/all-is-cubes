@@ -8,7 +8,7 @@ use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{self, point2, vec2};
 use all_is_cubes::listen::{self, Source as _};
-use all_is_cubes::math::{Rgba, ZeroOne};
+use all_is_cubes::math::{Rgba, Srgba8, ZeroOne};
 use all_is_cubes::space::Space;
 use all_is_cubes::text;
 use all_is_cubes::universe::{self, Handle, ReadTicket};
@@ -284,7 +284,7 @@ impl RtRenderer<()> {
         let size = self.modified_viewport().framebuffer_size;
 
         let mut data = vec![[0; 4]; area_usize(size).expect("viewport size must be feasible")];
-        let info = self.draw::<ColorBuf, _, [u8; 4], _>(
+        let info = self.draw::<ColorBuf, _, Srgba8, _>(
             info_text_fn,
             |pixel_buf| camera.post_process_color(Rgba::from(pixel_buf)).to_srgb8(),
             &mut data,

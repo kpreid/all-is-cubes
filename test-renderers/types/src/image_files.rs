@@ -4,7 +4,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use all_is_cubes::math::u32size;
+use all_is_cubes::math::{Srgba8, u32size};
 use all_is_cubes_render::Rendering;
 
 use crate::{ImageId, SuiteId, TestId};
@@ -125,7 +125,7 @@ pub(crate) struct LoadedExpectedImage {
     /// Loaded image in memory.
     ///
     /// [`None`] if the image file is missing.
-    pub image: Option<imgref::ImgVec<[u8; 4]>>,
+    pub image: Option<imgref::ImgVec<Srgba8>>,
 
     /// Path we loaded the image from, which should be under version control.
     pub src_file_path: PathBuf,
@@ -149,7 +149,7 @@ pub fn rendering_to_oxipng(input: Rendering) -> Result<oxipng::RawImage, oxipng:
 }
 
 pub fn imgref_to_oxipng(
-    input: imgref::ImgVec<[u8; 4]>,
+    input: imgref::ImgVec<Srgba8>,
 ) -> Result<oxipng::RawImage, oxipng::PngError> {
     oxipng::RawImage::new(
         u32::try_from(input.width()).unwrap(),
@@ -160,7 +160,7 @@ pub fn imgref_to_oxipng(
     )
 }
 
-pub(crate) fn read_png(file_path: &Path) -> Result<imgref::ImgVec<[u8; 4]>, ReadError> {
+pub(crate) fn read_png(file_path: &Path) -> Result<imgref::ImgVec<Srgba8>, ReadError> {
     let (header, data) = png_decoder::decode(&fs::read(file_path).map_err(ReadError::Io)?)
         .map_err(ReadError::Png)?;
     Ok(imgref::ImgVec::new(

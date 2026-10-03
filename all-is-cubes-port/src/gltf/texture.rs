@@ -208,7 +208,7 @@ impl PartialEq for GltfTile {
 }
 
 impl GltfTile {
-    fn allocate_texels(&self) -> Vec<[u8; 4]> {
+    fn allocate_texels(&self) -> Vec<math::Srgba8> {
         vec![[0, 0, 0, 0]; self.bounds.volume().none_is_unreachable()]
     }
 }
@@ -474,7 +474,7 @@ impl AtlasEntry {
 }
 
 /// Storage shared by [`GltfTile`]s for writing and [`Gatherer::build_atlas()`] for reading.
-type TexelsCell = Arc<OnceLock<Vec<[u8; 4]>>>;
+type TexelsCell = Arc<OnceLock<Vec<math::Srgba8>>>;
 
 /// Data structure for a built texture atlas, and its image data, or a reference to its image data,
 /// in some form `I`.

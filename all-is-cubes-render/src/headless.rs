@@ -4,7 +4,7 @@ use core::any::Any;
 use core::fmt::Debug;
 
 use all_is_cubes::character::Cursor;
-use all_is_cubes::math::u32size;
+use all_is_cubes::math::{Srgba8, u32size};
 use all_is_cubes::util::{Fmt, StatusText};
 
 use crate::camera::{ImageSize, Layers};
@@ -54,7 +54,7 @@ pub struct Rendering {
     pub size: ImageSize,
 
     /// Image data, RGBA, 8 bits per component, in the sRGB color space.
-    pub data: Vec<[u8; 4]>,
+    pub data: Vec<Srgba8>,
 
     /// Deficiencies of the rendering; ways in which it fails to accurately represent the
     /// scene or apply the renderer’s configuration.
@@ -66,7 +66,7 @@ pub struct Rendering {
     pub info: Arc<dyn Info>,
 }
 
-impl From<Rendering> for imgref::ImgVec<[u8; 4]> {
+impl From<Rendering> for imgref::ImgVec<Srgba8> {
     fn from(value: Rendering) -> Self {
         imgref::Img::new(
             value.data,
@@ -75,7 +75,7 @@ impl From<Rendering> for imgref::ImgVec<[u8; 4]> {
         )
     }
 }
-impl<'a> From<&'a Rendering> for imgref::ImgRef<'a, [u8; 4]> {
+impl<'a> From<&'a Rendering> for imgref::ImgRef<'a, Srgba8> {
     fn from(value: &'a Rendering) -> Self {
         imgref::Img::new(
             value.data.as_slice(),

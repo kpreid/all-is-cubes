@@ -5,6 +5,7 @@ use std::sync::{Arc, mpsc};
 use png::{Encoder, chunk::ChunkType};
 
 use all_is_cubes::listen;
+use all_is_cubes::math::Srgba8;
 use all_is_cubes_render::Rendering;
 
 use crate::record::{RecordOptions, Status};
@@ -28,7 +29,7 @@ pub(crate) fn threaded_write_frames(
         'frame_loop: loop {
             match image_data_receiver.recv() {
                 Ok((status, image)) => {
-                    let image_data: &[[u8; 4]] = image.data.as_ref();
+                    let image_data: &[Srgba8] = image.data.as_ref();
                     png_writer.write_image_data(image_data.as_flattened())?;
                     status_notifier.notify(&status);
                 }

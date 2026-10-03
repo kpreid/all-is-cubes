@@ -31,7 +31,7 @@ use all_is_cubes::content::load_image::PngAdapter;
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{Point2D, point2, vec3};
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Rgba};
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Rgba, Srgba8};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 
 // for convenience, incorporate key items from of `load_image`
@@ -183,7 +183,7 @@ impl Context<'_> {
                 };
                 let full_block_bounds = GridAab::for_block(resolution);
 
-                let pixel_color_to_voxel = |srgba_color: [u8; 4]| -> Option<block::Block> {
+                let pixel_color_to_voxel = |srgba_color: Srgba8| -> Option<block::Block> {
                     let is_invisible = srgba_color[3] == 0;
                     let voxel_config @ &Vox {
                         collision,
@@ -246,7 +246,7 @@ impl Context<'_> {
                             read_ticket,
                             image,
                             rotation,
-                            &|pixel: [u8; 4]| {
+                            &|pixel: Srgba8| {
                                 if let Some(block) = pixel_color_to_voxel(pixel) {
                                     VoxelBrush::new(extrusion_cubes.iter().map(|&cube| {
                                         (cube.lower_bounds().to_vector(), block.clone())

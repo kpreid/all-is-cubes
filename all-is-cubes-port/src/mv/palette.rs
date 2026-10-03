@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+#[cfg(feature = "export")]
+use all_is_cubes::math::Srgb8;
 use itertools::{EitherOrBoth, Itertools};
 
 use all_is_cubes::arcstr;
@@ -68,10 +70,10 @@ pub(crate) fn dot_vox_palette_to_blocks(
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum MaterialKey {
     Diffuse {
-        color: [u8; 3],
+        color: Srgb8,
     },
     Blend {
-        color: [u8; 3],
+        color: Srgb8,
         transparency: ZeroOne<f32>,
     },
     Emit {
@@ -218,6 +220,6 @@ fn color_in(dot_vox::Color { r, g, b, a: _ }: dot_vox::Color) -> Rgb01 {
 }
 
 #[cfg(feature = "export")]
-fn make_color_struct([r, g, b]: [u8; 3]) -> dot_vox::Color {
+fn make_color_struct([r, g, b]: Srgb8) -> dot_vox::Color {
     dot_vox::Color { r, g, b, a: 255 }
 }

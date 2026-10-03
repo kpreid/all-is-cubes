@@ -188,7 +188,7 @@ pub fn get_image_from_gpu(
     );
 
     let size = camera::ImageSize::new(texture.width(), texture.height());
-    let data_future = get_texels_from_gpu::<[u8; 4]>(device, queue, texture, 1);
+    let data_future = get_texels_from_gpu::<math::Srgba8>(device, queue, texture, 1);
 
     async move {
         Rendering {

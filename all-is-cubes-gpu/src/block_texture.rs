@@ -18,7 +18,7 @@ use itertools::iproduct;
 use all_is_cubes::block;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{Box3D, Translation3D};
-use all_is_cubes::math::{self, Cube, GridAab, GridCoordinate, VectorOps as _};
+use all_is_cubes::math::{self, Cube, GridAab, GridCoordinate, Srgba8, VectorOps as _};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;
@@ -104,11 +104,12 @@ struct TileBacking {
 
     /// sRGB reflectance data (that might not be sent to the GPU yet, or reused upon resize).
     /// Is `Some` if `write()` has been called.
-    reflectance: Option<Box<[[u8; 4]]>>,
+    reflectance: Option<Box<[Srgba8]>>,
 
     /// sRGB emission data (that might not be sent to the GPU yet, or reused upon resize).
     /// Is `Some` if `write()` has been called and there is an emission channel.
-    emission: Option<Box<[[u8; 4]]>>,
+    // TODO: Should be using a float format for HDR
+    emission: Option<Box<[Srgba8]>>,
 
     /// Whether the data has changed so that we need to send it to the GPU on next
     /// [`AtlasAllocator::flush`].
@@ -760,7 +761,7 @@ impl TextureLimits {
     }
 }
 
-fn zero_box(volume: usize) -> Box<[[u8; 4]]> {
+fn zero_box(volume: usize) -> Box<[Srgba8]> {
     vec![[0, 0, 0, 0]; volume].into_boxed_slice()
 }
 

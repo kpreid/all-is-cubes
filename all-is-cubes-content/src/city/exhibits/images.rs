@@ -18,7 +18,7 @@ fn IMAGES(ctx: Context<'_>) {
     let mut outer_space = Space::empty(GridAab::from_lower_size([0, 0, 0], [4, 2, 1]));
 
     let mut place = |position: [i32; 3], rotation: GridRotation| -> Result<(), InGenError> {
-        let terrain_map_function = |pixel: [u8; 4]| -> VoxelBrush<'static> {
+        let terrain_map_function = |pixel: Srgba8| -> VoxelBrush<'static> {
             let [r, g, b, a] = pixel;
             if (r > b || g > b) && a > 0 {
                 let block = Block::from(Rgba::from_srgb8(pixel));

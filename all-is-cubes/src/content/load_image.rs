@@ -21,7 +21,7 @@ use png_decoder::PngHeader;
 use crate::block::{self, AIR, Block, Resolution};
 use crate::camera::{ImagePixel, ImageSize};
 use crate::drawing::VoxelBrush;
-use crate::math::{Cube, FaceMap, GridAab, GridCoordinate, GridRotation, Rgba, u32size};
+use crate::math::{Cube, FaceMap, GridAab, GridCoordinate, GridRotation, Rgba, Srgba8, u32size};
 use crate::space::{self, Space, SpacePhysics};
 use crate::universe::{ReadTicket, UniverseTransaction};
 
@@ -33,11 +33,8 @@ use crate::universe::{ReadTicket, UniverseTransaction};
 #[derive(Clone, Debug, PartialEq)]
 pub struct DecodedPng {
     header: PngHeader,
-    rgba_image_data: Vec<Srgba>,
+    rgba_image_data: Vec<Srgba8>,
 }
-
-/// Pixel type.
-type Srgba = [u8; 4];
 
 /// Adapter from [`png_decoder`] decoded images to voxel drawing.
 ///
@@ -47,8 +44,8 @@ type Srgba = [u8; 4];
 pub struct PngAdapter<'a> {
     width: i32,
     height: i32,
-    rgba_image_data: &'a [Srgba],
-    color_map: HashMap<Srgba, VoxelBrush<'a>>,
+    rgba_image_data: &'a [Srgba8],
+    color_map: HashMap<Srgba8, VoxelBrush<'a>>,
     max_brush: GridAab,
 }
 
@@ -89,12 +86,12 @@ impl DecodedPng {
         size2(self.header.width, self.header.height)
     }
 
-    pub fn pixels(&self) -> &[Srgba] {
+    pub fn pixels(&self) -> &[Srgba8] {
         &self.rgba_image_data
     }
 
     /// Returns the value of one pixel, or [`None`] for out-of-bounds access.
-    pub fn get_pixel<T: TryInto<u32>>(&self, pixel: Point2D<T, ImagePixel>) -> Option<Srgba> {
+    pub fn get_pixel<T: TryInto<u32>>(&self, pixel: Point2D<T, ImagePixel>) -> Option<Srgba8> {
         let Ok(x) = pixel.x.try_into() else {
             return None;
         };
@@ -115,14 +112,14 @@ impl<'a> PngAdapter<'a> {
     pub fn adapt<'png: 'a, 'brush: 'a>(
         png: &'png DecodedPng,
         // Note: this could be FnMut, at the price of forcing all callers to write `&mut`
-        pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'brush>,
+        pixel_function: &dyn Fn(Srgba8) -> VoxelBrush<'brush>,
     ) -> Self {
         let DecodedPng {
             header,
             rgba_image_data,
         } = png;
 
-        let mut color_map: HashMap<Srgba, VoxelBrush<'a>> = HashMap::new();
+        let mut color_map: HashMap<Srgba8, VoxelBrush<'a>> = HashMap::new();
         let mut max_brush: Option<GridAab> = None;
         for &color in rgba_image_data.iter() {
             let brush = color_map.entry(color).or_insert_with(|| pixel_function(color));
@@ -174,7 +171,7 @@ pub fn space_from_image<'b>(
     png: &DecodedPng,
     rotation: GridRotation,
     // Note: this could be FnMut, at the price of forcing all callers to write `&mut`
-    pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'b>,
+    pixel_function: &dyn Fn(Srgba8) -> VoxelBrush<'b>,
 ) -> Result<Space, space::builder::Error> {
     let header = &png.header;
     let size: Size2D<i32, ()> = Size2D::new(header.width, header.height).to_i32();
@@ -228,7 +225,7 @@ pub fn block_from_image<'b, 'ticket>(
     read_ticket: ReadTicket<'ticket>,
     png: &DecodedPng,
     rotation: GridRotation,
-    pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'b>,
+    pixel_function: &dyn Fn(Srgba8) -> VoxelBrush<'b>,
 ) -> Result<block::Builder<'ticket, block::builder::Voxels, UniverseTransaction>, BlockFromImageError>
 {
     let size = png.size();
@@ -253,7 +250,7 @@ pub fn block_from_image<'b, 'ticket>(
 /// [`AIR`], to meet normal expectations about collision, selection, and equality.
 #[doc(hidden)] // still experimental API
 #[inline(never)]
-pub fn default_srgb(pixel: Srgba) -> VoxelBrush<'static> {
+pub fn default_srgb(pixel: Srgba8) -> VoxelBrush<'static> {
     VoxelBrush::single(if pixel[3] == 0 {
         AIR
     } else {

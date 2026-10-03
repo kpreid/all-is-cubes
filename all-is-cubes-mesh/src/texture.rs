@@ -6,7 +6,7 @@ use core::fmt;
 
 use all_is_cubes::block;
 use all_is_cubes::euclid::Point3D;
-use all_is_cubes::math::{Axis, Cube, GridAab, GridSizeCoord, Rgb};
+use all_is_cubes::math::{Axis, Cube, GridAab, GridSizeCoord, Rgb, Srgba8};
 use all_is_cubes::util::{ConciseDebug, Fmt};
 
 // -------------------------------------------------------------------------------------------------
@@ -291,8 +291,8 @@ pub(super) fn needed_channels(voxels: block::EvoxelsRef<'_>) -> Channels {
 #[expect(clippy::module_name_repetitions)]
 pub fn copy_voxels_into_xmaj_texture(
     voxels: block::EvoxelsRef<'_>,
-    reflectance_texture: &mut [[u8; 4]],
-    emission_texture: Option<&mut [[u8; 4]]>,
+    reflectance_texture: &mut [Srgba8],
+    emission_texture: Option<&mut [Srgba8]>,
 ) {
     let bounds = voxels.bounds();
     let volume: usize = voxels.indices().volume();
