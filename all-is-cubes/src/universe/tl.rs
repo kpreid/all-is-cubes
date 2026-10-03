@@ -19,13 +19,13 @@ use crate::universe::Universe;
 
 std::thread_local! {
     /// Thread-local state used to communicate from [`Universe`] deserialization to
-    /// [`Handle`] deserialization so that the [`Handle`]`] points to a member of that
+    /// [`Handle`] deserialization so that the [`Handle`] points to a member of that
     /// [`Universe`].
     ///
     /// If [`None`], no [`Universe`] deserialization is currently occurring.
     ///
     /// TODO: Find an alternative not dependent on external state. Perhaps
-    /// serde::DeserializeSeed will do, or if necessary we can modify Handle to support
+    /// `serde::DeserializeSeed` will do, or if necessary we can modify Handle to support
     /// modification after construction.
     static HANDLE_CONTEXT: RefCell<Option<Context>> = const {
         RefCell::new(None)

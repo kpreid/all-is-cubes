@@ -208,6 +208,7 @@ needless_update = "allow"
 single_match = "allow"
 single_range_in_vec_init = "allow" # false positives <https://github.com/rust-lang/rust-clippy/issues/11086>
 too_many_arguments = "allow" # not usefully actionable for the internal functions it fires on
+while_let_loop = "allow" # proposes making exhaustive matches non-exhaustive <https://github.com/rust-lang/rust-clippy/issues/17839>
 
 # clippy::pedantic lints that are set to allow
 cast_possible_truncation = "allow" # we would need an alternative for intentional from-float saturation and to-float precision loss

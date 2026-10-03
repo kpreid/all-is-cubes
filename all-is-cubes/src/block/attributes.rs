@@ -275,6 +275,7 @@ macro_rules! derive_attribute_helpers {
 macro_rules! attribute_builder_method {
     // Custom name for the `inventory` field.
     ($(#[doc = $field_doc:literal] )* exact inventory: $field_type:ty) => {
+        #[allow(unknown_lints, clippy::empty_docs)] // TODO: remove unknown_lints after Rust 1.101
         #[doc = concat!(
             "Sets the value for [`BlockAttributes::inventory`], which is:",
         )]
@@ -288,6 +289,7 @@ macro_rules! attribute_builder_method {
 
     // These two rules are identical except for the type of the method’s value parameter.
     ($(#[doc = $field_doc:literal] )* exact $field_name:ident: $field_type:ty) => {
+        #[allow(unknown_lints, clippy::empty_docs)] // TODO: remove unknown_lints after Rust 1.101
         #[doc = concat!(
             "Sets the value for [`BlockAttributes::",
             stringify!($field_name),
@@ -301,6 +303,7 @@ macro_rules! attribute_builder_method {
         }
     };
     ($(#[doc = $field_doc:literal] )* into $field_name:ident: $field_type:ty) => {
+        #[allow(unknown_lints, clippy::empty_docs)] // TODO: remove unknown_lints after Rust 1.101
         #[doc = concat!(
             "Sets the value for [`BlockAttributes::",
             stringify!($field_name),

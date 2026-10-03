@@ -80,13 +80,10 @@ palette! {
     // Physical material colors.
     /// A realistic value for typical black materials, which do not absorb all light.
     ALMOST_BLACK: Rgb01 = srgb[0x3d 0x3d 0x3d];
-    ///
     GRASS: Rgb01 = srgb[0x61 0xAA 0x31];
-    ///
     DIRT: Rgb01 = srgb[0x6C 0x50 0x44];
     /// Generic unspecified some-kind-of-stone...
     STONE: Rgb01 = srgb[0xD9 0xD7 0xD5];
-    ///
     TREE_BARK: Rgb01 = srgb[0x83 0x5C 0x42];
     /// TODO: Not actually exercised in demo content yet
     TREE_LEAVES: Rgb01 = srgb[0x61 0xAA 0x31];
