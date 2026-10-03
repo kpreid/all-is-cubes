@@ -1,5 +1,3 @@
-use all_is_cubes::content::load_image::{block_from_image, default_srgb};
-
 use super::prelude::*;
 
 #[macro_rules_attribute::apply(exhibit!)]
@@ -24,12 +22,12 @@ fn IMAGES(ctx: Context<'_>) {
                 let block = Block::from(Rgba::from_srgb8(pixel));
                 VoxelBrush::with_thickness(block, 0..2).rotate(rotation)
             } else {
-                default_srgb(pixel)
+                asset::default_srgb(pixel)
             }
         };
 
-        let image = include_image!("terrain-image.png");
-        let block = block_from_image(
+        let image = asset::include_image!("terrain-image.png");
+        let block = asset::block_from_image(
             ctx.universe.read_ticket(),
             image,
             rotation,

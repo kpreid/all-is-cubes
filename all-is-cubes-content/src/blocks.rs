@@ -18,6 +18,7 @@ use rand::{RngExt as _, SeedableRng as _};
 use num_traits::float::Float as _;
 
 use all_is_cubes::arcstr::literal;
+use all_is_cubes::asset::{self, include_image};
 use all_is_cubes::block::{
     self, AIR, AnimationHint, Block, BlockCollision, BlockDef, Resolution::*,
     RotationPlacementRule, TickAction,
@@ -39,7 +40,6 @@ use all_is_cubes::util::YieldProgress;
 use crate::alg::{gradient_lookup, scale_color, square_radius};
 use crate::landscape::install_landscape_blocks;
 use crate::load_block as lb;
-use crate::load_image::{default_srgb, include_image, space_from_image};
 use crate::palette;
 
 // -------------------------------------------------------------------------------------------------
@@ -208,11 +208,11 @@ fn demo_blocks_generator(
 
                 // This image is (32×4) by 32 in size, having four tiles making up parts of the
                 // crate.
-                let image_space = space_from_image(
+                let image_space = asset::space_from_image(
                     txn.read_ticket(),
                     include_image!("blocks/crate.png"),
                     GridRotation::IDENTITY,
-                    default_srgb,
+                    asset::default_srgb,
                 )?;
                 let image_space = txn.insert_anonymous(image_space);
 
@@ -281,13 +281,11 @@ fn demo_blocks_generator(
                 // Use the image as a source of color palettes, not an image.
                 // TODO: use hash of coord instead of rng
 
-                use all_is_cubes::content::load_image::{PngAdapter, default_srgb};
-
                 let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3458679152340);
 
-                let palette_image = PngAdapter::adapt(
-                    crate::load_image::include_image!("blocks/road-palette.png").as_ref(),
-                    &mut default_srgb,
+                let palette_image = asset::PngAdapter::adapt(
+                    asset::include_image!("blocks/road-palette.png").as_ref(),
+                    &mut asset::default_srgb,
                 );
                 let range = 0..palette_image.size().width;
 

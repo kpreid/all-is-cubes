@@ -4,10 +4,8 @@ use core::fmt;
 
 use exhaust::Exhaust;
 
+use all_is_cubes::asset::{block_from_image, default_srgb, include_image, space_from_image};
 use all_is_cubes::block::{self, AIR, Block, Resolution::*};
-use all_is_cubes::content::load_image::{
-    block_from_image, default_srgb, include_image, space_from_image,
-};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::TOOL_SELECTIONS;

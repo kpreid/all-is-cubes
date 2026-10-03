@@ -11,6 +11,7 @@ use noise_functions::Noise as _;
 use num_traits::float::Float as _;
 
 use all_is_cubes::arcstr;
+use all_is_cubes::asset::include_image;
 use all_is_cubes::block::{self, AIR, Block, Resolution, RotationPlacementRule, Zoom};
 use all_is_cubes::content::palette;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
@@ -25,7 +26,6 @@ use all_is_cubes::util::YieldProgress;
 use crate::Fire;
 use crate::alg::scale_color;
 use crate::load_block as lb;
-use crate::load_image::include_image;
 
 // -------------------------------------------------------------------------------------------------
 

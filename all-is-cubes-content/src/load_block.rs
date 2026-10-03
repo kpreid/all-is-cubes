@@ -26,17 +26,17 @@
 use alloc::format;
 use alloc::vec::Vec;
 
+use all_is_cubes::asset;
 use all_is_cubes::block::{self, Resolution};
 use all_is_cubes::camera::imgref_size;
-use all_is_cubes::content::load_image::PngAdapter;
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{Point2D, point2, vec3};
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Rgba, Srgba8};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 
-// for convenience, incorporate key items from of `load_image`
-pub use all_is_cubes::content::load_image::{LazyImage, include_image};
+// for convenience, incorporate key items from `asset`
+pub use all_is_cubes::asset::{LazyImage, include_image};
 
 #[cfg(doc)]
 use crate::load_block; // self, for documentation
@@ -243,7 +243,7 @@ impl Context<'_> {
                             ));
                         }
 
-                        let space = all_is_cubes::content::load_image::space_from_image(
+                        let space = asset::space_from_image(
                             read_ticket,
                             image,
                             rotation,
@@ -276,7 +276,7 @@ impl Context<'_> {
                         let transform =
                             rotation.inverse().to_positive_octant_transform(resolution.into());
 
-                        let adapter = PngAdapter::adapt(image.as_ref(), &mut |pixel| {
+                        let adapter = asset::PngAdapter::adapt(image.as_ref(), &mut |pixel| {
                             if let Some(block) = pixel_color_to_voxel(pixel) {
                                 VoxelBrush::single(block)
                             } else {
@@ -314,6 +314,7 @@ impl Context<'_> {
 mod tests {
     use alloc::sync::Arc;
 
+    use all_is_cubes::asset;
     use all_is_cubes::block::{self, Resolution::R2};
     use all_is_cubes::linking::InGenError;
     use all_is_cubes::math::{GridAab, GridRotation, Rgb, Rgba, Vol};
@@ -321,7 +322,6 @@ mod tests {
     use all_is_cubes::util::ErrorChain;
 
     use crate::load_block as lb;
-    use crate::load_image::{LazyImage, include_image};
 
     fn pretty_unwrap<T>(result: Result<T, InGenError>) -> T {
         match result {
@@ -350,7 +350,7 @@ mod tests {
         assert!(txn.is_empty());
     }
 
-    const IMAGE_2X2: &LazyImage = include_image!("load_block/test_2x2_0rgb.png");
+    const IMAGE_2X2: &asset::LazyImage = asset::include_image!("load_block/test_2x2_0rgb.png");
 
     #[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
     fn image_simple_extrusion(

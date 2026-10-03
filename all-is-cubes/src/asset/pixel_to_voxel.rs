@@ -1,9 +1,3 @@
-//! Loading images embedded in the binary for use as game assets (i.e. [`Block`]s).
-//!
-//! The images are lazily decompressed from PNG.
-//! This has the disadvantage of requiring a decoder, but makes up for it in the
-//! compactness of individual images.
-
 #![expect(
     clippy::unwrap_used,
     reason = "TODO: better, unified handling of coordinate overflows"
@@ -12,47 +6,14 @@
 use core::fmt;
 
 use hashbrown::HashMap;
-use imgref::{Img, ImgExt as _};
-
-use bevy_platform::sync::OnceLock;
+use imgref::{Img, ImgExt as _, ImgRef};
 
 use crate::block::{self, AIR, Block, Resolution};
 use crate::camera::{ImageSize, imgref_size};
 use crate::drawing::VoxelBrush;
-use crate::math::{Cube, FaceMap, GridAab, GridCoordinate, GridRotation, Rgba, Srgba8, u32size};
+use crate::math::{Cube, FaceMap, GridAab, GridCoordinate, GridRotation, Rgba, Srgba8};
 use crate::space::{self, Space, SpacePhysics};
 use crate::universe::{ReadTicket, UniverseTransaction};
-
-// -------------------------------------------------------------------------------------------------
-
-pub use imgref::{ImgRef, ImgVec};
-
-/// Decode data in PNG format.
-///
-/// This function is intended to be used with embedded assets, in a pattern like:
-///
-/// ```
-/// # use all_is_cubes::content::load_image::decode_static;
-/// # drop(
-/// decode_static(include_bytes!("load_image_test.png"), "load_image_test.png")
-/// # );
-/// ```
-///
-/// Ordinarily, you should use [`include_image!`] instead of this function, which provides
-/// lazy loading (memoization of decoding).
-/// This function is provided for cases where built-in memoization is unwanted, such as if
-/// further work is going to be done and the image discarded.
-///
-/// # Panics
-///
-/// Panics if the data is not a valid PNG.
-#[track_caller]
-pub fn decode_static(png_data: &'static [u8], path: &'static str) -> ImgVec<Srgba8> {
-    match png_decoder::decode(png_data) {
-        Ok((header, data)) => ImgVec::new(data, u32size(header.width), u32size(header.height)),
-        Err(error) => panic!("Error loading image asset {path:?}: {error:?}"),
-    }
-}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -70,6 +31,7 @@ pub struct PngAdapter<'a> {
 }
 
 impl<'a> PngAdapter<'a> {
+    #[expect(clippy::missing_panics_doc)]
     #[inline(never)]
     pub fn adapt<'image: 'a, 'brush: 'a>(
         image: ImgRef<'image, Srgba8>,
@@ -120,9 +82,18 @@ impl<'a> PngAdapter<'a> {
 ///
 /// The `pixel_function` will be memoized.
 ///
+/// The space’s physics will be set to [`SpacePhysics::DEFAULT_FOR_BLOCK`].
+///
+/// # Errors
+///
+/// Returns an error if
+///
+/// * the image’s dimensions are not square or not equal to a valid [`Resolution`], or
+/// * the blocks produced by `pixel_function` are too numerous or cannot be evaluated using
+///   `read_ticket`.
+//---
 // TODO: Allow `space::Builder` controls somehow. Maybe this belongs as a method on it.
 // TODO: pixel_function should have a Result return
-#[doc(hidden)] // still experimental API
 #[inline(always)] // manually polymorphized for code size; inline this adapter function
 pub fn space_from_image<'b>(
     read_ticket: ReadTicket<'_>,
@@ -188,7 +159,14 @@ pub fn space_from_image<'b>(
 
 /// Convert an image into a [`block::Builder`] with voxels (which can then create a [`Block`]).
 /// The image’s dimensions must be square and equal to some [`Resolution`].
-#[doc(hidden)] // still experimental API
+///
+/// # Errors
+///
+/// Returns an error if
+///
+/// * the image’s dimensions are not square or not equal to a valid [`Resolution`], or
+/// * the blocks produced by `pixel_function` are too numerous or cannot be evaluated using
+///   `read_ticket`.
 #[inline(always)] // manually polymorphized for code size; inline this adapter function
 pub fn block_from_image<'b, 'ticket>(
     read_ticket: ReadTicket<'ticket>,
@@ -224,12 +202,11 @@ pub fn block_from_image<'b, 'ticket>(
     inner(read_ticket, image.as_ref(), rotation, &mut pixel_function)
 }
 
-/// Simple function for [`space_from_image()`] pixel conversion.
+/// Simple pixel-to-voxel function for use with [`space_from_image()`] and [`block_from_image()`].
 ///
 /// Special case:
 /// All pixels with 0 alpha (regardless of other channel values) are converted to
 /// [`AIR`], to meet normal expectations about collision, selection, and equality.
-#[doc(hidden)] // still experimental API
 #[inline(never)]
 pub fn default_srgb(pixel: Srgba8) -> VoxelBrush<'static> {
     VoxelBrush::single(if pixel[3] == 0 {
@@ -239,7 +216,7 @@ pub fn default_srgb(pixel: Srgba8) -> VoxelBrush<'static> {
     })
 }
 
-#[doc(hidden)] // still experimental API
+/// Error returned by [`block_from_image()`].
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum BlockFromImageError {
@@ -277,75 +254,11 @@ impl core::error::Error for BlockFromImageError {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Data type produced by [`include_image!`].
-///
-/// Dereferences to [`ImgVec`] of [`Srgba8`].
-#[derive(Debug)]
-pub struct LazyImage {
-    /// Lazily decoded image data.
-    decoded_data: OnceLock<ImgVec<Srgba8>>,
-
-    /// PNG image data for decoding.
-    encoded_data: &'static [u8],
-
-    /// (File) name of the image, for printing in case of errors.
-    path: &'static str,
-}
-
-impl LazyImage {
-    #[doc(hidden)]
-    pub const fn private_include_image_macro_new(
-        path: &'static str,
-        encoded_data: &'static [u8],
-    ) -> Self {
-        Self {
-            decoded_data: OnceLock::new(),
-            path,
-            encoded_data,
-        }
-    }
-
-    /// The path of the image, exposed for diagnostic purposes.
-    ///
-    /// This path is not guaranteed to be absolute or to be relative to any particular directory.
-    pub fn path(&self) -> &'static str {
-        self.path
-    }
-}
-
-impl core::ops::Deref for LazyImage {
-    type Target = ImgVec<Srgba8>;
-    #[track_caller] // attribute decoding error to the lazy site
-    fn deref(&self) -> &Self::Target {
-        self.decoded_data.get_or_init(|| decode_static(self.encoded_data, self.path))
-    }
-}
-
-/// Load an image from a relative path.
-///
-/// This macro expands to an expression of type [`&'static LazyImage`][LazyImage],
-/// which dereferences to [`ImgVec`] of [`Srgba8`].
-#[doc(hidden)]
-#[macro_export]
-macro_rules! _content_load_image_include_image {
-    ( $path:literal ) => {{
-        static IMAGE: $crate::content::load_image::LazyImage =
-            $crate::content::load_image::LazyImage::private_include_image_macro_new(
-                $path,
-                ::core::include_bytes!($path),
-            );
-        &IMAGE
-    }};
-}
-pub use _content_load_image_include_image as include_image;
-
-// -------------------------------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::block;
-    use imgref::ImgRef;
+    use imgref::ImgVec;
 
     fn test_image() -> ImgVec<Srgba8> {
         ImgVec::new(
@@ -414,30 +327,5 @@ mod tests {
             GridAab::from_lower_upper([10, 0, 0], [12, 2, 1])
         );
         assert_eq!(space[[11, 0, 0]], block::from_color!(1., 0., 0.));
-    }
-
-    #[test]
-    fn include_image() {
-        // Putting this in a `const` item shows that `include_image!` can be called from a
-        // const context.
-        const IMAGE: &LazyImage = include_image!("load_image_test.png");
-
-        let decoded: &ImgVec<Srgba8> = IMAGE;
-        assert_eq!(
-            decoded.as_ref(),
-            ImgRef::new(
-                [
-                    [0, 0, 0, 0],
-                    [255, 0, 0, 255],
-                    [255, 0, 0, 255],
-                    [255, 0, 0, 255],
-                    [255, 0, 0, 255],
-                    [255, 0, 0, 255]
-                ]
-                .as_slice(),
-                3,
-                2,
-            )
-        )
     }
 }

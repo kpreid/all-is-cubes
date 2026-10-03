@@ -5,6 +5,7 @@
 ### Added
 
 * `all-is-cubes` library:
+    * `asset` module, for defining blocks based on embedded images.
     * `block::Atom::from_color()`, a const fn.
     * `block::BlockDef` can now be used to make block definitions that are looping animations.
       New items `block::Animation` and `block::BlockDef::new_animated()` support this functionality.

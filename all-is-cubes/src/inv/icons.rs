@@ -9,8 +9,8 @@ use exhaust::Exhaust;
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
+use crate::asset::{block_from_image, default_srgb, include_image};
 use crate::block::{self, AIR, Block, Resolution::*};
-use crate::content::load_image::{block_from_image, default_srgb, include_image};
 use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{FreeCoordinate, GridCoordinate, GridRotation, Rgba, rgb_const, rgba_const};
 use crate::universe::{ReadTicket, UniverseTransaction};

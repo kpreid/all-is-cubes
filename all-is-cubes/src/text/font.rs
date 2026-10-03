@@ -280,7 +280,7 @@ pub(crate) struct FontDecl {
 
 impl FontDecl {
     pub(crate) fn load(&self) -> FontDef {
-        let decoded_png = crate::content::load_image::decode_static(self.png_data, self.png_path);
+        let decoded_png = crate::asset::decode_static(self.png_data, self.png_path);
         assert_eq!(
             decoded_png.width(),
             u32size(u32::from(self.metrics.character_size.width) * GLYPHS_PER_ROW),

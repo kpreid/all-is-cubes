@@ -108,7 +108,7 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
     let color_card = const {
         lb::Block {
             primitive: lb::PrimitiveOrSuch::Image {
-                image: include_image!("color-card.png"),
+                image: asset::include_image!("color-card.png"),
                 rotation: GridRotation::RXyZ,
                 expansion: lb::Expansion::Extrude(&[
                     WALL_RESOLUTION.to_grid() - 1..WALL_RESOLUTION.to_grid()

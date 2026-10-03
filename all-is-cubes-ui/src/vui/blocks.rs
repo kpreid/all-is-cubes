@@ -2,7 +2,7 @@ use core::fmt;
 
 use exhaust::Exhaust;
 
-use all_is_cubes::content::load_image::include_image;
+use all_is_cubes::asset::include_image;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;

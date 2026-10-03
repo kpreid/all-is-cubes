@@ -6,7 +6,7 @@ use core::num::NonZeroU64;
 
 use wgpu::util::DeviceExt;
 
-use all_is_cubes::content::load_image::include_image;
+use all_is_cubes::asset::include_image;
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::universe;
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption, imgref_size};

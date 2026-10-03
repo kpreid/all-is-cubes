@@ -610,8 +610,8 @@ impl From<SetCubeError> for InGenError {
         InGenError::SetCube(error)
     }
 }
-impl From<crate::content::load_image::BlockFromImageError> for InGenError {
-    fn from(error: crate::content::load_image::BlockFromImageError) -> Self {
+impl From<crate::asset::BlockFromImageError> for InGenError {
+    fn from(error: crate::asset::BlockFromImageError) -> Self {
         // TODO: give this its own variant?
         InGenError::Other(Box::new(error))
     }

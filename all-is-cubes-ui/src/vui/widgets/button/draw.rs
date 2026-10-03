@@ -8,12 +8,12 @@ use core::iter;
 
 use exhaust::Exhaust;
 
+use all_is_cubes::asset;
 use all_is_cubes::block::AIR;
 use all_is_cubes::block::{
     self, Block, Builder,
     Resolution::{self, *},
 };
-use all_is_cubes::content::load_image::{ImgRef, default_srgb, include_image, space_from_image};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{Vector2D, vec3};
@@ -148,7 +148,7 @@ impl ButtonLabel {
 }
 
 pub(crate) enum ButtonIcon<'a> {
-    Icon(ImgRef<'a, Srgba8>),
+    Icon(asset::ImgRef<'a, Srgba8>),
 }
 
 /// TODO: document, refine, and make public
@@ -167,9 +167,10 @@ pub(crate) fn make_button_label_block(
             .extend(0)
             .cast_unit::<Cube>();
 
-            let space = space_from_image(ReadTicket::stub(), &icon, GridRotation::RXyZ, |color| {
-                default_srgb(color).translate(centering)
-            })?;
+            let space =
+                asset::space_from_image(ReadTicket::stub(), &icon, GridRotation::RXyZ, |color| {
+                    asset::default_srgb(color).translate(centering)
+                })?;
 
             // TODO: Implement the same bounds-shrinking feature as `Block::voxels_fn()` has.
             Block::builder()
@@ -241,7 +242,7 @@ impl ButtonBase for super::ButtonVisualState {
             txn.insert_anonymous(draw_button_multiblock_from_image(
                 self,
                 self.pressed,
-                include_image!("../theme/button-shape-action.png").as_ref(),
+                asset::include_image!("../theme/button-shape-action.png").as_ref(),
             )?),
             "Action Button",
         ))
@@ -259,7 +260,7 @@ impl ButtonBase for super::ToggleButtonVisualState {
             txn.insert_anonymous(draw_button_multiblock_from_image(
                 self,
                 self.value,
-                include_image!("../theme/button-shape-toggle.png").as_ref(),
+                asset::include_image!("../theme/button-shape-toggle.png").as_ref(),
             )?),
             &format!("Toggle Button {self}"),
         ))
@@ -285,7 +286,7 @@ mod image_palette {
 fn draw_button_multiblock_from_image(
     state: &impl ButtonBase,
     active: bool,
-    image: ImgRef<'_, Srgba8>,
+    image: asset::ImgRef<'_, Srgba8>,
 ) -> Result<Space, InGenError> {
     let label_z = state.button_label_z();
     let illuminate = move |builder: Builder<'static, block::builder::Atom, ()>| {
@@ -304,7 +305,7 @@ fn draw_button_multiblock_from_image(
     };
     let back_color_block = illuminate(Block::builder().color(back_color));
     let rim_color_block = illuminate(Block::builder().color(theme::rim_lightening(back_color)));
-    let space = space_from_image(
+    let space = asset::space_from_image(
         ReadTicket::stub(), // all color blocks are dependency-free
         &image,
         GridRotation::RXyZ,

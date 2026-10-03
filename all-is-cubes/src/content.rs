@@ -22,8 +22,6 @@ use crate::universe::{self, Universe, UniverseTransaction};
 
 mod draw_box;
 pub use draw_box::*;
-#[doc(hidden)] // TODO: make public with better API
-pub mod load_image;
 pub mod palette;
 #[doc(hidden)]
 pub mod testing;

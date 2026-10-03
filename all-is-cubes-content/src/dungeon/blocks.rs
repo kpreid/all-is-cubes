@@ -8,8 +8,8 @@ use core::f64::consts::TAU;
 use num_traits::float::Float as _;
 
 use all_is_cubes::arcstr::literal;
+use all_is_cubes::asset::include_image;
 use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule};
-use all_is_cubes::content::load_image::include_image;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{point3, vec3};
 use all_is_cubes::inv;

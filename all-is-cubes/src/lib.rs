@@ -161,6 +161,7 @@ extern crate std;
 #[doc(inline)]
 pub use all_is_cubes_base::raycast;
 
+pub mod asset;
 pub mod behavior;
 pub mod block;
 #[doc(hidden)] // Exported only for use by all_is_cubes_render
