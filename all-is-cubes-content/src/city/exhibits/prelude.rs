@@ -20,6 +20,7 @@ pub(super) use num_traits::float::Float as _;
 
 pub(super) use all_is_cubes::arcstr::{self, literal};
 pub(super) use all_is_cubes::asset;
+pub(super) use all_is_cubes::asset as lb; // TODO: temporary for refactoring; remove
 pub(super) use all_is_cubes::block::{
     self, AIR, Block, BlockCollision, Composite, CompositeOperator, Move,
     Resolution::{self, *},
@@ -46,7 +47,6 @@ pub(super) use all_is_cubes::universe::{Builtin, ReadTicket};
 
 pub(super) use crate::alg::{self, stack};
 pub(super) use crate::city::exhibit::{Context, Exhibit, ExhibitTransaction, Placement, exhibit};
-pub(super) use crate::load_block as lb;
 pub(super) use crate::{
     BoxPart, BoxStyle, DemoBlocks, Fire, LandscapeBlocks, make_some_blocks,
     make_some_voxel_blocks_txn, palette, tree,

@@ -11,6 +11,10 @@ mod image;
 pub(crate) use image::decode_static;
 pub use image::{LazyImage, include_image};
 
+// TODO: better name and organization
+mod load_block;
+pub use load_block::{Block, Expansion, PrimitiveOrSuch, Vox};
+
 mod pixel_to_voxel;
 #[doc(hidden)] // not yet polished
 pub use pixel_to_voxel::PngAdapter;

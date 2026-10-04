@@ -8,6 +8,7 @@ use core::f64::consts::TAU;
 use num_traits::float::Float as _;
 
 use all_is_cubes::arcstr::literal;
+use all_is_cubes::asset as lb;
 use all_is_cubes::asset::include_image;
 use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule};
 use all_is_cubes::content::palette;
@@ -21,8 +22,6 @@ use all_is_cubes::op;
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-
-use crate::load_block as lb;
 
 // -------------------------------------------------------------------------------------------------
 

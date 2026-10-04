@@ -18,6 +18,7 @@ use rand::{RngExt as _, SeedableRng as _};
 use num_traits::float::Float as _;
 
 use all_is_cubes::arcstr::literal;
+use all_is_cubes::asset as lb; // TODO: temporary for refactoring; remove
 use all_is_cubes::asset::{self, include_image};
 use all_is_cubes::block::{
     self, AIR, AnimationHint, Block, BlockCollision, BlockDef, Resolution::*,
@@ -39,7 +40,6 @@ use all_is_cubes::util::YieldProgress;
 
 use crate::alg::{gradient_lookup, scale_color, square_radius};
 use crate::landscape::install_landscape_blocks;
-use crate::load_block as lb;
 use crate::palette;
 
 // -------------------------------------------------------------------------------------------------
@@ -197,7 +197,7 @@ fn demo_blocks_generator(
             .load(txn)?,
 
             // It's in Rust, gotta have crates ;)
-            // TODO: Make this composition of tiles expressible using `load_block`.
+            // TODO: Make this composition of tiles expressible using `all_is_cubes::asset`.
             Crate => {
                 use GridRotation::*;
                 use block::Composite;
@@ -819,7 +819,7 @@ fn demo_blocks_generator(
 /// You can either have pre-rotated blocks and pass `FaceMap::splat(GridRotation::IDENTITY)`,
 /// or pass blocks in all the same orientation and rotations for them.
 //---
-// TODO: integrate this into the `load_block` system so it can be expressed as constant data
+// TODO: integrate this into the `asset` system so it can be expressed as constant data
 // instead of a function call.
 #[inline(never)]
 pub(crate) fn compose_block_from_faces(

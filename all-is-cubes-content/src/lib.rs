@@ -32,7 +32,6 @@ mod animation;
 pub(crate) use animation::*;
 mod atrium;
 mod blocks;
-mod load_block;
 pub use blocks::*;
 mod city;
 pub(crate) use city::demo_city;

@@ -1,68 +1,95 @@
-//! Experimental module to express block definitions as constant data structures rather than
+//! Expressing block definitions as constant data structures rather than
 //! Rust functions that build non-constant data structures.
 //!
-//! Eventually, we hope that these data structures will become able to be stored as simple data
-//! files, but for the moment, they are still written as Rust code, particularly to avoid the
-//! overhead of a parser that is (currently) only used to load hardcoded data.
+//! # Motivation
 //!
-//! # Rationale
+//! Because these data structures are fully constructible in `const` context, the code can be
+//! guaranteed to be compiled into constant values rather than machine code that constructs those
+//! values. This typically results in the executable being smaller.
 //!
-//! Actual and planned advantages:
-//!
-//! * Eliminate costs of having distinct, nontrivial Rust code for each block definition.
-//! * Instead of having both code defining the block and `.png`s for the voxels, have the
-//!   rest of the definition live next to the `.png`s.
-//!   (This is not implemented, and will need to be done using a proc-macro or `include!` abuse.)
-//! * Public and usable as a tool downstream, eventually.
-//!
-//! Costs/disadvantages:
-//!
-//! * Another parallel(ish) set of data structures that aren’t just `Block`.
-//!
-//! If the experiment is successful, then this should likely be promoted out of
-//! `all-is-cubes-content` into a public module of `all-is-cubes`, so that it can be used without
-//! bringing in the demo content.
+//! Eventually, we hope that we will also be able to keep these as data files rather than making
+//! them part of the source code, but that may not turn out to be feasible or desirable.
+
+#![expect(
+    clippy::exhaustive_structs,
+    missing_debug_implementations,
+    reason = "these types are intended to be written as constants, only"
+)]
+#![expect(missing_docs, clippy::missing_errors_doc, reason = "TODO")]
 
 use alloc::format;
 use alloc::vec::Vec;
 
-use all_is_cubes::asset;
-use all_is_cubes::block::{self, Resolution};
-use all_is_cubes::camera::imgref_size;
-use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::euclid::{Point2D, point2, vec3};
-use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Rgba, Srgba8};
-use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
-
-// for convenience, incorporate key items from `asset`
-pub use all_is_cubes::asset::{LazyImage, include_image};
+use crate::asset;
+use crate::block::{self, Resolution};
+use crate::camera::imgref_size;
+use crate::drawing::VoxelBrush;
+use crate::euclid::{Point2D, point2, vec3};
+use crate::linking::InGenError;
+use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Rgba, Srgba8};
+use crate::universe::{ReadTicket, UniverseTransaction};
 
 #[cfg(doc)]
-use crate::load_block; // self, for documentation
+use crate::block::Atom;
 
 // -------------------------------------------------------------------------------------------------
 // Const-compatible “schema” data structures
 
 /// Const-constructible data which a [`block::Block`] can be built from.
+///
+/// # Example
+///
+// TODO: make a runnable example using a suitable png file
+/// ```no_run
+/// # fn main() -> Result<(), all_is_cubes::linking::InGenError> {
+/// use all_is_cubes::{
+///     arcstr::literal,
+///     asset,
+///     block,
+///     math::GridRotation,
+///     universe::UniverseTransaction,
+/// };
+///
+/// let mut txn = UniverseTransaction::default();
+/// let block: block::Block = const {
+///     asset::Block {
+///         primitive: asset::PrimitiveOrSuch::Image {
+///             image: asset::include_image!("load_image_test.png"),
+///             rotation: GridRotation::RXZY,
+///             expansion: asset::Expansion::Extrude(&[0..2]),
+///             visible: asset::Vox::DEFAULT,
+///             invisible: asset::Vox::DENOTES_AIR,
+///         },
+///         modifiers: &[block::Modifier::SetAttribute(
+///             block::SetAttribute::DisplayName(literal!("Example Block")),
+///         )],
+///     }
+/// }
+/// .load(&mut txn)?;
+/// # Ok(()) }
+/// ```
+///
+/// Placing the [`asset::Block`] expression in a `const {}` block ensures that it will be
+/// compiled into constant data rather than code that constructs it,
+/// which is usually more compact.
+#[expect(missing_docs, reason = "TODO")]
 pub struct Block {
     pub primitive: PrimitiveOrSuch,
     pub modifiers: &'static [block::Modifier],
 }
 
 impl Block {
-    /// Entry point to the [`load_block`] system.
-    /// Call this to turn the static [`load_block::Block`] data into a regular
-    /// [`all_is_cubes::block::Block`].
+    /// Turns the static [`asset::Block`] data into a regular [`block::Block`].
     #[inline(never)] // don't duplicate *any* of this logic, to keep binary size down
     pub fn load(self, txn: &mut UniverseTransaction) -> Result<block::Block, InGenError> {
         Context { txn }.build_block(self)
     }
 }
 
-/// Specifies the block’s primitive (and possibly some modifiers).
+/// Specifies an [`asset::Block`]’s primitive (and possibly some modifiers).
 /// Differs from [`block::Primitive`] in that it does not contain the voxel data, or a handle
 /// to the voxel data, but instead a procedure for obtaining or computing the data.
+#[non_exhaustive]
 pub enum PrimitiveOrSuch {
     /// Use a single [`block::Atom`].
     Atom(block::Atom),
@@ -71,7 +98,7 @@ pub enum PrimitiveOrSuch {
     ///
     /// The resolution of the block is taken from the image.
     Image {
-        image: &'static LazyImage,
+        image: &'static asset::LazyImage,
 
         /// After the image is expanded into a 3D shape, rotate or reflect it this way.
         ///
@@ -90,7 +117,8 @@ pub enum PrimitiveOrSuch {
     },
 }
 
-/// How to expand a 2D image into a 3D voxel shape.
+/// How to expand a 2D image into a 3D voxel shape in a [`asset::PrimitiveOrSuch::Image`].
+#[non_exhaustive]
 pub enum Expansion {
     /// Extrude the image on the depth (Z before rotation) axis, possibly discontiguously,
     /// within the given ranges.
@@ -106,10 +134,12 @@ pub enum Expansion {
     Stack,
 }
 
-/// Specifies the properties of each voxel in the block, except for the color taken from the
-/// image.
+/// Specifies the properties of each voxel in a block produced by
+/// [`asset::PrimitiveOrSuch::Image`],
+/// other than the color taken from the image.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Vox {
+    /// As per [`Atom::collision`].
     // TODO: support specifying emission mapping (instead of color or duplicated, and scale factor)
     pub collision: block::BlockCollision,
 
@@ -314,14 +344,14 @@ impl Context<'_> {
 mod tests {
     use alloc::sync::Arc;
 
-    use all_is_cubes::asset;
-    use all_is_cubes::block::{self, Resolution::R2};
-    use all_is_cubes::linking::InGenError;
-    use all_is_cubes::math::{GridAab, GridRotation, Rgb, Rgba, Vol};
-    use all_is_cubes::universe::UniverseTransaction;
-    use all_is_cubes::util::ErrorChain;
+    use crate::asset;
+    use crate::block::{self, Resolution::R2};
+    use crate::linking::InGenError;
+    use crate::math::{GridAab, GridRotation, Rgb, Rgba, Vol};
+    use crate::universe::UniverseTransaction;
+    use crate::util::ErrorChain;
 
-    use crate::load_block as lb;
+    use asset as lb; // TODO: temporary for refactoring; remove
 
     fn pretty_unwrap<T>(result: Result<T, InGenError>) -> T {
         match result {
@@ -352,7 +382,7 @@ mod tests {
 
     const IMAGE_2X2: &asset::LazyImage = asset::include_image!("load_block/test_2x2_0rgb.png");
 
-    #[macro_rules_attribute::apply(all_is_cubes::util::cartesian_product_test)]
+    #[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
     fn image_simple_extrusion(
         #[case(visible = lb::Vox::DEFAULT)]
         #[case(invisible = lb::Vox::DENOTES_AIR)]
