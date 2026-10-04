@@ -351,8 +351,6 @@ mod tests {
     use crate::universe::UniverseTransaction;
     use crate::util::ErrorChain;
 
-    use asset as lb; // TODO: temporary for refactoring; remove
-
     fn pretty_unwrap<T>(result: Result<T, InGenError>) -> T {
         match result {
             Ok(value) => value,
@@ -368,8 +366,8 @@ mod tests {
             collision: block::BlockCollision::None,
         };
         const ROTATE: block::Modifier = block::Modifier::Rotate(GridRotation::RZYX);
-        const INPUT: lb::Block = lb::Block {
-            primitive: lb::PrimitiveOrSuch::Atom(ATOM),
+        const INPUT: asset::Block = asset::Block {
+            primitive: asset::PrimitiveOrSuch::Atom(ATOM),
             modifiers: &[ROTATE],
         };
 
@@ -384,16 +382,16 @@ mod tests {
 
     #[macro_rules_attribute::apply(crate::util::cartesian_product_test)]
     fn image_simple_extrusion(
-        #[case(visible = lb::Vox::DEFAULT)]
-        #[case(invisible = lb::Vox::DENOTES_AIR)]
-        invisible: lb::Vox,
+        #[case(visible = asset::Vox::DEFAULT)]
+        #[case(invisible = asset::Vox::DENOTES_AIR)]
+        invisible: asset::Vox,
     ) {
-        let config = lb::Block {
-            primitive: lb::PrimitiveOrSuch::Image {
+        let config = asset::Block {
+            primitive: asset::PrimitiveOrSuch::Image {
                 image: IMAGE_2X2,
                 rotation: GridRotation::IDENTITY,
-                expansion: lb::Expansion::Extrude(&[0..2]),
-                visible: lb::Vox::DEFAULT,
+                expansion: asset::Expansion::Extrude(&[0..2]),
+                visible: asset::Vox::DEFAULT,
                 invisible,
             },
             modifiers: &[],
@@ -403,7 +401,7 @@ mod tests {
         let loaded_block = pretty_unwrap(config.load(txn));
 
         // this branch matches the special case in the code under test
-        let invisible_voxel = if invisible == lb::Vox::DENOTES_AIR {
+        let invisible_voxel = if invisible == asset::Vox::DENOTES_AIR {
             block::Evoxel::AIR
         } else {
             block::Evoxel::from_color(Rgba::TRANSPARENT)
@@ -429,13 +427,13 @@ mod tests {
 
     #[test]
     fn extrusion_out_of_range() {
-        let config = lb::Block {
-            primitive: lb::PrimitiveOrSuch::Image {
+        let config = asset::Block {
+            primitive: asset::PrimitiveOrSuch::Image {
                 image: IMAGE_2X2,
                 rotation: GridRotation::IDENTITY,
-                expansion: lb::Expansion::Extrude(&[0..3]),
-                visible: lb::Vox::DEFAULT,
-                invisible: lb::Vox::DEFAULT,
+                expansion: asset::Expansion::Extrude(&[0..3]),
+                visible: asset::Vox::DEFAULT,
+                invisible: asset::Vox::DEFAULT,
             },
             modifiers: &[],
         };

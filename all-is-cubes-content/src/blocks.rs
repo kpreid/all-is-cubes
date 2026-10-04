@@ -18,7 +18,6 @@ use rand::{RngExt as _, SeedableRng as _};
 use num_traits::float::Float as _;
 
 use all_is_cubes::arcstr::literal;
-use all_is_cubes::asset as lb; // TODO: temporary for refactoring; remove
 use all_is_cubes::asset::{self, include_image};
 use all_is_cubes::block::{
     self, AIR, AnimationHint, Block, BlockCollision, BlockDef, Resolution::*,
@@ -167,13 +166,13 @@ fn demo_blocks_generator(
     move |provider, txn, key| {
         Ok(match key {
             PushPull => const {
-                lb::Block {
-                    primitive: lb::PrimitiveOrSuch::Image {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Image {
                         image: include_image!("blocks/push.png"),
                         rotation: GridRotation::RXZY,
-                        expansion: lb::Expansion::Stack,
-                        visible: lb::Vox::DEFAULT,
-                        invisible: lb::Vox::DENOTES_AIR,
+                        expansion: asset::Expansion::Stack,
+                        visible: asset::Vox::DEFAULT,
+                        invisible: asset::Vox::DENOTES_AIR,
                     },
                     modifiers: &[block::Modifier::SetAttribute(
                         block::SetAttribute::DisplayName(literal!("Push/Pull")),
@@ -183,13 +182,13 @@ fn demo_blocks_generator(
             .load(txn)?,
 
             Toolbox => const {
-                lb::Block {
-                    primitive: lb::PrimitiveOrSuch::Image {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Image {
                         image: include_image!("blocks/toolbox.png"),
                         rotation: GridRotation::RXZY,
-                        expansion: lb::Expansion::Stack,
-                        visible: lb::Vox::DEFAULT,
-                        invisible: lb::Vox::DENOTES_AIR,
+                        expansion: asset::Expansion::Stack,
+                        visible: asset::Vox::DEFAULT,
+                        invisible: asset::Vox::DENOTES_AIR,
                     },
                     modifiers: &[],
                 }
@@ -560,8 +559,8 @@ fn demo_blocks_generator(
 
             // TODO: not all text that should use this does yet
             LabelTextVoxel => const {
-                lb::Block {
-                    primitive: lb::PrimitiveOrSuch::Atom(block::Atom {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Atom(block::Atom {
                         color: palette::ALMOST_BLACK.with_alpha_one(),
                         emission: Rgb::ZERO,
                         collision: BlockCollision::None,
@@ -760,31 +759,31 @@ fn demo_blocks_generator(
                 .build_txn(txn),
 
             Greebly => {
-                const DEFS: [lb::Block; 2] = {
-                    let image = lb::include_image!("blocks/greeble.png");
-                    let white = lb::Vox {
+                const DEFS: [asset::Block; 2] = {
+                    let image = asset::include_image!("blocks/greeble.png");
+                    let white = asset::Vox {
                         collision: BlockCollision::Hard,
                         replace_color: Some(Rgba::WHITE),
                     };
                     [
-                        lb::Block {
-                            primitive: lb::PrimitiveOrSuch::Image {
+                        asset::Block {
+                            primitive: asset::PrimitiveOrSuch::Image {
                                 image,
                                 rotation: GridRotation::IDENTITY,
-                                expansion: lb::Expansion::Extrude(&[0..1]),
+                                expansion: asset::Expansion::Extrude(&[0..1]),
                                 // cover the entire bounds of the image, ignoring color
                                 visible: white,
                                 invisible: white,
                             },
                             modifiers: &[],
                         },
-                        lb::Block {
-                            primitive: lb::PrimitiveOrSuch::Image {
+                        asset::Block {
+                            primitive: asset::PrimitiveOrSuch::Image {
                                 image,
                                 rotation: GridRotation::IDENTITY,
-                                expansion: lb::Expansion::Extrude(&[0..1]),
-                                visible: lb::Vox::DEFAULT,
-                                invisible: lb::Vox::DENOTES_AIR,
+                                expansion: asset::Expansion::Extrude(&[0..1]),
+                                visible: asset::Vox::DEFAULT,
+                                invisible: asset::Vox::DENOTES_AIR,
                             },
                             modifiers: &[],
                         },

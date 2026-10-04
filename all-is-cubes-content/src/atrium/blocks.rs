@@ -11,8 +11,7 @@ use noise_functions::Noise as _;
 use num_traits::float::Float as _;
 
 use all_is_cubes::arcstr;
-use all_is_cubes::asset as lb; // TODO: temporary for refactoring; remove
-use all_is_cubes::asset::include_image;
+use all_is_cubes::asset::{self, include_image};
 use all_is_cubes::block::{self, AIR, Block, Resolution, RotationPlacementRule, Zoom};
 use all_is_cubes::content::palette;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
@@ -245,13 +244,13 @@ pub(in crate::atrium) async fn install_atrium_blocks(
     let center_point_doubled = (one_diagonal * RESOLUTION_G).to_point();
 
     let banner_shape = const {
-        lb::Block {
-            primitive: lb::PrimitiveOrSuch::Image {
+        asset::Block {
+            primitive: asset::PrimitiveOrSuch::Image {
                 image: include_image!("banner-shape.png"),
                 rotation: GridRotation::RXZY,
-                expansion: lb::Expansion::Extrude(&[0..RESOLUTION_G]),
-                visible: lb::Vox::DEFAULT,
-                invisible: lb::Vox::DENOTES_AIR,
+                expansion: asset::Expansion::Extrude(&[0..RESOLUTION_G]),
+                visible: asset::Vox::DEFAULT,
+                invisible: asset::Vox::DENOTES_AIR,
             },
             modifiers: &[block::Modifier::SetAttribute(
                 block::SetAttribute::DisplayName(arcstr::literal!("Uncolored Banner")),
@@ -263,8 +262,8 @@ pub(in crate::atrium) async fn install_atrium_blocks(
     Ok(BlockProvider::<AtriumBlocks>::new(progress, |key| {
         Ok(match key {
             AtriumBlocks::Sun => const {
-                lb::Block {
-                    primitive: lb::PrimitiveOrSuch::Atom(block::Atom {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Atom(block::Atom {
                         color: Rgba::WHITE,
                         emission: Rgb::new(1.0, 1.0, 0.9843).scale(ps32(40.0)),
                         collision: block::BlockCollision::Hard,
@@ -397,13 +396,13 @@ pub(in crate::atrium) async fn install_atrium_blocks(
                     "Atrium Banner {color}"
                 ))),
             AtriumBlocks::BannerBottomAccent => const {
-                lb::Block {
-                    primitive: lb::PrimitiveOrSuch::Image {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Image {
                         image: include_image!("banner-trim.png"),
                         rotation: GridRotation::RXyZ,
-                        expansion: lb::Expansion::Extrude(&[0..RESOLUTION_G]),
-                        visible: lb::Vox::DEFAULT,
-                        invisible: lb::Vox::DENOTES_AIR,
+                        expansion: asset::Expansion::Extrude(&[0..RESOLUTION_G]),
+                        visible: asset::Vox::DEFAULT,
+                        invisible: asset::Vox::DENOTES_AIR,
                     },
                     modifiers: &[block::Modifier::SetAttribute(
                         block::SetAttribute::DisplayName(arcstr::literal!("Banner Accent")),

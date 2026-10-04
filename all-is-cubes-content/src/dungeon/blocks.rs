@@ -8,8 +8,7 @@ use core::f64::consts::TAU;
 use num_traits::float::Float as _;
 
 use all_is_cubes::arcstr::literal;
-use all_is_cubes::asset as lb;
-use all_is_cubes::asset::include_image;
+use all_is_cubes::asset::{self, include_image};
 use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{point3, vec3};
@@ -144,13 +143,13 @@ pub(crate) async fn install_dungeon_blocks(
                 .build(),
 
             FloorTile => const {
-                lb::Block {
-                    primitive: lb::PrimitiveOrSuch::Image {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Image {
                         image: include_image!("floor.png"),
                         rotation: GridRotation::RXZY,
-                        expansion: lb::Expansion::Extrude(&[0..32]), // TODO: "same as image resolution" should be an option
-                        visible: lb::Vox::DEFAULT,
-                        invisible: lb::Vox::DEFAULT,
+                        expansion: asset::Expansion::Extrude(&[0..32]), // TODO: "same as image resolution" should be an option
+                        visible: asset::Vox::DEFAULT,
+                        invisible: asset::Vox::DEFAULT,
                     },
                     modifiers: &[block::Modifier::SetAttribute(
                         block::SetAttribute::DisplayName(literal!("Floor Tile")),
@@ -173,15 +172,15 @@ pub(crate) async fn install_dungeon_blocks(
                 .build_txn(txn),
 
             Gate => const {
-                lb::Block {
-                    primitive: lb::PrimitiveOrSuch::Image {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Image {
                         image: include_image!("fence.png"),
                         rotation: GridRotation::RXyZ,
-                        expansion: lb::Expansion::Extrude(&[7..9]),
-                        visible: lb::Vox::DEFAULT,
+                        expansion: asset::Expansion::Extrude(&[7..9]),
+                        visible: asset::Vox::DEFAULT,
                         // selectable collidable transparent blocks,
                         // so it is impossible to reach through the gate.
-                        invisible: lb::Vox::DEFAULT,
+                        invisible: asset::Vox::DEFAULT,
                     },
                     modifiers: &[block::Modifier::SetAttribute(
                         block::SetAttribute::DisplayName(literal!("Gate")),
@@ -191,15 +190,15 @@ pub(crate) async fn install_dungeon_blocks(
             .load(txn)?,
 
             GatePocket => const {
-                lb::Block {
-                    primitive: lb::PrimitiveOrSuch::Image {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Image {
                         image: include_image!("fence-pocket.png"),
                         rotation: GridRotation::RXyZ,
-                        expansion: lb::Expansion::Extrude(&[6..7, 9..10]),
-                        visible: lb::Vox::DEFAULT,
+                        expansion: asset::Expansion::Extrude(&[6..7, 9..10]),
+                        visible: asset::Vox::DEFAULT,
                         // selectable collidable transparent blocks,
                         // so it is impossible to reach through the gate.
-                        invisible: lb::Vox::DEFAULT,
+                        invisible: asset::Vox::DEFAULT,
                     },
                     modifiers: &[block::Modifier::SetAttribute(
                         block::SetAttribute::DisplayName(literal!("Gate Pocket")),
@@ -209,13 +208,13 @@ pub(crate) async fn install_dungeon_blocks(
             .load(txn)?,
 
             GateLock => const {
-                lb::Block {
-                    primitive: lb::PrimitiveOrSuch::Image {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Image {
                         image: include_image!("gate-lock.png"),
                         rotation: GridRotation::RXyZ,
-                        expansion: lb::Expansion::Extrude(&[5..11]),
-                        visible: lb::Vox::DEFAULT,
-                        invisible: lb::Vox::DENOTES_AIR,
+                        expansion: asset::Expansion::Extrude(&[5..11]),
+                        visible: asset::Vox::DEFAULT,
+                        invisible: asset::Vox::DENOTES_AIR,
                     },
                     modifiers: &[block::Modifier::SetAttribute(
                         block::SetAttribute::DisplayName(literal!("Keyhole")),
@@ -225,13 +224,13 @@ pub(crate) async fn install_dungeon_blocks(
             .load(txn)?,
 
             Key => const {
-                lb::Block {
-                    primitive: lb::PrimitiveOrSuch::Image {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Image {
                         image: include_image!("key.png"),
                         rotation: GridRotation::RXyZ,
-                        expansion: lb::Expansion::Extrude(&[7..9]),
-                        visible: lb::Vox::DEFAULT,
-                        invisible: lb::Vox::DENOTES_AIR,
+                        expansion: asset::Expansion::Extrude(&[7..9]),
+                        visible: asset::Vox::DEFAULT,
+                        invisible: asset::Vox::DENOTES_AIR,
                     },
                     modifiers: &[block::Modifier::SetAttribute(
                         block::SetAttribute::DisplayName(literal!("Key")),

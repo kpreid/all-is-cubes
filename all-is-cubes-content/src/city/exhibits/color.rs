@@ -106,15 +106,15 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
     let wall_color_block = block::from_color!(WALL_COLOR);
     const WALL_RESOLUTION: Resolution = R16; // TODO: take from from image
     let color_card = const {
-        lb::Block {
-            primitive: lb::PrimitiveOrSuch::Image {
+        asset::Block {
+            primitive: asset::PrimitiveOrSuch::Image {
                 image: asset::include_image!("color-card.png"),
                 rotation: GridRotation::RXyZ,
-                expansion: lb::Expansion::Extrude(&[
+                expansion: asset::Expansion::Extrude(&[
                     WALL_RESOLUTION.to_grid() - 1..WALL_RESOLUTION.to_grid()
                 ]),
-                visible: lb::Vox::DEFAULT,
-                invisible: lb::Vox::DEFAULT,
+                visible: asset::Vox::DEFAULT,
+                invisible: asset::Vox::DEFAULT,
             },
             modifiers: &[],
         }
