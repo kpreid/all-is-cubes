@@ -170,7 +170,7 @@ fn demo_blocks_generator(
                     primitive: asset::PrimitiveOrSuch::Image {
                         image: include_image!("blocks/push.png"),
                         rotation: GridRotation::RXZY,
-                        expansion: asset::Expansion::Stack,
+                        expansion: asset::Expansion::Stack { slice_height: 32 },
                         visible: asset::Vox::DEFAULT,
                         invisible: asset::Vox::DENOTES_AIR,
                     },
@@ -186,7 +186,7 @@ fn demo_blocks_generator(
                     primitive: asset::PrimitiveOrSuch::Image {
                         image: include_image!("blocks/toolbox.png"),
                         rotation: GridRotation::RXZY,
-                        expansion: asset::Expansion::Stack,
+                        expansion: asset::Expansion::Stack { slice_height: 16 },
                         visible: asset::Vox::DEFAULT,
                         invisible: asset::Vox::DENOTES_AIR,
                     },

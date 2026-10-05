@@ -27,6 +27,7 @@ use crate::drawing::VoxelBrush;
 use crate::euclid::vec3;
 use crate::linking::InGenError;
 use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Rgba, Srgba8};
+use crate::space;
 use crate::universe::{ReadTicket, UniverseTransaction};
 
 #[cfg(doc)]
@@ -128,10 +129,11 @@ pub enum Expansion {
     Extrude(&'static [core::ops::Range<GridCoordinate>]),
 
     /// Treat the image as a series of slices on the depth (Z before rotation) axis.
-    /// Each slice is assumed to be square, and slices are arranged along the vertical axis,
+    /// Slices are arranged along the vertical axis,
     /// so the image must overall have dimensions
-    /// (<var>width</var>, <var>width</var> × <var>slice count</var>).
-    Stack,
+    /// (<var>width</var>, <var>`slice_height`</var> × <var>slice count</var>)
+    /// <var>slice count</var> is the image’s height divided by <var>`slice_height`</var>.
+    Stack { slice_height: u16 },
 }
 
 /// Specifies the properties of each voxel in a block produced by
@@ -163,10 +165,43 @@ impl Vox {
     };
 }
 
+/// Const-constructible data which a [`space::Space`] can be built from.
+///
+/// This is primarily intended to be used for constructing multiple blocks that share a space.
+#[non_exhaustive]
+pub enum Space {
+    Image {
+        image: &'static asset::LazyImage,
+
+        /// After the image is expanded into a 3D shape, rotate or reflect it this way.
+        ///
+        /// In many cases, this should be [`GridRotation::RXyZ`] in order to convert from
+        /// Y-down coordinates to Y-up.
+        rotation: GridRotation,
+
+        /// How to expand the 2D image into a 3D voxel shape.
+        expansion: Expansion,
+
+        /// Voxel properties to use for image pixels whose alpha is not 0.
+        visible: Vox,
+
+        /// Voxel properties to use for image pixels whose alpha is 0.
+        invisible: Vox,
+    },
+}
+
+impl Space {
+    /// Turns the static [`asset::Space`] data into a regular [`space::Space`].
+    #[inline(never)] // don't duplicate *any* of this logic, to keep binary size down
+    pub fn load(self, txn: &mut UniverseTransaction) -> Result<space::Space, InGenError> {
+        Context { txn }.build_space(self, None)
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 // Conversion innards
 
-/// Temporary structure for the state of a [`Block::load()`] operation.
+/// Temporary structure for the state of a [`Block::load()`] or [`Space::load()`] operation.
 struct Context<'a> {
     /// The transaction into which any needed blocks or spaces will be inserted.
     txn: &'a mut UniverseTransaction,
@@ -202,7 +237,7 @@ impl Context<'_> {
                 invisible,
             } => {
                 let path = image.path();
-                let [image_width, image_height] = imgref_size(image).into();
+                let [image_width, _image_height] = imgref_size(image).into();
                 let Ok(resolution) = Resolution::try_from(image_width) else {
                     return Err(InGenError::Other(
                         format!(
@@ -212,7 +247,47 @@ impl Context<'_> {
                         .into(),
                     ));
                 };
-                let full_block_bounds = GridAab::for_block(resolution);
+                let space = self.build_space(
+                    Space::Image {
+                        image,
+                        rotation,
+                        expansion,
+                        visible,
+                        invisible,
+                    },
+                    Some(resolution),
+                )?;
+
+                let block_builder = block::Block::builder().read_ticket(read_ticket);
+
+                let space_handle = self.txn.insert_anonymous(space);
+
+                block_builder.voxels_handle(resolution, space_handle).build()
+            }
+        })
+    }
+
+    fn build_space(
+        &mut self,
+        input: Space,
+        constrain_to_block: Option<Resolution>,
+    ) -> Result<space::Space, InGenError> {
+        // not using txn
+        let _ = self;
+
+        // Stub ticket is OK because all blocks used have no indirection.
+        let read_ticket = ReadTicket::stub();
+
+        Ok(match input {
+            Space::Image {
+                image,
+                rotation,
+                expansion,
+                visible,
+                invisible,
+            } => {
+                let path = image.path();
+                let [image_width, image_height] = imgref_size(image).into();
 
                 let pixel_color_to_voxel = |srgba_color: Srgba8| -> Option<block::Block> {
                     let is_invisible = srgba_color[3] == 0;
@@ -232,11 +307,11 @@ impl Context<'_> {
                     }
                 };
 
-                let block_builder = block::Block::builder().read_ticket(read_ticket);
-
-                let space = match expansion {
+                match expansion {
                     Expansion::Extrude(extrusion) => {
-                        if u32::from(resolution) != image_height {
+                        if let Some(resolution) = constrain_to_block
+                            && u32::from(resolution) != image_height
+                        {
                             return Err(InGenError::Other(
                                 format!(
                                     "image “{path}” has height {image_height}, \
@@ -256,12 +331,13 @@ impl Context<'_> {
                             })
                             .collect();
 
-                        if let Some(brush_bounds) = extrusion_cubes
-                            .iter()
-                            .copied()
-                            .map(Cube::grid_aab)
-                            .reduce(GridAab::union_cubes)
-                            && !full_block_bounds.contains_box(brush_bounds)
+                        if let Some(resolution) = constrain_to_block
+                            && let Some(brush_bounds) = extrusion_cubes
+                                .iter()
+                                .copied()
+                                .map(Cube::grid_aab)
+                                .reduce(GridAab::union_cubes)
+                            && !GridAab::for_block(resolution).contains_box(brush_bounds)
                         {
                             return Err(InGenError::Other(
                                 format!(
@@ -288,22 +364,18 @@ impl Context<'_> {
                             &mut asset::pixel_to_voxel::flat_2d_to_3d,
                         )
                     }
-                    Expansion::Stack => {
-                        // TODO: Currently we require that the image size makes a full set of
-                        // slices, but ideally we could also allow shorter images.
-                        let expected_image_height = u32::from(resolution).pow(2);
-                        if image_height != expected_image_height {
+                    Expansion::Stack { slice_height } => {
+                        if !image_height.is_multiple_of(u32::from(slice_height)) {
                             return Err(InGenError::Other(
                                 format!(
                                     "image “{path}” has height {image_height}, \
-                                        but should have the width squared, {expected_image_height}"
+                                        which is not a multiple of the slice height {slice_height}"
                                 )
                                 .into(),
                             ));
                         }
 
-                        let resolution_g = GridCoordinate::from(resolution);
-
+                        let slice_height = i32::from(slice_height);
                         asset::space_from_image_raw(
                             read_ticket,
                             image.as_ref(),
@@ -319,16 +391,13 @@ impl Context<'_> {
                                 let p = p.to_i32();
                                 Cube::new(
                                     p.x,
-                                    p.y.rem_euclid(resolution_g),
-                                    p.y.div_euclid(resolution_g),
+                                    p.y.rem_euclid(slice_height),
+                                    p.y.div_euclid(slice_height),
                                 )
                             },
                         )
                     }
-                }?;
-                let space_handle = self.txn.insert_anonymous(space);
-
-                block_builder.voxels_handle(resolution, space_handle).build()
+                }?
             }
         })
     }

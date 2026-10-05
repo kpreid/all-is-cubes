@@ -13,7 +13,7 @@ pub use image::{LazyImage, include_image};
 
 // TODO: better name and organization
 mod load_block;
-pub use load_block::{Block, Expansion, PrimitiveOrSuch, Vox};
+pub use load_block::{Block, Expansion, PrimitiveOrSuch, Space, Vox};
 
 mod pixel_to_voxel;
 use pixel_to_voxel::space_from_image_raw;
