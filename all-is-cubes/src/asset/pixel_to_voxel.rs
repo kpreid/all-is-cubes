@@ -4,14 +4,16 @@
 )]
 
 use core::fmt;
+use core::iter;
 
+use euclid::{Point2D, point2};
 use hashbrown::HashMap;
 use imgref::{Img, ImgExt as _, ImgRef};
 
 use crate::block::{self, AIR, Block, Resolution};
-use crate::camera::{ImageSize, imgref_size};
+use crate::camera::{ImagePixel, ImageSize, imgref_size};
 use crate::drawing::VoxelBrush;
-use crate::math::{Cube, FaceMap, GridAab, GridCoordinate, GridRotation, Rgba, Srgba8};
+use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgba, Srgba8};
 use crate::space::{self, Space, SpacePhysics};
 use crate::universe::{ReadTicket, UniverseTransaction};
 
@@ -20,11 +22,13 @@ use crate::universe::{ReadTicket, UniverseTransaction};
 /// A color-to-[`VoxelBrush`] mapping for a specific image.
 /// Part of the implementation of [`space_from_image()`].
 pub(in crate::asset) struct PngAdapter<'a> {
-    width: i32,
-    height: i32,
-    rgba_image_data: &'a [Srgba8],
+    image: ImgRef<'a, Srgba8>,
+
+    /// Maps from every color occurring in the image to the corresponding voxel brush.
     color_map: HashMap<Srgba8, VoxelBrush<'a>>,
-    max_brush: GridAab,
+
+    /// Bounding box of the image, after transformation.
+    bounding_box: GridAab,
 }
 
 impl<'a> PngAdapter<'a> {
@@ -32,37 +36,42 @@ impl<'a> PngAdapter<'a> {
     pub fn adapt<'image: 'a, 'brush: 'a>(
         image: ImgRef<'image, Srgba8>,
         pixel_function: &mut dyn FnMut(Srgba8) -> VoxelBrush<'brush>,
+        transform: &mut dyn FnMut(Point2D<usize, ImagePixel>) -> Cube,
     ) -> Self {
         let mut color_map: HashMap<Srgba8, VoxelBrush<'a>> = HashMap::new();
-        let mut max_brush: Option<GridAab> = None;
-        for &color in image.buf().iter() {
+        let mut bounding_box: Option<GridAab> = None;
+        for ((y, x), &color) in iter::zip(
+            itertools::iproduct!(0..image.height(), 0..image.width()),
+            image.buf().iter(),
+        ) {
+            let position = point2(x, y);
             let brush = color_map.entry(color).or_insert_with(|| pixel_function(color));
             if let Some(bounds) = brush.bounds() {
-                max_brush = max_brush.map(|m| m.union_box(bounds)).or(Some(bounds));
+                let bounds = bounds.translate(transform(position).lower_bounds().to_vector());
+                bounding_box = bounding_box.map(|m| m.union_box(bounds)).or(Some(bounds));
             }
         }
 
         Self {
-            width: i32::try_from(image.width()).unwrap(),
-            height: i32::try_from(image.height()).unwrap(),
-            rgba_image_data: image.buf(),
+            image,
             color_map,
-            max_brush: max_brush.unwrap_or(GridAab::ORIGIN_CUBE),
+            bounding_box: bounding_box.unwrap_or(GridAab::ORIGIN_CUBE),
         }
     }
 
     #[doc(hidden)] // TODO: ponder good API
     pub fn get_brush(&self, x: i32, y: i32) -> &VoxelBrush<'_> {
-        if x < 0 || y < 0 || x >= self.width || y >= self.height {
-            return VoxelBrush::EMPTY_REF;
+        if let Ok(x) = usize::try_from(x)
+            && let Ok(y) = usize::try_from(y)
+            && x < self.image.width()
+            && y < self.image.height()
+        {
+            self.color_map
+                .get(&self.image[(x, y)])
+                .expect("can't happen: color data changed")
+        } else {
+            VoxelBrush::EMPTY_REF
         }
-        let Ok(pixel_index) = usize::try_from(x + y * self.width) else {
-            return VoxelBrush::EMPTY_REF;
-        };
-        let Some(pixel) = self.rgba_image_data.get(pixel_index) else {
-            return VoxelBrush::EMPTY_REF;
-        };
-        self.color_map.get(pixel).expect("can't happen: color data changed")
     }
 }
 
@@ -108,31 +117,11 @@ pub fn space_from_image<'b>(
             GridCoordinate::try_from(size.width.max(size.height)).unwrap(),
         );
 
-        let ia = &PngAdapter::adapt(image.as_ref(), pixel_function);
+        let ia = &PngAdapter::adapt(image.as_ref(), pixel_function, &mut |p| {
+            transform.transform_cube(flat_2d_to_3d(p))
+        });
 
-        // Compute bounds including the brush sizes.
-        // Note: This strategy will overestimate the size in case a brush has X/Y size but is
-        // never used near the edge. To fix that, we could use a dynamically resized Space
-        // instead of this pessimistic choice.
-        let bounds: GridAab = GridAab::from_lower_size([0, 0, 0], [size.width, size.height, 1])
-            .transform(transform)
-            .unwrap()
-            .minkowski_sum(
-                ia.max_brush
-                    // account for that a brush of size 1×1×1 is zero expansion of the image
-                    .shrink(FaceMap {
-                        nx: 0,
-                        ny: 0,
-                        nz: 0,
-                        px: 1,
-                        py: 1,
-                        pz: 1,
-                    })
-                    .unwrap_or(GridAab::ORIGIN_EMPTY),
-            )
-            .unwrap();
-
-        Space::builder(bounds)
+        Space::builder(ia.bounding_box)
             .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
             .read_ticket(read_ticket)
             .build_and_mutate(|m| {
@@ -206,6 +195,11 @@ pub fn default_srgb(pixel: Srgba8) -> VoxelBrush<'static> {
     } else {
         Block::from(Rgba::from_srgb8(pixel))
     })
+}
+
+/// Simple transformation function for [`PngAdapter::adapt()`]
+pub(in crate::asset) fn flat_2d_to_3d(p: Point2D<usize, ImagePixel>) -> Cube {
+    Cube::from(p.cast::<i32>().cast_unit().extend(0))
 }
 
 /// Error returned by [`block_from_image()`].

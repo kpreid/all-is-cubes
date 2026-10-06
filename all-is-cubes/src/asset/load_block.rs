@@ -315,6 +315,7 @@ impl Context<'_> {
                                     VoxelBrush::EMPTY_REF.clone()
                                 }
                             },
+                            &mut asset::pixel_to_voxel::flat_2d_to_3d,
                         );
 
                         // TODO: dubious whether we should be using voxels_fn rather than starting
