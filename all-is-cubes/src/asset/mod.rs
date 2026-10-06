@@ -16,8 +16,6 @@ mod load_block;
 pub use load_block::{Block, Expansion, PrimitiveOrSuch, Vox};
 
 mod pixel_to_voxel;
-#[doc(hidden)] // not yet polished
-pub use pixel_to_voxel::PngAdapter;
 pub use pixel_to_voxel::{BlockFromImageError, block_from_image, default_srgb, space_from_image};
 
 // -------------------------------------------------------------------------------------------------

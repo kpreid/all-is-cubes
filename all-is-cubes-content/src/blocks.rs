@@ -277,23 +277,27 @@ fn demo_blocks_generator(
 
             Road => {
                 let output_resolution = R32;
-                // Use the image as a source of color palettes, not an image.
-                // TODO: use hash of coord instead of rng
 
                 let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3458679152340);
 
-                let palette_image = asset::PngAdapter::adapt(
-                    asset::include_image!("blocks/road-palette.png").as_ref(),
-                    &mut asset::default_srgb,
-                );
-                let range = 0..palette_image.size().width;
+                // Use the image as a source of color palettes, not an image.
+                // TODO: use hash of coord instead of rng
+                // TODO: constructing this space just for the palette is wasted effort, but we’re
+                // probably eventually going to use some other approach to make this block.
+                let palette_data = asset::space_from_image(
+                    txn.read_ticket(),
+                    include_image!("blocks/road-palette.png"),
+                    GridRotation::IDENTITY,
+                    asset::default_srgb,
+                )?;
+                let range = 0..palette_data.bounds().size().width.cast_signed();
 
                 Block::builder()
                     .display_name("Road")
                     .voxels_fn(output_resolution, |cube| {
                         let y = (i32::from(output_resolution) - 1 - cube.y) / 2;
                         let x = rng.random_range(range.clone());
-                        palette_image.get_brush(x, y).origin_block().unwrap_or(&AIR)
+                        &palette_data[[x, y, 0]]
                     })?
                     .build_txn(txn)
             }

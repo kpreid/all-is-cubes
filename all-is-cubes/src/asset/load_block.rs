@@ -306,13 +306,16 @@ impl Context<'_> {
                         let transform =
                             rotation.inverse().to_positive_octant_transform(resolution.into());
 
-                        let adapter = asset::PngAdapter::adapt(image.as_ref(), &mut |pixel| {
-                            if let Some(block) = pixel_color_to_voxel(pixel) {
-                                VoxelBrush::single(block)
-                            } else {
-                                VoxelBrush::EMPTY_REF.clone()
-                            }
-                        });
+                        let adapter = super::pixel_to_voxel::PngAdapter::adapt(
+                            image.as_ref(),
+                            &mut |pixel| {
+                                if let Some(block) = pixel_color_to_voxel(pixel) {
+                                    VoxelBrush::single(block)
+                                } else {
+                                    VoxelBrush::EMPTY_REF.clone()
+                                }
+                            },
+                        );
 
                         // TODO: dubious whether we should be using voxels_fn rather than starting
                         // from the image pixels. This way we get voxels_fn()'s empty space

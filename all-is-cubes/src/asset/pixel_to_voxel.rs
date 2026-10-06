@@ -18,11 +18,8 @@ use crate::universe::{ReadTicket, UniverseTransaction};
 // -------------------------------------------------------------------------------------------------
 
 /// A color-to-[`VoxelBrush`] mapping for a specific image.
-///
-/// TODO: Needs a better name.
-#[doc(hidden)] // still experimental API
-#[expect(missing_debug_implementations)]
-pub struct PngAdapter<'a> {
+/// Part of the implementation of [`space_from_image()`].
+pub(in crate::asset) struct PngAdapter<'a> {
     width: i32,
     height: i32,
     rgba_image_data: &'a [Srgba8],
@@ -31,7 +28,6 @@ pub struct PngAdapter<'a> {
 }
 
 impl<'a> PngAdapter<'a> {
-    #[expect(clippy::missing_panics_doc)]
     #[inline(never)]
     pub fn adapt<'image: 'a, 'brush: 'a>(
         image: ImgRef<'image, Srgba8>,
@@ -53,10 +49,6 @@ impl<'a> PngAdapter<'a> {
             color_map,
             max_brush: max_brush.unwrap_or(GridAab::ORIGIN_CUBE),
         }
-    }
-
-    pub fn size(&self) -> euclid::default::Size2D<i32> {
-        euclid::default::Size2D::new(self.width, self.height)
     }
 
     #[doc(hidden)] // TODO: ponder good API
