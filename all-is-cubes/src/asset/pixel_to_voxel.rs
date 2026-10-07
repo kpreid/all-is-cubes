@@ -104,40 +104,48 @@ pub fn space_from_image<'b>(
     rotation: GridRotation,
     mut color_function: impl FnMut(Srgba8) -> VoxelBrush<'b>,
 ) -> Result<Space, space::builder::Error> {
-    #[inline(never)]
-    fn inner<'b>(
-        read_ticket: ReadTicket<'_>,
-        image: ImgRef<'_, Srgba8>,
-        rotation: GridRotation,
-        color_function: &mut dyn FnMut(Srgba8) -> VoxelBrush<'b>,
-    ) -> Result<Space, space::builder::Error> {
-        let size = imgref_size(&image);
-        let size_i = size.to_i32();
+    space_from_image_raw(
+        read_ticket,
+        image.as_ref(),
+        rotation,
+        &mut color_function,
+        &mut flat_2d_to_3d,
+    )
+}
 
-        // TODO: let caller control the transform offsets (not necessarily positive-octant)
-        let transform = rotation.to_positive_octant_transform(
-            GridCoordinate::try_from(size.width.max(size.height)).unwrap(),
-        );
+/// As [`space_from_image()`], but non-generic and allowing more position transformation.
+#[inline(never)]
+pub(in crate::asset) fn space_from_image_raw<'b>(
+    read_ticket: ReadTicket<'_>,
+    image: ImgRef<'_, Srgba8>,
+    rotation: GridRotation,
+    color_function: &mut dyn FnMut(Srgba8) -> VoxelBrush<'b>,
+    position_function: &mut dyn FnMut(Point2D<GridCoordinate, ImagePixel>) -> Cube,
+) -> Result<Space, space::builder::Error> {
+    let size = imgref_size(&image);
+    let size_i = size.to_i32();
 
-        let ia = &PngAdapter::adapt(image.as_ref(), color_function, &mut |p| {
-            transform.transform_cube(flat_2d_to_3d(p))
-        });
+    // TODO: let caller control the transform offsets (not necessarily positive-octant)
+    let transform = rotation.to_positive_octant_transform(
+        GridCoordinate::try_from(size.width.max(size.height)).unwrap(),
+    );
 
-        Space::builder(ia.bounding_box)
-            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-            .read_ticket(read_ticket)
-            .build_and_mutate(|m| {
-                for y in 0..(size_i.height) {
-                    for x in 0..(size_i.width) {
-                        ia.get_brush(x, y)
-                            .paint(m, transform.transform_cube(Cube::new(x, y, 0)))?;
-                    }
+    let ia = &PngAdapter::adapt(image.as_ref(), color_function, &mut |p| {
+        transform.transform_cube(position_function(p))
+    });
+
+    Space::builder(ia.bounding_box)
+        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+        .read_ticket(read_ticket)
+        .build_and_mutate(|m| {
+            for y in 0..(size_i.height) {
+                for x in 0..(size_i.width) {
+                    ia.get_brush(x, y)
+                        .paint(m, transform.transform_cube(position_function(point2(x, y))))?;
                 }
-                Ok(())
-            })
-    }
-
-    inner(read_ticket, image.as_ref(), rotation, &mut color_function)
+            }
+            Ok(())
+        })
 }
 
 /// Convert an image into a [`block::Builder`] with voxels (which can then create a [`Block`]).
