@@ -36,12 +36,14 @@ impl<'a> PngAdapter<'a> {
     pub fn adapt<'image: 'a, 'brush: 'a>(
         image: ImgRef<'image, Srgba8>,
         pixel_function: &mut dyn FnMut(Srgba8) -> VoxelBrush<'brush>,
-        transform: &mut dyn FnMut(Point2D<usize, ImagePixel>) -> Cube,
+        transform: &mut dyn FnMut(Point2D<GridCoordinate, ImagePixel>) -> Cube,
     ) -> Self {
+        let image_size = imgref_size(&image).try_cast::<i32>().expect("image size must fit in i32");
+
         let mut color_map: HashMap<Srgba8, VoxelBrush<'a>> = HashMap::new();
         let mut bounding_box: Option<GridAab> = None;
         for ((y, x), &color) in iter::zip(
-            itertools::iproduct!(0..image.height(), 0..image.width()),
+            itertools::iproduct!(0..image_size.height, 0..image_size.width),
             image.buf().iter(),
         ) {
             let position = point2(x, y);
@@ -60,7 +62,7 @@ impl<'a> PngAdapter<'a> {
     }
 
     #[doc(hidden)] // TODO: ponder good API
-    pub fn get_brush(&self, x: i32, y: i32) -> &VoxelBrush<'_> {
+    pub fn get_brush(&self, x: GridCoordinate, y: GridCoordinate) -> &VoxelBrush<'_> {
         if let Ok(x) = usize::try_from(x)
             && let Ok(y) = usize::try_from(y)
             && x < self.image.width()
@@ -79,35 +81,35 @@ impl<'a> PngAdapter<'a> {
 
 /// Convert an image into a [`Space`] by mapping each pixel to a [`VoxelBrush`].
 ///
-/// The image’s dimensions must be no greater than [`i32::MAX`].
+/// The image’s dimensions must be no greater than [`GridCoordinate::MAX`].
 ///
-/// The `pixel_function` will be memoized.
+/// The `color_function` will be memoized.
 ///
 /// The space’s physics will be set to [`SpacePhysics::DEFAULT_FOR_BLOCK`].
 ///
 /// # Errors
 ///
-/// Returns an error if
+/// Returns any error that occurs when placing the blocks into a [`Space`].
 ///
-/// * the image’s dimensions are not square or not equal to a valid [`Resolution`], or
-/// * the blocks produced by `pixel_function` are too numerous or cannot be evaluated using
-///   `read_ticket`.
+/// # Panics
+///
+/// Panics if any dimension of `image` is greater than [`GridCoordinate::MAX`].
 //---
 // TODO: Allow `space::Builder` controls somehow. Maybe this belongs as a method on it.
-// TODO: pixel_function should have a Result return
+// TODO: color_function should have a Result return
 #[inline(always)] // manually polymorphized for code size; inline this adapter function
 pub fn space_from_image<'b>(
     read_ticket: ReadTicket<'_>,
     image: &Img<impl AsRef<[Srgba8]>>,
     rotation: GridRotation,
-    mut pixel_function: impl FnMut(Srgba8) -> VoxelBrush<'b>,
+    mut color_function: impl FnMut(Srgba8) -> VoxelBrush<'b>,
 ) -> Result<Space, space::builder::Error> {
     #[inline(never)]
     fn inner<'b>(
         read_ticket: ReadTicket<'_>,
         image: ImgRef<'_, Srgba8>,
         rotation: GridRotation,
-        pixel_function: &mut dyn FnMut(Srgba8) -> VoxelBrush<'b>,
+        color_function: &mut dyn FnMut(Srgba8) -> VoxelBrush<'b>,
     ) -> Result<Space, space::builder::Error> {
         let size = imgref_size(&image);
         let size_i = size.to_i32();
@@ -117,7 +119,7 @@ pub fn space_from_image<'b>(
             GridCoordinate::try_from(size.width.max(size.height)).unwrap(),
         );
 
-        let ia = &PngAdapter::adapt(image.as_ref(), pixel_function, &mut |p| {
+        let ia = &PngAdapter::adapt(image.as_ref(), color_function, &mut |p| {
             transform.transform_cube(flat_2d_to_3d(p))
         });
 
@@ -135,7 +137,7 @@ pub fn space_from_image<'b>(
             })
     }
 
-    inner(read_ticket, image.as_ref(), rotation, &mut pixel_function)
+    inner(read_ticket, image.as_ref(), rotation, &mut color_function)
 }
 
 /// Convert an image into a [`block::Builder`] with voxels (which can then create a [`Block`]).
@@ -146,14 +148,14 @@ pub fn space_from_image<'b>(
 /// Returns an error if
 ///
 /// * the image’s dimensions are not square or not equal to a valid [`Resolution`], or
-/// * the blocks produced by `pixel_function` are too numerous or cannot be evaluated using
+/// * the blocks produced by `color_function` are too numerous or cannot be evaluated using
 ///   `read_ticket`.
 #[inline(always)] // manually polymorphized for code size; inline this adapter function
 pub fn block_from_image<'b, 'ticket>(
     read_ticket: ReadTicket<'ticket>,
     image: &Img<impl AsRef<[Srgba8]>>,
     rotation: GridRotation,
-    mut pixel_function: impl FnMut(Srgba8) -> VoxelBrush<'b>,
+    mut color_function: impl FnMut(Srgba8) -> VoxelBrush<'b>,
 ) -> Result<block::Builder<'ticket, block::builder::Voxels, UniverseTransaction>, BlockFromImageError>
 {
     #[inline(never)] // keep polymorphic and avoid code duplication
@@ -161,7 +163,7 @@ pub fn block_from_image<'b, 'ticket>(
         read_ticket: ReadTicket<'ticket>,
         image: ImgRef<'_, Srgba8>,
         rotation: GridRotation,
-        pixel_function: &mut dyn FnMut(Srgba8) -> VoxelBrush<'b>,
+        color_function: &mut dyn FnMut(Srgba8) -> VoxelBrush<'b>,
     ) -> Result<
         block::Builder<'ticket, block::builder::Voxels, UniverseTransaction>,
         BlockFromImageError,
@@ -176,11 +178,11 @@ pub fn block_from_image<'b, 'ticket>(
         // TODO: Implement the same bounds-shrinking feature as `Block::voxels_fn()` has.
         Ok(Block::builder().read_ticket(read_ticket).voxels_space(
             resolution,
-            space_from_image(read_ticket, &image, rotation, pixel_function)
+            space_from_image(read_ticket, &image, rotation, color_function)
                 .map_err(BlockFromImageError::Space)?,
         ))
     }
-    inner(read_ticket, image.as_ref(), rotation, &mut pixel_function)
+    inner(read_ticket, image.as_ref(), rotation, &mut color_function)
 }
 
 /// Simple pixel-to-voxel function for use with [`space_from_image()`] and [`block_from_image()`].
@@ -198,8 +200,8 @@ pub fn default_srgb(pixel: Srgba8) -> VoxelBrush<'static> {
 }
 
 /// Simple transformation function for [`PngAdapter::adapt()`]
-pub(in crate::asset) fn flat_2d_to_3d(p: Point2D<usize, ImagePixel>) -> Cube {
-    Cube::from(p.cast::<i32>().cast_unit().extend(0))
+pub(in crate::asset) fn flat_2d_to_3d(p: Point2D<GridCoordinate, ImagePixel>) -> Cube {
+    Cube::from(p.cast_unit().extend(0))
 }
 
 /// Error returned by [`block_from_image()`].
