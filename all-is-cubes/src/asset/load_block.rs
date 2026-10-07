@@ -234,8 +234,7 @@ impl Context<'_> {
 
                 let block_builder = block::Block::builder().read_ticket(read_ticket);
 
-                // TODO: Make these different modes share more of their logic.
-                match expansion {
+                let space = match expansion {
                     Expansion::Extrude(extrusion) => {
                         if u32::from(resolution) != image_height {
                             return Err(InGenError::Other(
@@ -273,11 +272,11 @@ impl Context<'_> {
                             ));
                         }
 
-                        let space = asset::space_from_image(
+                        asset::space_from_image_raw(
                             read_ticket,
-                            image,
+                            image.as_ref(),
                             rotation,
-                            |pixel: Srgba8| {
+                            &mut |pixel: Srgba8| {
                                 if let Some(block) = pixel_color_to_voxel(pixel) {
                                     VoxelBrush::new(extrusion_cubes.iter().map(|&cube| {
                                         (cube.lower_bounds().to_vector(), block.clone())
@@ -286,10 +285,8 @@ impl Context<'_> {
                                     VoxelBrush::EMPTY_REF.clone()
                                 }
                             },
-                        )?;
-                        let space_handle = self.txn.insert_anonymous(space);
-
-                        block_builder.voxels_handle(resolution, space_handle).build()
+                            &mut asset::pixel_to_voxel::flat_2d_to_3d,
+                        )
                     }
                     Expansion::Stack => {
                         // TODO: Currently we require that the image size makes a full set of
@@ -307,7 +304,7 @@ impl Context<'_> {
 
                         let resolution_g = GridCoordinate::from(resolution);
 
-                        let space = asset::pixel_to_voxel::space_from_image_raw(
+                        asset::space_from_image_raw(
                             read_ticket,
                             image.as_ref(),
                             rotation,
@@ -326,13 +323,12 @@ impl Context<'_> {
                                     p.y.div_euclid(resolution_g),
                                 )
                             },
-                        )?;
-
-                        let space_handle = self.txn.insert_anonymous(space);
-
-                        block_builder.voxels_handle(resolution, space_handle).build()
+                        )
                     }
-                }
+                }?;
+                let space_handle = self.txn.insert_anonymous(space);
+
+                block_builder.voxels_handle(resolution, space_handle).build()
             }
         })
     }
