@@ -22,11 +22,12 @@ use alloc::vec::Vec;
 
 use crate::asset;
 use crate::block::{self, Resolution};
-use crate::camera::imgref_size;
+use crate::camera::{ImagePixel, imgref_size};
 use crate::drawing::VoxelBrush;
 use crate::euclid::{Point2D, point2, vec3};
 use crate::linking::InGenError;
 use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Rgba, Srgba8};
+use crate::space;
 use crate::universe::{ReadTicket, UniverseTransaction};
 
 #[cfg(doc)]
@@ -292,6 +293,8 @@ impl Context<'_> {
                         block_builder.voxels_handle(resolution, space_handle).build()
                     }
                     Expansion::Stack => {
+                        // TODO: Currently we require that the image size makes a full set of
+                        // slices, but ideally we could also allow shorter images.
                         let expected_image_height = u32::from(resolution).pow(2);
                         if image_height != expected_image_height {
                             return Err(InGenError::Other(
@@ -303,10 +306,25 @@ impl Context<'_> {
                             ));
                         }
 
-                        let transform =
-                            rotation.inverse().to_positive_octant_transform(resolution.into());
+                        let resolution_g = GridCoordinate::from(resolution);
+                        let rotation_transform =
+                            rotation.to_positive_octant_transform(resolution_g);
 
-                        let adapter = super::pixel_to_voxel::PngAdapter::adapt(
+                        // Transforms image pixel coordinates to 3D coordinates,
+                        // first by building the stack (Y / block height becomes the Z coordinate),
+                        // then by applying the caller-provided rotation.
+                        let stack_and_rotate = |p: Point2D<i32, ImagePixel>| -> Cube {
+                            let cube = Cube::new(
+                                p.x,
+                                p.y.rem_euclid(resolution_g),
+                                p.y.div_euclid(resolution_g),
+                            );
+                            rotation_transform.transform_cube(cube)
+                        };
+
+                        // Not using space_from_image() because it doesn’t let us pass the position
+                        // transform. TODO: Refactor so that is possible.
+                        let ia = super::pixel_to_voxel::PngAdapter::adapt(
                             image.as_ref(),
                             &mut |pixel| {
                                 if let Some(block) = pixel_color_to_voxel(pixel) {
@@ -315,26 +333,24 @@ impl Context<'_> {
                                     VoxelBrush::EMPTY_REF.clone()
                                 }
                             },
-                            &mut asset::pixel_to_voxel::flat_2d_to_3d,
+                            &mut |p| stack_and_rotate(p.to_i32()),
                         );
 
-                        // TODO: dubious whether we should be using voxels_fn rather than starting
-                        // from the image pixels. This way we get voxels_fn()'s empty space
-                        // shrinking, but arguably that should be done some other way.
-                        block_builder
-                            .voxels_fn(resolution, |cube| {
-                                let cube = transform.transform_cube(cube).lower_bounds();
-                                let image_point: Point2D<i32, ()> =
-                                    point2(cube.x, cube.y + i32::from(resolution) * cube.z);
+                        let space = space::Space::builder(ia.bounding_box)
+                            .physics(space::SpacePhysics::DEFAULT_FOR_BLOCK)
+                            .read_ticket(read_ticket)
+                            .build_and_mutate(|m| {
+                                for y in 0..image_height.cast_signed() {
+                                    for x in 0..image_width.cast_signed() {
+                                        ia.get_brush(x, y)
+                                            .paint(m, stack_and_rotate(point2(x, y)))?;
+                                    }
+                                }
+                                Ok(())
+                            })?;
+                        let space_handle = self.txn.insert_anonymous(space);
 
-                                // TODO: make the adapter able to work with single blocks always,
-                                // instead of brushes.
-                                adapter
-                                    .get_brush(image_point.x, image_point.y)
-                                    .origin_block()
-                                    .unwrap_or(&block::AIR)
-                            })?
-                            .build_txn(self.txn)
+                        block_builder.voxels_handle(resolution, space_handle).build()
                     }
                 }
             }

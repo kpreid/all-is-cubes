@@ -28,7 +28,7 @@ pub(in crate::asset) struct PngAdapter<'a> {
     color_map: HashMap<Srgba8, VoxelBrush<'a>>,
 
     /// Bounding box of the image, after transformation.
-    bounding_box: GridAab,
+    pub(in crate::asset) bounding_box: GridAab,
 }
 
 impl<'a> PngAdapter<'a> {
