@@ -207,12 +207,16 @@ fn demo_blocks_generator(
 
                 // This image is (32×4) by 32 in size, having four tiles making up parts of the
                 // crate.
-                let image_space = asset::space_from_image(
-                    txn.read_ticket(),
-                    include_image!("blocks/crate.png"),
-                    GridRotation::IDENTITY,
-                    asset::default_srgb,
-                )?;
+                let image_space = const {
+                    asset::Space::Image {
+                        image: include_image!("blocks/crate.png"),
+                        rotation: GridRotation::IDENTITY,
+                        expansion: asset::Expansion::Extrude(&[0..1]),
+                        visible: asset::Vox::DEFAULT,
+                        invisible: asset::Vox::DENOTES_AIR,
+                    }
+                }
+                .load(txn)?;
                 let image_space = txn.insert_anonymous(image_space);
 
                 // Make blocks which have each of the image tiles.
@@ -284,12 +288,16 @@ fn demo_blocks_generator(
                 // TODO: use hash of coord instead of rng
                 // TODO: constructing this space just for the palette is wasted effort, but we’re
                 // probably eventually going to use some other approach to make this block.
-                let palette_data = asset::space_from_image(
-                    txn.read_ticket(),
-                    include_image!("blocks/road-palette.png"),
-                    GridRotation::IDENTITY,
-                    asset::default_srgb,
-                )?;
+                let palette_data = const {
+                    asset::Space::Image {
+                        image: include_image!("blocks/road-palette.png"),
+                        rotation: GridRotation::IDENTITY,
+                        expansion: asset::Expansion::Stack { slice_height: 16 },
+                        visible: asset::Vox::DEFAULT,
+                        invisible: asset::Vox::DENOTES_AIR,
+                    }
+                }
+                .load(txn)?;
                 let range = 0..palette_data.bounds().size().width.cast_signed();
 
                 Block::builder()
