@@ -22,12 +22,11 @@ use alloc::vec::Vec;
 
 use crate::asset;
 use crate::block::{self, Resolution};
-use crate::camera::{ImagePixel, imgref_size};
+use crate::camera::imgref_size;
 use crate::drawing::VoxelBrush;
-use crate::euclid::{Point2D, point2, vec3};
+use crate::euclid::vec3;
 use crate::linking::InGenError;
 use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Rgba, Srgba8};
-use crate::space;
 use crate::universe::{ReadTicket, UniverseTransaction};
 
 #[cfg(doc)]
@@ -307,25 +306,11 @@ impl Context<'_> {
                         }
 
                         let resolution_g = GridCoordinate::from(resolution);
-                        let rotation_transform =
-                            rotation.to_positive_octant_transform(resolution_g);
 
-                        // Transforms image pixel coordinates to 3D coordinates,
-                        // first by building the stack (Y / block height becomes the Z coordinate),
-                        // then by applying the caller-provided rotation.
-                        let stack_and_rotate = |p: Point2D<i32, ImagePixel>| -> Cube {
-                            let cube = Cube::new(
-                                p.x,
-                                p.y.rem_euclid(resolution_g),
-                                p.y.div_euclid(resolution_g),
-                            );
-                            rotation_transform.transform_cube(cube)
-                        };
-
-                        // Not using space_from_image() because it doesn’t let us pass the position
-                        // transform. TODO: Refactor so that is possible.
-                        let ia = super::pixel_to_voxel::PngAdapter::adapt(
+                        let space = asset::pixel_to_voxel::space_from_image_raw(
+                            read_ticket,
                             image.as_ref(),
+                            rotation,
                             &mut |pixel| {
                                 if let Some(block) = pixel_color_to_voxel(pixel) {
                                     VoxelBrush::single(block)
@@ -333,21 +318,16 @@ impl Context<'_> {
                                     VoxelBrush::EMPTY_REF.clone()
                                 }
                             },
-                            &mut |p| stack_and_rotate(p.to_i32()),
-                        );
+                            &mut |p| {
+                                let p = p.to_i32();
+                                Cube::new(
+                                    p.x,
+                                    p.y.rem_euclid(resolution_g),
+                                    p.y.div_euclid(resolution_g),
+                                )
+                            },
+                        )?;
 
-                        let space = space::Space::builder(ia.bounding_box)
-                            .physics(space::SpacePhysics::DEFAULT_FOR_BLOCK)
-                            .read_ticket(read_ticket)
-                            .build_and_mutate(|m| {
-                                for y in 0..image_height.cast_signed() {
-                                    for x in 0..image_width.cast_signed() {
-                                        ia.get_brush(x, y)
-                                            .paint(m, stack_and_rotate(point2(x, y)))?;
-                                    }
-                                }
-                                Ok(())
-                            })?;
                         let space_handle = self.txn.insert_anonymous(space);
 
                         block_builder.voxels_handle(resolution, space_handle).build()
