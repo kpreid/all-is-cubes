@@ -12,6 +12,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use std::sync::{Mutex, MutexGuard};
 
+use half::f16;
 #[cfg(feature = "rerun")]
 use itertools::iproduct;
 
@@ -29,7 +30,7 @@ use crate::glue::{size3d_to_extent, write_texture_by_aab};
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
 use crate::vertex::{AtlasTexel, FixTexCoord, TexPoint};
 
-//------------------------------------------------------------------------------------------------//
+//--------------------------------------------------------------------------------------------------
 // Types
 
 /// Implementation of [`texture::Allocator`] for [`wgpu`].
@@ -104,12 +105,11 @@ struct TileBacking {
 
     /// sRGB reflectance data (that might not be sent to the GPU yet, or reused upon resize).
     /// Is `Some` if `write()` has been called.
-    reflectance: Option<Box<[Srgba8]>>,
+    reflectance: Option<Box<[ReflectanceTexel]>>,
 
-    /// sRGB emission data (that might not be sent to the GPU yet, or reused upon resize).
+    /// Emission data (that might not be sent to the GPU yet, or reused upon resize).
     /// Is `Some` if `write()` has been called and there is an emission channel.
-    // TODO: Should be using a float format for HDR
-    emission: Option<Box<[Srgba8]>>,
+    emission: Option<Box<[EmissionTexel]>>,
 
     /// Whether the data has changed so that we need to send it to the GPU on next
     /// [`AtlasAllocator::flush`].
@@ -181,7 +181,7 @@ struct TextureLimits {
     use_3d_texture_copies: bool,
 }
 
-//------------------------------------------------------------------------------------------------//
+//--------------------------------------------------------------------------------------------------
 // Implementations
 
 impl AtlasAllocator {
@@ -383,11 +383,15 @@ impl texture::Tile for AtlasTile {
 
             texture::copy_voxels_into_xmaj_texture(
                 data,
-                tile_backing.reflectance.get_or_insert_with(|| zero_box(volume)),
+                tile_backing
+                    .reflectance
+                    .get_or_insert_with(|| vec![REFLECTANCE_ZERO; volume].into_boxed_slice()),
                 self.channels.has_emission().then(|| {
-                    &mut tile_backing.emission.get_or_insert_with(|| zero_box(volume))[..]
+                    &mut tile_backing
+                        .emission
+                        .get_or_insert_with(|| vec![EMISSION_ZERO; volume].into_boxed_slice())[..]
                 }),
-                |emission| emission.with_alpha_one().to_srgb8(),
+                encode_emission_color,
             );
             tile_backing.dirty = true;
 
@@ -503,14 +507,14 @@ impl AllocatorBacking {
                 reflectance: GpuTexture::new(
                     device,
                     needed_texture_size,
-                    wgpu::TextureFormat::Rgba8UnormSrgb,
+                    REFLECTANCE_FORMAT,
                     &format!("{} reflectance", backing.texture_label),
                 ),
                 emission: backing.channels.has_emission().then(|| {
                     GpuTexture::new(
                         device,
                         needed_texture_size,
-                        wgpu::TextureFormat::Rgba8UnormSrgb, // TODO: use HDR format
+                        EMISSION_FORMAT,
                         &format!("{} emission", backing.texture_label),
                     )
                 }),
@@ -607,16 +611,21 @@ impl AllocatorBacking {
                         // <https://github.com/kpreid/all-is-cubes/issues/378>, at which point we
                         // might reasonably disable it.
                         let region = weak_tile.allocated_bounds.map(u32::from);
+                        let volume = math::u32size(region.volume());
 
                         // TODO: keep a preallocated GPU buffer instead
-                        let data = vec![
-                            palette::UNALLOCATED_TEXELS_ERROR.to_srgb8();
-                            math::u32size(region.volume())
-                        ];
+                        let reflectance_data =
+                            vec![palette::UNALLOCATED_TEXELS_ERROR.to_srgb8(); volume];
 
-                        write_texture_by_aab(queue, &textures.reflectance.texture, region, &data);
+                        write_texture_by_aab(
+                            queue,
+                            &textures.reflectance.texture,
+                            region,
+                            &reflectance_data,
+                        );
                         if let Some(t) = &textures.emission {
-                            write_texture_by_aab(queue, &t.texture, region, &data);
+                            let emission_data = vec![EMISSION_ZERO; volume];
+                            write_texture_by_aab(queue, &t.texture, region, &emission_data);
                         }
 
                         false // discard from self.in_use
@@ -762,9 +771,26 @@ impl TextureLimits {
     }
 }
 
-fn zero_box(volume: usize) -> Box<[Srgba8]> {
-    vec![[0, 0, 0, 0]; volume].into_boxed_slice()
+// -------------------------------------------------------------------------------------------------
+
+// Centralized definitions that depend on our choice of texture formats for each channel.
+type ReflectanceTexel = Srgba8;
+type EmissionTexel = [f16; 4];
+const REFLECTANCE_ZERO: Srgba8 = [0; 4];
+const EMISSION_ZERO: [f16; 4] = [f16::ZERO; 4];
+const REFLECTANCE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+const EMISSION_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+
+fn encode_emission_color(emission: math::Rgb) -> EmissionTexel {
+    [
+        f16::from_f32(emission.red().into_inner()),
+        f16::from_f32(emission.green().into_inner()),
+        f16::from_f32(emission.blue().into_inner()),
+        f16::from_f32(1.0),
+    ]
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Compute the cube root of `value`, rounded down.
 /// (This algorithm is probably wrong for certain large values, but we only use it to compute

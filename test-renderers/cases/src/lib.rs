@@ -1353,7 +1353,7 @@ async fn bloom_test_universe() -> Arc<Universe> {
         .build_and_mutate(|m| {
             let light_source_block = Block::builder()
                 .color(rgba_const!(0.0, 0.0, 0.0, 1.0))
-                .light_emission(rgb_const!(0.5, 100.0, 0.0))
+                .light_emission(rgb_const!(0.5, 1.0, 0.0))
                 .build();
             m.set([0, 0, 0], &light_source_block).unwrap();
             Ok(())
