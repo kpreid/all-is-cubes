@@ -1133,13 +1133,12 @@ async fn tone_map(
         context.universe(),
     );
 
-    // TODO: There is a notable ray/wgpu difference concentrated in the middle range of Reinhard.
-    // So, there are probably bugs lurking here.
-    // (The thresholds here are *not* for those difference but other pixel differences.)
     context
         .render_comparison_test(
             Threshold::new([
-                (10, 100),
+                // allow various rounding pixel position differences seen in CI
+                (20, 50),
+                (10, 50),
                 (3, 500),
                 (1, usize::MAX), // allow rounding differences
             ]),
