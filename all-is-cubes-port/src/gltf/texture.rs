@@ -228,6 +228,7 @@ impl texture::Tile for GltfTile {
             data,
             &mut reflectance_buffer,
             emission_buffer.as_deref_mut(),
+            |emission| emission.with_alpha_one().to_srgb8(),
         );
 
         // OK to panic on failure because if we do, the caller ignored Self::REUSABLE.

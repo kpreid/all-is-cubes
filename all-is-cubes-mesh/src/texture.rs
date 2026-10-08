@@ -289,10 +289,11 @@ pub(super) fn needed_channels(voxels: block::EvoxelsRef<'_>) -> Channels {
     reason = "<https://github.com/rust-lang/rust-clippy/issues/7456>"
 )]
 #[expect(clippy::module_name_repetitions)]
-pub fn copy_voxels_into_xmaj_texture(
+pub fn copy_voxels_into_xmaj_texture<E>(
     voxels: block::EvoxelsRef<'_>,
     reflectance_texture: &mut [Srgba8],
-    emission_texture: Option<&mut [Srgba8]>,
+    emission_texture: Option<&mut [E]>,
+    emission_color_transform: fn(Rgb) -> E,
 ) {
     let bounds = voxels.bounds();
     let volume: usize = voxels.indices().volume();
@@ -312,7 +313,7 @@ pub fn copy_voxels_into_xmaj_texture(
                 reflectance_texture[i] = voxel.color.to_srgb8();
 
                 if let Some(&mut ref mut t) = emission_texture {
-                    t[i] = voxel.emission.with_alpha_one().to_srgb8();
+                    t[i] = emission_color_transform(voxel.emission);
                 }
 
                 i += 1;

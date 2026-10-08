@@ -387,6 +387,7 @@ impl texture::Tile for AtlasTile {
                 self.channels.has_emission().then(|| {
                     &mut tile_backing.emission.get_or_insert_with(|| zero_box(volume))[..]
                 }),
+                |emission| emission.with_alpha_one().to_srgb8(),
             );
             tile_backing.dirty = true;
 
