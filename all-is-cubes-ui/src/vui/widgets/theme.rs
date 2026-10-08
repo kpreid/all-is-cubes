@@ -4,7 +4,8 @@ use core::fmt;
 
 use exhaust::Exhaust;
 
-use all_is_cubes::asset::{block_from_image, default_srgb, include_image, space_from_image};
+use all_is_cubes::arcstr::literal;
+use all_is_cubes::asset::{self, block_from_image, default_srgb, include_image, space_from_image};
 use all_is_cubes::block::{self, AIR, Block, Resolution::*};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
@@ -153,21 +154,25 @@ impl WidgetBlocks {
                 .display_name("Crosshair")
                 .build_txn(txn),
 
-                WidgetBlocks::ToolbarSlotFrame => {
-                    Block::builder()
-                        .display_name("Toolbar Slot Frame")
-                        .voxels_handle(
-                            R64,
-                            txn.insert_anonymous(space_from_image(
-                                ReadTicket::stub(),
-                                include_image!("theme/toolbar-slot.png"),
-                                GridRotation::RXZY,
-                                // TODO: better way to do translations
-                                |pixel| default_srgb(pixel).translate([0, 16 - 1, 0]),
-                            )?),
-                        )
-                        .build()
+                // TODO: This is a 3x3 multiblock with block resolution 16, but due to the
+                // limitations of the `asset` framework, the image has to be 64×64.
+                // We need a new scheme for multiblocks, or if not that, then a resolution override
+                // in the asset framework.
+                WidgetBlocks::ToolbarSlotFrame => const {
+                    asset::Block {
+                        primitive: asset::PrimitiveOrSuch::Image {
+                            image: include_image!("theme/toolbar-slot.png"),
+                            rotation: GridRotation::RXZY,
+                            expansion: asset::Expansion::Extrude(&[15..16]),
+                            visible: asset::Vox::DEFAULT,
+                            invisible: asset::Vox::DENOTES_AIR,
+                        },
+                        modifiers: &[block::Modifier::SetAttribute(
+                            block::SetAttribute::DisplayName(literal!("Toolbar Slot Frame")),
+                        )],
+                    }
                 }
+                .load(txn)?,
 
                 #[rustfmt::skip] // otherwise it breaks
                 WidgetBlocks::ToolbarPointer([
@@ -226,6 +231,7 @@ impl WidgetBlocks {
                 WidgetBlocks::ActionButton(state) => state.button_block(txn)?,
                 WidgetBlocks::ToggleButton(state) => state.button_block(txn)?,
 
+                // TODO: convert these to the new `asset` framework
                 WidgetBlocks::LayoutDebugBoxCorner => Block::builder()
                     .display_name("LayoutDebugBoxCorner")
                     .voxels_handle(
