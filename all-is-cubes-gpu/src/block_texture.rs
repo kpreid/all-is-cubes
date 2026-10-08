@@ -12,7 +12,6 @@ use alloc::vec;
 use alloc::vec::Vec;
 use std::sync::{Mutex, MutexGuard};
 
-use half::f16;
 #[cfg(feature = "rerun")]
 use itertools::iproduct;
 
@@ -775,19 +774,50 @@ impl TextureLimits {
 
 // Centralized definitions that depend on our choice of texture formats for each channel.
 type ReflectanceTexel = Srgba8;
-type EmissionTexel = [f16; 4];
+type EmissionTexel = u32;
 const REFLECTANCE_ZERO: Srgba8 = [0; 4];
-const EMISSION_ZERO: [f16; 4] = [f16::ZERO; 4];
+const EMISSION_ZERO: u32 = 0;
 const REFLECTANCE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
-const EMISSION_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+const EMISSION_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgb9e5Ufloat;
 
 fn encode_emission_color(emission: math::Rgb) -> EmissionTexel {
-    [
-        f16::from_f32(emission.red().into_inner()),
-        f16::from_f32(emission.green().into_inner()),
-        f16::from_f32(emission.blue().into_inner()),
-        f16::from_f32(1.0),
-    ]
+    /// f32 has a mantissa of 24 bits (counting the implicit leading 1).
+    /// rgb9e5 has a mantissa of 9 bits (with explicit leading 1).
+    const LOST_MANTISSA_BITS: i16 = 24 - 9;
+
+    /// Difference between a `f32` exponent value as returned by `integer_decode()`,
+    /// and an encoded rgb9e5 exponent value.
+    const EXPONENT_CHANGE: i16 = 39;
+
+    let [r, g, b] = <[f32; 3]>::from(emission);
+    let (r_mantissa, mut r_exponent, _r_sign) = num_traits::Float::integer_decode(r);
+    let (g_mantissa, mut g_exponent, _g_sign) = num_traits::Float::integer_decode(g);
+    let (b_mantissa, mut b_exponent, _b_sign) = num_traits::Float::integer_decode(b);
+
+    // Convert the exponents from f32 terms to rgb9e5 terms.
+    r_exponent += EXPONENT_CHANGE;
+    g_exponent += EXPONENT_CHANGE;
+    b_exponent += EXPONENT_CHANGE;
+
+    // Find the largest exponent, which will become the shared exponent, then
+    // clamp it to the permissible range.
+    let shared_exponent = r_exponent.max(g_exponent).max(b_exponent).clamp(0, 0b11111);
+
+    fn rndshift(value: u64, shift: u32) -> u32 {
+        (value + (1u64.unbounded_shl(shift - 1))).unbounded_shr(shift) as u32
+    }
+
+    // Shift away the bits that we must lose due to lower precision and shared exponent.
+    // (This process always rounds down. Arguably we should round to nearest instead.)
+    let r_shift = (shared_exponent - r_exponent + LOST_MANTISSA_BITS) as u32;
+    let g_shift = (shared_exponent - g_exponent + LOST_MANTISSA_BITS) as u32;
+    let b_shift = (shared_exponent - b_exponent + LOST_MANTISSA_BITS) as u32;
+    let r_scaled = rndshift(r_mantissa, r_shift);
+    let g_scaled = rndshift(g_mantissa, g_shift);
+    let b_scaled = rndshift(b_mantissa, b_shift);
+
+    // Pack components.
+    ((shared_exponent as u32) << 27) | (b_scaled << 18) | (g_scaled << 9) | r_scaled
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -801,4 +831,53 @@ fn cube_root_u64(value: u64) -> u64 {
         root -= 1;
     }
     root
+}
+
+// -------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use math::Rgb;
+    use std::{print, println};
+
+    fn decode_rgb9e5(rgb9e5_value: u32) -> Rgb {
+        const EXPONENT_BIAS: i32 = 24;
+        let encoded_exponent = (rgb9e5_value >> 27) & 0b11111;
+        let b_mantissa = (rgb9e5_value >> 18) & 0b111111111;
+        let g_mantissa = (rgb9e5_value >> 9) & 0b111111111;
+        let r_mantissa = rgb9e5_value & 0b111111111;
+        let shared_exponent = encoded_exponent.cast_signed() - EXPONENT_BIAS;
+        let r = (r_mantissa as f32) * 2f32.powi(shared_exponent);
+        let g = (g_mantissa as f32) * 2f32.powi(shared_exponent);
+        let b = (b_mantissa as f32) * 2f32.powi(shared_exponent);
+        Rgb::new(r, g, b)
+    }
+
+    #[test]
+    fn encode_rgb9e5_test() {
+        let mut failed = false;
+        let mut check = |[r, g, b]: [f32; 3], expected: u32| {
+            let actual = encode_emission_color(Rgb::new(r, g, b));
+            let roundtrip = decode_rgb9e5(actual);
+            print!("encode [{r:7.03}, {g:7.03}, {b:7.03}] → {actual:032b} → {roundtrip:?}");
+            if actual != expected {
+                failed = true;
+                print!(", failed");
+            }
+            println!();
+        };
+        #[rustfmt::skip]
+        {
+            // Note that the component ordering, viewed as a number, is (exponent, B, G, R).
+            check([0., 0.,    0.  ], 0b00000_000000000_000000000_000000000); // simple zero
+            check([1., 1.,    1.  ], 0b10000_100000000_100000000_100000000); // simple one
+            check([1., 0.5,   0.25], 0b10000_001000000_010000000_100000000); // lower than one
+            check([1., 2.,    4.  ], 0b10010_100000000_010000000_001000000); // higher than one
+            check([1., 0.,  256.  ], 0b11000_100000000_000000000_000000001); // uses all 9 bits of dynamic range
+            check([1., 0.,  512.  ], 0b11001_100000000_000000000_000000001); // red component is rounded up
+            check([1., 0., 1024.  ], 0b11010_100000000_000000000_000000000); // red component underflows to zero
+        };
+        assert!(!failed);
+    }
 }
