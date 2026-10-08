@@ -75,15 +75,11 @@ pub(crate) fn add_eye_systems(world: &mut ecs::World) {
     );
     schedules.add_systems(
         time::schedule::Step,
-        // This chain relation doesn’t matter semantically but we have to pick one.
-        // TODO(ecs): Consider whether we should arrange for possible parallel execution
-        // (exposure being computed using last frame's data).
         (
             step_eye_position.after(crate::physics::step::BodyPhysicsSet),
             step_exposure.after(step_eye_position),
             step_ambient_sound.after(step_eye_position),
-        )
-            .chain(),
+        ),
     );
 }
 
