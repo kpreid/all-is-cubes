@@ -17,7 +17,7 @@ dependencies = [
  "arrayvec",
  "base64",
  "bevy_ecs",
- "bevy_platform",
+ "bevy_platform 0.20.0",
  "bitflags",
  "bytemuck",
  "derive_more",
@@ -55,7 +55,7 @@ dependencies = [
 name = "all-is-cubes-base"
 version = "0.10.0"
 dependencies = [
- "bevy_platform",
+ "bevy_platform 0.20.0",
  "bytemuck",
  "descriptive-unwrap",
  "displaydoc",
@@ -207,7 +207,7 @@ dependencies = [
  "all-is-cubes",
  "all-is-cubes-render",
  "async_fn_traits",
- "bevy_platform",
+ "bevy_platform 0.20.0",
  "bitflags",
  "descriptive-unwrap",
  "displaydoc",
@@ -241,7 +241,7 @@ dependencies = [
  "all-is-cubes-port",
  "all-is-cubes-render",
  "all-is-cubes-ui",
- "bevy_platform",
+ "bevy_platform 0.20.0",
  "console_error_panic_hook",
  "console_log",
  "descriptive-unwrap",
@@ -338,7 +338,7 @@ checksum = "a350b2e4c2e47f7903d688affb8a723b31bca63af9789f1da88703f1ba04e354"
 dependencies = [
  "arrayvec",
  "bevy_ecs_macros",
- "bevy_platform",
+ "bevy_platform 0.19.1",
  "bevy_ptr",
  "bevy_tasks",
  "bevy_utils",
@@ -399,6 +399,22 @@ version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd610a417e7b4a3b9602cf11264d16cbbff8eabe689c5fed8be4e84c6a2680a3"
 dependencies = [
+ "foldhash 0.2.0",
+ "futures-channel",
+ "hashbrown 0.16.1",
+ "portable-atomic",
+ "portable-atomic-util",
+ "serde",
+ "spin 0.10.1",
+ "windows-sys",
+]
+
+[[package]]
+name = "bevy_platform"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "000bc467d1b344b6609fcf217a9b08d349d49c8e85dc4179fb7656f2b6e3db47"
+dependencies = [
  "critical-section",
  "foldhash 0.2.0",
  "futures-channel",
@@ -407,7 +423,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde",
- "spin 0.10.1",
+ "spin 0.12.3",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-time",
@@ -428,7 +444,7 @@ checksum = "1f787d4ba7237b64b30bd2d690a8cbae1ba775e0eec326711c446654cb720e7c"
 dependencies = [
  "async-task",
  "atomic-waker",
- "bevy_platform",
+ "bevy_platform 0.19.1",
  "crossbeam-queue",
  "derive_more",
  "futures-lite",
@@ -442,7 +458,7 @@ version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de51fa7ea2e95d4c2d1278c5629285d59eec951cc60c992964c03f30910ef5a1"
 dependencies = [
- "bevy_platform",
+ "bevy_platform 0.19.1",
  "disqualified",
  "indexmap",
 ]
@@ -1801,6 +1817,15 @@ name = "spin"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "023a211cb3138dbc438680b32560ad89f699977624c9f8dbb95a47d5b4c07dd3"
+dependencies = [
+ "portable-atomic",
+]
+
+[[package]]
+name = "spin"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0134f9043ed38b087ac4f7d4af44c79e2c9e5094421fe3164f435ce585953b10"
 dependencies = [
  "portable-atomic",
 ]
