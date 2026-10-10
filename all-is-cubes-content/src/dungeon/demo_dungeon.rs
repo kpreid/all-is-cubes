@@ -706,7 +706,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     // Add the box of optional cheats. This is not a “grants item” because it is
                     // multiple items and has a special container. TODO: Fix the “grants item” mechanism
                     // to support that.
-                    let box_position = Cube::from(room_data.extended_bounds.lower_bounds());
+                    let box_position = Cube::from(interior.lower_bounds());
                     ctx.set(box_position, &self.box_of_cheats_block)?;
 
                     Ok(Some(spawn))
