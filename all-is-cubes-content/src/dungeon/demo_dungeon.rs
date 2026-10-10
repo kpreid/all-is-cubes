@@ -174,12 +174,6 @@ impl DemoTheme {
         let room_1_box = self.actual_room_box(room_1_position, room_1_data);
         let room_2_box = self.actual_room_box(room_2_position, room_2_data);
 
-        let wall_parallel = Face::PY.clockwise().transform(face);
-        let parallel_axis = wall_parallel.axis();
-        assert_ne!(parallel_axis, Axis::Y);
-
-        let rotate_nz_to_face = GridRotation::from_to(Face::NZ, face, Face::PY).unwrap();
-
         // This box is exactly the volume which would ordinarily be impassable if this corridor.
         // were not being added.
         let doorway_box = {
@@ -232,6 +226,15 @@ impl DemoTheme {
             Door::Permanent => (true, false, false),
         };
         if gate_present {
+            let wall_parallel = Face::PY.clockwise().transform(face);
+            let parallel_axis = wall_parallel.axis();
+            let rotate_nz_to_face = GridRotation::from_to(Face::NZ, face, Face::PY).unwrap();
+            assert_ne!(
+                parallel_axis,
+                Axis::Y,
+                "cannot make gate on vertical connection"
+            );
+
             let gate_box = doorway_box
                 .abut(face, -1)
                 .unwrap()
@@ -491,7 +494,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 Ok(None)
             }
             1 => {
-                for face in [Face::PX, Face::PZ] {
+                for face in [Face::PX, Face::PY, Face::PZ] {
                     if let WallFeature::Passage(door) = room_data.wall_features[face] {
                         self.inside_doorway(ctx, map, room_position, face, door)?;
                     }
@@ -900,7 +903,10 @@ fn generate_dungeon_map(
                         || maze[neighbor].kind == MazeRoomKind::OffPath)
                         || maze_room.position_on_path == Some(gain_key.found_on_path_position);
 
-                    let door = *if must_be_passable {
+                    let door = *if face.axis() == Axis::Y {
+                        // Currently, vertical passages must not have doors.
+                        &[Door::None]
+                    } else if must_be_passable {
                         if gain_key.room_may_require_this(maze_room) {
                             // If the rooms are on the path and the player has a key,
                             // generate no door or a door that is can be opened.
