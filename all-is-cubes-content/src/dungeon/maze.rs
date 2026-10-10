@@ -97,10 +97,15 @@ fn generate_path(
 
         let Some(next_direction) = Face::ALL
             .into_iter()
-            .filter(|dir| {
+            .filter(|&dir| {
                 let neighbor = path_cube + dir.normal_vector();
-                maze.bounds().contains_cube(neighbor)
-                    && maze[neighbor].kind == MazeRoomKind::Unoccupied
+                // Assume no flight available (for now), so all main paths must be horizontal or
+                // downward.
+                dir != Face::PY
+                    // Starting room may not contain a downward passage.
+                    && (path_cube != starting_cube || dir != Face::NY)
+                    // Passage must lead to a space that is in-bounds and isn’t already in use.
+                    && maze.get(neighbor).is_some_and(|n| n.kind == MazeRoomKind::Unoccupied)
             })
             .choose(rng)
         else {
@@ -139,9 +144,10 @@ fn generate_dead_ends(maze: &mut Maze, rng: &mut rand_xoshiro::Xoshiro256Plus) {
     while let Some(cube_to_fill) = needs_filling.pop_front() {
         match Face::ALL
             .into_iter()
-            .filter(|dir| {
+            .filter(|&dir| {
                 let neighbor = cube_to_fill + dir.normal_vector();
-                maze.bounds().contains_cube(neighbor)
+                dir != Face::PY // a dead end may never be a pit you can’t get out of
+                    && maze.bounds().contains_cube(neighbor)
                     && maze[neighbor].kind != MazeRoomKind::Unoccupied
             })
             .choose(rng)
