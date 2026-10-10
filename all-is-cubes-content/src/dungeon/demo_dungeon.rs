@@ -851,9 +851,9 @@ fn generate_dungeon_map(
     let [gain_key] = choose_key_locations(&mut rng, &maze, path_length);
 
     // Expand bounds to allow for extra-tall rooms.
-    let expanded_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
+    let expanded_maze_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
 
-    Vol::from_fn(expanded_bounds, |room_position| {
+    Vol::from_fn(expanded_maze_bounds, |room_position| {
         let maze_room = maze.get(room_position)?;
 
         let must_grant_item: Option<Tool> =
@@ -867,15 +867,17 @@ fn generate_dungeon_map(
 
         let corridor_only = is_not_end && must_grant_item.is_none() && rng.random_bool(0.5);
 
-        let mut extended_bounds = GridAab::ORIGIN_CUBE;
+        let mut expanded_room_bounds = GridAab::ORIGIN_CUBE;
         // Optional high ceiling
         if !corridor_only && rng.random_bool(0.25) {
-            extended_bounds = extended_bounds.expand(FaceMap::default().with(Face::PY, 1));
+            expanded_room_bounds =
+                expanded_room_bounds.expand(FaceMap::default().with(Face::PY, 1));
         }
         // Floor pit
         let floor =
             if !corridor_only && is_not_end && must_grant_item.is_none() && rng.random_bool(0.25) {
-                extended_bounds = extended_bounds.expand(FaceMap::default().with(Face::NY, 1));
+                expanded_room_bounds =
+                    expanded_room_bounds.expand(FaceMap::default().with(Face::NY, 1));
                 *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
                     .choose(&mut rng)
                     .unwrap()
@@ -952,7 +954,7 @@ fn generate_dungeon_map(
         Some(DemoRoom {
             maze_kind: maze_room.kind,
             position_on_path: maze_room.position_on_path,
-            extended_bounds,
+            extended_bounds: expanded_room_bounds,
             wall_features,
             floor,
             corridor_only,
