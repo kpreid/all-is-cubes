@@ -9,6 +9,7 @@ use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use alloc::{vec, vec::Vec};
 use core::fmt;
+use manyfmt::Refmt;
 
 use hashbrown::HashMap;
 
@@ -1122,13 +1123,15 @@ impl fmt::Debug for Primitive {
             } => f
                 .debug_struct("Recur")
                 .field("space", space)
-                .field("offset", offset)
+                .field("offset", &offset.refmt(&crate::util::ConciseDebug))
                 .field("resolution", resolution)
                 .finish(),
             Self::Air => write!(f, "Air"),
-            Self::Text { text, offset } => {
-                f.debug_struct("Text").field("offset", offset).field("text", text).finish()
-            }
+            Self::Text { text, offset } => f
+                .debug_struct("Text")
+                .field("offset", &offset.refmt(&crate::util::ConciseDebug))
+                .field("text", text)
+                .finish(),
             Self::Raw {
                 attributes,
                 voxels: _,

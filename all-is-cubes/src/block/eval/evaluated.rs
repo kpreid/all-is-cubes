@@ -883,11 +883,7 @@ mod tests {
                     block: Block {
                         primitive: Recur {
                             space: Handle([anonymous #0]),
-                            offset: (
-                                0,
-                                0,
-                                0,
-                            ),
+                            offset: (+0, +0, +0),
                             resolution: 2,
                         },
                         modifiers: [
