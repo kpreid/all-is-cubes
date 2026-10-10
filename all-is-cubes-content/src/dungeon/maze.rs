@@ -69,10 +69,10 @@ pub fn generate_maze(seed: u64, requested_rooms: GridSize) -> (Maze, usize) {
         },
     );
 
-    let start = Cube::new(0, 0, 0);
+    let start = Cube::new(0, (requested_rooms.height - 1).cast_signed(), 0);
     maze[start].kind = MazeRoomKind::Start;
 
-    let path_length = generate_path(&mut maze, &mut rng, Cube::new(0, 0, 0), MazeRoomKind::Goal);
+    let path_length = generate_path(&mut maze, &mut rng, start, MazeRoomKind::Goal);
     generate_dead_ends(&mut maze, &mut rng);
     fill_remaining_distances(&mut maze, start);
 
