@@ -755,19 +755,23 @@ pub(crate) async fn demo_dungeon(
         room_wall_thickness: FaceMap::splat(1),
         gap_between_walls: Size3D::new(1, 1, 1),
     };
+    // allow room for some grass to see out the windows
     let perimeter_margin: GridSizeCoord = 30;
+    // Allow room for upward and downward expansions of rooms.
+    // This corresponds to `expanded_maze_bounds` elsewhere in the generator.
+    let vertical_expansion: GridSizeCoord = dungeon_grid.room_spacing().height * 2;
 
     let mut requested_rooms = Size3D::from(
         (requested_size.unwrap_or(Size3D::new(135, 40, 135))
-            - Size3D::new(perimeter_margin, 0, perimeter_margin))
+            - Size3D::new(perimeter_margin, vertical_expansion, perimeter_margin))
         .to_vector()
         .component_div(dungeon_grid.room_spacing().to_vector()),
     );
-    if requested_rooms.width == 0 || requested_rooms.depth == 0 {
+    if requested_rooms.width == 0 || requested_rooms.height == 0 || requested_rooms.depth == 0 {
         return Err(InGenError::Other("Size too small".into()));
     }
 
-    // TODO: Add 3D support (avoid collisions with tall rooms + generate stairs).
+    // TODO: Add 3D support (generate stairs / know when a one-way drop is acceptable).
     // For now, ignore vertical size suggestions entirely
     requested_rooms.height = 1;
 
