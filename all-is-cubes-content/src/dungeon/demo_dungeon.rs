@@ -130,6 +130,154 @@ struct DemoTheme {
 // -------------------------------------------------------------------------------------------------
 
 impl DemoTheme {
+    fn new(
+        dungeon_grid: &DungeonGrid,
+        landscape_blocks: &BlockProvider<LandscapeBlocks>,
+        demo_blocks: &BlockProvider<DemoBlocks>,
+        dungeon_blocks: BlockProvider<DungeonBlocks>,
+    ) -> Self {
+        let lintel_with_stone =
+            landscape_blocks[LandscapeBlocks::Stone]
+                .clone()
+                .with_modifier(block::Composite::new(
+                    dungeon_blocks[Lintel].clone(),
+                    block::CompositeOperator::Over,
+                ));
+
+        DemoTheme {
+            dungeon_grid: dungeon_grid.clone(),
+            room_style: BoxStyle::from_fn(|part| {
+                if part == BoxPart::INTERIOR {
+                    Some(AIR)
+                } else if part.is_on_face(Face::NY) {
+                    Some(dungeon_blocks[FloorTile].clone())
+                } else {
+                    // TODO: add wall-tile and ceiling-tile blocks
+                    Some(landscape_blocks[LandscapeBlocks::Stone].clone())
+                }
+            }),
+            corridor_box: GridAab::from_lower_size([2, 0, 2], [3, 3, 3]),
+            corridor_box_styles: {
+                let basic_style = BoxStyle::from_fn(|part| {
+                    if part == BoxPart::INTERIOR {
+                        Some(AIR)
+                    } else if part.is_on_face(Face::NY) {
+                        Some(dungeon_blocks[FloorTile].clone())
+                    } else {
+                        // TODO: add wall-tile and ceiling-tile blocks
+                        Some(landscape_blocks[LandscapeBlocks::Stone].clone())
+                    }
+                });
+
+                let corner_block = |facing_room: Face, left: bool| {
+                    block::Composite::new(
+                        dungeon_blocks[DoorwaySideMask].clone().rotate(
+                            GridRotation::from_to(Face::PZ, facing_room, Face::PY).unwrap()
+                                * if left {
+                                    GridRotation::IDENTITY
+                                } else {
+                                    GridRotation::RxYZ
+                                },
+                        ),
+                        block::CompositeOperator::In,
+                    )
+                    .reversed()
+                    .compose_or_replace(landscape_blocks[LandscapeBlocks::Stone].clone())
+                };
+
+                let on_horizontal_axis = |axis: Axis| -> BoxStyle {
+                    basic_style
+                        .clone()
+                        // Cut open the open spaces
+                        .with(BoxPart::face(axis.negative_face()), Some(AIR))
+                        .with(BoxPart::face(axis.positive_face()), Some(AIR))
+                        // Add lintels
+                        .map(|part, block| {
+                            if part.is_on_face(Face::PY)
+                                && (part.is_on_face(axis.positive_face())
+                                    || part.is_on_face(axis.negative_face()))
+                            {
+                                lintel_with_stone.clone()
+                            } else {
+                                block
+                            }
+                        })
+                        // Add vertical DoorwaySideMask blocks for each of the four "sides of a
+                        // dooorway" in this corridor.
+                        // TODO: way too repetitive and unclear
+                        .with(
+                            BoxPart::face(axis.positive_face())
+                                .push(axis.positive_face().cross(Face::PY).try_into().unwrap()),
+                            Some(corner_block(axis.positive_face(), true)),
+                        )
+                        .with(
+                            BoxPart::face(axis.positive_face())
+                                .push(axis.positive_face().cross(Face::NY).try_into().unwrap()),
+                            Some(corner_block(axis.positive_face(), false)),
+                        )
+                        .with(
+                            BoxPart::face(axis.negative_face())
+                                .push(axis.negative_face().cross(Face::PY).try_into().unwrap()),
+                            Some(corner_block(axis.negative_face(), true)),
+                        )
+                        .with(
+                            BoxPart::face(axis.negative_face())
+                                .push(axis.negative_face().cross(Face::NY).try_into().unwrap()),
+                            Some(corner_block(axis.negative_face(), false)),
+                        )
+                };
+
+                let on_vertical_axis: BoxStyle = basic_style
+                    .clone()
+                    .map(|part, block| {
+                        if part.is_on_face(Face::NY) {
+                            // ceiling block instead of floor block
+                            landscape_blocks[LandscapeBlocks::Stone].clone()
+                        } else {
+                            block
+                        }
+                    })
+                    .with(BoxPart::face(Face::NY), Some(AIR))
+                    .with(BoxPart::face(Face::PY), Some(AIR));
+
+                // Build the 3 different corridor boxes
+                vec3(
+                    on_horizontal_axis(Axis::X),
+                    on_vertical_axis,
+                    on_horizontal_axis(Axis::Z),
+                )
+            },
+            locked_gate_block: dungeon_blocks[Gate].clone().with_modifier(block::Composite::new(
+                dungeon_blocks[GateLock].clone(),
+                block::CompositeOperator::Over,
+            )),
+            window_glass_block: demo_blocks[DemoBlocks::GlassBlock].clone(),
+            item_pedestal: demo_blocks[DemoBlocks::Pedestal].clone(),
+            lintel_with_stone,
+            box_of_cheats_block: demo_blocks[DemoBlocks::Toolbox]
+                .clone()
+                // Note: can't put this in the block definition because the Arc is not const
+                // constructible. This is a deficiency in the representation of the attribute.
+                .with_modifier(block::SetAttribute::ActivationAction(Some(Arc::new(
+                    op::Operation::TakeInventory {
+                        destroy_if_empty: true,
+                    },
+                ))))
+                .with_modifier(block::Modifier::Inventory(inv::Inventory::from_slots([
+                    // Inventory items that allow exploring the maze without solving it "fairly".
+                    Tool::RemoveBlock { keep: true }.into(),
+                ]))),
+            blocks: dungeon_blocks,
+            starting_inventory: vec![
+                Tool::Activate.into(),
+                // TODO: make jetpack an item acquired within the maze.
+                // Currently, it’s one of the items which doesn’t have an icon when displayed by a
+                // block, so doing so would not be playable.
+                Tool::Jetpack { active: false }.into(),
+            ],
+        }
+    }
+
     fn plain_room(
         &self,
         wall_block: Option<&Block>,
@@ -615,145 +763,14 @@ pub(crate) async fn demo_dungeon(
 
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
-    let dungeon_blocks = BlockProvider::<DungeonBlocks>::using(universe)?;
-    let lintel_with_stone =
-        landscape_blocks[LandscapeBlocks::Stone]
-            .clone()
-            .with_modifier(block::Composite::new(
-                dungeon_blocks[Lintel].clone(),
-                block::CompositeOperator::Over,
-            ));
-    let theme = DemoTheme {
-        dungeon_grid: dungeon_grid.clone(),
-        room_style: BoxStyle::from_fn(|part| {
-            if part == BoxPart::INTERIOR {
-                Some(AIR)
-            } else if part.is_on_face(Face::NY) {
-                Some(dungeon_blocks[FloorTile].clone())
-            } else {
-                // TODO: add wall-tile and ceiling-tile blocks
-                Some(landscape_blocks[LandscapeBlocks::Stone].clone())
-            }
-        }),
-        corridor_box: GridAab::from_lower_size([2, 0, 2], [3, 3, 3]),
-        corridor_box_styles: {
-            let basic_style = BoxStyle::from_fn(|part| {
-                if part == BoxPart::INTERIOR {
-                    Some(AIR)
-                } else if part.is_on_face(Face::NY) {
-                    Some(dungeon_blocks[FloorTile].clone())
-                } else {
-                    // TODO: add wall-tile and ceiling-tile blocks
-                    Some(landscape_blocks[LandscapeBlocks::Stone].clone())
-                }
-            });
-
-            let corner_block = |facing_room: Face, left: bool| {
-                block::Composite::new(
-                    dungeon_blocks[DoorwaySideMask].clone().rotate(
-                        GridRotation::from_to(Face::PZ, facing_room, Face::PY).unwrap()
-                            * if left {
-                                GridRotation::IDENTITY
-                            } else {
-                                GridRotation::RxYZ
-                            },
-                    ),
-                    block::CompositeOperator::In,
-                )
-                .reversed()
-                .compose_or_replace(landscape_blocks[LandscapeBlocks::Stone].clone())
-            };
-
-            let on_horizontal_axis = |axis: Axis| -> BoxStyle {
-                basic_style
-                    .clone()
-                    // Cut open the open spaces
-                    .with(BoxPart::face(axis.negative_face()), Some(AIR))
-                    .with(BoxPart::face(axis.positive_face()), Some(AIR))
-                    // Add lintels
-                    .map(|part, block| {
-                        if part.is_on_face(Face::PY)
-                            && (part.is_on_face(axis.positive_face())
-                                || part.is_on_face(axis.negative_face()))
-                        {
-                            lintel_with_stone.clone()
-                        } else {
-                            block
-                        }
-                    })
-                    // Add vertical DoorwaySideMask blocks for each of the four "sides of a
-                    // dooorway" in this corridor.
-                    // TODO: way too repetitive and unclear
-                    .with(
-                        BoxPart::face(axis.positive_face())
-                            .push(axis.positive_face().cross(Face::PY).try_into().unwrap()),
-                        Some(corner_block(axis.positive_face(), true)),
-                    )
-                    .with(
-                        BoxPart::face(axis.positive_face())
-                            .push(axis.positive_face().cross(Face::NY).try_into().unwrap()),
-                        Some(corner_block(axis.positive_face(), false)),
-                    )
-                    .with(
-                        BoxPart::face(axis.negative_face())
-                            .push(axis.negative_face().cross(Face::PY).try_into().unwrap()),
-                        Some(corner_block(axis.negative_face(), true)),
-                    )
-                    .with(
-                        BoxPart::face(axis.negative_face())
-                            .push(axis.negative_face().cross(Face::NY).try_into().unwrap()),
-                        Some(corner_block(axis.negative_face(), false)),
-                    )
-            };
-
-            let on_vertical_axis: BoxStyle = basic_style
-                .clone()
-                .map(|part, block| {
-                    if part.is_on_face(Face::NY) {
-                        // ceiling block instead of floor block
-                        landscape_blocks[LandscapeBlocks::Stone].clone()
-                    } else {
-                        block
-                    }
-                })
-                .with(BoxPart::face(Face::NY), Some(AIR))
-                .with(BoxPart::face(Face::PY), Some(AIR));
-
-            // Build the 3 different corridor boxes
-            vec3(
-                on_horizontal_axis(Axis::X),
-                on_vertical_axis,
-                on_horizontal_axis(Axis::Z),
-            )
-        },
-        locked_gate_block: dungeon_blocks[Gate].clone().with_modifier(block::Composite::new(
-            dungeon_blocks[GateLock].clone(),
-            block::CompositeOperator::Over,
-        )),
-        window_glass_block: demo_blocks[DemoBlocks::GlassBlock].clone(),
-        item_pedestal: demo_blocks[DemoBlocks::Pedestal].clone(),
-        lintel_with_stone,
-        box_of_cheats_block: demo_blocks[DemoBlocks::Toolbox]
-            .clone()
-            // Note: can't put this in the block definition because the Arc is not const
-            // constructible. This is a deficiency in the representation of the attribute.
-            .with_modifier(block::SetAttribute::ActivationAction(Some(Arc::new(
-                op::Operation::TakeInventory {
-                    destroy_if_empty: true,
-                },
-            ))))
-            .with_modifier(block::Modifier::Inventory(inv::Inventory::from_slots([
-                // Inventory items that allow exploring the maze without solving it "fairly".
-                Tool::RemoveBlock { keep: true }.into(),
-            ]))),
-        blocks: dungeon_blocks,
-        starting_inventory: vec![
-            Tool::Activate.into(),
-            // TODO: make jetpack an item acquired within the maze.
-            // Currently, it’s one of the items which doesn’t have an icon when displayed by a
-            // block, so doing so would not be playable.
-            Tool::Jetpack { active: false }.into(),
-        ],
+    let theme = {
+        let dungeon_blocks = BlockProvider::<DungeonBlocks>::using(universe)?;
+        DemoTheme::new(
+            &dungeon_grid,
+            &landscape_blocks,
+            &demo_blocks,
+            dungeon_blocks,
+        )
     };
     // Random assortment of items to provide
     // TODO: make this things like keys for doors
