@@ -856,15 +856,12 @@ impl fmt::Debug for Evoxels {
                 resolution,
                 palette,
                 indices,
-            })) => {
-                f.debug_struct("Many")
-                    .field("resolution", resolution)
-                    .field("palette", &FmtPalette(palette))
-                    // `Vol` will take care of truncating the data if it is long.
-                    // TODO: But it would be nice to have neatly 2D text layout.
-                    .field("indices", indices)
-                    .finish()
-            }
+            })) => f
+                .debug_struct("Many")
+                .field("resolution", resolution)
+                .field("palette", &FmtPalette(palette))
+                .field("indices", &FmtIndices(indices.as_linear()))
+                .finish(),
         }
     }
 }
@@ -880,8 +877,7 @@ impl fmt::Debug for EvoxelsRef<'_> {
         f.debug_struct("EvoxelsRef")
             .field("resolution", resolution)
             .field("palette", &FmtPalette(palette))
-            // `Vol` will take care of truncating the data if it is long.
-            .field("indices", indices)
+            .field("indices", &FmtIndices(indices.as_linear()))
             .finish()
     }
 }
@@ -896,6 +892,46 @@ impl fmt::Debug for FmtPalette<'_> {
         fmt.debug_list()
             .entries(self.0.iter().map(crate::util::NoAlternateDebug))
             .finish()
+    }
+}
+
+/// Format a list of indices, with multiple indices per line and truncation.
+pub(in crate::block) struct FmtIndices<'a>(pub &'a [VoxelIndex]);
+
+impl fmt::Debug for FmtIndices<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            [] => write!(f, "[]"),
+
+            // Single-line formatting.
+            [first, rest @ ..] if rest.len() < 16 => {
+                write!(f, "[{first}")?;
+                for elem in rest {
+                    write!(f, ", {elem}")?;
+                }
+                write!(f, "]")?;
+                Ok(())
+            }
+
+            // Multi-line formatting with arbitrary line breaks.
+            many => {
+                write!(f, "[\n   ")?;
+                for (i, elem) in many.iter().copied().enumerate() {
+                    if i >= 128 {
+                        write!(f, "\n    ...")?;
+                        break;
+                    } else if i != 0 && i.rem_euclid(16) == 0 {
+                        // Line breaks
+                        write!(f, "\n    ")?;
+                    } else {
+                        write!(f, " ")?;
+                    }
+                    write!(f, "{elem:2},")?;
+                }
+                write!(f, "\n]")?;
+                Ok(())
+            }
+        }
     }
 }
 

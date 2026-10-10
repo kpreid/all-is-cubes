@@ -9,6 +9,7 @@ use core::ptr;
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
+use crate::block::eval::voxel_storage;
 use crate::block::{
     self, BlRotate as _, Block, BlockAttributes, BlockCollision, Cost, Derived, Evoxel, Evoxels,
     EvoxelsEq,
@@ -98,24 +99,11 @@ impl fmt::Debug for EvaluatedBlock {
                 ds.field("voxels.bounds", &NoAlternateDebug(voxels.bounds()));
                 ds.field(
                     "voxels.palette",
-                    &super::voxel_storage::FmtPalette(voxels.palette()),
+                    &voxel_storage::FmtPalette(voxels.palette()),
                 );
                 ds.field(
                     "voxels.indices",
-                    &fmt::from_fn(|f| {
-                        let mut dl = f.debug_list();
-                        let indices = voxels.indices();
-                        const LIMIT: usize = 8;
-                        // TODO: consider matrix-like formatting
-                        for index in indices.as_linear().iter().take(LIMIT) {
-                            dl.entry(&index);
-                        }
-                        if indices.volume() > LIMIT {
-                            dl.finish_non_exhaustive()
-                        } else {
-                            dl.finish()
-                        }
-                    }),
+                    &voxel_storage::FmtIndices(voxels.indices().as_linear()),
                 )
             }
         };
@@ -904,16 +892,7 @@ mod tests {
                         Evoxel { color: Rgba(0.0, 0.0, 0.0, 0.0), selectable: false, collision: None },
                         Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0), emission: Rgb(1.0, 2.0, 3.0) },
                     ],
-                    voxels.indices: [
-                        1,
-                        1,
-                        1,
-                        1,
-                        1,
-                        1,
-                        1,
-                        0,
-                    ],
+                    voxels.indices: [1, 1, 1, 1, 1, 1, 1, 0],
                     voxel_opacity_mask: VoxelOpacityMask {
                         resolution: 2,
                         bounds: GridAab(0..2, 0..2, 0..2),
@@ -926,6 +905,66 @@ mod tests {
                     },
                 }
             "#}
+        );
+    }
+
+    /// Test multiline formatting of indices.
+    #[test]
+    fn evaluated_block_debug_large_volume() {
+        let mut universe = Universe::new();
+        let voxel = block::from_color!(Rgba::WHITE);
+        let ev = Block::builder()
+            .voxels_fn(Resolution::R4, |p| {
+                if p == Cube::new(0, 0, 0) {
+                    &block::AIR
+                } else {
+                    &voxel
+                }
+            })
+            .unwrap()
+            .build_into(&mut universe)
+            .evaluate(universe.read_ticket())
+            .unwrap();
+
+        assert_eq!(
+            format!("{ev:#?}\n"),
+            indoc! {r"
+                EvaluatedBlock {
+                    block: Block {
+                        primitive: Recur {
+                            space: Handle([anonymous #0]),
+                            offset: (+0, +0, +0),
+                            resolution: 4,
+                        },
+                    },
+                    color: Rgba(1.0, 1.0, 1.0, 1.0),
+                    opaque: {−all: false, +all: true},
+                    visible: true,
+                    uniform_collision: None,
+                    resolution: 4,
+                    voxels.bounds: GridAab(0..4, 0..4, 0..4),
+                    voxels.palette: [
+                        Evoxel { color: Rgba(0.0, 0.0, 0.0, 0.0), selectable: false, collision: None },
+                        Evoxel { color: Rgba(1.0, 1.0, 1.0, 1.0) },
+                    ],
+                    voxels.indices: [
+                         0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+                         1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+                         1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+                         1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+                    ],
+                    voxel_opacity_mask: VoxelOpacityMask {
+                        resolution: 4,
+                        bounds: GridAab(0..4, 0..4, 0..4),
+                        opacity: [ █████████████████████████████..],
+                    },
+                    cost: Cost {
+                        components: 1,
+                        voxels: 64,
+                        recursion: 0,
+                    },
+                }
+            "}
         );
     }
 
