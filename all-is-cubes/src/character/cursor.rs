@@ -247,13 +247,13 @@ impl lines::Wireframe for Cursor {
             let inset = -1. / 128.;
 
             let face_coordinate = expanded_aabb.face_coordinate_on_axis(face);
-            let face_aabb = expanded_aabb
-                .expand_or_shrink(FaceMap::splat(inset))
-                .none_is_unreachable()
-                .with_axis_range(face.axis(), face_coordinate, face_coordinate)
-                .none_is_unreachable();
+            if let Some(inset_aab) = expanded_aabb.expand_or_shrink(FaceMap::splat(inset)) {
+                let face_aabb = inset_aab
+                    .with_axis_range(face.axis(), face_coordinate, face_coordinate)
+                    .none_is_unreachable();
 
-            face_aabb.wireframe_points(&mut lines::colorize(output, palette::CURSOR_OUTLINE));
+                face_aabb.wireframe_points(&mut lines::colorize(output, palette::CURSOR_OUTLINE));
+            }
         }
 
         // Frame the cursor intersection point with a diamond.
@@ -287,8 +287,9 @@ mod tests {
     use super::*;
     use crate::block::{AIR, Resolution::*};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::math::{GridAab, Rgba};
+    use crate::math::{GridAab, Rgba, lines::Wireframe as _};
     use crate::universe::Universe;
+    use alloc::vec::Vec;
     use euclid::{Point3D, Vector3D, vec3};
     use std::{assert_matches, dbg};
 
@@ -434,5 +435,26 @@ mod tests {
         dbg!(&cursor);
         assert_eq!(cursor.face_entered, Face7::NX);
         assert_eq!(cursor.face_selected(), Face7::PY);
+    }
+
+    #[test]
+    fn wireframe_of_high_resolution_thin_face() {
+        let universe = &mut Universe::new();
+        let slab = make_slab(universe, 1, R128);
+        let space_handle = test_space(universe, [&slab]);
+
+        let cursor = cursor_raycast(
+            universe.read_ticket(),
+            Ray::new([-1., 1. / 256., 0.5], [1., 0., 0.]),
+            &space_handle,
+            f64::INFINITY,
+        )
+        .unwrap()
+        .unwrap();
+
+        dbg!(&cursor);
+        assert_eq!(cursor.face_selected(), Face7::NX);
+        // This should not panic.
+        cursor.wireframe_points(&mut Vec::new());
     }
 }
