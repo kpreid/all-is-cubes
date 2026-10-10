@@ -664,7 +664,7 @@ pub(crate) async fn demo_dungeon(
                 .compose_or_replace(landscape_blocks[LandscapeBlocks::Stone].clone())
             };
 
-            let on_horizontal_axis = |axis: Axis| {
+            let on_horizontal_axis = |axis: Axis| -> BoxStyle {
                 basic_style
                     .clone()
                     // Cut open the open spaces
@@ -706,12 +706,23 @@ pub(crate) async fn demo_dungeon(
                     )
             };
 
+            let on_vertical_axis: BoxStyle = basic_style
+                .clone()
+                .map(|part, block| {
+                    if part.is_on_face(Face::NY) {
+                        // ceiling block instead of floor block
+                        landscape_blocks[LandscapeBlocks::Stone].clone()
+                    } else {
+                        block
+                    }
+                })
+                .with(BoxPart::face(Face::NY), Some(AIR))
+                .with(BoxPart::face(Face::PY), Some(AIR));
+
+            // Build the 3 different corridor boxes
             vec3(
                 on_horizontal_axis(Axis::X),
-                basic_style
-                    .clone()
-                    .with(BoxPart::face(Face::NY), Some(AIR))
-                    .with(BoxPart::face(Face::PY), Some(AIR)),
+                on_vertical_axis,
                 on_horizontal_axis(Axis::Z),
             )
         },
