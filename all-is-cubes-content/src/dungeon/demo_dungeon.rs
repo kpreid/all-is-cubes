@@ -870,23 +870,37 @@ fn generate_dungeon_map(
 
         let corridor_only = is_not_end && must_grant_item.is_none() && rng.random_bool(0.5);
 
+        // Add features that enlarge the room, if there is space to expand into, either
+        // * an unoccupied room, or
+        // * space outside the bounds of maze generation, but within `expanded_maze_bounds`.
         let mut expanded_room_bounds = GridAab::ORIGIN_CUBE;
         // Optional high ceiling
-        if !corridor_only && rng.random_bool(0.25) {
+        if !corridor_only
+            && maze
+                .get(room_position + Face::PY.normal_vector())
+                .is_none_or(|above| above.kind == MazeRoomKind::Unoccupied)
+            && rng.random_bool(0.25)
+        {
             expanded_room_bounds =
                 expanded_room_bounds.expand(FaceMap::default().with(Face::PY, 1));
         }
         // Floor pit
-        let floor =
-            if !corridor_only && is_not_end && must_grant_item.is_none() && rng.random_bool(0.25) {
-                expanded_room_bounds =
-                    expanded_room_bounds.expand(FaceMap::default().with(Face::NY, 1));
-                *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
-                    .choose(&mut rng)
-                    .unwrap()
-            } else {
-                FloorKind::Solid
-            };
+        let floor = if !corridor_only
+            && is_not_end
+            && must_grant_item.is_none()
+            && maze
+                .get(room_position + Face::NY.normal_vector())
+                .is_none_or(|below| below.kind == MazeRoomKind::Unoccupied)
+            && rng.random_bool(0.25)
+        {
+            expanded_room_bounds =
+                expanded_room_bounds.expand(FaceMap::default().with(Face::NY, 1));
+            *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
+                .choose(&mut rng)
+                .unwrap()
+        } else {
+            FloorKind::Solid
+        };
 
         let wall_features = {
             FaceMap::from_fn(|face| -> WallFeature {
