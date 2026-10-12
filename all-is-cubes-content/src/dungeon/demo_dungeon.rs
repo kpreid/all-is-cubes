@@ -677,11 +677,21 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 // Item.
                 if let Some(item) = room_data.grants_item.clone() {
                     // note that this is the nominal floor, not the possibly extended downward floor
-                    let floor_middle =
-                        Cube::containing(floor_layer.abut(Face::PY, 1).unwrap().center()).unwrap();
-                    ctx.set(floor_middle, &self.item_pedestal)?;
+                    let pedestal_location: Cube = match room_data.wall_features[Face::NY] {
+                        WallFeature::Blank | WallFeature::Window => {
+                            // Center of floor
+                            Cube::containing(floor_layer.abut(Face::PY, 1).unwrap().center())
+                                .unwrap()
+                        }
+                        WallFeature::Passage(..) => {
+                            // Can't use the center of the floor because there's a hole there.
+                            // Put the item near a corner instead.
+                            Cube::from(floor_layer.lower_bounds() + vec3(1, 1, 1))
+                        }
+                    };
+                    ctx.set(pedestal_location, &self.item_pedestal)?;
                     ctx.set(
-                        floor_middle + GridVector::new(0, 1, 0),
+                        pedestal_location + GridVector::new(0, 1, 0),
                         self.blocks[ItemHolder]
                             .clone()
                             .with_modifier(inv::Inventory::from_slots([item.into()])),
