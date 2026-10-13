@@ -259,10 +259,7 @@ fn push_out_simple() {
     let (_contacts, info) = dbg!(tester.step());
     dbg!(info);
 
-    assert_eq!(
-        tester.body().position(),
-        point3(1.5 + POSITION_EPSILON, 0.5, 0.5)
-    );
+    assert_eq!(tester.body().position(), point3(1.5, 0.5, 0.5));
     assert_eq!(tester.body().velocity(), Vector3D::zero());
     // TODO: push out should create and report contacts just like normal collision
     // assert_eq!(contacts, [CubeFace::new((0, 0, 0), Face7::PY)]);

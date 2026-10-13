@@ -431,6 +431,7 @@ impl CollisionSpace for block::EvoxelsRef<'_> {
 /// in disagreement about what cubes the AAB actually touches. Replace all uses of this
 /// with `aab_raycast()` to fix that.
 #[deprecated]
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn aab_raycast_legacy(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaster {
     let leading_corner = aab.corner_point(Octant::from_vector(if reversed {
         -origin_ray.direction
@@ -534,14 +535,16 @@ pub(crate) fn aab_raycast(
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AabRaycastStep {
     /// The distance traveled so far, in multiples of `direction.length()`.
-    t_distance: FreeCoordinate,
+    pub t_distance: FreeCoordinate,
+
     /// The input AAB translated to the position described by this step.
     ///
     /// The face `self.face` of this [`Aab`] will always be an exact integer.
-    translated_aab: Aab,
+    pub translated_aab: Aab,
+
     /// The face of the AAB which is touching a new cube on the grid.
     /// (This is the opposite of the new cube’s face.)
-    aab_face: Face7,
+    pub aab_face: Face7,
 }
 
 /// Given an [`Aab`] and a [`Ray`] such that the given face of

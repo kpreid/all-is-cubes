@@ -23,7 +23,7 @@ use manyfmt::Refmt as _;
 use ordered_float::NotNan;
 
 use super::collision::{collide_along_ray, find_colliding_cubes, nudge_on_ray};
-use crate::block::{self, Resolution};
+use crate::block;
 use crate::character::{self, ParentSpace};
 use crate::fluff::Fluff;
 #[cfg(not(any(feature = "std", test)))]
@@ -664,6 +664,7 @@ where
 fn push_out(body: &mut Body, space: &space::Read<'_>) -> Option<FreeVector> {
     // TODO: need to unsquash the `occupying` box if possible
 
+    let max_distance = 4.125;
     let colliding = find_colliding_cubes(space, body.collision_box_abs()).next().is_some();
     if colliding {
         let exit_backwards: FreeVector = -body.velocity.map(NotNan::into_inner).cast_unit(); // don't care about magnitude
@@ -682,7 +683,7 @@ fn push_out(body: &mut Body, space: &space::Read<'_>) -> Option<FreeVector> {
                     })
                 })
             })
-            .filter_map(|direction| attempt_push_out(body, space, direction))
+            .filter_map(|direction| attempt_push_out(body, space, direction * max_distance))
             .min_by_key(|(_, distance)| *distance);
 
         if let Some((new_position, _)) = shortest_push_out {
@@ -694,32 +695,15 @@ fn push_out(body: &mut Body, space: &space::Read<'_>) -> Option<FreeVector> {
     None
 }
 
-/// Try moving in the given direction, find an empty space, and
+/// Try moving along the given displacement vector, find an empty space as close as possible, and
 /// return the new position and distance to it.
 fn attempt_push_out(
     body: &Body,
     space: &space::Read<'_>,
-    direction: FreeVector,
+    displacement: FreeVector,
 ) -> Option<(FreePoint, NotNan<FreeCoordinate>)> {
-    let ray = Ray::new(body.position.map(NotNan::into_inner), direction);
-    // TODO: upper bound on distance to try
-    #[expect(deprecated, reason = "TODO")]
-    'raycast: for ray_step in super::collision::aab_raycast_legacy(
-        body.collision_box, /* TODO(crush): use occupying */
-        ray,
-        true,
-    ) {
-        let adjusted_segment = nudge_on_ray(
-            body.collision_box, /* TODO(crush): use occupying */
-            ray.scale_direction(ray_step.t_distance()),
-            ray_step.face(),
-            Resolution::R1,
-            true,
-        );
-        let step_aab = body
-            .collision_box /* TODO(crush): use occupying */
-            .translate(adjusted_segment.unit_endpoint().to_vector());
-        for cube in step_aab.round_up_to_grid().interior_iter() {
+    'raycast: for aab_step in super::collision::aab_raycast(body.occupying, displacement, true).0 {
+        for cube in aab_step.translated_aab.round_up_to_grid().interior_iter() {
             // TODO: refactor to combine this with other collision attribute tests
             match space.get_evaluated(cube).uniform_collision() {
                 Some(block::Collision::Hard) => {
@@ -735,8 +719,9 @@ fn attempt_push_out(
         }
         // No collisions, so we can use this.
         return Some((
-            adjusted_segment.unit_endpoint(),
-            NotNan::new(ray_step.t_distance() * direction.length()).ok()?,
+            // TODO: should return the translated_aab to become the new body.occupying
+            body.position.map(NotNan::into_inner) + (displacement * aab_step.t_distance),
+            NotNan::new(aab_step.t_distance * displacement.length()).ok()?,
         ));
     }
 
