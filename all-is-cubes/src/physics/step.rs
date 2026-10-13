@@ -608,13 +608,14 @@ where
         Ray::new(body.position.map(NotNan::into_inner), delta_position);
     let collision = collide_along_ray(
         space,
-        movement_ignoring_collision,
-        body.collision_box, // TODO(crush): use occupying
+        delta_position,
+        body.occupying,
         collision_callback,
         StopAt::NotAlreadyColliding,
     );
 
     if let Some(contact) = collision.contact {
+        // TODO: this expect() is not true — in the event of rounding errors we might get them anyway for the final position
         let axis = contact.normal().axis().expect("Face7::Within collisions should not reach here");
         // Advance however much straight-line distance is available.
         // But a little bit back from that, to avoid floating point error pushing us
@@ -741,7 +742,7 @@ pub(super) fn crush_if_colliding(
         let mut a_contact: Option<Contact> = None;
         collide_along_ray(
             space,
-            Ray::new([0., 0., 0.], [0., 0., 0.]),
+            FreeVector::zero(),
             body.occupying,
             |contact| {
                 a_contact = Some(contact);
@@ -835,7 +836,7 @@ fn uncrush(body: &mut Body, space: &space::Read<'_>) -> UncrushInfo {
         // 3 different possible single-axis expansions.
         collide_along_ray(
             space,
-            Ray::new([0., 0., 0.], [0., 0., 0.]),
+            FreeVector::zero(),
             uncrushed,
             |contact| {
                 collided_with_anything = true;

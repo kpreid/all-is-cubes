@@ -25,12 +25,11 @@ use crate::{raycast::RaycastStep, space::Space};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Result of [`collide_along_ray()`], which specifies how much progress along the ray was made
-/// before a collision, and what that collision was.
+/// Result of [`collide_along_ray()`], which specifies how much progress along the proposed
+/// translation was made before a collision, and what that collision was.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct CollisionRayEnd {
-    /// Non-colliding length of the provided ray. This is in units of the ray's direction
-    /// vector's length, *not* ordinary space coordinates.
+    /// Non-colliding fraction of the provided translation.
     ///
     /// It is equal to 1.0 if there was no collision.
     pub t_distance: FreeCoordinate,
@@ -98,17 +97,17 @@ pub(crate) enum StopAt {
     NotAlreadyColliding,
 }
 
-/// Move `aab`'s origin along the line segment from `ray.origin` to `ray.origin + ray.direction`,
-/// and find the first point at which it collides with `space`'s collidable blocks.
+/// Performs a *continuous collision detection:* given a straight-line translation of `aab`
+/// by `delta_position`, finds where that movement first collides with `space`'s collidable blocks.
 ///
 /// The return value specifies the distance achieved and the normal (face) of the surface collided
-///  with; if [`None`], then no obstacles were met along the full length of the line segment.
+/// with; if [`None`], then no obstacles were met along the full length of the line segment.
 ///
 /// `collision_callback` is called once for each colliding cube — any one of them would have been
-/// sufficient to stop the ray, but all are reported. It is not called for each voxel of each cube.
+/// sufficient to stop, but all are reported. It is not called for each voxel of each cube.
 pub(crate) fn collide_along_ray<Sp, CC>(
     space: &Sp,
-    ray: Ray,
+    delta_position: FreeVector,
     aab: Aab,
     mut collision_callback: CC,
     stop_at: StopAt,
@@ -120,12 +119,12 @@ where
     let mut already_colliding: ContactSet = ContactSet::new();
 
     debug_assert!(
-        ray.direction.square_length() < super::VELOCITY_MAGNITUDE_LIMIT_SQUARED * 2.,
-        "Attempting to collide_along_ray a very long distance: {ray:?}"
+        // TODO: this comparison is confusing distance-per-time and distance-per-step
+        delta_position.square_length() < super::VELOCITY_MAGNITUDE_LIMIT_SQUARED * 2.,
+        "Attempting to collide_along_ray a very long distance: {delta_position:?}"
     );
 
-    let (iter_except_last, last_aab_step) =
-        aab_raycast(aab.translate(ray.origin.to_vector()), ray.direction, false);
+    let (iter_except_last, last_aab_step) = aab_raycast(aab, delta_position, false);
 
     // Note: including the last step is necessary to ensure that `collide_along_ray()` never
     // fails to return a contact if one exists, because we need to test for collision with the
@@ -187,7 +186,7 @@ where
                     } = Sp::recurse(
                         cube,
                         aab,
-                        ray,
+                        delta_position,
                         cell,
                         match (stop_at, aab_step.aab_face) {
                             // If we are checking the initial position (face == Face7::Within),
@@ -291,10 +290,11 @@ where
 {
     // TODO: rework interfaces to avoid allocating a vector
     // TODO: don't throw out the contact details
+    // (There are several uses of collide_along_ray() which could be this if those were fixed.)
     let mut points = Vec::new();
     collide_along_ray(
         space,
-        Ray::new([0., 0., 0.], [0., 0., 0.]),
+        FreeVector::zero(),
         aab,
         |contact| {
             points.push(contact.cube());
@@ -331,7 +331,7 @@ pub(crate) trait CollisionSpace {
     fn recurse(
         cube: Cube,
         aab: Aab,
-        ray: Ray,
+        space_delta_position: FreeVector,
         cell: &Self::Cell,
         stop_at: StopAt,
     ) -> CollisionRayEnd;
@@ -358,20 +358,19 @@ impl CollisionSpace for space::Read<'_> {
     fn recurse(
         cube: Cube,
         space_aab: Aab,
-        space_ray: Ray,
+        space_delta_position: FreeVector,
         evaluated: &EvaluatedBlock,
         stop_at: StopAt,
     ) -> CollisionRayEnd {
         let resolution = evaluated.resolution();
         let cube_translation = cube.lower_bounds().to_vector().map(|s| -FreeCoordinate::from(s));
         let scale = FreeCoordinate::from(resolution);
-        // Transform our original AAB and ray so that it is in the coordinate system of the block voxels.
-        // Note: aab is not translated since it's relative to the ray anyway.
-        let voxel_aab = space_aab.scale(scale);
-        let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
+        // Transform our original AAB and delta so that it is in the coordinate system of the block voxels.
+        let voxel_aab = space_aab.translate(cube_translation).scale(scale);
+        let voxel_delta_position = space_delta_position * scale;
         collide_along_ray(
             &evaluated.voxels().read(),
-            voxel_ray,
+            voxel_delta_position,
             voxel_aab,
             drop,
             stop_at,
@@ -401,7 +400,7 @@ impl CollisionSpace for block::EvoxelsRef<'_> {
     fn recurse(
         _cube: Cube,
         _aab: Aab,
-        _local_ray: Ray,
+        _local_delta_position: FreeVector,
         _cell: &Self::Cell,
         _stop_at: StopAt,
     ) -> CollisionRayEnd {
@@ -428,7 +427,7 @@ impl CollisionSpace for block::EvoxelsRef<'_> {
 /// in disagreement about what cubes the AAB actually touches. Replace all uses of this
 /// with `aab_raycast()` to fix that.
 #[deprecated]
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code, reason = "TODO: remove")]
 pub(crate) fn aab_raycast_legacy(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaster {
     let leading_corner = aab.corner_point(Octant::from_vector(if reversed {
         -origin_ray.direction
@@ -725,12 +724,18 @@ mod tests {
         // with lower corner [0.5, 1.5, 0] so it should contact the "left" half of
         // the `block` after moving a distance of 0.5 plus whatever penetration
         // depth into a recursive block applies.
-        let aab = Cube::ORIGIN.aab();
-        let ray = Ray::new([0.5, initial_y, 0.], [0., -2., 0.]);
+        let aab = Cube::ORIGIN.aab().translate(vec3(0.5, initial_y, 0.));
+        let delta_position = vec3(0., -2., 0.);
 
-        eprintln!("initial AAB: {:?}", aab.translate(ray.origin.to_vector()));
+        eprintln!("initial AAB: {aab:?}");
 
-        let result = collide_along_ray(&space.read(), ray, aab, drop, StopAt::NotAlreadyColliding);
+        let result = collide_along_ray(
+            &space.read(),
+            delta_position,
+            aab,
+            drop,
+            StopAt::NotAlreadyColliding,
+        );
         assert_eq!(
             result, expected_end,
             "collide_along_ray() result ≠ expected"
@@ -753,13 +758,14 @@ mod tests {
             })
             .unwrap();
 
-        let aab = Aab::from_lower_upper([-1., -1., -1.], [2., 1., 1.]);
-        let ray = Ray::new([0.5, 0.0, 0.5], [1., 0., 0.]);
+        let aab =
+            Aab::from_lower_upper([-1., -1., -1.], [2., 1., 1.]).translate(vec3(0.5, 0.0, 0.5));
+        let delta_position = vec3(1., 0., 0.);
 
         let mut contacts = Vec::new();
         let result = collide_along_ray(
             &space.read(),
-            ray,
+            delta_position,
             aab,
             |c| contacts.push(c),
             StopAt::NotAlreadyColliding,
@@ -779,7 +785,7 @@ mod tests {
                 // *out* of intersections.
                 CollisionRayEnd {
                     t_distance: 1.0,
-                    translated_aab: aab.translate(ray.unit_endpoint().to_vector()),
+                    translated_aab: aab.translate(delta_position),
                     contact: None,
                 },
                 // Contacts are duplicated due to the currently-necessary final collision check.
