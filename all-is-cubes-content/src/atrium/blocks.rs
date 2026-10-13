@@ -135,7 +135,7 @@ pub(in crate::atrium) async fn install_atrium_blocks(
     let solid_air: &Block = &Block::from_primitive(block::Primitive::Atom(block::Atom {
         color: Rgba::TRANSPARENT,
         emission: Rgb::ZERO,
-        collision: block::BlockCollision::Hard,
+        collision: block::Collision::Hard,
     }));
 
     // TODO: This whole section is about having noise pick from a fixed set of pregenerated shades.
@@ -266,7 +266,7 @@ pub(in crate::atrium) async fn install_atrium_blocks(
                     primitive: asset::PrimitiveOrSuch::Atom(block::Atom {
                         color: Rgba::WHITE,
                         emission: Rgb::new(1.0, 1.0, 0.9843).scale(ps32(40.0)),
-                        collision: block::BlockCollision::Hard,
+                        collision: block::Collision::Hard,
                     }),
                     modifiers: &[block::Modifier::SetAttribute(
                         block::SetAttribute::DisplayName(arcstr::literal!("Sun")),

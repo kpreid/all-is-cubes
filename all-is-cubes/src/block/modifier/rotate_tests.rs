@@ -7,8 +7,8 @@ use core::assert_matches;
 use pretty_assertions::assert_eq;
 
 use crate::block::{
-    self, Block, BlockAttributes, BlockCollision, Evoxel, Evoxels, GridRotation, Modifier,
-    Primitive, Resolution::R2, TickAction, Vol,
+    self, Block, BlockAttributes, Collision, Evoxel, Evoxels, GridRotation, Modifier, Primitive,
+    Resolution::R2, TickAction, Vol,
 };
 use crate::content::make_some_voxel_blocks;
 use crate::math::{Cube, Face, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
@@ -67,7 +67,7 @@ fn rotate_evaluation() {
                     color: rotated_color_fn(cube),
                     emission: Rgb::ZERO,
                     selectable: true,
-                    collision: BlockCollision::Hard,
+                    collision: Collision::Hard,
                 }
             })
             .into(),
@@ -82,7 +82,7 @@ fn rotate_evaluation() {
                 light_emission: Rgb::ZERO,
                 opaque: FaceMap::splat(false).with(rotation.transform(Face::NY), true),
                 visible: true,
-                uniform_collision: Some(BlockCollision::Hard),
+                uniform_collision: Some(Collision::Hard),
                 voxel_opacity_mask: block::VoxelOpacityMask::new_raw(
                     resolution,
                     Vol::from_fn(block_bounds, |cube| {

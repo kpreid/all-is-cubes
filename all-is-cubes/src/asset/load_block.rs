@@ -143,7 +143,7 @@ pub enum Expansion {
 pub struct Vox {
     /// As per [`Atom::collision`].
     // TODO: support specifying emission mapping (instead of color or duplicated, and scale factor)
-    pub collision: block::BlockCollision,
+    pub collision: block::Collision,
 
     /// If `Some`, then pretend the pixel color is the given color, ignoring all components
     /// including alpha.
@@ -153,7 +153,7 @@ pub struct Vox {
 impl Vox {
     /// The values which are also the values used by `Block as From<Rgba>`.
     pub const DEFAULT: Self = Self {
-        collision: block::BlockCollision::Hard,
+        collision: block::Collision::Hard,
         replace_color: None,
     };
 
@@ -428,7 +428,7 @@ mod tests {
         const ATOM: block::Atom = block::Atom {
             color: Rgba::new(1.0, 0.0, 1.0, 1.0),
             emission: Rgb::new(1.0, 2.0, 3.0),
-            collision: block::BlockCollision::None,
+            collision: block::Collision::None,
         };
         const ROTATE: block::Modifier = block::Modifier::Rotate(GridRotation::RZYX);
         const INPUT: asset::Block = asset::Block {

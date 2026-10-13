@@ -9,7 +9,7 @@ use rand::{RngExt as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
 use all_is_cubes::behavior;
-use all_is_cubes::block::{self, AIR, Block, BlockCollision};
+use all_is_cubes::block::{self, AIR, Block};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{Cube, GridAab, GridRotation, GridVector, Rgba, Vol, rgba_const};
 use all_is_cubes::op;
@@ -113,7 +113,7 @@ impl Fire {
             Block::builder()
                 .color(color)
                 .light_emission(color.to_rgb() * 8.0)
-                .collision(BlockCollision::None)
+                .collision(block::Collision::None)
                 .build()
         }
         let blocks = [

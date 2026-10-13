@@ -25,8 +25,7 @@ use crate::math::Rgb;
 // -------------------------------------------------------------------------------------------------
 
 mod atom;
-#[expect(clippy::module_name_repetitions, reason = "TODO")]
-pub use atom::{Atom, BlockCollision};
+pub use atom::{Atom, Collision};
 
 mod attributes;
 pub use attributes::*;

@@ -7,8 +7,7 @@ use alloc::vec::Vec;
 use descriptive_unwrap::ResultExt as _;
 
 use crate::block::{
-    self, AIR, Block, BlockAttributes, BlockCollision, BlockParts, BlockPtr, Modifier, Primitive,
-    Resolution,
+    self, AIR, Block, BlockAttributes, BlockParts, BlockPtr, Modifier, Primitive, Resolution,
 };
 use crate::math::{Cube, GridAab, GridPoint, Rgb, Rgb01, Rgba};
 use crate::space::{SetCubeError, Space};
@@ -136,7 +135,7 @@ impl<'u, P, Txn> Builder<'u, P, Txn> {
             primitive_builder: Atom {
                 color: color.into(),
                 emission: Rgb::ZERO,
-                collision: BlockCollision::Hard,
+                collision: block::Collision::Hard,
             },
             modifiers,
             // TODO: This might not be the right thing in more general transaction usage.
@@ -413,7 +412,7 @@ impl<P: BuildPrimitive> Builder<'_, P, UniverseTransaction> {
 /// Atom-specific builder methods.
 impl<Txn> Builder<'_, Atom, Txn> {
     /// Sets the collision behavior of a [`Primitive::Atom`] block.
-    pub const fn collision(mut self, collision: BlockCollision) -> Self {
+    pub const fn collision(mut self, collision: block::Collision) -> Self {
         self.primitive_builder.collision = collision;
         self
     }
@@ -482,7 +481,7 @@ pub trait BuildPrimitive {
 pub struct Atom {
     color: Rgba,
     emission: Rgb,
-    collision: BlockCollision,
+    collision: block::Collision,
 }
 impl BuildPrimitive for Atom {
     fn build_primitive(self) -> Primitive {
@@ -536,7 +535,7 @@ mod tests {
             Block::from(block::Atom {
                 color,
                 emission: Rgb::ZERO,
-                collision: BlockCollision::Hard,
+                collision: block::Collision::Hard,
             }),
         );
     }
@@ -580,7 +579,7 @@ mod tests {
                 .color(color)
                 .display_name("hello world")
                 .inventory_config(inventory.clone())
-                .collision(BlockCollision::None)
+                .collision(block::Collision::None)
                 .rotation_rule(rotation_rule)
                 .selectable(false)
                 .light_emission(emission)
@@ -596,7 +595,7 @@ mod tests {
             Block::from(block::Atom {
                 color,
                 emission,
-                collision: BlockCollision::None,
+                collision: block::Collision::None,
             })
             .with_modifier(SetAttribute::DisplayName(arcstr::literal!("hello world")))
             .with_modifier(SetAttribute::Selectable(false))

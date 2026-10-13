@@ -11,8 +11,7 @@ use num_traits::float::FloatCore as _;
 
 use crate::block::eval::voxel_storage;
 use crate::block::{
-    self, BlRotate as _, Block, BlockAttributes, BlockCollision, Cost, Derived, Evoxel, Evoxels,
-    EvoxelsEq,
+    self, BlRotate as _, Block, BlockAttributes, Cost, Derived, Evoxel, Evoxels, EvoxelsEq,
     Resolution::{self, R1},
     VoxelOpacityMask,
 };
@@ -218,7 +217,7 @@ impl EvaluatedBlock {
     /// Note that this is [`None`] for all blocks with voxels that do not fill the cube
     /// bounds, even if all voxels in the voxel data bounds have the same collision.
     #[inline]
-    pub fn uniform_collision(&self) -> Option<BlockCollision> {
+    pub fn uniform_collision(&self) -> Option<block::Collision> {
         self.derived.uniform_collision
     }
 
@@ -423,7 +422,7 @@ const AIR_DERIVED: Derived = Derived {
     light_emission: Rgb::ZERO,
     opaque: FaceMap::splat_copy(false),
     visible: false,
-    uniform_collision: Some(BlockCollision::None),
+    uniform_collision: Some(block::Collision::None),
     voxel_opacity_mask: VoxelOpacityMask::R1_INVISIBLE,
 };
 
@@ -995,7 +994,7 @@ mod tests {
                     light_emission: Rgb::ZERO,
                     opaque: FaceMap::splat(false),
                     visible: false,
-                    uniform_collision: Some(BlockCollision::None),
+                    uniform_collision: Some(block::Collision::None),
                     voxel_opacity_mask: VoxelOpacityMask::new(voxels.read()),
                 }),
                 voxels: EvoxelsEq::from(voxels),

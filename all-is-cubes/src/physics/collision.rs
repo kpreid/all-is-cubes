@@ -9,7 +9,7 @@ use euclid::Vector3D;
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
-use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
+use crate::block::{self, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
     Aab, Cube, CubeFace, Face, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, Octant,
 };
@@ -161,11 +161,11 @@ where
                 }),
             };
             let found_end = match Sp::collision(cell) {
-                Some(BlockCollision::None) => {
+                Some(block::Collision::None) => {
                     // No collision for this block
                     continue 'potential_collision;
                 }
-                Some(BlockCollision::Hard) => full_cube_end,
+                Some(block::Collision::Hard) => full_cube_end,
                 None => {
                     // Recursion
                     if let Some(found_end) = Sp::recurse(
@@ -264,7 +264,7 @@ pub(crate) trait CollisionSpace {
 
     /// Retrieve a cell's collision behavior.
     /// If None, recursion is needed.
-    fn collision(cell: &Self::Cell) -> Option<BlockCollision>;
+    fn collision(cell: &Self::Cell) -> Option<block::Collision>;
 
     /// Recursion helper for [`collide_along_ray()`].
     /// This breaks the infinite static recursion we would get otherwise,
@@ -294,7 +294,7 @@ impl CollisionSpace for space::Read<'_> {
     }
 
     #[inline]
-    fn collision(cell: &Self::Cell) -> Option<BlockCollision> {
+    fn collision(cell: &Self::Cell) -> Option<block::Collision> {
         cell.uniform_collision()
     }
 
@@ -324,11 +324,11 @@ impl CollisionSpace for space::Read<'_> {
     }
 }
 
-impl CollisionSpace for crate::block::EvoxelsRef<'_> {
+impl CollisionSpace for block::EvoxelsRef<'_> {
     type Cell = Evoxel;
 
     fn bounds(&self) -> GridAab {
-        crate::block::EvoxelsRef::bounds(self)
+        block::EvoxelsRef::bounds(self)
     }
 
     #[inline]
@@ -337,7 +337,7 @@ impl CollisionSpace for crate::block::EvoxelsRef<'_> {
     }
 
     #[inline]
-    fn collision(cell: &Self::Cell) -> Option<BlockCollision> {
+    fn collision(cell: &Self::Cell) -> Option<block::Collision> {
         Some(cell.collision)
     }
 

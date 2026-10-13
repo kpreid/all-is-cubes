@@ -12,7 +12,7 @@ use num_traits::float::Float as _;
 
 use all_is_cubes::arcstr;
 use all_is_cubes::block::{
-    AIR, Block, BlockAttributes, BlockCollision, Primitive,
+    self, AIR, Block, BlockAttributes, Primitive,
     Resolution::{self, R16},
 };
 use all_is_cubes::euclid::{Point2D, point2, vec3};
@@ -183,7 +183,7 @@ impl DefaultProvision<Block> for LandscapeBlocks {
             Block::builder()
                 .display_name("Grass Blades")
                 .color(palette::GRASS.with_alpha(zo32(0.1)))
-                .collision(BlockCollision::None)
+                .collision(block::Collision::None)
                 .build()
         }
 
@@ -227,7 +227,7 @@ pub async fn install_landscape_blocks(
     // TODO: easier way to do this?
     if let Primitive::Atom(atom) = grass_blade_atom.primitive_mut() {
         atom.color = atom.color.to_rgb().with_alpha_one();
-        atom.collision = BlockCollision::None;
+        atom.collision = block::Collision::None;
     }
 
     let blade_color_noise = array_of_random(resolution, 0x2e240365, -1.0..=1.0, move |value| {

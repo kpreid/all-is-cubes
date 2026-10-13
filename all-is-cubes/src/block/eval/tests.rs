@@ -9,9 +9,8 @@ use euclid::{Vector3D, point3};
 use pretty_assertions::assert_eq;
 
 use crate::block::{
-    self, AIR, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision,
-    BlockDef, Cost, EvKey, EvaluatedBlock, EvaluatedBlockEq, Evoxel, Evoxels, EvoxelsEq, Modifier,
-    Primitive,
+    self, AIR, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockDef, Cost, EvKey,
+    EvaluatedBlock, EvaluatedBlockEq, Evoxel, Evoxels, EvoxelsEq, Modifier, Primitive,
     Resolution::{self, *},
     VoxelOpacityMask, modifier,
 };
@@ -124,7 +123,7 @@ fn opaque_atom_and_attributes() {
     let block = Block::from(Atom {
         color,
         emission: Rgb::ONE,
-        collision: BlockCollision::None,
+        collision: block::Collision::None,
     });
     let e = eval_out(&block);
     assert_eq!(e.attributes(), BlockAttributes::DEFAULT_REF);
@@ -137,7 +136,7 @@ fn opaque_atom_and_attributes() {
             color,
             emission: Rgb::ONE,
             selectable: true,
-            collision: BlockCollision::None,
+            collision: block::Collision::None,
         }))
     );
     assert_eq!(e.resolution(), R1);
@@ -226,7 +225,7 @@ fn voxels_checked_individually() {
                 color: Rgba::new(point.x, point.y, point.z, 1.0),
                 emission: Rgb::ZERO,
                 selectable: true,
-                collision: BlockCollision::Hard,
+                collision: block::Collision::Hard,
             }
         })
     );
@@ -492,8 +491,8 @@ fn uniform_collision() {
         ),
         (
             None,
-            Some(BlockCollision::Hard),
-            Some(BlockCollision::None),
+            Some(block::Collision::Hard),
+            Some(block::Collision::None),
             None,
         )
     );
@@ -531,7 +530,7 @@ fn recur_with_offset() {
                 color: Rgba::new(point.x, point.y, point.z, 1.0),
                 emission: Rgb::ZERO,
                 selectable: true,
-                collision: BlockCollision::Hard,
+                collision: block::Collision::Hard,
             }
         })
     );

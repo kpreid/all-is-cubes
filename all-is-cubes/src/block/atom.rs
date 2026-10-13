@@ -98,8 +98,8 @@ pub struct Atom {
 
     /// The effect on a [`Body`](crate::physics::Body) of colliding with this block.
     ///
-    /// The default value is [`BlockCollision::Hard`].
-    pub collision: BlockCollision,
+    /// The default value is [`Collision::Hard`].
+    pub collision: Collision,
 }
 
 impl Atom {
@@ -154,7 +154,7 @@ mod conversions_for_atom {
             Atom {
                 color,
                 emission: Rgb::ZERO,
-                collision: BlockCollision::DEFAULT_FOR_FROM_COLOR,
+                collision: Collision::DEFAULT_FOR_FROM_COLOR,
             }
         }
     }
@@ -192,7 +192,7 @@ mod conversions_for_atom {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
-pub enum BlockCollision {
+pub enum Collision {
     /// The atom can be passed through; it is not an obstacle (though intersecting it
     /// might cause other effects not directly part of collision response).
     None,
@@ -203,7 +203,7 @@ pub enum BlockCollision {
     // Future values might include bouncy solid, water-like resistance, force fields, etc.
 }
 
-impl BlockCollision {
+impl Collision {
     /// Value used when we are constructing a block from a color with default other
     /// characteristics. This is not just a [`Default`] impl so that if we later decide
     /// that e.g. transparent atoms automatically become non-colliding, we can replace

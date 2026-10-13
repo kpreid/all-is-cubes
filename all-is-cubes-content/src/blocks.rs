@@ -20,8 +20,7 @@ use num_traits::float::Float as _;
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::asset::{self, include_image};
 use all_is_cubes::block::{
-    self, AIR, AnimationHint, Block, BlockCollision, BlockDef, Resolution::*,
-    RotationPlacementRule, TickAction,
+    self, AIR, AnimationHint, Block, BlockDef, Resolution::*, RotationPlacementRule, TickAction,
 };
 use all_is_cubes::euclid::{Vector3D, point3};
 use all_is_cubes::fluff::Fluff;
@@ -575,7 +574,7 @@ fn demo_blocks_generator(
                     primitive: asset::PrimitiveOrSuch::Atom(block::Atom {
                         color: palette::ALMOST_BLACK.with_alpha_one(),
                         emission: Rgb::ZERO,
-                        collision: BlockCollision::None,
+                        collision: block::Collision::None,
                     }),
                     modifiers: &[block::Modifier::SetAttribute(
                         block::SetAttribute::DisplayName(literal!("Sun")),
@@ -700,7 +699,7 @@ fn demo_blocks_generator(
                 let atom = Block::builder()
                     .display_name(format!("Explosion {timer} particle"))
                     .color(rgba_const!(0.014, 0.01, 0.01, 1.0))
-                    .collision(BlockCollision::None)
+                    .collision(block::Collision::None)
                     .light_emission(if timer < 0 {
                         if timer.rem_euclid(4) < 2 {
                             Rgb::ZERO
@@ -774,7 +773,7 @@ fn demo_blocks_generator(
                 const DEFS: [asset::Block; 2] = {
                     let image = asset::include_image!("blocks/greeble.png");
                     let white = asset::Vox {
-                        collision: BlockCollision::Hard,
+                        collision: block::Collision::Hard,
                         replace_color: Some(Rgba::WHITE),
                     };
                     [

@@ -285,7 +285,6 @@ pub fn free_editing_starter_inventory(flying: bool) -> Vec<Slot> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Atom, BlockCollision};
     use crate::math::Rgb;
 
     #[test]
@@ -298,10 +297,10 @@ mod tests {
         // Should succeed even though the normal range would be division-by-zero.
         assert_eq!(
             make_some_blocks::<1>(),
-            [Block::from(Atom {
+            [Block::from(block::Atom {
                 color: Rgba::new(0.5, 0.5, 0.5, 1.0),
                 emission: Rgb::ZERO,
-                collision: BlockCollision::Hard,
+                collision: block::Collision::Hard,
             })
             .with_modifier(block::SetAttribute::DisplayName(arcstr::literal!("0")))]
         );
@@ -312,16 +311,16 @@ mod tests {
         assert_eq!(
             make_some_blocks::<2>(),
             [
-                Block::from(Atom {
+                Block::from(block::Atom {
                     color: Rgba::new(0.0, 0.0, 0.0, 1.0),
                     emission: Rgb::ZERO,
-                    collision: BlockCollision::Hard,
+                    collision: block::Collision::Hard,
                 })
                 .with_modifier(block::SetAttribute::DisplayName(arcstr::literal!("0"))),
-                Block::from(Atom {
+                Block::from(block::Atom {
                     color: Rgba::new(1.0, 1.0, 1.0, 1.0),
                     emission: Rgb::ZERO,
-                    collision: BlockCollision::Hard,
+                    collision: block::Collision::Hard,
                 })
                 .with_modifier(block::SetAttribute::DisplayName(arcstr::literal!("1")))
             ]

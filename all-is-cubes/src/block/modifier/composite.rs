@@ -7,9 +7,7 @@ use descriptive_unwrap::OptionExt as _;
 use hashbrown::HashMap;
 use hashbrown::hash_map::Entry;
 
-use crate::block::{
-    self, AIR, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, VoxelIndex,
-};
+use crate::block::{self, AIR, Block, Collision, Evoxel, Evoxels, MinEval, Modifier, VoxelIndex};
 use crate::math::{
     Cube, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, PositiveSign, Rgb, Vol,
     ZeroOne,
@@ -536,7 +534,7 @@ pub enum CompositeOperator {
 impl CompositeOperator {
     /// Entry point by which [`evaluate_composition()`] uses [`Self`].
     fn blend_evoxel(self, src_ev: &Evoxel, dst_ev: &Evoxel) -> Evoxel {
-        use BlockCollision as Coll;
+        use Collision as Coll;
         Evoxel {
             color: {
                 // Clamp to avoid silly outcomes of the arithmetic.
@@ -856,13 +854,16 @@ pub(in crate::block) fn render_inventory(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{EvKey, EvaluatedBlock, Resolution::*};
+    use crate::block::{
+        Collision::{Hard, None as CNone},
+        EvKey, EvaluatedBlock,
+        Resolution::*,
+    };
     use crate::content::{make_slab, make_some_blocks};
     use crate::math::{Rgba, zo32};
     use crate::space::Space;
     use crate::time;
     use crate::universe::Universe;
-    use BlockCollision::{Hard, None as CNone};
     use CompositeOperator::{Atop, In, Out, Over};
     use arcstr::literal;
     use pretty_assertions::assert_eq;
@@ -903,7 +904,7 @@ mod tests {
         }
     }
 
-    fn evcoll(collision: BlockCollision) -> Evoxel {
+    fn evcoll(collision: Collision) -> Evoxel {
         Evoxel {
             color: Rgba::WHITE, // no effect
             emission: Rgb::ZERO,

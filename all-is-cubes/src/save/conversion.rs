@@ -78,7 +78,7 @@ mod behavior {
 mod block {
     use super::*;
     use crate::block::{
-        AnimationChange, AnimationHint, Atom, Block, BlockCollision, Composite, Modifier, Move,
+        AnimationChange, AnimationHint, Atom, Block, Collision, Composite, Modifier, Move,
         PlacementAction, Primitive, Quote, RotationPlacementRule, TickAction, Zoom,
     };
     use crate::math::{Rgb, Rgba};
@@ -171,22 +171,22 @@ mod block {
         }
     }
 
-    impl From<BlockCollision> for schema::BlockCollisionSer {
-        fn from(value: BlockCollision) -> Self {
+    impl From<Collision> for schema::BlockCollisionSer {
+        fn from(value: Collision) -> Self {
             use schema::BlockCollisionSer as S;
             match value {
-                BlockCollision::None => S::NoneV1,
-                BlockCollision::Hard => S::HardV1,
+                Collision::None => S::NoneV1,
+                Collision::Hard => S::HardV1,
             }
         }
     }
 
-    impl From<schema::BlockCollisionSer> for BlockCollision {
+    impl From<schema::BlockCollisionSer> for Collision {
         fn from(value: schema::BlockCollisionSer) -> Self {
             use schema::BlockCollisionSer as S;
             match value {
-                S::NoneV1 => BlockCollision::None,
-                S::HardV1 => BlockCollision::Hard,
+                S::NoneV1 => Collision::None,
+                S::HardV1 => Collision::Hard,
             }
         }
     }

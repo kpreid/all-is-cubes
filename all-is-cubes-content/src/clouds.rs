@@ -2,7 +2,7 @@
 
 use noise_functions::Noise as _;
 
-use all_is_cubes::block::{AIR, Block, BlockCollision};
+use all_is_cubes::block::{self, Block};
 use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, Rgb01, zo32};
 use all_is_cubes::space::{self, SetCubeError};
 
@@ -31,9 +31,9 @@ pub fn clouds(
             .display_name("Cloud")
             .color(Rgb01::WHITE.with_alpha(zo32(alpha)))
             .collision(if alpha >= 1.0 {
-                BlockCollision::Hard
+                block::Collision::Hard
             } else {
-                BlockCollision::None
+                block::Collision::None
             })
             .build()
     }
@@ -50,7 +50,7 @@ pub fn clouds(
             let surface = noise_value as GridCoordinate;
             for y in region.y_range() {
                 let cube = GridPoint::new(x, y, z);
-                if m[cube] != AIR {
+                if m[cube] != block::AIR {
                     continue;
                 }
                 // TODO: This math isn't really doing what we want -- isn't using the highest levels.

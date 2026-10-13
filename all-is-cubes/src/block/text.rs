@@ -787,7 +787,7 @@ const DEBUG_NO_INTERSECTION_VOXEL: Evoxel = Evoxel {
     color: rgba_const!(1.0, 0.0, 0.0, 0.95),
     emission: Rgb::ZERO,
     selectable: true,
-    collision: block::BlockCollision::None,
+    collision: block::Collision::None,
 };
 /// Voxel used in [`Text::debug`] mode in the volume which is within
 /// [`Text::rendering_bounding_voxels()`] but not any glyph.
@@ -795,14 +795,14 @@ const DEBUG_TEXT_RENDERING_BOUNDS_VOXEL: Evoxel = Evoxel {
     color: rgba_const!(0.25, 0.75, 0.25, 0.95),
     emission: Rgb::ZERO,
     selectable: true,
-    collision: block::BlockCollision::None,
+    collision: block::Collision::None,
 };
 /// Voxel used in [`Text::debug`] mode in the volume which is within the bounds of a glyph image.
 const DEBUG_TEXT_GLYPH_BOUNDS_VOXEL: Evoxel = Evoxel {
     color: rgba_const!(1.0, 1.0, 0.0, 0.95),
     emission: Rgb::ZERO,
     selectable: true,
-    collision: block::BlockCollision::None,
+    collision: block::Collision::None,
 };
 
 /// Specifies how a text glyph is painted into 3D space.

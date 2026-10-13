@@ -60,14 +60,14 @@ pub(in crate::block) struct Derived {
 
     /// If all voxels in the cube have the same collision behavior, then this is that.
     //
-    // TODO: As currently defined, this is None or Some(BlockCollision::None)
+    // TODO: As currently defined, this is None or Some(block::Collision::None)
     // if the voxels don't fill the cube bounds. But "collide with the bounding box"
     // might be a nice efficient option.
     //
     // TODO: This won't generalize properly to having more than 2 states of
-    // BlockCollision in the way that transformation to `Evoxel` needs. We will need to
+    // block::Collision in the way that transformation to `Evoxel` needs. We will need to
     // make this its own enum, or a bitmask of all seen values, or something.
-    pub(in crate::block) uniform_collision: Option<block::BlockCollision>,
+    pub(in crate::block) uniform_collision: Option<block::Collision>,
 
     /// See [`VoxelOpacityMask`]'s documentation for the use of this.
     pub(in crate::block) voxel_opacity_mask: VoxelOpacityMask,
@@ -160,7 +160,7 @@ pub(in crate::block::eval) fn compute_derived(voxels: &Evoxels) -> Derived {
     let uniform_collision = {
         let outside_collision = if less_than_full {
             // Some of the block’s volume is occupied by implicit air voxels.
-            Some(block::BlockCollision::None)
+            Some(block::Collision::None)
         } else {
             None
         };

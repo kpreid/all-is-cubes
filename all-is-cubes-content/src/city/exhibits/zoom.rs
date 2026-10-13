@@ -29,7 +29,7 @@ fn ZOOM(ctx: Context<'_>) {
                 if !m.get_evaluated(cube).visible() {
                     // Cancel placing useless invisible zoomed blocks.
                     // Note: This is not an equivalent optimization (if the original block has
-                    // BlockCollision::Hard or animation).
+                    // block::Collision::Hard or animation).
                     m.set(cube, AIR).unwrap();
                 }
             }

@@ -21,7 +21,7 @@ pub(super) use num_traits::float::Float as _;
 pub(super) use all_is_cubes::arcstr::{self, literal};
 pub(super) use all_is_cubes::asset;
 pub(super) use all_is_cubes::block::{
-    self, AIR, Block, BlockCollision, Composite, CompositeOperator, Move,
+    self, AIR, Block, Composite, CompositeOperator, Move,
     Resolution::{self, *},
     RotationPlacementRule, Zoom, space_to_blocks,
 };

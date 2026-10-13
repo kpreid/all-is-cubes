@@ -23,7 +23,7 @@ use manyfmt::Refmt as _;
 use ordered_float::NotNan;
 
 use super::collision::{aab_raycast, collide_along_ray, find_colliding_cubes, nudge_on_ray};
-use crate::block::{BlockCollision, Resolution};
+use crate::block::{self, Resolution};
 use crate::character::{self, ParentSpace};
 use crate::fluff::Fluff;
 #[cfg(not(any(feature = "std", test)))]
@@ -477,7 +477,7 @@ pub(crate) fn step_one_body(
                 .round_up_to_grid()
                 .interior_iter()
                 .filter(|cube| {
-                    space.get_evaluated(*cube).uniform_collision() != Some(BlockCollision::None)
+                    space.get_evaluated(*cube).uniform_collision() != Some(block::Collision::None)
                 });
             let (class_ids, colors): (Vec<rg::ClassId>, Vec<_>) = cubes
                 .clone()
@@ -723,11 +723,11 @@ fn attempt_push_out(
         for cube in step_aab.round_up_to_grid().interior_iter() {
             // TODO: refactor to combine this with other collision attribute tests
             match space.get_evaluated(cube).uniform_collision() {
-                Some(BlockCollision::Hard) => {
+                Some(block::Collision::Hard) => {
                     // Not a clear space
                     continue 'raycast;
                 }
-                Some(BlockCollision::None) => {}
+                Some(block::Collision::None) => {}
                 None => {
                     // TODO: Either check collision, or continue
                     //continue 'raycast;

@@ -102,11 +102,11 @@ fn TRANSPARENCY_GLASS_AND_WATER(ctx: Context<'_>) {
 
     let water_voxel = Block::builder()
         .color(rgba_const!(0.02, 0.04, 0.9, 0.5))
-        .collision(BlockCollision::None)
+        .collision(block::Collision::None)
         .build();
     let water_surface_voxel = Block::builder()
         .color(rgba_const!(0.5, 0.5, 0.72, 0.8))
-        .collision(BlockCollision::None)
+        .collision(block::Collision::None)
         .build();
 
     let water_surface_block = Block::builder()
@@ -230,7 +230,7 @@ fn SWIMMING_POOL(ctx: Context<'_>) {
             &Block::builder()
                 .display_name("Not entirely unlike water")
                 .color(Rgba::new(0.96, 0.96, 1.0, 0.1))
-                .collision(BlockCollision::None)
+                .collision(block::Collision::None)
                 .build(),
         )
     })?;

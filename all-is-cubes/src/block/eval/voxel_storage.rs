@@ -10,15 +10,15 @@ use descriptive_unwrap::OptionExt as _;
 use hashbrown::HashMap;
 
 use crate::block::{
-    BlockAttributes, BlockCollision, EvaluatedBlock,
+    self, BlockAttributes, EvaluatedBlock,
     Resolution::{self, R1},
 };
-use crate::math::{Cube, GridAab, OpacityCategory, Rgb, Rgba, Vol};
+use crate::math::{Cube, GridAab, GridRotation, OpacityCategory, Rgb, Rgba, Vol};
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
 use {
-    crate::block::{self, AIR, Atom, Primitive},
+    crate::block::{AIR, Atom, Collision, Primitive},
     crate::space,
 };
 
@@ -57,7 +57,7 @@ pub struct Evoxel {
     pub selectable: bool,
 
     /// The effect on a [`Body`](crate::physics::Body) of colliding with this voxel.
-    pub collision: BlockCollision,
+    pub collision: block::Collision,
 }
 
 impl Evoxel {
@@ -69,7 +69,7 @@ impl Evoxel {
         color: Rgba::TRANSPARENT,
         emission: Rgb::ZERO,
         selectable: false,
-        collision: BlockCollision::None,
+        collision: block::Collision::None,
     };
 
     /// Construct an [`Evoxel`] which represents the given evaluated block.
@@ -81,8 +81,8 @@ impl Evoxel {
             emission: block.light_emission(),
             selectable: block.attributes().selectable,
             // TODO: This won't generalize properly to having more than 2 states of
-            // BlockCollision. We need uniform_collision to carry more info.
-            collision: block.uniform_collision().unwrap_or(BlockCollision::Hard),
+            // Collision. We need uniform_collision to carry more info.
+            collision: block.uniform_collision().unwrap_or(block::Collision::Hard),
         }
     }
 
@@ -95,7 +95,7 @@ impl Evoxel {
             // Use the selectable value from BlockAttributes's default for consistency.
             // with the result of a default atom block.
             selectable: BlockAttributes::DEFAULT_REF.selectable,
-            collision: BlockCollision::DEFAULT_FOR_FROM_COLOR,
+            collision: block::Collision::DEFAULT_FOR_FROM_COLOR,
         }
     }
 
@@ -140,7 +140,7 @@ impl fmt::Debug for Evoxel {
         if !selectable {
             ds.field("selectable", &selectable);
         }
-        if collision != BlockCollision::Hard {
+        if collision != block::Collision::Hard {
             ds.field("collision", &self.collision);
         }
 
@@ -148,8 +148,8 @@ impl fmt::Debug for Evoxel {
     }
 }
 
-impl crate::block::BlRotate for Evoxel {
-    fn rotate(self, _rotation: all_is_cubes_base::math::GridRotation) -> Self {
+impl block::BlRotate for Evoxel {
+    fn rotate(self, _rotation: GridRotation) -> Self {
         // Currently, none of these fields need rotation.
         let Self {
             color: _,
@@ -964,7 +964,7 @@ mod tests {
             color: Rgba::new(1.0, 0.0, 0.0, 1.0),
             emission: Rgb::new(0.0, 1.0, 0.0),
             selectable: false,
-            collision: BlockCollision::None,
+            collision: block::Collision::None,
         };
         assert_eq!(
             format!("{voxel:#?}\n"),

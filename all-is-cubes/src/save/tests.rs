@@ -178,7 +178,7 @@ fn block_atom_with_all_attributes() {
     assert_round_trip_value(
         &Block::builder()
             .color(Rgba::new(1.0, 0.5, 0.0, 0.5))
-            .collision(block::BlockCollision::None)
+            .collision(block::Collision::None)
             .display_name("foo")
             .selectable(false)
             .inventory_config(inv::InvInBlock::new(

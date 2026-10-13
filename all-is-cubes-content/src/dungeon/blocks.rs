@@ -267,7 +267,7 @@ pub(crate) async fn install_dungeon_blocks(
                     Block::builder()
                         .display_name("Item")
                         .color(Rgba::TRANSPARENT) // TODO: have a shape?
-                        .collision(block::BlockCollision::None)
+                        .collision(block::Collision::None)
                         // TODO: instead of or in addition to having a special action for this,
                         // it should also be expressible as something that happens when the entire
                         // block is taken, as part of Block::unspecialize().
