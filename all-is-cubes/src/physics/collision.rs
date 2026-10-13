@@ -1,6 +1,7 @@
 //! Algorithms for collision detection with [`Space`](crate::space::Space)s.
 
 use alloc::vec::Vec;
+use core::iter;
 
 use descriptive_unwrap::OptionExt as _;
 use euclid::Vector3D;
@@ -123,9 +124,18 @@ where
         "Attempting to collide_along_ray a very long distance: {ray:?}"
     );
 
-    let (iter, last_aab_step) =
+    let (iter_except_last, last_aab_step) =
         aab_raycast(aab.translate(ray.origin.to_vector()), ray.direction, false);
-    'ray_step: for aab_step in iter {
+
+    // Note: including the last step is necessary to ensure that `collide_along_ray()` never
+    // fails to return a contact if one exists, because we need to test for collision with the
+    // final *rounded* position of the translated AAB, even if the raycast process did not see its
+    // leading corner moving that far. We might be able to avoid this usually-redundant work if we
+    // switch to fixed-point arithmetic for AABs.
+    let iter_including_last_step =
+        iter_including_last_step_if_different(iter_except_last, last_aab_step);
+
+    'ray_step: for aab_step in iter_including_last_step {
         // Compute the AAB that *definitely intersects* the cubes we need to test for collision,
         // rather than just abutting them.
         const EPSILON: f64 = Resolution::MAX.recip_f64() * 0.5;
@@ -240,6 +250,38 @@ where
         translated_aab: last_aab_step.translated_aab,
         contact: None,
     }
+}
+
+fn iter_including_last_step_if_different(
+    mut iter_except_last: impl Iterator<Item = AabRaycastStep>,
+    last_aab_step: AabRaycastStep,
+) -> impl Iterator<Item = AabRaycastStep> {
+    iter::from_fn({
+        enum State {
+            Steps,
+            Exhausted,
+        }
+        let mut state: State = State::Steps;
+        let mut penultimate_step = None;
+        move || match state {
+            State::Steps => {
+                if let Some(next_step) = iter_except_last.next() {
+                    penultimate_step = Some(next_step);
+                    Some(next_step)
+                } else {
+                    state = State::Exhausted;
+                    if penultimate_step
+                        .is_some_and(|ps| ps.translated_aab != last_aab_step.translated_aab)
+                    {
+                        Some(last_aab_step)
+                    } else {
+                        None
+                    }
+                }
+            }
+            State::Exhausted => None,
+        }
+    })
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -446,6 +488,9 @@ pub(crate) fn aab_raycast(
         let leading_corner_this_step = leading_corner_ray.unit_endpoint();
         AabRaycastStep {
             t_distance: 1.0,
+            // TODO(crush): “within” doesn’t quite describe this accurately, because it is
+            // sometimes taken as describing only a preexisting collision.
+            // We may need a different data type for the best possible handling.
             aab_face: Face7::Within,
             translated_aab: Aab::from_two_points(
                 leading_corner_this_step,
@@ -720,12 +765,13 @@ mod tests {
             StopAt::NotAlreadyColliding,
         );
 
-        let expected_contact = Contact::Voxel {
+        let contact1 = Contact::Voxel {
             cube: Cube::new(1, 0, 0),
             resolution: R2,
             // TODO: the voxel reported here is arbitrary, so this test is fragile
             voxel: CubeFace::new([0, 0, 0], Face7::Within),
         };
+        let contact0 = Contact::Block(CubeFace::new([0, 0, 0], Face7::Within));
         assert_eq!(
             (result, contacts),
             (
@@ -736,10 +782,11 @@ mod tests {
                     translated_aab: aab.translate(ray.unit_endpoint().to_vector()),
                     contact: None,
                 },
-                vec![
-                    Contact::Block(CubeFace::new([0, 0, 0], Face7::Within)),
-                    expected_contact
-                ]
+                // Contacts are duplicated due to the currently-necessary final collision check.
+                // We may be able to eliminate this later, if the AAB math is revised to use fixed
+                // point coordinates and thus never have surprising rounding, but I am not set on
+                // that route.
+                vec![contact0, contact1, contact0, contact1]
             )
         )
     }
