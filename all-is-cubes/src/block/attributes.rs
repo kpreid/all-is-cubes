@@ -505,32 +505,6 @@ impl From<SetAttribute> for Modifier {
     }
 }
 
-/// Specifies the effect on a [`Body`](crate::physics::Body) of colliding with a
-/// [`Primitive::Atom`] block or voxel having this property.
-//
-// TODO: This is no longer a part of attributes. Move? Rename?
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[non_exhaustive]
-pub enum BlockCollision {
-    /// The atom can be passed through; it is not an obstacle (though intersecting it
-    /// might cause other effects not directly part of collision response).
-    None,
-    /// The atom is a perfectly solid obstacle occupying its entire bounding cube.
-    ///
-    /// This is the default value used for most blocks.
-    Hard,
-    // Future values might include bouncy solid, water-like resistance, force fields, etc.
-}
-
-impl BlockCollision {
-    /// Value used when we are constructing a block from a color with default other
-    /// characteristics. This is not just a [`Default`] impl so that if we later decide
-    /// that e.g. transparent atoms automatically become non-colliding, we can replace
-    /// uses of this constant with that.
-    pub(crate) const DEFAULT_FOR_FROM_COLOR: Self = Self::Hard;
-}
-
 /// Rule about how this block should be rotated, or not, when placed in a [`Space`] by
 /// some agent not otherwise specifying rotation.
 ///
