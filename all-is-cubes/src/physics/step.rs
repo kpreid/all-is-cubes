@@ -22,7 +22,7 @@ use hashbrown::HashSet as HbHashSet;
 use manyfmt::Refmt as _;
 use ordered_float::NotNan;
 
-use super::collision::{aab_raycast, collide_along_ray, find_colliding_cubes, nudge_on_ray};
+use super::collision::{collide_along_ray, find_colliding_cubes, nudge_on_ray};
 use crate::block::{self, Resolution};
 use crate::character::{self, ParentSpace};
 use crate::fluff::Fluff;
@@ -703,7 +703,8 @@ fn attempt_push_out(
 ) -> Option<(FreePoint, NotNan<FreeCoordinate>)> {
     let ray = Ray::new(body.position.map(NotNan::into_inner), direction);
     // TODO: upper bound on distance to try
-    'raycast: for ray_step in aab_raycast(
+    #[expect(deprecated, reason = "TODO")]
+    'raycast: for ray_step in super::collision::aab_raycast_legacy(
         body.collision_box, /* TODO(crush): use occupying */
         ray,
         true,

@@ -124,7 +124,7 @@ where
     );
 
     let (iter, last_aab_step) =
-        new_aab_raycast(aab.translate(ray.origin.to_vector()), ray.direction, false);
+        aab_raycast(aab.translate(ray.origin.to_vector()), ray.direction, false);
     'ray_step: for aab_step in iter {
         // Compute the AAB that *definitely intersects* the cubes we need to test for collision,
         // rather than just abutting them.
@@ -387,8 +387,9 @@ impl CollisionSpace for block::EvoxelsRef<'_> {
 ///
 /// TODO(crush): This function does not give enough information to avoid rounding errors resulting
 /// in disagreement about what cubes the AAB actually touches. Replace all uses of this
-/// with `new_aab_raycast()` to fix that.
-pub(crate) fn aab_raycast(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaster {
+/// with `aab_raycast()` to fix that.
+#[deprecated]
+pub(crate) fn aab_raycast_legacy(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaster {
     let leading_corner = aab.corner_point(Octant::from_vector(if reversed {
         -origin_ray.direction
     } else {
@@ -418,7 +419,7 @@ pub(crate) fn aab_raycast(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaste
 /// and corresponds to the completion of a movement without collision.
 /// (It is not returned as part of the iterator so that callers can depend on it always existing
 /// and treat it specially.)
-pub(crate) fn new_aab_raycast(
+pub(crate) fn aab_raycast(
     absolute_aab: Aab,
     translation: FreeVector,
     reversed: bool,
@@ -484,7 +485,7 @@ pub(crate) fn new_aab_raycast(
     (iterator, last_step)
 }
 
-/// Step output of [`new_aab_raycast()`].
+/// Step output of [`aab_raycast()`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AabRaycastStep {
     /// The distance traveled so far, in multiples of `direction.length()`.
@@ -753,7 +754,9 @@ mod tests {
                 Aab::from_radius(ps64(2.)).random_point(&mut rng),
                 Aab::from_radius(ps64(1.)).random_point(&mut rng).to_vector(),
             );
-            let step = aab_raycast(moving_aab, ray, false).nth(rng.random_range(1..10)).unwrap();
+            #[expect(deprecated, reason = "TODO")]
+            let step =
+                aab_raycast_legacy(moving_aab, ray, false).nth(rng.random_range(1..10)).unwrap();
             let axis = step.face().axis().expect("should have an axis");
             let segment = ray.scale_direction(step.t_distance()); // TODO: this should be a function? Should aab_raycast return a special step type with these features?
             let unnudged_aab = moving_aab.translate(segment.unit_endpoint().to_vector());
@@ -817,7 +820,7 @@ mod tests {
         }
     }
 
-    fn new_aab_raycast_collect(
+    fn aab_raycast_collect(
         (iterator, last): (impl Iterator<Item = AabRaycastStep>, AabRaycastStep),
     ) -> (Vec<AabRaycastStep>, AabRaycastStep) {
         const LIMIT: usize = 101;
@@ -828,7 +831,7 @@ mod tests {
         (steps, last)
     }
 
-    /// Non-randomized test of a concrete example of what [`new_aab_raycast()`] is supposed to do,
+    /// Non-randomized test of a concrete example of what [`aab_raycast()`] is supposed to do,
     /// with simple numbers instead of ones that will provoke rounding errors.
     #[test]
     fn aab_raycast_simple() {
@@ -837,7 +840,7 @@ mod tests {
         let translation = vec3(2.0, 0.0, 0.0);
 
         pretty_assertions::assert_eq!(
-            new_aab_raycast_collect(new_aab_raycast(absolute_aab, translation, false)),
+            aab_raycast_collect(aab_raycast(absolute_aab, translation, false)),
             (
                 vec![
                     AabRaycastStep {
@@ -887,7 +890,7 @@ mod tests {
             eprintln!("\n#{case_number} with inputs:");
             eprintln!("  translation: {translation:?}");
 
-            let (iter, last) = new_aab_raycast(absolute_aab, translation, reversed);
+            let (iter, last) = aab_raycast(absolute_aab, translation, reversed);
             let mut iter = iter.take(100);
 
             let first_step = iter.next().expect("should have at least one step");
