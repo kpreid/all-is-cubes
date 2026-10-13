@@ -28,9 +28,12 @@ use crate::{raycast::RaycastStep, space::Space};
 pub(crate) struct CollisionRayEnd {
     /// Non-colliding length of the provided ray. This is in units of the ray's direction
     /// vector's length, *not* ordinary space coordinates.
+    ///
+    /// It is equal to 1.0 if there was no collision.
     pub t_distance: FreeCoordinate,
 
-    /// The originally provided AAB, translated to the position at which it collided.
+    /// The originally provided AAB, translated to the position at which it collided
+    /// or the end of the motion.
     ///
     /// TODO(crush): This is currently unused.
     /// It should be used by changing stepping to use `translated_aab` as the new value of
@@ -39,8 +42,9 @@ pub(crate) struct CollisionRayEnd {
     /// If that strategy doesn't work out, this field may be deleted if it turns out unneccessary.
     pub translated_aab: Aab,
 
-    /// One of possibly several contacts that ended the raycast.
-    pub contact: Contact,
+    /// One of possibly several collisions that ended the movement.
+    /// [`None`] if there was no collision.
+    pub contact: Option<Contact>,
 }
 
 impl CollisionRayEnd {
@@ -52,26 +56,28 @@ impl CollisionRayEnd {
             contact,
         } = self;
 
-        match contact {
-            Contact::Block(voxel) => CollisionRayEnd {
-                // We don't need to adjust the distance because the ray length
-                // will have been scaled appropriately itself.
-                t_distance: voxel_t_distance,
+        let translated_aab = translated_aab
+            // This scaling does not add any rounding error, because we are
+            // dividing by a power of 2.
+            .scale(resolution.recip_f64())
+            // However, this translation might have some rounding error.
+            .translate(cube.lower_bounds().to_vector().to_f64());
 
-                translated_aab: translated_aab
-                    // This scaling does not add any rounding error, because we are
-                    // dividing by a power of 2.
-                    .scale(resolution.recip_f64())
-                    // However, this translation might have some rounding error.
-                    .translate(cube.lower_bounds().to_vector().to_f64()),
+        CollisionRayEnd {
+            // We don't need to adjust the distance because the ray length
+            // will have been scaled appropriately itself.
+            t_distance: voxel_t_distance,
 
-                contact: Contact::Voxel {
+            translated_aab,
+
+            contact: contact.map(|contact| match contact {
+                Contact::Block(voxel) => Contact::Voxel {
                     cube,
                     resolution,
                     voxel,
                 },
-            },
-            Contact::Voxel { .. } => unreachable!("encountered 3-level voxel recursion"),
+                Contact::Voxel { .. } => unreachable!("encountered 3-level voxel recursion"),
+            }),
         }
     }
 }
@@ -103,7 +109,7 @@ pub(crate) fn collide_along_ray<Sp, CC>(
     aab: Aab,
     mut collision_callback: CC,
     stop_at: StopAt,
-) -> Option<CollisionRayEnd>
+) -> CollisionRayEnd
 where
     Sp: CollisionSpace,
     CC: FnMut(Contact),
@@ -146,7 +152,7 @@ where
         // any of them are solid, and if so, how far into their volume is a hit.
         // TODO: Useful optimization for large AABs would be skipping all the interior
         // cubes that must have been detected in the _previous_ step.
-        let mut something_hit = None;
+        let mut something_hit: Option<CollisionRayEnd> = None;
         'potential_collision: for cube in potential_intersection_bounds.interior_iter() {
             let cell = space.get_cell(cube);
             let full_cube_end = CollisionRayEnd {
@@ -155,12 +161,15 @@ where
                 translated_aab: aab.translate(
                     ray.scale_direction(ray_step.t_distance()).unit_endpoint().to_vector(),
                 ),
-                contact: Contact::Block(CubeFace {
+                contact: Some(Contact::Block(CubeFace {
                     cube,
                     face: ray_step.face(),
-                }),
+                })),
             };
-            let found_end = match Sp::collision(cell) {
+            let found_end @ CollisionRayEnd {
+                contact: Some(found_contact),
+                ..
+            } = (match Sp::collision(cell) {
                 Some(block::Collision::None) => {
                     // No collision for this block
                     continue 'potential_collision;
@@ -168,7 +177,9 @@ where
                 Some(block::Collision::Hard) => full_cube_end,
                 None => {
                     // Recursion
-                    if let Some(found_end) = Sp::recurse(
+                    if let found_end @ CollisionRayEnd {
+                        contact: Some(_), ..
+                    } = Sp::recurse(
                         cube,
                         aab,
                         ray,
@@ -187,23 +198,27 @@ where
                         continue 'potential_collision;
                     }
                 }
+            })
+            else {
+                // TODO: figure out a way to express this control flow better
+                unreachable!("lack of contact should have been checked")
             };
 
             if stop_at == StopAt::NotAlreadyColliding {
-                if found_end.contact.normal() == Face7::Within {
+                if found_contact.normal() == Face7::Within {
                     // If we start intersecting a block, we are allowed to leave it; pretend
                     // it doesn't exist. (Ideally, `push_out()` would have fixed this, but
                     // maybe there's no clear direction.)
-                    already_colliding.insert(found_end.contact);
-                    collision_callback(found_end.contact);
+                    already_colliding.insert(found_contact);
+                    collision_callback(found_contact);
                     continue 'potential_collision;
-                } else if already_colliding.contains(&found_end.contact.without_normal()) {
+                } else if already_colliding.contains(&found_contact.without_normal()) {
                     continue 'potential_collision;
                 }
             }
 
             // TODO: We need to buffer contacts instead of calling this callback, in case something else is closer
-            collision_callback(found_end.contact);
+            collision_callback(found_contact);
 
             let nearest_so_far = match something_hit {
                 Some(CollisionRayEnd { t_distance, .. }) => t_distance,
@@ -216,13 +231,20 @@ where
 
         // Now that we've found _all_ the contacts for this step, report the collision.
         if let Some(end) = something_hit {
-            return Some(end);
+            return end;
         }
     }
 
     // We reach here if the loop reached the end of the line without finding a `stop_at`
     // point, *or* if the line is zero length (in which case `aab_raycast` stops).
-    None
+    //
+    // TODO: When we’ve switched to `new_aab_raycast()`, we will be able to, and should,
+    // stop synthesizing an AAB that’s not the AAB we actually collision tested with.
+    CollisionRayEnd {
+        t_distance: 1.0,
+        translated_aab: aab.translate(ray.unit_endpoint().to_vector()),
+        contact: None,
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -278,7 +300,7 @@ pub(crate) trait CollisionSpace {
         ray: Ray,
         cell: &Self::Cell,
         stop_at: StopAt,
-    ) -> Option<CollisionRayEnd>;
+    ) -> CollisionRayEnd;
 }
 
 impl CollisionSpace for space::Read<'_> {
@@ -305,7 +327,7 @@ impl CollisionSpace for space::Read<'_> {
         space_ray: Ray,
         evaluated: &EvaluatedBlock,
         stop_at: StopAt,
-    ) -> Option<CollisionRayEnd> {
+    ) -> CollisionRayEnd {
         let resolution = evaluated.resolution();
         let cube_translation = cube.lower_bounds().to_vector().map(|s| -FreeCoordinate::from(s));
         let scale = FreeCoordinate::from(resolution);
@@ -313,14 +335,14 @@ impl CollisionSpace for space::Read<'_> {
         // Note: aab is not translated since it's relative to the ray anyway.
         let voxel_aab = space_aab.scale(scale);
         let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
-        let result = collide_along_ray(
+        collide_along_ray(
             &evaluated.voxels().read(),
             voxel_ray,
             voxel_aab,
             drop,
             stop_at,
-        );
-        result.map(|end| end.wrap_as_voxel(cube, resolution))
+        )
+        .wrap_as_voxel(cube, resolution)
     }
 }
 
@@ -348,7 +370,7 @@ impl CollisionSpace for block::EvoxelsRef<'_> {
         _local_ray: Ray,
         _cell: &Self::Cell,
         _stop_at: StopAt,
-    ) -> Option<CollisionRayEnd> {
+    ) -> CollisionRayEnd {
         // collision() never returns None so this should never be called
         unreachable!()
     }
@@ -559,11 +581,11 @@ mod tests {
                 let [block] = make_some_blocks();
                 [AIR, block]
             },
-            Some(CollisionRayEnd {
+            CollisionRayEnd {
                 t_distance: 0.25, // half of a unit cube, quarter of a ray with magnitude 2
                 translated_aab: Aab::from_lower_upper([0.5, 1.0, 0.0], [1.5, 2.0, 1.0]),
-                contact: Contact::Block(CubeFace::new([1, 0, 0], Face7::PY)),
-            }),
+                contact: Some(Contact::Block(CubeFace::new([1, 0, 0], Face7::PY))),
+            },
         );
     }
 
@@ -572,16 +594,16 @@ mod tests {
         collide_along_ray_tester(
             1.5,
             |u| [AIR, make_slab(u, 1, R2)],
-            Some(CollisionRayEnd {
+            CollisionRayEnd {
                 t_distance: 0.5, // half of a ray with magnitude 2
                 translated_aab: Aab::from_lower_upper([0.5, 0.5, 0.0], [1.5, 1.5, 1.0]),
-                contact: Contact::Voxel {
+                contact: Some(Contact::Voxel {
                     cube: Cube::new(1, 0, 0),
                     resolution: R2,
                     // TODO: the voxel reported here is arbitrary, so this test is fragile
                     voxel: CubeFace::new([0, 0, 0], Face7::PY),
-                },
-            }),
+                }),
+            },
         );
     }
 
@@ -590,16 +612,16 @@ mod tests {
         collide_along_ray_tester(
             0.75, // initial Y inside of the block we will collide with
             |u| [AIR, make_slab(u, 1, R2)],
-            Some(CollisionRayEnd {
+            CollisionRayEnd {
                 t_distance: 0.125,
                 translated_aab: Aab::from_lower_upper([0.5, 0.5, 0.0], [1.5, 1.5, 1.0]),
-                contact: Contact::Voxel {
+                contact: Some(Contact::Voxel {
                     cube: Cube::new(1, 0, 0),
                     resolution: R2,
                     // TODO: the voxel reported here is arbitrary, so this test is fragile
                     voxel: CubeFace::new([0, 0, 0], Face7::PY),
-                },
-            }),
+                }),
+            },
         );
     }
 
@@ -613,29 +635,29 @@ mod tests {
         collide_along_ray_tester(
             0.75,
             |u| [make_slab(u, 1, R4), make_slab(u, 1, R2)],
-            Some(CollisionRayEnd {
+            CollisionRayEnd {
                 t_distance,
                 translated_aab,
-                contact: Contact::Voxel {
+                contact: Some(Contact::Voxel {
                     cube: Cube::new(1, 0, 0), // second of 2 blocks is taller
                     resolution: R2,
                     voxel: CubeFace::new([0, 0, 0], Face7::PY),
-                },
-            }),
+                }),
+            },
         );
         collide_along_ray_tester(
             0.75,
             // Opposite ordering of the other test
             |u| [make_slab(u, 1, R2), make_slab(u, 1, R4)],
-            Some(CollisionRayEnd {
+            CollisionRayEnd {
                 t_distance: 0.125,
                 translated_aab,
-                contact: Contact::Voxel {
+                contact: Some(Contact::Voxel {
                     cube: Cube::new(0, 0, 0), // first of 2 blocks is taller
                     resolution: R2,
                     voxel: CubeFace::new([1, 0, 0], Face7::PY),
-                },
-            }),
+                }),
+            },
         );
     }
 
@@ -643,7 +665,7 @@ mod tests {
     fn collide_along_ray_tester(
         initial_y: FreeCoordinate,
         block_gen: fn(&mut Universe) -> [Block; 2],
-        expected_end: Option<CollisionRayEnd>,
+        expected_end: CollisionRayEnd,
     ) {
         let u = &mut Universe::new();
         let blocks = block_gen(u);
@@ -705,18 +727,26 @@ mod tests {
             |c| contacts.push(c),
             StopAt::NotAlreadyColliding,
         );
+
+        let expected_contact = Contact::Voxel {
+            cube: Cube::new(1, 0, 0),
+            resolution: R2,
+            // TODO: the voxel reported here is arbitrary, so this test is fragile
+            voxel: CubeFace::new([0, 0, 0], Face7::Within),
+        };
         assert_eq!(
             (result, contacts),
             (
-                None,
+                // This result is unobstructed (distance = 1) because bodies are allowed to move
+                // *out* of intersections.
+                CollisionRayEnd {
+                    t_distance: 1.0,
+                    translated_aab: aab.translate(ray.unit_endpoint().to_vector()),
+                    contact: None,
+                },
                 vec![
                     Contact::Block(CubeFace::new([0, 0, 0], Face7::Within)),
-                    Contact::Voxel {
-                        cube: Cube::new(1, 0, 0),
-                        resolution: R2,
-                        // TODO: the voxel reported here is arbitrary, so this test is fragile
-                        voxel: CubeFace::new([0, 0, 0], Face7::Within),
-                    }
+                    expected_contact
                 ]
             )
         )

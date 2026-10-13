@@ -614,20 +614,16 @@ where
         StopAt::NotAlreadyColliding,
     );
 
-    if let Some(collision) = collision {
-        let axis = collision
-            .contact
-            .normal()
-            .axis()
-            .expect("Face7::Within collisions should not reach here");
+    if let Some(contact) = collision.contact {
+        let axis = contact.normal().axis().expect("Face7::Within collisions should not reach here");
         // Advance however much straight-line distance is available.
         // But a little bit back from that, to avoid floating point error pushing us
         // into being already colliding next frame.
         let motion_segment = nudge_on_ray(
             body.collision_box, // TODO(crush): use occupying
             movement_ignoring_collision.scale_direction(collision.t_distance),
-            collision.contact.normal().opposite(),
-            collision.contact.resolution(),
+            contact.normal().opposite(),
+            contact.resolution(),
             true,
         );
         let unobstructed_delta_position = motion_segment.direction;
@@ -646,11 +642,13 @@ where
             delta_position,
             MoveSegment {
                 delta_position: unobstructed_delta_position,
-                stopped_by: Some(collision.contact),
+                stopped_by: Some(contact),
             },
         )
     } else {
         // We did not hit anything for the length of the raycast. Proceed unobstructed.
+        //
+        // TODO(crush): Use the collision.translated_aab as the new occupying box.
         body.set_position(body.position.map(NotNan::into_inner) + delta_position);
         (
             Vector3D::zero(),
