@@ -165,10 +165,7 @@ where
             let cell = space.get_cell(cube);
             let full_cube_end = CollisionRayEnd {
                 t_distance: aab_step.t_distance,
-                // note: unlike `step_aab`, this AAB is not “nudged”.
-                translated_aab: aab.translate(
-                    ray.scale_direction(aab_step.t_distance).unit_endpoint().to_vector(),
-                ),
+                translated_aab: aab_step.translated_aab,
                 contact: Some(Contact::Block(CubeFace {
                     cube,
                     face: aab_step.aab_face.opposite(),
