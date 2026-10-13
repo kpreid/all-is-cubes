@@ -536,6 +536,8 @@ impl State {
                 .ray
                 .origin
                 .to_vector()
+                // Note that scale_to_integer_step()’s answers must agree with the cube selections
+                // made by `Cube::containing()`.
                 .zip(param.ray.direction, scale_to_integer_step)
                 .cast_unit(),
             last_face: Face7::Within,
@@ -787,7 +789,12 @@ fn signum_101(x: FreeCoordinate) -> GridCoordinate {
     }
 }
 
-/// Find the smallest positive `t` such that `s + t * ds` is an integer.
+/// Find the smallest positive `t` such that `s + t * ds` advances `s` to touch a cube boundary.
+///
+/// Because cubes are considered to be half-open intervals \[<var>s</var>, <bvar>s</var> + 1)
+/// in each axis, this is not the same thing as the smallest `t` such that `s + t * ds` is an
+/// integer; if `s` is already an integer, then the result is zero if `ds` is negative and
+/// nonzero if `ds` is positive.
 ///
 /// If `ds` is zero, returns positive infinity; this is a useful answer because
 /// it means that the less-than comparisons in the raycast algorithm will never pick
@@ -800,6 +807,8 @@ pub fn scale_to_integer_step(mut s: FreeCoordinate, mut ds: FreeCoordinate) -> F
         // This almost could be implicit, but it is possible for the below division to
         // return NaN instead of +inf, in the case where (1.0 - s) rounds down to zero.
         return FreeCoordinate::INFINITY;
+    } else if num_traits::Float::fract(s) == 0.0 && ds < 0.0 {
+        return 0.0;
     } else if ds < 0.0 {
         // Simplify to positive case only.
         // Note that the previous condition eliminated the case of negative zero.

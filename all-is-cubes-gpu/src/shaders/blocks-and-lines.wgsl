@@ -249,17 +249,34 @@ fn coarsestep(x: f32) -> f32 {
     return (floor(x * 4.0) + 0.5) / 4.0;
 }
 
-/// Find the smallest positive `t` such that `s + t * ds` is an integer.
-///
-/// If `ds` is zero, returns positive infinity; this is a useful answer because
-/// it means that the less-than comparisons in the raycast algorithm will never
-/// pick the corresponding axis. If any input is NaN, returns NaN.
-/// (Or at least, it would if it were executing on the CPU.
-/// TODO: review GPU floating point behavior considerations.)
-///
-/// The canonical version of this algorithm is
-/// `all_is_cubes::raycast::scale_to_integer_step`.
+/// GPU version of `all_is_cubes::raycast::scale_to_integer_step()`.
+/// See that function’s documentation for details.
 fn scale_to_integer_step(s_in: f32, ds_in: f32) -> f32 {
+    var s = s_in;
+    var ds = ds_in;
+    if fract(s) == 0.0 && ds < 0.0 {
+        return 0.0;
+    }
+    if sign(ds) < 0.0 {
+        s = 1.0 - s;
+        ds = -ds;
+        // Note: This will not act on a negative zero.
+        // That must be handled separately.
+    }
+    s = modulo(s, 1.0);
+    // problem is now s + t * ds = 1
+    var result = (1.0 - s) / ds;
+
+    // Fix sign error in case of negative zero.
+    if s < 0.0 {
+        result *= -1.0;
+    }
+
+    return result;
+}
+
+/// Find the smallest positive `t` such that `s + t * ds` is an integer and `t` is nonzero.
+fn scale_to_integer_step_never_zero(s_in: f32, ds_in: f32) -> f32 {
     var s = s_in;
     var ds = ds_in;
     if sign(ds) < 0.0 {
@@ -654,9 +671,9 @@ fn volumetric_thickness(in: BlockFragmentInput) -> f32 {
     
     // Run a minimal version of the same raycasting algorithm we use on the CPU side.
     let t_delta = vec3<f32>(
-        scale_to_integer_step(in.position_in_cube.x, in.camera_ray_direction.x),
-        scale_to_integer_step(in.position_in_cube.y, in.camera_ray_direction.y),
-        scale_to_integer_step(in.position_in_cube.z, in.camera_ray_direction.z)
+        scale_to_integer_step_never_zero(in.position_in_cube.x, in.camera_ray_direction.x),
+        scale_to_integer_step_never_zero(in.position_in_cube.y, in.camera_ray_direction.y),
+        scale_to_integer_step_never_zero(in.position_in_cube.z, in.camera_ray_direction.z)
     );
     // t_delta now represents the distance, in units of
     // length(in.camera_ray_direction), to the next cube face. Normalize this

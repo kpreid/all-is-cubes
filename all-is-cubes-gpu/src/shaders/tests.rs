@@ -116,12 +116,37 @@ fn scale_to_integer_step_consistency() {
     let camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
     let resources = bl_resources(&camera);
 
-    for case @ (s, ds) in [(0.5f32, 0.25), (0.0, 0.25), (0.5, -0.125)] {
+    for case @ (s, ds) in [
+        (-0.5f32, -0.25),
+        (-0.5, 0.25),
+        (0.5, -0.25),
+        (0.5, 0.25),
+        (-0.0, 0.25),
+        (-0.0, -0.25),
+        (0.0, 0.25),
+        (0.0, -0.25),
+        (-0.5, -0.125),
+        (-0.5, 0.125),
+        (0.5, -0.125),
+        (0.5, 0.125),
+    ] {
+        let expected =
+            all_is_cubes::raycast::scale_to_integer_step(f64::from(s), f64::from(ds)) as f32;
         assert_eq!(
-            all_is_cubes::raycast::scale_to_integer_step(f64::from(s), f64::from(ds)) as f32,
+            expected,
             resources.scale_to_integer_step(s, ds),
-            "{case:?}",
-        )
+            "case {case:?}, regular",
+        );
+        if s.fract() != 0.0 {
+            assert_eq!(
+                expected,
+                resources.scale_to_integer_step_never_zero(s, ds),
+                "case {case:?}, never_zero",
+            );
+        } else {
+            // Ideally we’d have test coverage for scale_to_integer_step_never_zero() here too,
+            // but doing this wrong will be caught by the render tests so it’s not critical.
+        }
     }
 }
 

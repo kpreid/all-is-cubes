@@ -196,7 +196,7 @@ fn direction_nan_produces_origin_cube_only() {
 /// and the ray is mostly aligned with that axis.
 #[test]
 fn start_on_cube_edge_parallel() {
-    // Positive origin, positive direction
+    // Positive origin, positive direction.
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.0, 20.5, 30.5), vec3(2.0, 0.1, 0.1)),
         [
@@ -205,13 +205,19 @@ fn start_on_cube_edge_parallel() {
             step(12, 20, 30, Face7::NX, 1.0),
         ],
     );
-    // Positive origin, negative direction
+    // Positive origin, negative direction.
+    // Note that the first two steps occur at identical t_distance.
+    // This is because, as a necessary tie-breaking, points with integer coordinates are
+    // considered to be within the cube with the higher coordinate rather than the lower.
+    // Thus, the initial position of this raycast is within (10,20,30) and then takes an
+    // infinitesimal step to (9,20,30).
     assert_steps_have_prefix(
         &mut Raycaster::new(point3(10.0, 20.5, 30.5), vec3(-2.0, 0.1, 0.1)),
         [
             step(10, 20, 30, Face7::Within, 0.0),
-            step(9, 20, 30, Face7::PX, 0.5),
-            step(8, 20, 30, Face7::PX, 1.0),
+            step(9, 20, 30, Face7::PX, 0.0),
+            step(8, 20, 30, Face7::PX, 0.5),
+            step(7, 20, 30, Face7::PX, 1.0),
         ],
     );
     // Negative origin, positive direction
@@ -228,8 +234,9 @@ fn start_on_cube_edge_parallel() {
         &mut Raycaster::new(point3(-10.0, 20.5, 30.5), vec3(-2.0, 0.1, 0.1)),
         [
             step(-10, 20, 30, Face7::Within, 0.0),
-            step(-11, 20, 30, Face7::PX, 0.5),
-            step(-12, 20, 30, Face7::PX, 1.0),
+            step(-11, 20, 30, Face7::PX, 0.0),
+            step(-12, 20, 30, Face7::PX, 0.5),
+            step(-13, 20, 30, Face7::PX, 1.0),
         ],
     );
 }
@@ -252,8 +259,8 @@ fn start_on_cube_edge_perpendicular() {
         &mut Raycaster::new(point3(10.0, 20.5, 30.5), vec3(-0.125, -1.0, 0.0)),
         [
             step(10, 20, 30, Face7::Within, 0.0),
-            step(10, 19, 30, Face7::PY, 0.5),
-            step(10, 18, 30, Face7::PY, 1.5),
+            step(9, 20, 30, Face7::PX, 0.0),
+            step(9, 19, 30, Face7::PY, 0.5),
         ],
     );
     // Negative origin, positive direction
@@ -270,8 +277,8 @@ fn start_on_cube_edge_perpendicular() {
         &mut Raycaster::new(point3(-10.0, -20.5, 30.5), vec3(-0.125, -1.0, 0.0)),
         [
             step(-10, -21, 30, Face7::Within, 0.0),
-            step(-10, -22, 30, Face7::PY, 0.5),
-            step(-10, -23, 30, Face7::PY, 1.5),
+            step(-11, -21, 30, Face7::PX, 0.0),
+            step(-11, -22, 30, Face7::PY, 0.5),
         ],
     );
 }
@@ -562,10 +569,15 @@ fn scale_to_integer_step_positive_and_negative_zero() {
 
 #[test]
 fn scale_to_integer_step_starting_on_integer() {
+    // Because integer-valued positions are considered to occupy the higher-numbered cube,
+    // the behavior of the function differs depending on the sign of the direction.
+    // Starting from an integer, moving in the positive direction to meet a boundary
+    // takes a step, whereas moving in the negative direction to meet a boundary does not because
+    // it is infinitesimally close to the boundary.
     assert_eq!(scale_to_integer_step(3.0, 0.5), 2.0);
-    assert_eq!(scale_to_integer_step(3.0, -0.5), 2.0);
+    assert_eq!(scale_to_integer_step(3.0, -0.5), 0.0);
     assert_eq!(scale_to_integer_step(-3.0, 0.5), 2.0);
-    assert_eq!(scale_to_integer_step(-3.0, -0.5), 2.0);
+    assert_eq!(scale_to_integer_step(-3.0, -0.5), 0.0);
 }
 
 #[test]
