@@ -440,6 +440,7 @@ pub(crate) fn step_one_body(
             move_segment_index += 1;
         }
     } else {
+        // Nothing to collide with.
         body.set_position(body.position.map(NotNan::into_inner) + unobstructed_delta_position);
         move_segments[0] = MoveSegment {
             delta_position: unobstructed_delta_position,
@@ -629,6 +630,7 @@ where
             true,
         );
         let unobstructed_delta_position = motion_segment.direction;
+        // TODO(crush): use body.set_position_and_occupying(), while stopping using nudge_on_ray()
         body.set_position(body.position.map(NotNan::into_inner) + unobstructed_delta_position);
         // Figure the distance we have have left.
         delta_position -= unobstructed_delta_position;
@@ -684,12 +686,11 @@ fn push_out(body: &mut Body, space: &space::Read<'_>) -> Option<FreeVector> {
                 })
             })
             .filter_map(|direction| attempt_push_out(body, space, direction * max_distance))
-            .min_by_key(|(_, distance)| *distance);
+            .min_by_key(|(_, _, distance)| *distance);
 
-        if let Some((new_position, _)) = shortest_push_out {
+        if let Some((new_position, new_occupying, _)) = shortest_push_out {
             let old_position: FreePoint = body.position.map(NotNan::into_inner);
-            // TODO(crush): should be setting body.occupying
-            body.set_position(new_position);
+            body.set_position_occupying(new_position, new_occupying);
             return Some(new_position - old_position);
         }
     }
@@ -702,7 +703,7 @@ fn attempt_push_out(
     body: &Body,
     space: &space::Read<'_>,
     displacement: FreeVector,
-) -> Option<(FreePoint, NotNan<FreeCoordinate>)> {
+) -> Option<(FreePoint, Aab, NotNan<FreeCoordinate>)> {
     'raycast: for aab_step in super::collision::aab_raycast(body.occupying, displacement, true).0 {
         for cube in aab_step.translated_aab.round_up_to_grid().interior_iter() {
             // TODO: refactor to combine this with other collision attribute tests
@@ -722,6 +723,7 @@ fn attempt_push_out(
         return Some((
             // TODO: should return the translated_aab to become the new body.occupying
             body.position.map(NotNan::into_inner) + (displacement * aab_step.t_distance),
+            aab_step.translated_aab,
             NotNan::new(aab_step.t_distance * displacement.length()).ok()?,
         ));
     }

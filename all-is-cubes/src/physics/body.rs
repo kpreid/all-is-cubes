@@ -206,6 +206,30 @@ impl Body {
         self.occupying = self.uncrushed_collision_box_abs();
     }
 
+    /// Sets the position of the body, including the exact volume it is considered to occupy
+    /// in absolute coordinates.
+    ///
+    /// If `position` is outside of `occupying`, then it is clamped to be within it, to maintain
+    /// consistency.
+    ///
+    /// This operation is currently considered an implementation detail of physics.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `position` is not finite.
+    pub(crate) fn set_position_occupying(&mut self, position: FreePoint, occupying: Aab) {
+        let clamped_position =
+            position.clamp(occupying.lower_bounds_p(), occupying.upper_bounds_p());
+
+        let Some(valid_position) = try_into_finite_point(clamped_position) else {
+            // TODO: consider what better error handling looks like
+            panic!("tried to set non-finite position {position:?}");
+        };
+
+        self.position = valid_position;
+        self.occupying = occupying;
+    }
+
     /// Returns the body’s current velocity.
     pub fn velocity(&self) -> Vector3D<f64, Velocity> {
         self.velocity.map(NotNan::into_inner)
