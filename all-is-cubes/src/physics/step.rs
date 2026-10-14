@@ -604,8 +604,6 @@ fn collide_and_advance<CC>(
 where
     CC: FnMut(Contact),
 {
-    let movement_ignoring_collision =
-        Ray::new(body.position.map(NotNan::into_inner), delta_position);
     let collision = collide_along_ray(
         space,
         delta_position,
@@ -621,8 +619,11 @@ where
         // But a little bit back from that, to avoid floating point error pushing us
         // into being already colliding next frame.
         let motion_segment = nudge_on_ray(
-            body.collision_box, // TODO(crush): use occupying
-            movement_ignoring_collision.scale_direction(collision.t_distance),
+            body.collision_box, // TODO(crush): use occupying (but we can probably get rid of nudge_on_ray entirely)
+            Ray::new(
+                body.position.map(NotNan::into_inner),
+                delta_position * collision.t_distance,
+            ),
             contact.normal().opposite(),
             contact.resolution(),
             true,
@@ -663,8 +664,6 @@ where
 
 /// Check if we're intersecting any blocks and fix that if so.
 fn push_out(body: &mut Body, space: &space::Read<'_>) -> Option<FreeVector> {
-    // TODO: need to unsquash the `occupying` box if possible
-
     let max_distance = 4.125;
     let colliding = find_colliding_cubes(space, body.collision_box_abs()).next().is_some();
     if colliding {
@@ -689,6 +688,7 @@ fn push_out(body: &mut Body, space: &space::Read<'_>) -> Option<FreeVector> {
 
         if let Some((new_position, _)) = shortest_push_out {
             let old_position: FreePoint = body.position.map(NotNan::into_inner);
+            // TODO(crush): should be setting body.occupying
             body.set_position(new_position);
             return Some(new_position - old_position);
         }
