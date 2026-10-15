@@ -666,35 +666,79 @@ where
 
 /// Check if we're intersecting any blocks and fix that if so.
 fn push_out(body: &mut Body, space: &space::Read<'_>) -> Option<FreeVector> {
-    let max_distance = 4.125;
-    let colliding = find_colliding_cubes(space, body.collision_box_abs()).next().is_some();
-    if colliding {
-        let exit_backwards: FreeVector = -body.velocity.map(NotNan::into_inner).cast_unit(); // don't care about magnitude
-        let shortest_push_out = (-1..=1)
-            .flat_map(move |dx| {
-                (-1..=1).flat_map(move |dy| {
-                    (-1..=1).map(move |dz| {
-                        let direction = Vector3D::new(dx, dy, dz).map(FreeCoordinate::from);
-                        if direction == Vector3D::zero() {
-                            // We've got an extra case, and an item to delete from the combinations,
-                            // so substitute the one from the other.
-                            exit_backwards
-                        } else {
-                            direction
-                        }
-                    })
-                })
-            })
-            .filter_map(|direction| attempt_push_out(body, space, direction * max_distance))
-            .min_by_key(|(_, _, distance)| *distance);
+    /// Fixed directions that push-out always tries.
+    ///
+    /// Defined as a constant in [`f32`] coordinates because this is smaller in the binary
+    /// than the machine code to compute it every time.
+    const PUSH_OUT_DIRECTIONS: &[Vector3D<f32, Cube>] = &{
+        // Coordinate values to form pre-scaled vectors.
+        // The length of a normalized vector that is a diagonal of 2 axes is sqrt(1^2 + 1^2),
+        // hence each of its coordinates has magnitude 1/sqrt(2).
+        // Similarly, a diagonal of 3 axes uses 1/sqrt(3).
+        const S2: f32 = core::f32::consts::FRAC_1_SQRT_2;
+        const S3: f32 = 0.57735026;
 
-        if let Some((new_position, new_occupying, _)) = shortest_push_out {
-            let old_position: FreePoint = body.position.map(NotNan::into_inner);
-            body.set_position_occupying(new_position, new_occupying);
-            return Some(new_position - old_position);
-        }
+        [
+            // Axis-aligned directions
+            vec3(0., 0., -1.),
+            vec3(0., 0., 1.),
+            vec3(0., -1., 0.),
+            vec3(0., 1., 0.),
+            vec3(-1., 0., 0.),
+            vec3(1., 0., 0.),
+            // Diagonals in two axes
+            vec3(0., -S2, -S2),
+            vec3(0., -S2, S2),
+            vec3(0., S2, -S2),
+            vec3(0., S2, S2),
+            vec3(-S2, 0., -S2),
+            vec3(-S2, 0., S2),
+            vec3(S2, 0., -S2),
+            vec3(S2, 0., S2),
+            vec3(-S2, -S2, 0.),
+            vec3(-S2, S2, 0.),
+            vec3(S2, -S2, 0.),
+            vec3(S2, S2, 0.),
+            // Diagonals in three axes
+            vec3(-S3, -S3, -S3),
+            vec3(-S3, -S3, S3),
+            vec3(-S3, S3, -S3),
+            vec3(-S3, S3, S3),
+            vec3(S3, -S3, -S3),
+            vec3(S3, -S3, S3),
+            vec3(S3, S3, -S3),
+            vec3(S3, S3, S3),
+        ]
+    };
+
+    // Nothing to do if we are not colliding with anything.
+    // TODO: It might be more efficient to let the caller make this decision using information
+    // it already has from a previous stage of the collision process?
+    find_colliding_cubes(space, body.collision_box_abs()).next()?;
+
+    let max_distance = 4.125;
+
+    // Choose candidate directions to push.
+    // One of them is always the opposite of the body’s velocity, so that it can “back out”.
+    let exit_backwards_direction: FreeVector =
+        -body.velocity.map(NotNan::into_inner).cast_unit().normalize();
+    let candidates = PUSH_OUT_DIRECTIONS
+        .iter()
+        .map(|&dir| dir.map(FreeCoordinate::from))
+        .chain(exit_backwards_direction.is_finite().then_some(exit_backwards_direction));
+
+    // Find the direction requiring the shortest distance to become free of obstacles.
+    let shortest_push_out = candidates
+        .filter_map(|direction| attempt_push_out(body, space, direction * max_distance))
+        .min_by_key(|&(_, _, distance)| distance);
+
+    if let Some((new_position, new_occupying, _)) = shortest_push_out {
+        let old_position: FreePoint = body.position.map(NotNan::into_inner);
+        body.set_position_occupying(new_position, new_occupying);
+        Some(new_position - old_position)
+    } else {
+        None
     }
-    None
 }
 
 /// Try moving along the given displacement vector, find an empty space as close as possible, and
