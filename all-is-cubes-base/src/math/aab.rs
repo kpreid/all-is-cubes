@@ -431,6 +431,47 @@ impl Aab {
         )
     }
 
+    /// Replaces the coordinate of `self` which is the position of the given `face` on its axis
+    /// (in the same sense as returned by [`Aab::face_coordinate_on_axis()`])
+    /// with the given `coordinate`.
+    ///
+    /// Returns [`None`] if this would result in the box being inside-out.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Aab, Face};
+    ///
+    /// let aab1 = Aab::from_lower_upper([1., 2., 3.], [4., 5., 6.]);
+    /// let aab2 = aab1.with_face_coordinate_on_axis(Face::PX, 100.).unwrap();
+    ///
+    /// assert_eq!(aab2, Aab::from_lower_upper([1., 2., 3.], [100., 5., 6.]));
+    /// ```
+    #[must_use]
+    #[allow(clippy::missing_inline_in_public_items)]
+    pub fn with_face_coordinate_on_axis(
+        mut self,
+        face: Face,
+        coordinate: FreeCoordinate,
+    ) -> Option<Self> {
+        let axis = face.axis();
+        if face.is_negative() {
+            if coordinate <= self.upper_bounds[axis] {
+                self.lower_bounds[axis] = coordinate;
+            } else {
+                return None;
+            }
+        } else {
+            if coordinate >= self.lower_bounds[axis] {
+                self.upper_bounds[axis] = coordinate;
+            } else {
+                return None;
+            }
+        }
+        Some(self)
+    }
+
     /// Substitutes the given coordinate range for the coordinates from `self`
     /// on the axis `axis`.
     ///
