@@ -714,7 +714,7 @@ fn push_out(body: &mut Body, space: &space::Read<'_>) -> Option<FreeVector> {
     // Nothing to do if we are not colliding with anything.
     // TODO: It might be more efficient to let the caller make this decision using information
     // it already has from a previous stage of the collision process?
-    find_colliding_cubes(space, body.collision_box_abs()).next()?;
+    find_colliding_cubes(space, body.uncrushed_collision_box_abs()).next()?;
 
     let max_distance = 4.125;
 
@@ -730,12 +730,12 @@ fn push_out(body: &mut Body, space: &space::Read<'_>) -> Option<FreeVector> {
     // Find the direction requiring the shortest distance to become free of obstacles.
     let shortest_push_out = candidates
         .filter_map(|direction| attempt_push_out(body, space, direction * max_distance))
-        .min_by_key(|&(_, _, distance)| distance);
+        .min_by_key(|candidate| candidate.rank);
 
-    if let Some((new_position, new_occupying, _)) = shortest_push_out {
+    if let Some(candidate) = shortest_push_out {
         let old_position: FreePoint = body.position.map(NotNan::into_inner);
-        body.set_position_occupying(new_position, new_occupying);
-        Some(new_position - old_position)
+        body.set_position_occupying(candidate.new_position, candidate.new_occupying);
+        Some(candidate.new_position - old_position)
     } else {
         None
     }
@@ -747,8 +747,54 @@ fn attempt_push_out(
     body: &Body,
     space: &space::Read<'_>,
     displacement: FreeVector,
-) -> Option<(FreePoint, Aab, NotNan<FreeCoordinate>)> {
-    'raycast: for aab_step in super::collision::aab_raycast(body.occupying, displacement, true).0 {
+) -> Option<PushOutCandidate> {
+    let ideal = body.uncrushed_collision_box_abs();
+
+    // Before doing any collision tests, uncrush the bounding box's trailing faces:
+    // move them outward to their desired position.
+    // This causes the found position, if any, to be big enough to allow that uncrushing.
+    //
+    // To see the value of this, consider a body which is “crushed into the floor”: its
+    // `occupying` box might not intersect the floor, but its `uncrushed_collision_box_abs()` does,
+    // and it should be moved upward until there is room for the uncrushed box. Without this step,
+    // such a body will never be moved upward unless pushed/controlled to do so.
+    //
+    // TODO: Do we really want to uncrush trailing faces only, or should we also do so for leading
+    // faces?
+    let mut candidate_aab = body.occupying;
+    let mut expansion_distance = FreeVector::zero();
+    for axis in Axis::ALL {
+        use core::cmp::Ordering;
+        match displacement[axis].partial_cmp(&0.0) {
+            Some(Ordering::Greater) => {
+                let face = axis.negative_face();
+                let new_coord = ideal.face_coordinate_on_axis(face);
+                if let Some(expanded) = candidate_aab.with_face_coordinate_on_axis(face, new_coord)
+                {
+                    expansion_distance[axis] =
+                        candidate_aab.face_coordinate_on_axis(face) - new_coord;
+                    candidate_aab = expanded;
+                }
+            }
+            Some(Ordering::Less) => {
+                let face = axis.positive_face();
+                let new_coord = ideal.face_coordinate_on_axis(face);
+                if let Some(expanded) = candidate_aab.with_face_coordinate_on_axis(face, new_coord)
+                {
+                    expansion_distance[axis] =
+                        new_coord - candidate_aab.face_coordinate_on_axis(face);
+                    candidate_aab = expanded;
+                }
+            }
+            Some(Ordering::Equal) | None => {}
+        }
+    }
+    // std::eprintln!(
+    //     "direction {displacement:?} initial {initial:?} ideal {ideal:?} uncrushed {candidate_aab:?}",
+    //     initial = body.occupying,
+    // );
+
+    'raycast: for aab_step in super::collision::aab_raycast(candidate_aab, displacement, true).0 {
         for cube in aab_step.translated_aab.round_up_to_grid().interior_iter() {
             // TODO: refactor to combine this with other collision attribute tests
             match space.get_evaluated(cube).uniform_collision() {
@@ -762,16 +808,35 @@ fn attempt_push_out(
                 }
             }
         }
+
         // No collisions, so we can use this.
-        return Some((
-            // TODO: should return the translated_aab to become the new body.occupying
-            body.position.map(NotNan::into_inner) + (displacement * aab_step.t_distance),
-            aab_step.translated_aab,
-            NotNan::new(aab_step.t_distance * displacement.length()).ok()?,
-        ));
+        let candidate = PushOutCandidate {
+            new_position: body.position.map(NotNan::into_inner)
+                + (displacement * aab_step.t_distance),
+            new_occupying: aab_step.translated_aab,
+            rank: NotNan::new(
+                // TODO: Not sure if this is a good formula. Maybe we should just strictly rank
+                // all uncrushing above all non-uncrushing moves?
+                aab_step.t_distance * displacement.length() - expansion_distance.length() * 2.0,
+            )
+            .ok()?,
+        };
+        // std::eprintln!("success {candidate:?}");
+        return Some(candidate);
     }
 
     None
+}
+
+/// Results of a push-out attempt in a specific direction.
+#[derive(Debug)]
+struct PushOutCandidate {
+    /// Proposed `Body::position` value.
+    new_position: FreePoint,
+    /// Proposed `Body::occupying` value
+    new_occupying: Aab,
+
+    rank: NotNan<FreeCoordinate>,
 }
 
 /// If [`Body::occupying`] is intersecting anything, shrink it so it isn’t, if possible.

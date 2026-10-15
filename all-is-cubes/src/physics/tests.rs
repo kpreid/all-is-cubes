@@ -240,7 +240,7 @@ fn falling_collision_partial_block() {
 }
 
 #[test]
-fn push_out_simple() {
+fn push_out_simple_intersection() {
     let [block] = make_some_blocks();
     let mut tester = BodyTester::new(
         Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
@@ -260,6 +260,44 @@ fn push_out_simple() {
     dbg!(info);
 
     assert_eq!(tester.body().position(), point3(1.5, 0.5, 0.5));
+    assert_eq!(
+        tester.body().collision_box_abs(),
+        Aab::from_lower_upper([1., 0., 0.], [2., 1., 1.])
+    );
+    assert_eq!(tester.body().velocity(), Vector3D::zero());
+    // TODO: push out should create and report contacts just like normal collision
+    // assert_eq!(contacts, [CubeFace::new((0, 0, 0), Face7::PY)]);
+}
+
+#[test]
+fn push_out_simple_uncrush() {
+    let [block] = make_some_blocks();
+    let mut tester = BodyTester::new(
+        Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+            .filled_with(block.clone())
+            .build(),
+        {
+            let mut body = test_body();
+            // intersection of 0.25, but no overlap in occupying
+            body.set_position_occupying(
+                point3(1.25, 0.5, 0.5),
+                Aab::from_lower_upper([1., 0., 0.], [1.75, 1., 1.]),
+            );
+            body.set_velocity(Vector3D::zero());
+            body.flying = true;
+            body
+        },
+        time::TickSchedule::per_second(1),
+    );
+
+    let (_contacts, info) = dbg!(tester.step());
+    dbg!(info);
+
+    assert_eq!(tester.body().position(), point3(1.5, 0.5, 0.5));
+    assert_eq!(
+        tester.body().collision_box_abs(),
+        Aab::from_lower_upper([1., 0., 0.], [2., 1., 1.])
+    );
     assert_eq!(tester.body().velocity(), Vector3D::zero());
     // TODO: push out should create and report contacts just like normal collision
     // assert_eq!(contacts, [CubeFace::new((0, 0, 0), Face7::PY)]);
