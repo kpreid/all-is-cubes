@@ -90,11 +90,15 @@ impl Aab {
     ///
     /// Panics if any given coordinate is NaN.
     #[inline]
+    #[track_caller]
     pub fn from_two_points(mut a: FreePoint, mut b: FreePoint) -> Self {
         sort_two(&mut a.x, &mut b.x);
         sort_two(&mut a.y, &mut b.y);
         sort_two(&mut a.z, &mut b.z);
-        Self::from_lower_upper(a, b)
+        match Self::checked_from_lower_upper(a, b) {
+            Some(aab) => aab,
+            None => panic!("AAB may not be constructed from NaN values: {a:?}, {b:?}"),
+        }
     }
 
     /// Constructs an [`Aab`] centered on the origin,
