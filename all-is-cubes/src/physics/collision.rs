@@ -100,11 +100,13 @@ pub(crate) enum StopAt {
 /// Performs a *continuous collision detection:* given a straight-line translation of `aab`
 /// by `delta_position`, finds where that movement first collides with `space`'s collidable blocks.
 ///
-/// The return value specifies the distance achieved and the normal (face) of the surface collided
-/// with; if [`None`], then no obstacles were met along the full length of the line segment.
+/// The return value reports how far `aab` could be moved before colliding, or its final position
+/// translated by `delta_position` if it collided with nothing.
 ///
 /// `collision_callback` is called once for each colliding cube — any one of them would have been
 /// sufficient to stop, but all are reported. It is not called for each voxel of each cube.
+///
+/// `stop_at` controls whether collisions already occurring are reported.
 pub(crate) fn collide_along_ray<Sp, CC>(
     space: &Sp,
     delta_position: FreeVector,

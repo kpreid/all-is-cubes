@@ -714,8 +714,7 @@ fn attempt_push_out(
                 }
                 Some(block::Collision::None) => {}
                 None => {
-                    // TODO: Either check collision, or continue
-                    //continue 'raycast;
+                    // TODO: Implement collision with non-uniform blocks
                 }
             }
         }
