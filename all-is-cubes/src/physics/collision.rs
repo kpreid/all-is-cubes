@@ -609,11 +609,19 @@ mod tests {
     #[test]
     fn collide_along_ray_with_opaque_block() {
         collide_along_ray_tester(
-            1.5,
+            // Set up to collide with the block such that the ray doesn't pass through it, to
+            // make sure the right cube is returned.
+            // The block is at [1, 0, 0] and we're "dropping" a block-shaped AAB onto it
+            // with lower corner [0.5, 1.5, 0] so it should contact the "left" half of
+            // the `block` after moving a distance of 0.5 plus whatever penetration
+            // depth into a recursive block applies.
+            Cube::ORIGIN.aab().translate(vec3(0.5, 1.5, 0.)),
+            vec3(0., -2., 0.),
             |_u| {
                 let [block] = make_some_blocks();
                 [AIR, block]
             },
+            StopAt::NotAlreadyColliding,
             CollisionRayEnd {
                 t_distance: 0.25, // half of a unit cube, quarter of a ray with magnitude 2
                 translated_aab: Aab::from_lower_upper([0.5, 1.0, 0.0], [1.5, 2.0, 1.0]),
@@ -625,8 +633,10 @@ mod tests {
     #[test]
     fn collide_along_ray_recursive_from_outside() {
         collide_along_ray_tester(
-            1.5,
+            Cube::ORIGIN.aab().translate(vec3(0.5, 1.5, 0.)),
+            vec3(0., -2., 0.),
             |u| [AIR, make_slab(u, 1, R2)],
+            StopAt::NotAlreadyColliding,
             CollisionRayEnd {
                 t_distance: 0.5, // half of a ray with magnitude 2
                 translated_aab: Aab::from_lower_upper([0.5, 0.5, 0.0], [1.5, 1.5, 1.0]),
@@ -643,8 +653,10 @@ mod tests {
     #[test]
     fn collide_along_ray_recursive_from_inside() {
         collide_along_ray_tester(
-            0.75, // initial Y inside of the block we will collide with
+            Cube::ORIGIN.aab().translate(vec3(0.5, 0.75, 0.)), // initial Y inside of the block we will collide with
+            vec3(0., -2., 0.),
             |u| [AIR, make_slab(u, 1, R2)],
+            StopAt::NotAlreadyColliding,
             CollisionRayEnd {
                 t_distance: 0.125,
                 translated_aab: Aab::from_lower_upper([0.5, 0.5, 0.0], [1.5, 1.5, 1.0]),
@@ -666,8 +678,10 @@ mod tests {
         let t_distance = 0.125;
 
         collide_along_ray_tester(
-            0.75,
+            Cube::ORIGIN.aab().translate(vec3(0.5, 0.75, 0.)),
+            vec3(0., -2., 0.),
             |u| [make_slab(u, 1, R4), make_slab(u, 1, R2)],
+            StopAt::NotAlreadyColliding,
             CollisionRayEnd {
                 t_distance,
                 translated_aab,
@@ -679,9 +693,11 @@ mod tests {
             },
         );
         collide_along_ray_tester(
-            0.75,
+            Cube::ORIGIN.aab().translate(vec3(0.5, 0.75, 0.)),
+            vec3(0., -2., 0.),
             // Opposite ordering of the other test
             |u| [make_slab(u, 1, R2), make_slab(u, 1, R4)],
+            StopAt::NotAlreadyColliding,
             CollisionRayEnd {
                 t_distance: 0.125,
                 translated_aab,
@@ -696,10 +712,12 @@ mod tests {
 
     #[expect(clippy::needless_pass_by_value, reason = "convenience")]
     fn collide_along_ray_tester(
-        initial_y: FreeCoordinate,
+        aab: Aab,
+        delta_position: FreeVector,
         block_gen: fn(&mut Universe) -> [Block; 2],
+        stop_at: StopAt,
         expected_end: CollisionRayEnd,
-    ) {
+    ) -> Vec<Contact> {
         let u = &mut Universe::new();
         let blocks = block_gen(u);
         let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
@@ -715,83 +733,62 @@ mod tests {
         // in `aic-test` but they don't need `all-is-cubes` internals as much.
         // print_space(&space.read(), [1., 1., 1.]);
 
-        // Set up to collide with the block such that the ray doesn't pass through it, to
-        // make sure the right cube is returned.
-        // The block is at [1, 0, 0] and we're "dropping" a block-shaped AAB onto it
-        // with lower corner [0.5, 1.5, 0] so it should contact the "left" half of
-        // the `block` after moving a distance of 0.5 plus whatever penetration
-        // depth into a recursive block applies.
-        let aab = Cube::ORIGIN.aab().translate(vec3(0.5, initial_y, 0.));
-        let delta_position = vec3(0., -2., 0.);
-
         eprintln!("initial AAB: {aab:?}");
-
-        let result = collide_along_ray(
-            &space.read(),
-            delta_position,
-            aab,
-            drop,
-            StopAt::NotAlreadyColliding,
-        );
-        assert_eq!(
-            result, expected_end,
-            "collide_along_ray() result ≠ expected"
-        );
-    }
-
-    /// Test reporting of being already inside a block at the start of the ray,
-    /// particularly with a trailing AAB bigger than a block.
-    #[test]
-    fn already_colliding() {
-        let mut u = Universe::new();
-        let [block] = make_some_blocks();
-        let half_block = make_slab(&mut u, 1, R2);
-        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
-            .read_ticket(u.read_ticket())
-            .build_and_mutate(|m| {
-                m.set([0, 0, 0], &block).unwrap();
-                m.set([1, 0, 0], &half_block).unwrap();
-                Ok(())
-            })
-            .unwrap();
-
-        let aab =
-            Aab::from_lower_upper([-1., -1., -1.], [2., 1., 1.]).translate(vec3(0.5, 0.0, 0.5));
-        let delta_position = vec3(1., 0., 0.);
 
         let mut contacts = Vec::new();
         let result = collide_along_ray(
             &space.read(),
             delta_position,
             aab,
-            |c| contacts.push(c),
-            StopAt::NotAlreadyColliding,
+            |contact| contacts.push(contact),
+            stop_at,
         );
 
+        assert_eq!(
+            result, expected_end,
+            "collide_along_ray() result ≠ expected"
+        );
+
+        contacts
+    }
+
+    /// Test reporting of being already inside a block at the start of the ray,
+    /// particularly with a trailing AAB bigger than a block.
+    #[test]
+    fn already_colliding() {
+        let aab =
+            Aab::from_lower_upper([-1., -1., -1.], [2., 1., 1.]).translate(vec3(0.5, 0.0, 0.5));
+        let delta_position = vec3(1., 0., 0.);
+        let contacts = collide_along_ray_tester(
+            aab,
+            delta_position,
+            |u| {
+                let [block] = make_some_blocks();
+                let half_block = make_slab(u, 1, R2);
+                [block, half_block]
+            },
+            StopAt::NotAlreadyColliding,
+            // This result is unobstructed (distance = 1) because bodies are allowed to move
+            // *out* of intersections.
+            CollisionRayEnd {
+                t_distance: 1.0,
+                translated_aab: aab.translate(delta_position),
+                contact: None,
+            },
+        );
+
+        let contact0 = Contact::Block(CubeFace::new([0, 0, 0], Face7::Within));
         let contact1 = Contact::Voxel {
             cube: Cube::new(1, 0, 0),
             resolution: R2,
             // TODO: the voxel reported here is arbitrary, so this test is fragile
             voxel: CubeFace::new([0, 0, 0], Face7::Within),
         };
-        let contact0 = Contact::Block(CubeFace::new([0, 0, 0], Face7::Within));
-        assert_eq!(
-            (result, contacts),
-            (
-                // This result is unobstructed (distance = 1) because bodies are allowed to move
-                // *out* of intersections.
-                CollisionRayEnd {
-                    t_distance: 1.0,
-                    translated_aab: aab.translate(delta_position),
-                    contact: None,
-                },
-                // Contacts are duplicated due to the currently-necessary final collision check.
-                // We may be able to eliminate this later, if the AAB math is revised to use fixed
-                // point coordinates and thus never have surprising rounding, but I am not set on
-                // that route.
-                vec![contact0, contact1, contact0, contact1]
-            )
-        )
+        // Contacts are duplicated due to the currently-necessary final collision check.
+        // We may be able to eliminate this later, if the AAB math is revised to use fixed
+        // point coordinates and thus never have surprising rounding, but I am not set on
+        // that route.
+        assert_eq!(contacts, vec![contact0, contact1, contact0, contact1]);
     }
 
     #[test]
