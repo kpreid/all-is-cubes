@@ -161,14 +161,6 @@ where
         let mut something_hit: Option<CollisionRayEnd> = None;
         'potential_collision: for cube in potential_intersection_bounds.interior_iter() {
             let cell = space.get_cell(cube);
-            let full_cube_end = CollisionRayEnd {
-                t_distance: aab_step.t_distance,
-                translated_aab: aab_step.translated_aab,
-                contact: Some(Contact::Block(CubeFace {
-                    cube,
-                    face: aab_step.aab_face.opposite(),
-                })),
-            };
             let found_end @ CollisionRayEnd {
                 contact: Some(found_contact),
                 ..
@@ -177,7 +169,14 @@ where
                     // No collision for this block
                     continue 'potential_collision;
                 }
-                Some(block::Collision::Hard) => full_cube_end,
+                Some(block::Collision::Hard) => CollisionRayEnd {
+                    t_distance: aab_step.t_distance,
+                    translated_aab: aab_step.translated_aab,
+                    contact: Some(Contact::Block(CubeFace {
+                        cube,
+                        face: aab_step.aab_face.opposite(),
+                    })),
+                },
                 None => {
                     // Recursion
                     if let found_end @ CollisionRayEnd {
