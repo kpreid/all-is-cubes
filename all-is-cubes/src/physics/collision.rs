@@ -606,6 +606,48 @@ mod tests {
     use rand_distr::Distribution as _;
     use std::eprintln;
 
+    #[expect(clippy::needless_pass_by_value, reason = "convenience")]
+    fn collide_along_ray_tester(
+        aab: Aab,
+        delta_position: FreeVector,
+        block_gen: fn(&mut Universe) -> [Block; 2],
+        stop_at: StopAt,
+        expected_end: CollisionRayEnd,
+    ) -> Vec<Contact> {
+        let u = &mut Universe::new();
+        let blocks = block_gen(u);
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+            .read_ticket(u.read_ticket())
+            .build_and_mutate(|m| {
+                m.set([0, 0, 0], &blocks[0]).unwrap();
+                m.set([1, 0, 0], &blocks[1]).unwrap();
+                Ok(())
+            })
+            .unwrap();
+
+        // TODO: Figure out how to recover this visualization .. other tests using it are
+        // in `aic-test` but they don't need `all-is-cubes` internals as much.
+        // print_space(&space.read(), [1., 1., 1.]);
+
+        eprintln!("initial AAB: {aab:?}");
+
+        let mut contacts = Vec::new();
+        let result = collide_along_ray(
+            &space.read(),
+            delta_position,
+            aab,
+            |contact| contacts.push(contact),
+            stop_at,
+        );
+
+        assert_eq!(
+            result, expected_end,
+            "collide_along_ray() result ≠ expected"
+        );
+
+        contacts
+    }
+
     #[test]
     fn collide_along_ray_with_opaque_block() {
         collide_along_ray_tester(
@@ -708,48 +750,6 @@ mod tests {
                 }),
             },
         );
-    }
-
-    #[expect(clippy::needless_pass_by_value, reason = "convenience")]
-    fn collide_along_ray_tester(
-        aab: Aab,
-        delta_position: FreeVector,
-        block_gen: fn(&mut Universe) -> [Block; 2],
-        stop_at: StopAt,
-        expected_end: CollisionRayEnd,
-    ) -> Vec<Contact> {
-        let u = &mut Universe::new();
-        let blocks = block_gen(u);
-        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
-            .read_ticket(u.read_ticket())
-            .build_and_mutate(|m| {
-                m.set([0, 0, 0], &blocks[0]).unwrap();
-                m.set([1, 0, 0], &blocks[1]).unwrap();
-                Ok(())
-            })
-            .unwrap();
-
-        // TODO: Figure out how to recover this visualization .. other tests using it are
-        // in `aic-test` but they don't need `all-is-cubes` internals as much.
-        // print_space(&space.read(), [1., 1., 1.]);
-
-        eprintln!("initial AAB: {aab:?}");
-
-        let mut contacts = Vec::new();
-        let result = collide_along_ray(
-            &space.read(),
-            delta_position,
-            aab,
-            |contact| contacts.push(contact),
-            stop_at,
-        );
-
-        assert_eq!(
-            result, expected_end,
-            "collide_along_ray() result ≠ expected"
-        );
-
-        contacts
     }
 
     /// Test reporting of being already inside a block at the start of the ray,
