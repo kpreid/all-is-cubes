@@ -161,14 +161,13 @@ where
         let mut something_hit: Option<CollisionRayEnd> = None;
         'potential_collision: for cube in potential_intersection_bounds.interior_iter() {
             let cell = space.get_cell(cube);
-            let found_end @ CollisionRayEnd {
-                contact: Some(found_contact),
-                ..
-            } = (match Sp::collision(cell) {
-                Some(block::Collision::None) => {
+            let found_end = match Sp::collision(cell) {
+                Some(block::Collision::None) => CollisionRayEnd {
+                    t_distance: aab_step.t_distance,
+                    translated_aab: aab_step.translated_aab,
                     // No collision for this block
-                    continue 'potential_collision;
-                }
+                    contact: None,
+                },
                 Some(block::Collision::Hard) => CollisionRayEnd {
                     t_distance: aab_step.t_distance,
                     translated_aab: aab_step.translated_aab,
@@ -178,10 +177,8 @@ where
                     })),
                 },
                 None => {
-                    // Recursion
-                    if let found_end @ CollisionRayEnd {
-                        contact: Some(_), ..
-                    } = Sp::recurse(
+                    // No simple case; must descend into the voxels
+                    Sp::recurse(
                         cube,
                         aab,
                         delta_position,
@@ -193,17 +190,17 @@ where
                             (StopAt::NotAlreadyColliding, Face7::Within) => StopAt::Anything,
                             (stop_at, _) => stop_at,
                         },
-                    ) {
-                        found_end
-                    } else {
-                        // No collision
-                        continue 'potential_collision;
-                    }
+                    )
                 }
-            })
+            };
+
+            let CollisionRayEnd {
+                contact: Some(found_contact),
+                ..
+            } = found_end
             else {
-                // TODO: figure out a way to express this control flow better
-                unreachable!("lack of contact should have been checked")
+                // No collision with `cube`.
+                continue 'potential_collision;
             };
 
             if stop_at == StopAt::NotAlreadyColliding {
