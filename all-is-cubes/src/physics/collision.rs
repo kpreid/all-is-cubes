@@ -37,11 +37,8 @@ pub(crate) struct CollisionRayEnd {
     /// The originally provided AAB, translated to the position at which it collided
     /// or the end of the motion.
     ///
-    /// TODO(crush): This is currently unused.
-    /// It should be used by changing stepping to use `translated_aab` as the new value of
-    /// `body.occupying`, so that the occupied volume is identical to the volume that was checked
-    /// for collision (at least, once `nudge_on_ray()` is replaced with a more reliable system).
-    /// If that strategy doesn't work out, this field may be deleted if it turns out unneccessary.
+    /// [`collide_along_ray()`] guarantees that none of the collisions which stopped the body,
+    /// if any, are within this box.
     pub translated_aab: Aab,
 
     /// One of possibly several collisions that ended the movement.
@@ -328,8 +325,6 @@ pub(crate) trait CollisionSpace {
     /// This breaks the infinite static recursion we would get otherwise,
     /// by only compiling into a call to [`collide_along_ray()`] if there is anything to do.
     /// TODO: document further
-    ///
-    /// * `entry_end`: the endpoint we would return if the recursion stopped here — entering the given cell.
     fn recurse(
         cube: Cube,
         aab: Aab,
