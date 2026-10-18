@@ -6,10 +6,10 @@ use alloc::sync::Arc;
 // TODO: if not using threads, don't even use a Mutex as it's entirely wasted
 use alloc::boxed::Box;
 #[cfg(feature = "auto-threads")]
-use alloc::sync::Weak;
-#[cfg(feature = "auto-threads")]
 use alloc::vec::Vec;
 use core::range::Range;
+#[cfg(feature = "auto-threads")]
+use std::sync::Condvar;
 use std::sync::Mutex;
 
 use half::f16;
@@ -45,7 +45,10 @@ type Point = all_is_cubes::euclid::Point2D<u32, ImagePixel>;
 
 #[derive(Debug)]
 pub(crate) struct RaytraceToTexture {
-    inner: Arc<Mutex<Inner>>,
+    /// State of the actual raytracer.
+    /// Shared with a background thread, if possible.
+    worker: WorkerOwner,
+
     reprojection_uniform_buffer: wgpu::Buffer,
     draw_direct_bind_group:
         Memo<(crate::Id<wgpu::TextureView>, crate::Id<wgpu::TextureView>), wgpu::BindGroup>,
@@ -68,7 +71,7 @@ pub(crate) struct RaytraceToTexture {
     /// in case that size might be different from the current size.
     should_reproject: Option<Viewport>,
 
-    /// Camera that was used for the frame currently stored in `Inner::color_render_target`.
+    /// Camera that was used for the frame currently stored in `State::color_render_target`.
     camera_used: Camera,
 
     /// Used to initialize `gap_fill_texture`.
@@ -90,9 +93,23 @@ pub(crate) struct RaytraceToTexture {
     background_thread: Option<std::thread::JoinHandle<()>>,
 }
 
+/// Shuts down the background thread, if any, when dropped.
+#[derive(Debug)]
+struct WorkerOwner(Arc<Worker>);
+
+/// Shared state between the renderer and the background thread, if any.
+#[derive(Debug)]
+struct Worker {
+    mutex: Mutex<Option<State>>,
+    /// The condition for this condvar is `dirty_pixels != 0 || state.is_none()`,
+    /// meaning that either there is work to do or the background thread should exit.
+    #[cfg(feature = "auto-threads")]
+    condvar: Condvar,
+}
+
 /// State for the possibly-asynchronous tracing job.
 #[derive(Debug)]
-struct Inner {
+struct State {
     rtr: RtRenderer<InLayer>,
     update_strategy: UpdateStrategy,
     dirty_pixels: usize,
@@ -171,39 +188,41 @@ impl RaytraceToTexture {
             )
         });
 
-        let inner = Arc::new(Mutex::new(Inner {
-            rays_per_frame: 5000
-                * match cameras.graphics_options().lighting_display {
-                    all_is_cubes_render::camera::LightingOption::Bounce { .. } => 1,
-                    _ => 10,
-                },
-            rtr: RtRenderer::new(
-                cameras,
-                Box::new(raytracer_size_policy),
-                listen::constant(Layers {
-                    world: Arc::new(InLayer::World),
-                    ui: Arc::new(InLayer::Ui),
-                }),
-            ),
-            dirty_pixels: update_strategy.cycle_length(),
-            update_strategy,
-            color_render_target: DrawableTexture::new(wgpu::TextureFormat::Rgba16Float),
-            // Not using a depth texture format because float depth textures cannot be copied to.
-            depth_render_target: DrawableTexture::new(wgpu::TextureFormat::R32Float),
+        let worker = WorkerOwner(Arc::new(Worker {
+            #[cfg(feature = "auto-threads")]
+            condvar: Condvar::new(),
+            mutex: Mutex::new(Some(State {
+                rays_per_frame: 5000
+                    * match cameras.graphics_options().lighting_display {
+                        all_is_cubes_render::camera::LightingOption::Bounce { .. } => 1,
+                        _ => 10,
+                    },
+                rtr: RtRenderer::new(
+                    cameras,
+                    Box::new(raytracer_size_policy),
+                    listen::constant(Layers {
+                        world: Arc::new(InLayer::World),
+                        ui: Arc::new(InLayer::Ui),
+                    }),
+                ),
+                dirty_pixels: update_strategy.cycle_length(),
+                update_strategy,
+                color_render_target: DrawableTexture::new(wgpu::TextureFormat::Rgba16Float),
+                // Not using a depth texture format because float depth textures cannot be copied to.
+                depth_render_target: DrawableTexture::new(wgpu::TextureFormat::R32Float),
+            })),
         }));
 
         #[cfg(feature = "auto-threads")]
         let background_thread = {
-            let weak_inner = Arc::downgrade(&inner);
+            // This thread will sleep on the condvar when not working, and terminate when
+            // the `Option` is cleared as `impl Drop for RaytraceToTexture` does.
+            let worker = Arc::clone(&worker.0);
             match std::thread::Builder::new()
                 .name("RaytraceToTexture".into())
-                .spawn(move || background_tracing_task(weak_inner))
+                .spawn(move || background_tracing_task(worker))
             {
-                Ok(handle) => {
-                    // The thread will stop itself when its weak reference breaks.
-                    // The join handle is only used to check if the thread is alive.
-                    Some(handle)
-                }
+                Ok(handle) => Some(handle),
                 Err(e) => {
                     log::error!(
                         "RaytraceToTexture failed to create background tracing thread: {e}. \
@@ -223,7 +242,7 @@ impl RaytraceToTexture {
                 usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
                 mapped_at_creation: false,
             }),
-            inner,
+            worker,
             may_start_next_frame: true,
             should_reproject: None,
             camera_used,
@@ -242,10 +261,11 @@ impl RaytraceToTexture {
         read_tickets: Layers<ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
-        let inner = &mut *self.inner.lock().unwrap();
-        if inner.update_strategy.incremental() || self.may_start_next_frame {
+        let state_option = &mut *self.worker.0.mutex.lock().expect("worker not poisoned");
+        let worker_state: &mut State = Option::as_mut(state_option).expect("worker not cleared");
+        if worker_state.update_strategy.incremental() || self.may_start_next_frame {
             self.may_start_next_frame = false;
-            inner.update_inputs(read_tickets, cursor)?;
+            self.worker.update_inputs(worker_state, read_tickets, cursor)?;
         }
         Ok(())
     }
@@ -260,7 +280,7 @@ impl RaytraceToTexture {
         camera: &Camera,
         queries: Option<&Queries>,
     ) {
-        // First, do steps we can do without taking the `Inner` lock.
+        // First, do steps we can do without taking the `State` lock.
 
         let render_viewport = raytracer_size_policy(camera.viewport());
 
@@ -301,7 +321,8 @@ impl RaytraceToTexture {
 
         // Take the lock.
         let start_time = Instant::now();
-        let inner = &mut *self.inner.lock().unwrap(); // not handling poisoning, just fail
+        let state_option = &mut *self.worker.0.mutex.lock().expect("worker not poisoned");
+        let state: &mut State = Option::as_mut(state_option).expect("worker not cleared");
         let got_lock_time = Instant::now();
         log::trace!(
             "waiting for raytracer lock lock for {}",
@@ -309,20 +330,20 @@ impl RaytraceToTexture {
         );
 
         // Resize textures if needed.
-        if inner.update_strategy.render_viewport() != render_viewport {
-            inner.color_render_target.resize(
+        if state.update_strategy.render_viewport() != render_viewport {
+            state.color_render_target.resize(
                 device,
                 Some("RaytraceToTexture::color_render_target"),
                 render_viewport.framebuffer_size,
             );
-            inner.depth_render_target.resize(
+            state.depth_render_target.resize(
                 device,
                 Some("RaytraceToTexture::depth_render_target"),
                 render_viewport.framebuffer_size,
             );
-            inner.update_strategy.resize(render_viewport);
+            state.update_strategy.resize(render_viewport);
 
-            if inner.update_strategy.want_reprojection() {
+            if state.update_strategy.want_reprojection() {
                 self.gap_fill_texture = Some(Identified::new(mip_ping::Texture::new(
                     device,
                     self.gap_fill_pipelines.as_deref().unwrap(),
@@ -335,12 +356,12 @@ impl RaytraceToTexture {
                 )));
             }
 
-            inner.dirty();
+            self.worker.dirty(state);
         }
 
         // Update bind group if needed
-        let color_view: &Identified<wgpu::TextureView> = inner.color_render_target.view().unwrap();
-        let depth_view: &Identified<wgpu::TextureView> = inner.depth_render_target.view().unwrap();
+        let color_view: &Identified<wgpu::TextureView> = state.color_render_target.view().unwrap();
+        let depth_view: &Identified<wgpu::TextureView> = state.depth_render_target.view().unwrap();
         let draw_direct_bind_group = self.draw_direct_bind_group.get_or_insert(
             (color_view.global_id(), depth_view.global_id()),
             || {
@@ -419,20 +440,20 @@ impl RaytraceToTexture {
             }
         };
         if !is_background {
-            inner.do_some_tracing();
+            let _ = state.do_some_tracing();
         }
 
         // Copy to GPU texture if we are in incremental mode or the frame is finished.
-        if inner.update_strategy.incremental() || inner.dirty_pixels == 0 {
-            inner.color_render_target.upload(queue);
-            inner.depth_render_target.upload(queue);
-            self.camera_used = inner.rtr.cameras().cameras().world.clone();
+        if state.update_strategy.incremental() || state.dirty_pixels == 0 {
+            state.color_render_target.upload(queue);
+            state.depth_render_target.upload(queue);
+            self.camera_used = state.rtr.cameras().cameras().world.clone();
             self.may_start_next_frame = true;
         }
 
         // If needed, compute reprojection matrix from the traced image's view to the current view.
         self.should_reproject = None;
-        if inner.update_strategy.want_reprojection()
+        if state.update_strategy.want_reprojection()
             // TODO: Compare transforms with some epsilon rather than exact equality.
             && self.camera_used.view_transform() != camera.view_transform()
         {
@@ -572,23 +593,39 @@ impl RaytraceToTexture {
     }
 }
 
-impl Inner {
+impl Drop for WorkerOwner {
+    fn drop(&mut self) {
+        if let Ok(mut guard) = self.0.mutex.lock() {
+            *guard = None;
+        }
+        #[cfg(feature = "auto-threads")]
+        self.0.condvar.notify_all();
+    }
+}
+
+impl WorkerOwner {
+    fn dirty(&self, locked_state: &mut State) {
+        locked_state.dirty_pixels = locked_state.update_strategy.cycle_length();
+        #[cfg(feature = "auto-threads")]
+        self.0.condvar.notify_one();
+    }
+
     fn update_inputs(
-        &mut self,
+        &self,
+        locked_state: &mut State,
         read_tickets: Layers<ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
-        if self.rtr.update(read_tickets, cursor)? {
-            self.dirty();
+        if locked_state.rtr.update(read_tickets, cursor)? {
+            self.dirty(locked_state);
         }
         Ok(())
     }
+}
 
-    fn dirty(&mut self) {
-        self.dirty_pixels = self.update_strategy.cycle_length();
-    }
-
-    fn do_some_tracing(&mut self) {
+impl State {
+    /// Returns whether any work remains to do.
+    fn do_some_tracing(&mut self) -> bool {
         #![expect(clippy::duration_suboptimal_units, reason = "using consistent units")]
 
         type Trace = (Point, [f16; 4], f32);
@@ -596,7 +633,7 @@ impl Inner {
         if self.dirty_pixels == 0 {
             // We've traced the entire frame buffer area, and no changes have occurred,
             // so we have no need to trace again.
-            return;
+            return false;
         }
 
         let render_viewport = self.update_strategy.render_viewport();
@@ -748,6 +785,8 @@ impl Inner {
         //     tracing_duration.as_micros(),
         //     self.rays_per_frame
         // );
+
+        self.dirty_pixels != 0
     }
 }
 
@@ -768,12 +807,27 @@ const REPROJECTION_CLEAR_COLOR: wgpu::Color = wgpu::Color {
     clippy::needless_pass_by_value,
     reason = "let thread function own its state"
 )]
-fn background_tracing_task(weak_inner: Weak<Mutex<Inner>>) {
-    // By using a weak reference, we arrange for this task to stop itself when it is no longer
-    // relevant.
-    while let Some(strong_inner) = weak_inner.upgrade() {
-        strong_inner.lock().unwrap().do_some_tracing();
-        std::thread::yield_now();
+fn background_tracing_task(worker: Arc<Worker>) {
+    let Ok(mut guard) = worker.mutex.lock() else {
+        return;
+    };
+    while let Some(state) = Option::as_mut(&mut *guard) {
+        let still_work_to_do = state.do_some_tracing();
+
+        let lock_result = if still_work_to_do {
+            // Release the lock temporarily for the renderer to access it.
+            drop(guard);
+            std::thread::yield_now();
+            worker.mutex.lock()
+        } else {
+            // Release the lock and wait until there is new work to do.
+            worker.condvar.wait(guard)
+        };
+
+        match lock_result {
+            Ok(new_guard) => guard = new_guard,
+            Err(_) => return,
+        }
     }
 }
 
@@ -993,7 +1047,29 @@ fn raytracer_size_policy(mut viewport: Viewport) -> Viewport {
 
 #[cfg(test)]
 mod tests {
-    //use super::*;
-    // ...
+    use super::*;
+
+    #[cfg(feature = "auto-threads")]
+    #[test]
+    fn background_thread_terminates_when_dropped() {
+        use all_is_cubes::universe::Universe;
+        use all_is_cubes_render::camera::GraphicsOptions;
+
+        let (device, _) = wgpu::Device::noop(&wgpu::DeviceDescriptor::default());
+        let shaders = Shaders::new(&device);
+        let cameras = StandardCameras::from_constant_for_test(
+            GraphicsOptions::default(),
+            Viewport::ARBITRARY,
+            &Universe::new(),
+        );
+        let mut rtt = RaytraceToTexture::new(&device, &shaders, cameras);
+        let thread_handle =
+            rtt.background_thread.take().expect("background thread should be present");
+
+        drop(rtt);
+        // This should not block.
+        let () = thread_handle.join().unwrap();
+    }
+
     // TODO: Test PixelPicker since it is independent of the GPU
 }
