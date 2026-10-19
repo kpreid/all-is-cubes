@@ -533,8 +533,8 @@ mod tests {
     use all_is_cubes::raycast::{self, Ray};
     use all_is_cubes::space::Space;
     use all_is_cubes::universe::Universe;
-    use pretty_assertions::assert_eq;
     use alloc::vec::Vec;
+    use pretty_assertions::assert_eq;
 
     type SurfaceIterR<'a> = SurfaceIter<'a, (), raycast::Raycaster>;
 
