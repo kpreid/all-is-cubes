@@ -7,7 +7,8 @@
 use num_traits::float::Float as _;
 
 use arrayvec::ArrayVec;
-use euclid::{Vector3D, vec3};
+use descriptive_unwrap::OptionExt as _;
+use euclid::{Size3D, Vector3D, vec3};
 
 #[cfg(not(any(feature = "std", test)))]
 #[allow(
@@ -22,17 +23,19 @@ use crate::space;
 
 // -------------------------------------------------------------------------------------------------
 
-/// If [`Body::occupying`] is smaller than [`Body::collision_box`], and there is room to grow it,
-/// then do so. This undoes the effect of [`crush_if_colliding()`], and is performed near the
+/// If [`Body::occupying`] is smaller than [`Body::collision_box`] (“crushed”), then fix that as
+/// much as possible.
+///
+/// If there is room to grow `occupying` to its normal size, that is done.
+/// The body’s position may also change, to become its normal position within that box.
+///
+/// This undoes the effect of [`crush_if_colliding()`], and is performed near the
 /// beginning of each body physics step.
-//
-// TODO: implement integrated push-out: move the body position when it would allow further
-// uncrushing away from the opposite direction.
 pub(in crate::physics) fn uncrush(body: &mut Body, space: &space::Read<'_>) -> UncrushInfo {
     const TRACE_UNCRUSH: bool = false;
 
-    let uncrushed = body.uncrushed_collision_box_abs();
-    if uncrushed == body.occupying {
+    let uncrushed_and_unmoved = body.uncrushed_collision_box_abs();
+    if uncrushed_and_unmoved == body.occupying {
         return UncrushInfo::NotNeeded;
     }
 
@@ -47,33 +50,50 @@ pub(in crate::physics) fn uncrush(body: &mut Body, space: &space::Read<'_>) -> U
             );
         }
         let current_volume = body.occupying.volume();
+        let current_crushed_length_per_axis =
+            (uncrushed_and_unmoved.size() - body.occupying.size()).max(Size3D::zero());
 
-        let mut collided_with_anything = false;
+        // Compute the region around the current `body.occupying` that we *might* want to expand
+        // into, and thus should be checked for obstacles.
+        let region_to_check_for_collision = body
+            .occupying
+            .expand_or_shrink(FaceMap::from_fn(|face| {
+                current_crushed_length_per_axis[face.axis()]
+            }))
+            .none_is_unreachable()
+            // protection against rounding error in the subtraction followed by addition;
+            // ensures uncrushed_and_unmoved will always be part of the checked region
+            .union(uncrushed_and_unmoved);
 
-        // `self.occupying` modified to be expanded on exactly one axis.
-        let single_axis_expansions: Vector3D<Aab, ()> = {
+        // `self.occupying` modified to be expanded on exactly one axis;
+        // used to determine which axes a contact is relevant to.
+        let single_axis_check_regions: Vector3D<Aab, ()> = {
             vec3(
-                body.occupying.with_axis_range_from(Axis::X, uncrushed),
-                body.occupying.with_axis_range_from(Axis::Y, uncrushed),
-                body.occupying.with_axis_range_from(Axis::Z, uncrushed),
+                body.occupying.with_axis_range_from(Axis::X, region_to_check_for_collision),
+                body.occupying.with_axis_range_from(Axis::Y, region_to_check_for_collision),
+                body.occupying.with_axis_range_from(Axis::Z, region_to_check_for_collision),
             )
         };
 
-        // Position on each axis which `occupying` could be expanded to touch without colliding with
-        // anything. Note that this
+        let mut collided_with_anything = false;
+
+        // After the `collide_along_ray()` completes, this variable holds the region on each axis
+        // which `occupying` could be expanded to touch without colliding with anything. Note that this
         // * Tracks expansions that are valid on a *single axis only*, but might collide if multiple
         //   axes are done simultaneously.
         // * Has flipped negative coordinates as per `Aab::face_coordinate_outward()`.
+        // * Is potentially bigger than `uncrushed_and_unmoved`.
         let mut clear_space: FaceMap<FreeCoordinate> =
-            FaceMap::from_fn(|face| uncrushed.face_coordinate_outward(face));
+            FaceMap::from_fn(|face| region_to_check_for_collision.face_coordinate_outward(face));
 
-        // Find what we would collide with if `body.occupying` were expanded.
+        // Find what the body could collide with if `body.occupying` were to be expanded and
+        // possibly moved.
         // Note that this is a single collision search which is then used to compute
         // 3 different possible single-axis expansions.
         collide_along_ray(
             space,
             FreeVector::zero(),
-            uncrushed,
+            region_to_check_for_collision,
             |contact| {
                 collided_with_anything = true;
                 let contact_aab = contact.aab();
@@ -82,8 +102,8 @@ pub(in crate::physics) fn uncrush(body: &mut Body, space: &space::Read<'_>) -> U
                     // The contact only counts if it overlaps in the axes perpendicular to the
                     // axis we are considering expanding on.
                     // TODO: it would be more efficient to test only the perpendicular axes
-                    // and not compute `single_axis_expansions` at all.
-                    if !single_axis_expansions[axis].intersects(contact_aab) {
+                    // and not compute `single_axis_check_regions` at all.
+                    if !single_axis_check_regions[axis].intersects(contact_aab) {
                         continue;
                     }
 
@@ -124,7 +144,7 @@ pub(in crate::physics) fn uncrush(body: &mut Body, space: &space::Read<'_>) -> U
 
         if !collided_with_anything {
             // No collisions at all means we can immediately jump to full uncrush.
-            body.occupying = uncrushed;
+            body.occupying = uncrushed_and_unmoved;
             return UncrushInfo::Complete;
         }
 
@@ -132,30 +152,64 @@ pub(in crate::physics) fn uncrush(body: &mut Body, space: &space::Read<'_>) -> U
         let best_expansion: Option<(Axis, Aab, PositiveSign<FreeCoordinate>)> = Axis::ALL
             .into_iter()
             .filter_map(|axis| {
-                let expanded_on_axis = body.occupying.with_axis_range(
-                    axis,
-                    -clear_space[axis.negative_face()],
-                    clear_space[axis.positive_face()],
-                )?;
-                if !expanded_on_axis.contains(body.position()) {
+                let clear_space_min = -clear_space[axis.negative_face()];
+                let clear_space_max = clear_space[axis.positive_face()];
+
+                let is_constrained_low =
+                    clear_space_min > uncrushed_and_unmoved.lower_bounds_p()[axis];
+                let is_constrained_high =
+                    clear_space_max < uncrushed_and_unmoved.upper_bounds_p()[axis];
+
+                // Determine how much expansion, in which direction, we actually propose to do
+                // on this axis.
+                let new_occupying = match (is_constrained_low, is_constrained_high) {
+                    // We can fully expand without any translation.
+                    (false, false) => {
+                        body.occupying.with_axis_range_from(axis, uncrushed_and_unmoved)
+                    }
+
+                    // We must translate the body in the positive direction
+                    (true, false) => body.occupying.with_axis_range(
+                        axis,
+                        clear_space_min,
+                        (clear_space_min + uncrushed_and_unmoved.size()[axis])
+                            .clamp(clear_space_min, clear_space_max),
+                    )?,
+
+                    // We must translate the body in the negative direction
+                    (false, true) => body.occupying.with_axis_range(
+                        axis,
+                        (clear_space_max - uncrushed_and_unmoved.size()[axis])
+                            .clamp(clear_space_min, clear_space_max),
+                        clear_space_max,
+                    )?,
+
+                    // The clear space is less than the goal size, so the body cannot expand fully
+                    // and will just take all available space.
+                    (true, true) => {
+                        body.occupying.with_axis_range(axis, clear_space_min, clear_space_max)?
+                    }
+                };
+
+                if !new_occupying.contains(body.position()) {
                     // Shouldn’t happen, but definitely don’t let occupying stop containing
                     // the body’s position.
                     if TRACE_UNCRUSH {
                         log::trace!(
-                            "rejecting {axis:?} {expanded_on_axis:?} \
+                            "rejecting {axis:?} {new_occupying:?} \
                             for not containing the body's position"
                         );
                     }
                     return None;
                 }
-                let expansion_volume = expanded_on_axis.volume().saturating_sub(current_volume);
+                let expansion_volume = new_occupying.volume().saturating_sub(current_volume);
                 if expansion_volume > 0.0 {
                     // Return the expansion only if it actually made some improvement
-                    Some((axis, expanded_on_axis, expansion_volume))
+                    Some((axis, new_occupying, expansion_volume))
                 } else {
                     if TRACE_UNCRUSH {
                         log::trace!(
-                            "rejecting {axis:?} {expanded_on_axis:?} \
+                            "rejecting {axis:?} {new_occupying:?} \
                             for not being an increase in volume"
                         );
                     }
@@ -164,11 +218,22 @@ pub(in crate::physics) fn uncrush(body: &mut Body, space: &space::Read<'_>) -> U
             })
             .max_by_key(|&(_, _, volume)| volume);
 
-        if let Some((axis, expanded_on_axis, volume)) = best_expansion {
+        if let Some((axis, new_occupying, volume)) = best_expansion {
             if TRACE_UNCRUSH {
-                log::trace!("best axis {axis:?} expands by {volume} to {expanded_on_axis:?}");
+                log::trace!("best axis {axis:?} expands by {volume} to {new_occupying:?}");
             }
-            body.occupying = expanded_on_axis;
+
+            // Compute the position which makes the new crushedness equal on both sides.
+            let mut new_position = body.position();
+            new_position[axis] =
+                // position of new occupying box,
+                new_occupying.lower_bounds_p()[axis]
+                // translated to where the body position should be relative to it,
+                - body.collision_box_rel().lower_bounds_p()[axis]
+                // but scaled to what the new occupying box size is
+                * (new_occupying.size()[axis] / body.collision_box_rel().size()[axis]);
+
+            body.set_position_occupying(new_position, new_occupying);
             successful_expansions.push(axis);
         } else {
             break;
@@ -207,7 +272,7 @@ pub(in crate::physics) enum UncrushInfo {
     NotNeeded,
     /// No room for expansion was found.
     NotPossible,
-    /// Body’s `occupying` is now the right size.
+    /// Body’s `occupying` is now the right size, and no translation was needed.
     Complete,
     /// Body’s `occupying` has been expanded fully or partially on one or more axes.
     Partial {
@@ -308,11 +373,10 @@ mod tests {
             // (Y lower is greater than 1.0, the block top, and greater than 0.75, the
             // fully uncrushed position)
             Aab::from_lower_upper([0.25, 1.125, 0.25], [0.75, 1.75, 0.75]),
-            // No movement.
-            // TODO: Should move up (at which point this is no longer a *partial* success).
-            position,
+            // position moved up
+            point3(0.5, 1.5, 0.5),
             // final occupying should touch the block
-            Aab::from_lower_upper([0., 1., 0.], [1., 1.75, 1.]),
+            Aab::from_lower_upper([0., 1., 0.], [1., 2., 1.]),
             UncrushInfo::Partial {
                 // note: Z and X are equally good and Z coming first is accidental
                 first: Axis::Z,
