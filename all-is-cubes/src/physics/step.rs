@@ -365,16 +365,20 @@ pub(crate) fn step_one_body(
     let position_before_push_out = body.position;
     let (uncrush_info, push_out_info, crush_info): (UncrushInfo, Option<FreeVector>, CrushInfo) =
         if let Some(space) = colliding_space {
-            // Uncrush: increase `body.occupying` to occupy its normal amount of space if that space
-            // is available. This undoes the effect of `crush_if_colliding()`.
-            let uncrush_info = physics::uncrush(body, space);
-            // Push out: move `body.position` away from being inside solid objects.
-            let push_out_info = push_out(body, space);
-            // Crush: If we did not succeed in not being inside any solid objects (either because
-            // push_out found no empty space or because of numerical error), shrink `body.occupying`
-            // to avoid intersections. This way, the upcoming collision tests for movement can
-            // better distinguish surfaces that should stop this body.
+            // Crush: In case we are intersecting any solid objects (either because the solid
+            // objects weren’t there before, or because of numerical error in prior operations)
+            // shrink `body.occupying` to avoid intersections with those objects.
             let crush_info = crush_if_colliding(body, space);
+
+            // Uncrush: increase `body.occupying` to occupy its normal amount of space if that space
+            // is available, and move `body.position` to be centered or otherwise properly
+            // positioned within that space.
+            // This undoes the effect of `crush_if_colliding()` if possible.
+            let uncrush_info = physics::uncrush(body, space);
+
+            // Push out: move `body.position` away from being inside solid objects
+            // (only has any effect if the overlap is larger than crush_if_colliding() handles).
+            let push_out_info = push_out(body, space);
 
             (uncrush_info, push_out_info, crush_info)
         } else {
