@@ -22,7 +22,6 @@ use hashbrown::HashSet as HbHashSet;
 use manyfmt::Refmt as _;
 use ordered_float::NotNan;
 
-use super::collision::{collide_along_ray, find_colliding_cubes, nudge_on_ray};
 use crate::block;
 use crate::character::{self, ParentSpace};
 use crate::fluff::Fluff;
@@ -36,7 +35,10 @@ use crate::math::{
     Aab, Axis, Cube, Face, Face7, FaceMap, FreeCoordinate, FreePoint, FreeVector, PositiveSign,
     notnan,
 };
-use crate::physics::{Body, BodyStepInfo, Contact, ContactSet, StopAt, Velocity};
+use crate::physics::{
+    self, Body, BodyStepInfo, Contact, ContactSet, StopAt, Velocity,
+    collision::{collide_along_ray, find_colliding_cubes, nudge_on_ray},
+};
 use crate::raycast::Ray;
 use crate::rerun_glue as rg;
 use crate::space::{self, Space};
@@ -794,7 +796,7 @@ fn attempt_push_out(
     //     initial = body.occupying,
     // );
 
-    'raycast: for aab_step in super::collision::aab_raycast(candidate_aab, displacement, true).0 {
+    'raycast: for aab_step in physics::aab_raycast(candidate_aab, displacement, true).0 {
         for cube in aab_step.translated_aab.round_up_to_grid().interior_iter() {
             // TODO: refactor to combine this with other collision attribute tests
             match space.get_evaluated(cube).uniform_collision() {

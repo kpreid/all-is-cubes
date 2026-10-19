@@ -4,6 +4,9 @@ use crate::math::FreeCoordinate;
 
 // -------------------------------------------------------------------------------------------------
 
+mod aab_raycast;
+use aab_raycast::{AabRaycastStep, aab_raycast};
+
 mod body;
 pub use body::*;
 
