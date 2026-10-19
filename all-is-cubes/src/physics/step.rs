@@ -845,7 +845,7 @@ pub(super) fn crush_if_colliding(
             StopAt::Anything,
         );
         let Some(a_contact) = a_contact else {
-            // No collision; nothing to do.
+            // No collision; nothing (more) needs to be done.
             break 'crush_step;
         };
 
@@ -853,27 +853,30 @@ pub(super) fn crush_if_colliding(
 
         // Find the direction which has the least penetration depth,
         // thus the smallest crush to resolve the collision.
-        let mut least_penetration_depth: Option<(Face, FreeCoordinate)> = None;
-        for face in Face::ALL {
-            let this_depth = body.occupying.face_coordinate_outward(face)
-                + contact_aab.face_coordinate_outward(face.opposite());
-            if this_depth >= 0. && least_penetration_depth.is_none_or(|(_, d)| this_depth < d) {
-                least_penetration_depth = Some((face, this_depth));
-            }
-        }
+        let least_penetration_depth: Option<(Aab, FreeCoordinate)> = Face::ALL
+            .into_iter()
+            .filter_map(|face| {
+                let depth = body.occupying.face_coordinate_outward(face)
+                    + contact_aab.face_coordinate_outward(face.opposite());
+                if depth >= 0. {
+                    let shrunk =
+                        body.occupying.expand_or_shrink(FaceMap::splat(0.0).with(face, -depth))?;
+                    if !shrunk.contains(body.position()) {
+                        None
+                    } else {
+                        Some((shrunk, depth))
+                    }
+                } else {
+                    None
+                }
+            })
+            .min_by_key(|&(_, depth)| ordered_float::OrderedFloat(depth));
 
-        if let Some((face, depth)) = least_penetration_depth {
-            // TODO: stop if we would lose the occupying-contains-position property
-            if let Some(shrunk) =
-                body.occupying.expand_or_shrink(FaceMap::splat(0.0).with(face, -depth))
-            {
-                body.occupying = shrunk;
-            } else {
-                log::debug!("cannot resolve by crushing");
-                break 'crush_step;
-            }
+        if let Some((shrunk, _)) = least_penetration_depth {
+            body.occupying = shrunk;
         } else {
-            panic!("collision but found no penetration");
+            // We cannot make further progress.
+            break 'crush_step;
         }
     }
     FaceMap::from_fn(|face| {
@@ -890,6 +893,7 @@ mod tests {
     use crate::math::{Aab, GridAab, ps64};
 
     /// Unit test of [`crush_if_colliding()`].
+    /// TODO: Need more cases for more coverate.
     #[test]
     fn crush() {
         let [block] = make_some_blocks();
