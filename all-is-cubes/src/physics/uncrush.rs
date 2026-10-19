@@ -223,29 +223,36 @@ pub(in crate::physics) enum UncrushInfo {
 mod tests {
     use super::*;
     use crate::content::make_some_blocks;
-    use crate::math::{Aab, GridAab, ps64};
+    use crate::math::{Aab, FreePoint, GridAab, ps64};
     use crate::space::Space;
+    use euclid::point3;
 
     fn test_uncrush(
         mut body: Body,
         space: &Space,
         initial_occupying: Aab,
+        expected_position: FreePoint,
         expected_occupying: Aab,
         expected_info: UncrushInfo,
     ) {
         body.occupying = initial_occupying;
         let info = uncrush(&mut body, &space.read());
-        assert_eq!((info, body.occupying), (expected_info, expected_occupying));
+        assert_eq!(
+            (info, body.position(), body.occupying),
+            (expected_info, expected_position, expected_occupying)
+        );
     }
 
     #[test]
     fn uncrush_not_needed() {
-        let body = Body::new_minimal([0., 1.25, 0.], Aab::from_radius(ps64(0.5)));
+        let position = point3(0., 1.25, 0.);
+        let body = Body::new_minimal(position, Aab::from_radius(ps64(0.5)));
         let occupying = body.occupying;
         test_uncrush(
             body,
             &Space::empty_positive(1, 1, 1),
             occupying,
+            position,
             occupying,
             UncrushInfo::NotNeeded,
         );
@@ -253,11 +260,13 @@ mod tests {
 
     #[test]
     fn uncrush_unobstructed() {
+        let position = point3(0., 1.25, 0.);
         let expected_occupying = Aab::from_lower_upper([-0.5, 0.75, -0.5], [0.5, 1.75, 0.5]);
         test_uncrush(
-            Body::new_minimal([0., 1.25, 0.], Aab::from_radius(ps64(0.5))),
+            Body::new_minimal(position, Aab::from_radius(ps64(0.5))),
             &Space::empty_positive(1, 1, 1),
             expected_occupying.expand_or_shrink(FaceMap::splat(0.1)).unwrap(),
+            position,
             expected_occupying,
             UncrushInfo::Complete,
         );
@@ -266,17 +275,19 @@ mod tests {
     /// When colliding with a fully overlapping cube, uncrush shouldn’t do anything.
     #[test]
     fn uncrush_impossible_intersecting() {
+        let position = point3(0.5, 0.5, 0.5);
         let [block] = make_some_blocks();
         // pick a shrunk occupying box which should not expand
         let expected_occupying = Aab::from_lower_upper([0.25, 0.25, 0.25], [0.75, 0.75, 0.75]);
         test_uncrush(
             // body that intersects the block
-            Body::new_minimal([0.5, 0.5, 0.5], Aab::from_radius(ps64(0.5))),
+            Body::new_minimal(position, Aab::from_radius(ps64(0.5))),
             // space that has a block
             &Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
                 .filled_with(block.clone())
                 .build(),
             expected_occupying,
+            position,
             expected_occupying,
             UncrushInfo::NotPossible,
         );
@@ -284,10 +295,11 @@ mod tests {
 
     #[test]
     fn uncrush_partial_success() {
+        let position = point3(0.5, 1.25, 0.5);
         let [block] = make_some_blocks();
         test_uncrush(
             // body whose lower 0.25 intersects the block
-            Body::new_minimal([0.5, 1.25, 0.5], Aab::from_radius(ps64(0.5))),
+            Body::new_minimal(position, Aab::from_radius(ps64(0.5))),
             // space that has a block
             &Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
                 .filled_with(block.clone())
@@ -296,8 +308,11 @@ mod tests {
             // (Y lower is greater than 1.0, the block top, and greater than 0.75, the
             // fully uncrushed position)
             Aab::from_lower_upper([0.25, 1.125, 0.25], [0.75, 1.75, 0.75]),
+            // No movement.
+            // TODO: Should move up (at which point this is no longer a *partial* success).
+            position,
             // final occupying should touch the block
-            Aab::from_lower_upper([0., 1.0, 0.], [1., 1.75, 1.0]),
+            Aab::from_lower_upper([0., 1., 0.], [1., 1.75, 1.]),
             UncrushInfo::Partial {
                 // note: Z and X are equally good and Z coming first is accidental
                 first: Axis::Z,
