@@ -22,6 +22,9 @@ pub(crate) use step::VELOCITY_MAGNITUDE_LIMIT_SQUARED;
 #[allow(clippy::module_name_repetitions)]
 pub use step::{BodyStepDetails, PhysicsOutputs};
 
+mod uncrush;
+use uncrush::{UncrushInfo, uncrush};
+
 #[cfg(test)]
 mod tests;
 
