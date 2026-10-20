@@ -188,7 +188,7 @@ fn build_ttf(font: &FontDef, font_name: &str) -> Result<Vec<u8>, ExportError> {
     // constructing it.
 
     // Character map (currently fixed, but this will change when `FontDef` goes proper Unicode).
-    builder.add_table(&build_cmap()).map_err(builder_error_to_export_error)?;
+    builder.add_table(&build_cmap(font)).map_err(builder_error_to_export_error)?;
 
     // Font metadata tables.
     builder
@@ -425,28 +425,80 @@ fn build_glyf_loca(
 }
 
 /// Character map table.
-fn build_cmap() -> tables::cmap::Cmap {
+fn build_cmap(font: &FontDef) -> tables::cmap::Cmap {
+    // TODO: check for whether everything fits in u16 or not, then decide which cmap format to use.
+    // TODO: Make `CharMap` give us more guarantees so that we can do this more efficiently.
+    let mut sorted_mappings: Vec<(u16, u16)> = font
+        .iter_char_map()
+        .map(|(c, g)| {
+            // Translate all-is-cubes FontDef terms to TTF/OTF terms.
+            // We add 1 to the glyph index because TTF reserves glyph index 0 as ".notdef",
+            // but we currently do not.
+            (c as u16, g as u16 + 1)
+        })
+        .collect();
+    sorted_mappings.sort_by_key(|&(c, _)| c);
+
+    // For information on how cmap format 4 works, see:
+    // <https://learn.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values>
+    let mut cmap4 = tables::cmap::Cmap4 {
+        language: 0,
+        start_code: Vec::new(),       // will be filled with discovered ranges
+        end_code: Vec::new(),         // ibid
+        id_delta: Vec::new(),         // ibid
+        id_range_offsets: Vec::new(), // will be filled with zeros
+        glyph_id_array: Vec::new(),   // not used because id_range_offsets are all 0
+    };
+
+    // Find ranges in the mapping and insert them into cmap4.
+    let mut sorted_iter = sorted_mappings.into_iter().peekable();
+    while let Some((range_start_code, range_start_glyph)) = sorted_iter.next() {
+        let offset = range_start_glyph.wrapping_sub(range_start_code).cast_signed();
+
+        if range_start_code == 0xFFFF {
+            // Reserved value which cannot be represented.
+            // TODO: Report export flaw, or define that fonts can never do this.
+            continue;
+        }
+
+        let mut range_end_code = range_start_code;
+        let mut range_end_glyph = range_start_glyph;
+        loop {
+            let next_code = range_end_code.wrapping_add(1);
+            let next_glyph = range_end_glyph.wrapping_add(1);
+            if next_code == 0xFFFF {
+                break;
+            }
+
+            if sorted_iter.peek() == Some(&(next_code, next_glyph)) {
+                range_end_code = next_code;
+                range_end_glyph = next_glyph;
+                sorted_iter.next();
+            } else {
+                break;
+            }
+        }
+
+        cmap4.start_code.push(range_start_code);
+        cmap4.end_code.push(range_end_code);
+        cmap4.id_delta.push(offset);
+        cmap4.id_range_offsets.push(0);
+    }
+
+    // Add special end marker range.
+    cmap4.start_code.push(0xFFFF);
+    cmap4.end_code.push(0xFFFF);
+    cmap4.id_delta.push(1); // wraps to 0 = .notdef
+    cmap4.id_range_offsets.push(0);
+
+    eprintln!("{cmap4:x?}");
+
     tables::cmap::Cmap::new(vec![tables::cmap::EncodingRecord {
         platform_id: tables::cmap::PlatformId::Unicode,
         // “Encoding ID 3 should be used in conjunction with 'cmap' subtable formats 4 or 6.”
         // — <https://learn.microsoft.com/en-us/typography/opentype/spec/cmap#encoding-records-and-encodings>
         encoding_id: 3,
-        // Format 4 with 2 segments for ISO-8859-1 non-controls
-        subtable: write_fonts::OffsetMarker::new(tables::cmap::CmapSubtable::Format4(
-            // <https://learn.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values>
-            tables::cmap::Cmap4 {
-                language: 0,
-                start_code: vec![0x0020, 0x00A0, 0xFFFF],
-                end_code: vec![0x007F, 0x00FF, 0xFFFF],
-                // Deltas chosen remove the control characters (which have no glyphs) to make a
-                // contiguous sequence of glyphs. However, index 0 is reserved for the “missing
-                // glyph” glyph, so the deltas are offset by 1. The last segment is not used,
-                // but its delta is chosen to map to index 0 too (by wrapping arithmetic).
-                id_delta: vec![-0x1F, -0x3F, 1],
-                id_range_offsets: vec![0, 0, 0],
-                glyph_id_array: Vec::new(), // not used because id_range_offsets are all 0
-            },
-        )),
+        subtable: write_fonts::OffsetMarker::new(tables::cmap::CmapSubtable::Format4(cmap4)),
     }])
 }
 

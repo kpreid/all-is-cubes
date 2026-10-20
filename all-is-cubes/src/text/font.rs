@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use euclid::{Box2D, Length, Point2D, Size2D, Translation2D, point2, size2, vec2};
+use hashbrown::HashMap;
 use itertools::iproduct;
 
 use crate::camera::{ImagePixel, imgref_size};
@@ -119,6 +120,45 @@ impl Metrics {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Mapping from Unicode characters to glyphs in a specific font.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct CharMap {
+    /// TODO: We will eventually need to support non-1:1 mappings.
+    /// TODO: Switch to something that supports mapping whole ranges.
+    map: HashMap<char, GlyphIndex>,
+}
+
+impl CharMap {
+    // TODO: replace this with character maps loaded from font data
+    fn iso_8859_1_with_hacks() -> Self {
+        let mut map = HashMap::new();
+
+        // ASCII non-controls (except including DEL) range
+        for c in '\u{20}'..='\u{7F}' {
+            map.insert(c, (c as GlyphIndex) - 0x20);
+        }
+
+        // ISO-8859-1 upper non-controls range
+        for c in '\u{A0}'..='\u{FF}' {
+            map.insert(c, (c as GlyphIndex) - 0x40);
+        }
+
+        // Miscellaneous glyph reuses:
+        // Curly quotes
+        map.insert('\u{2018}', '\'' as GlyphIndex);
+        map.insert('\u{2019}', '\'' as GlyphIndex);
+        map.insert('\u{201C}', '"' as GlyphIndex);
+        map.insert('\u{201D}', '"' as GlyphIndex);
+        // Dashes
+        map.insert('\u{2013}', '-' as GlyphIndex);
+        map.insert('\u{2212}', '-' as GlyphIndex);
+
+        Self { map }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// An index into a font’s glyph table.
 ///
 /// These are produced by [`FontDef::glyph_for_char()`].
@@ -126,6 +166,8 @@ impl Metrics {
 /// TODO: optimize using smaller index type.
 /// We could probably get away with using u16 for now.
 pub(in crate::text) type GlyphIndex = usize;
+
+// -------------------------------------------------------------------------------------------------
 
 /// The data of a font that may be used with [`Text`] blocks.
 ///
@@ -136,6 +178,7 @@ pub(in crate::text) type GlyphIndex = usize;
 pub struct FontDef {
     pub(crate) glyphs: Glyphs,
     pub(crate) metrics: Metrics,
+    pub(crate) char_map: CharMap,
 }
 
 impl FontDef {
@@ -208,25 +251,24 @@ impl FontDef {
     /// * Some characters could be more efficiently represented as combinations of glyphs, e.g.
     ///   accented characters.
     /// * Some single glyphs will be chosen from a grapheme cluster consisting of multiple `char`s.
-    #[expect(clippy::unused_self, reason = "TODO")]
     pub(in crate::text) fn char_to_glyph_index(&self, c: char) -> GlyphIndex {
-        // Currently, all fonts’ repertoire is exactly ISO-8859-1, plus some Unicode lookalikes.
+        // TODO: TrueType uses glyph index 0 as the "notdef" "no glyph available" glyph.
+        // We should do the same.
+        self.char_map.map.get(&c).copied().unwrap_or('?' as GlyphIndex)
+    }
 
-        // Remap characters for which we use the same glyphs
-        let c = match c {
-            '\u{2018}' | '\u{2019}' => '\'', // curly single quotes/apostrophes
-            '\u{201C}' | '\u{201D}' => '"',  // curly double quotes
-            c => c,
-        };
-        match c {
-            '\u{20}'..='\u{7F}' => (c as GlyphIndex) - 0x20,
-            '\u{A0}'..='\u{FF}' => (c as GlyphIndex) - 0x40,
-            _ => 0x1f, // unavailable glyphs become question marks -- TODO: dedicate a glyph
-        }
+    /// Iterate over all the character-to-glyph-mappings.
+    ///
+    /// Currently, each element is only a single `char` which maps to a single glyph index.
+    /// This will change in the future.
+    ///
+    /// The order in which mappings are reported is not guaranteed.
+    /// This may change in the future.
+    pub fn iter_char_map(&self) -> impl Iterator<Item = (char, GlyphIndex)> + '_ {
+        self.char_map.map.iter().map(|(&c, &g)| (c, g))
     }
 
     /// Returns an iterator over all glyphs in this font.
-    #[doc(hidden)] // cannot be used properly until it accompanies a character mapping table.
     pub fn iter_glyphs(&self) -> impl ExactSizeIterator<Item = ReadGlyph<'_>> {
         self.glyphs
             .lookup
@@ -246,6 +288,7 @@ impl universe::VisitHandles for FontDef {
             // no handles yet
             glyphs: _,
             metrics: _,
+            char_map: _,
         } = self;
     }
 }
@@ -288,6 +331,7 @@ impl FontDecl {
         FontDef {
             metrics: self.metrics.clone(),
             glyphs: Glyphs::new(decoded_png.as_ref(), self.metrics.character_size),
+            char_map: CharMap::iso_8859_1_with_hacks(),
         }
     }
 }
@@ -562,7 +606,6 @@ fn rgba_to_bit([r, _, _, a]: Srgba8) -> bool {
 /// Information about a single glyph in a [`FontDef`].
 ///
 /// This type is used for manipulating the font rather than drawing text.
-#[doc(hidden)] // unsure if good public API; currently used experimentally only
 #[derive(Clone, Copy)]
 pub struct ReadGlyph<'font> {
     font: &'font FontDef,
@@ -590,6 +633,7 @@ impl ReadGlyph<'_> {
         self.font.glyphs.rendering_bounding_box(self.glyph_index, false)
     }
 
+    /// Returns the horizontal length this glyph occupies.
     pub fn advance_width(&self) -> u32 {
         u32::from(self.font.metrics.character_size.width)
     }
