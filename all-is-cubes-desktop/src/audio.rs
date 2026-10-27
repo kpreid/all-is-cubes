@@ -3,7 +3,6 @@
 //! Note: This contains extremely similar code to the web version at
 //! `all-is-cubes-wasm/src/audio.rs`. Most changes should apply to both.
 
-use std::collections::HashMap;
 use std::fmt;
 use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, atomic};
@@ -18,9 +17,9 @@ use rand::{RngExt as _, SeedableRng as _};
 
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::sound::{Band, SoundDef, SpatialAmbient};
-use all_is_cubes::universe::{Handle, ReadTicket};
+use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_render::camera::{self, Camera, Layers, StandardCameras};
-use all_is_cubes_ui::apps::{SessionFluff, SessionFluffSource};
+use all_is_cubes_ui::apps::{SessionFluff, SessionFluffSource, SoundCache};
 
 use crate::Session;
 
@@ -132,7 +131,7 @@ fn audio_command_thread(
     spatial_listener_id: kira::listener::ListenerId,
 ) {
     let sample_rate = 44100;
-    let mut sound_cache: HashMap<Handle<SoundDef>, StaticSoundData> = HashMap::new();
+    let mut sound_cache: SoundCache<StaticSoundData> = SoundCache::new();
     let mut rng = rand::rngs::StdRng::seed_from_u64(0);
 
     // TODO: maybe synthesize white noise continuously to avoid any chance of audible repetition?
@@ -168,21 +167,12 @@ fn audio_command_thread(
     while let Ok(message) = receiver.recv() {
         match message {
             AudioCommand::Fluff(SessionFluff { fluff, source }) => {
-                let _ = source; // TODO: spatial audio
-
                 if let Some((sound_handle, amplitude)) = fluff.sound() {
-                    // TODO: When sounds are stored in Universes rather than only as builtins,
-                    // we must preload all sounds by use of an appropriate ReadTicket.
-                    let mut sound: StaticSoundData = match sound_cache.get(sound_handle) {
+                    let mut sound = match sound_cache.get(sound_handle.clone(), |sound_def| {
+                        Some(convert_sound_to_kira(sample_rate, sound_def))
+                    }) {
                         Some(sound) => sound.clone(),
-                        None => {
-                            let new_sound = convert_sound_to_kira(
-                                sample_rate,
-                                sound_handle.read(ReadTicket::stub()).unwrap(),
-                            );
-                            sound_cache.insert(sound_handle.clone(), new_sound.clone());
-                            new_sound
-                        }
+                        _ => continue,
                     };
                     sound.settings.volume = amplitude_to_value(amplitude);
                     // Randomize start time to reduce constructive interference effects.

@@ -53,7 +53,8 @@ pub struct SoundDef {
 }
 
 impl SoundDef {
-    #[doc(hidden)] // API design still experimental
+    /// Synthesize this sound into a sequence of stereo audio samples, at the requested
+    /// sample rate in Hz.
     pub fn synthesize(&self, sample_rate: f32) -> impl Iterator<Item = [f32; 2]> {
         let sample_count = (self.duration.into_inner() * sample_rate).round() as usize;
         let sample_index_to_radians = self.frequency * core::f32::consts::TAU / sample_rate;

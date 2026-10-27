@@ -4,7 +4,6 @@
 //! `all-is-cubes-desktop/src/audio.rs`. Most changes should apply to both.
 
 use core::fmt;
-use std::collections::HashMap;
 
 use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 use rand::{RngExt as _, SeedableRng as _};
@@ -14,9 +13,8 @@ use web_sys::{AudioBuffer, AudioContext, AudioListener, GainNode};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::listen::{self, Listen as _, Listener as _};
 use all_is_cubes::sound::{self, SoundDef};
-use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes_render::camera::Camera;
-use all_is_cubes_ui::apps::{SessionFluff, SessionFluffSource};
+use all_is_cubes_ui::apps::{SessionFluff, SessionFluffSource, SoundCache};
 
 use crate::web_glue::{ErrorFromJs, excontext};
 use crate::web_session::Session;
@@ -87,7 +85,7 @@ async fn audio_command_task(
     ambient_source: listen::DynSource<sound::SpatialAmbient>,
 ) {
     let sample_rate = context.sample_rate().round() as u32;
-    let mut sound_cache: HashMap<Handle<SoundDef>, AudioBuffer> = HashMap::new();
+    let mut sound_cache: SoundCache<AudioBuffer> = SoundCache::new();
 
     let mut ambient_noise_gains = match make_ambient_sound_synthesizer(sample_rate, &context) {
         Ok(g) => Some(g),
@@ -103,28 +101,18 @@ async fn audio_command_task(
         match message {
             AudioCommand::Fluff(SessionFluff { fluff, source }) => {
                 if let Some((sound_handle, gain)) = fluff.sound() {
-                    // TODO: Need a better solution than comparing sounds by value.
-                    // When we have the sounds stored in Universes instead of as constants,
-                    // we can compare the Handles by name.
-                    let buffer: AudioBuffer = match sound_cache.get(sound_handle) {
-                        Some(buffer) => buffer.clone(),
-                        None => match convert_sound_to_buffer(
-                            sample_rate,
-                            sound_handle
-                                .read(ReadTicket::stub())
-                                .expect("TODO: arrange to have read tickets we need"),
-                        ) {
-                            Ok(buffer) => {
-                                sound_cache.insert(sound_handle.clone(), buffer.clone());
-                                buffer
-                            }
+                    let Some(buffer) = sound_cache.get(sound_handle.clone(), |sound_def| {
+                        match convert_sound_to_buffer(sample_rate, sound_def) {
+                            Ok(buffer) => Some(buffer),
                             Err(e) => {
                                 // If this actually happens, it is either a bug or we're out of
                                 // memory to store audio.
                                 log::warn!("Error while filling sound cache: {e:?}");
-                                continue;
+                                None
                             }
-                        },
+                        }
+                    }) else {
+                        continue;
                     };
 
                     // This function is a pseudo-try-block for handling the JS errors
@@ -136,7 +124,7 @@ async fn audio_command_task(
                         let source_node = context
                             .create_buffer_source()
                             .map_err(excontext("createBufferSource"))?;
-                        source_node.set_buffer(Some(&buffer));
+                        source_node.set_buffer(Some(buffer));
 
                         let gain_node = context.create_gain().map_err(excontext("createGain"))?;
                         gain_node.gain().set_value(gain);
