@@ -15,11 +15,11 @@ use kira::track::SpatialTrackBuilder;
 use kira::{AudioManager, PlaySoundError};
 use rand::{RngExt as _, SeedableRng as _};
 
-use all_is_cubes::listen::{self, Listen as _};
+use all_is_cubes::listen;
 use all_is_cubes::sound::{Band, SoundDef, SpatialAmbient};
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_render::camera::{self, Camera, Layers, StandardCameras};
-use all_is_cubes_ui::apps::{SessionFluff, SessionFluffSource, SoundCache};
+use all_is_cubes_ui::apps::{AudioEvent, AudioEventSource, SoundCache};
 
 use crate::Session;
 
@@ -31,7 +31,7 @@ pub(crate) struct AudioTask {
         dead_code,
         reason = "eventually we're going to need this for volume control etc."
     )]
-    sender: flume::Sender<AudioCommand>,
+    sender: flume::Sender<AudioEvent>,
     world_spatial_listener: ListenerHandle,
 
     // TODO: having our own separate `StandardCameras` is overkill for audio, but because it
@@ -63,21 +63,14 @@ impl AudioTask {
         // Transfers audio events to the audio processing thread.
         // We never block on this channel, but drop things if full.
         let (sender, receiver) = flume::bounded(256);
-
-        // Hook up ambient sound to channel
-        let ambient_source = session.ambient_sound();
-        // TODO: this whole custom listener scheme should be replaced with something more async
-        // and less custom-code-per-use-case.
-        ambient_source.listen(UpdateAmbientListener(sender.clone()));
-        sender.send(AudioCommand::UpdateAmbient).unwrap(); // ensure initial sync
-
-        // Hook up fluff to channel
-        session.listen_fluff(FluffListener(sender.clone()));
+        sender.send(AudioEvent::UpdateAmbient).unwrap(); // ensure initial sync
+        session.listen_to_audio_events(EventAdapter(sender.clone()));
 
         // The audio processing is done on a thread because `AudioManager` wants `&mut self`
         // to perform operations, so I either need a dedicated thread (actor) or a mutex.
         // We also don’t want to find ourselves running synthesis inside the Listener.
         // Note that this is *not* a sample-by-sample realtime audio thread.
+        let ambient_source = session.ambient_sound();
         if let Err(e) = std::thread::Builder::new()
             .name("all_is_cubes audio core".to_owned())
             .spawn(move || {
@@ -115,17 +108,11 @@ impl AudioTask {
     }
 }
 
-#[derive(Debug)]
-enum AudioCommand {
-    Fluff(SessionFluff),
-    UpdateAmbient,
-}
-
 /// Thread function for receiving commands and executing them on `&mut AudioManager`.
 /// This is not a real-time audio thread.
 #[expect(clippy::needless_pass_by_value)]
 fn audio_command_thread(
-    receiver: flume::Receiver<AudioCommand>,
+    receiver: flume::Receiver<AudioEvent>,
     mut manager: AudioManager,
     ambient_source: listen::DynSource<SpatialAmbient>,
     spatial_listener_id: kira::listener::ListenerId,
@@ -166,7 +153,7 @@ fn audio_command_thread(
 
     while let Ok(message) = receiver.recv() {
         match message {
-            AudioCommand::Fluff(SessionFluff { fluff, source }) => {
+            AudioEvent::Play { fluff, source } => {
                 if let Some((sound_handle, amplitude)) = fluff.sound() {
                     let mut sound = match sound_cache.get(sound_handle.clone(), |sound_def| {
                         Some(convert_sound_to_kira(sample_rate, sound_def))
@@ -182,7 +169,7 @@ fn audio_command_thread(
                     ));
 
                     match source {
-                        SessionFluffSource::World(position) => {
+                        AudioEventSource::World(position) => {
                             match manager.add_spatial_sub_track(
                                 spatial_listener_id,
                                 position.to_vector().to_f32(),
@@ -199,14 +186,14 @@ fn audio_command_thread(
                                 ),
                             }
                         }
-                        SessionFluffSource::NonSpatial => {
+                        AudioEventSource::NonSpatial => {
                             log_playback_result(manager.play(sound));
                         }
-                        _ => unimplemented!("unknown `SessionFluffSource` variant {source:?}"),
+                        _ => unimplemented!("unknown `AudioEventSource` variant {source:?}"),
                     }
                 }
             }
-            AudioCommand::UpdateAmbient => {
+            AudioEvent::UpdateAmbient => {
                 let new_ambient = ambient_source.get();
 
                 for (left_amplitude, right_amplitude, band_playback_volume) in itertools::izip!(
@@ -253,56 +240,29 @@ fn log_playback_result(
 // (`all_is_cubes::util` is a place for adapters, but it doesn't depend on `flume`.)
 
 /// Adapter from [`Listener`] to the audio command channel.
-struct FluffListener(flume::Sender<AudioCommand>);
+struct EventAdapter(flume::Sender<AudioEvent>);
 
-impl fmt::Debug for FluffListener {
+impl fmt::Debug for EventAdapter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("FluffListener")
+        f.debug_struct("EventAdapter")
             .field("alive", &!self.0.is_disconnected())
             .finish_non_exhaustive()
     }
 }
 
-impl listen::Listener<SessionFluff> for FluffListener {
-    fn receive(&self, fluffs: &[SessionFluff]) -> bool {
-        if fluffs.is_empty() {
+impl listen::Listener<AudioEvent> for EventAdapter {
+    fn receive(&self, events: &[AudioEvent]) -> bool {
+        if events.is_empty() {
             !self.0.is_disconnected()
         } else {
-            for fluff in fluffs {
-                match self.0.try_send(AudioCommand::Fluff(fluff.clone())) {
+            for event in events {
+                match self.0.try_send(event.clone()) {
                     Ok(()) => {}
                     Err(flume::TrySendError::Full(_)) => {} // drop message if full
                     Err(flume::TrySendError::Disconnected(_)) => return false,
                 }
             }
             true
-        }
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-/// Adapter from the `session.ambient_sound()` source to the audio command channel.
-struct UpdateAmbientListener(flume::Sender<AudioCommand>);
-
-impl fmt::Debug for UpdateAmbientListener {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("UpdateAmbientListener")
-            .field("alive", &!self.0.is_disconnected())
-            .finish_non_exhaustive()
-    }
-}
-
-impl listen::Listener<()> for UpdateAmbientListener {
-    fn receive(&self, messages: &[()]) -> bool {
-        match messages {
-            [] => !self.0.is_disconnected(),
-            // Coalesce multiple messages into one.
-            [(), ..] => match self.0.try_send(AudioCommand::UpdateAmbient) {
-                Ok(()) => true,
-                Err(flume::TrySendError::Full(_)) => true, // drop message if full
-                Err(flume::TrySendError::Disconnected(_)) => false,
-            },
         }
     }
 }

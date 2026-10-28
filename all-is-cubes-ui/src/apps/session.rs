@@ -130,8 +130,8 @@ struct Shuttle {
     /// Last cursor raycast result.
     cursor_result: Option<Cursor>,
 
-    /// Outputs [`Fluff`] from the game character's viewpoint and also the session UI.
-    fluff_notifier: Arc<listen::Notifier<SessionFluff>>,
+    /// Outputs sounds from the game character's viewpoint and also the session UI.
+    sound_notifier: Arc<listen::Notifier<AudioEvent>>,
 
     ambient_sound_state: listen::CellWithLocal<sound::SpatialAmbient>,
 
@@ -175,7 +175,7 @@ impl fmt::Debug for Session {
             control_channel_sender: _,
             cursor_result,
             quit_fn,
-            fluff_notifier,
+            sound_notifier,
             ambient_sound_state,
             session_event_notifier,
             custom_commands,
@@ -191,7 +191,7 @@ impl fmt::Debug for Session {
             .field("space_watch_state", space_watch_state)
             .field("main_task", &main_task.as_ref().map(|_| "..."))
             .field("session_event_notifier", session_event_notifier)
-            .field("fluff_notifier", fluff_notifier)
+            .field("sound_notifier", sound_notifier)
             .field("ambient_sound_state", ambient_sound_state)
             .field("paused", &paused)
             .field("ui", &ui)
@@ -334,13 +334,13 @@ impl Session {
         c
     }
 
-    /// Listen for [`Fluff`] events from this session. Fluff constitutes short-duration
-    /// sound or particle effects.
-    pub fn listen_fluff(
+    /// Receive [`AudioEvent`]s from this session.
+    /// This should be done in order to implement audio playback.
+    pub fn listen_to_audio_events(
         &self,
-        listener: impl listen::Listener<SessionFluff> + Send + Sync + 'static,
+        listener: impl listen::Listener<AudioEvent> + Send + Sync + 'static,
     ) {
-        self.shuttle().fluff_notifier.listen(listener)
+        self.shuttle().sound_notifier.listen(listener)
     }
 
     /// Source of the current ambient sound environment from the game world.
@@ -646,11 +646,8 @@ impl Session {
 
         if let Err(error) = &result {
             let shuttle = self.shuttle();
-            for fluff in error.fluff() {
-                shuttle.fluff_notifier.notify(&SessionFluff {
-                    fluff,
-                    source: SessionFluffSource::NonSpatial,
-                });
+            for sound in error.fluff().filter_map(filter_ui_fluff_to_session) {
+                shuttle.sound_notifier.notify(&sound);
             }
         } else {
             // success effects should come from the tool's transaction
@@ -799,7 +796,7 @@ impl Shuttle {
                 self.space_watch_state.world = SpaceWatchState::new(
                     self.game_universe.read_ticket(),
                     space.cloned(),
-                    &self.fluff_notifier,
+                    &self.sound_notifier,
                 )
                 .expect("TODO: decide how to handle error");
             }
@@ -823,7 +820,7 @@ impl Shuttle {
             };
             if space != self.space_watch_state.ui.space {
                 self.space_watch_state.ui =
-                    SpaceWatchState::new(read_ticket, space, &self.fluff_notifier)
+                    SpaceWatchState::new(read_ticket, space, &self.sound_notifier)
                         .expect("TODO: decide how to handle error");
             }
         }
@@ -891,6 +888,7 @@ impl SessionBuilder {
         let ambient_sound_state = listen::CellWithLocal::new(sound::SpatialAmbient::SILENT);
         let (control_send, control_recv) = flume::bounded(100);
         let custom_commands = listen::CellWithLocal::new([].into());
+        let sound_notifier = Arc::new(listen::Notifier::<AudioEvent>::new());
 
         let space_watch_state = Layers {
             world: SpaceWatchState::empty(),
@@ -915,6 +913,11 @@ impl SessionBuilder {
             ),
             None => None,
         };
+
+        ambient_sound_state.listen(
+            listen::Notifier::forwarder(Arc::downgrade(&sound_notifier))
+                .filter(|()| Some(AudioEvent::UpdateAmbient)),
+        );
 
         // Note: Putting this after the last .await avoids the future needing to be big enough to
         // own the `Universe` (which is quite a large struct).
@@ -947,7 +950,7 @@ impl SessionBuilder {
                 space_watch_state,
                 cursor_result: None,
                 session_event_notifier: Arc::new(listen::Notifier::new()),
-                fluff_notifier: Arc::new(listen::Notifier::new()),
+                sound_notifier,
                 ambient_sound_state,
                 control_channel_sender: control_send.clone(),
                 quit_fn,
@@ -1077,18 +1080,14 @@ impl SpaceWatchState {
     fn new(
         read_ticket: ReadTicket<'_>,
         space: Option<Handle<Space>>,
-        fluff_notifier: &Arc<listen::Notifier<SessionFluff>>,
+        fluff_notifier: &Arc<listen::Notifier<AudioEvent>>,
     ) -> Result<Self, universe::HandleError> {
         if let Some(space) = space {
             let space_read = space.read(read_ticket)?;
+
             let (fluff_gate, fluff_forwarder) =
                 listen::Notifier::forwarder(Arc::downgrade(fluff_notifier))
-                    .filter(move |sf: &space::SpaceFluff| {
-                        Some(SessionFluff {
-                            fluff: sf.fluff.clone(),
-                            source: SessionFluffSource::World(sf.position.center()),
-                        })
-                    })
+                    .filter(filter_space_fluff_to_session)
                     .with_stack_buffer::<10>() // TODO: non-arbitrary number
                     .gate();
             space_read.fluff().listen(fluff_forwarder);
@@ -1111,27 +1110,60 @@ impl SpaceWatchState {
 
 // -------------------------------------------------------------------------------------------------
 
-/// [`Fluff`] with additional information about its origin, produced by [`Session`].
+/// Event to be processed by audio playback implementations.
 #[derive(Debug, Clone)]
-#[expect(clippy::exhaustive_structs)]
-pub struct SessionFluff {
-    #[allow(missing_docs)]
-    pub fluff: Fluff,
-    /// Origin of the fluff, to be used for spatial audio, independent volume control, etc.
-    pub source: SessionFluffSource,
+#[expect(
+    clippy::exhaustive_enums,
+    reason = "handling this must be implemented by dependents"
+)]
+pub enum AudioEvent {
+    /// Play a sound.
+    Play {
+        /// The fluff value specifying the sound to be played.
+        ///
+        /// This should never be a fluff without sound, but if it is, recipients should ignore this
+        /// event.
+        //---
+        // Design note: We pass `Fluff` rather than `Handle<SoundDef>` because passing `Fluff`
+        // allows skipping some refcount adjustments, and it may be useful to have higher-level
+        // information. This decision was made on no concrete evidence and may be revisited.
+        fluff: Fluff,
+        /// Origin of the sound, to be used for spatial audio, independent volume control, etc.
+        source: AudioEventSource,
+    },
+
+    /// The ambient sound environment has changed and should be re-fetched from
+    /// [`Session::ambient_sound()`].
+    UpdateAmbient,
 }
 
-/// Identifies the source of a [`SessionFluff`].
+/// Identifies the source of an [`AudioEvent`].
 ///
 /// May be used to modify its rendering/playback according to spatial location or user settings.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub enum SessionFluffSource {
+pub enum AudioEventSource {
     /// Fluff is from the game world (current character’s current [`Space`]).
     World(FreePoint),
     /// Fluff is from a non-spatial source.
     /// TODO: Eventually this should be more specific, like "UI"
     NonSpatial,
+}
+
+fn filter_space_fluff_to_session(sf: &space::SpaceFluff) -> Option<AudioEvent> {
+    sf.fluff.sound()?;
+    Some(AudioEvent::Play {
+        fluff: sf.fluff.clone(),
+        source: AudioEventSource::World(sf.position.center()),
+    })
+}
+
+fn filter_ui_fluff_to_session(fluff: Fluff) -> Option<AudioEvent> {
+    fluff.sound()?;
+    Some(AudioEvent::Play {
+        fluff,
+        source: AudioEventSource::NonSpatial,
+    })
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -1541,7 +1573,7 @@ mod tests {
     }
 
     #[macro_rules_attribute::apply(smol_macros::test)]
-    async fn fluff_forwarding_following() {
+    async fn sound_forwarding_following_space_change() {
         // Create universe members
         let mut u = Universe::new();
         let space1 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
@@ -1556,7 +1588,10 @@ mod tests {
         session.set_universe(u);
         session.set_character(Some(character.clone()));
         let log = listen::Log::<Fluff>::new();
-        session.listen_fluff(log.listener().filter(|sf: &SessionFluff| Some(sf.fluff.clone())));
+        session.listen_to_audio_events(log.listener().filter(|sf: &AudioEvent| match sf {
+            AudioEvent::Play { fluff, .. } => Some(fluff.clone()),
+            AudioEvent::UpdateAmbient => None,
+        }));
 
         // Try some fluff with the initial state (we haven't even stepped the session)
         session.universe_mut().execute_1(&space1, st.clone()).unwrap();
