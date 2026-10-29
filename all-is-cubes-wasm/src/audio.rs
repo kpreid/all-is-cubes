@@ -35,9 +35,6 @@ impl AudioTask {
 
         // Transfers audio events to the audio processing task.
         let (sender, receiver) = flume::bounded(256);
-
-        sender.send(AudioEvent::UpdateAmbient).err_is_unreachable(); // ensure initial sync
-
         let (gate, listener) = EventAdapter(sender).gate();
         session.listen_to_audio_events(listener);
 

@@ -63,7 +63,6 @@ impl AudioTask {
         // Transfers audio events to the audio processing thread.
         // We never block on this channel, but drop things if full.
         let (sender, receiver) = flume::bounded(256);
-        sender.send(AudioEvent::UpdateAmbient).unwrap(); // ensure initial sync
         session.listen_to_audio_events(EventAdapter(sender.clone()));
 
         // The audio processing is done on a thread because `AudioManager` wants `&mut self`

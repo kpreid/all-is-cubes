@@ -336,11 +336,15 @@ impl Session {
 
     /// Receive [`AudioEvent`]s from this session.
     /// This should be done in order to implement audio playback.
+    ///
+    /// Immediately upon calling this function, the listener will receive messages relevant to
+    /// synchronizing its state with the current state of the session.
     pub fn listen_to_audio_events(
         &self,
         listener: impl listen::Listener<AudioEvent> + Send + Sync + 'static,
     ) {
-        self.shuttle().sound_notifier.listen(listener)
+        listener.receive(&[AudioEvent::UpdateAmbient]);
+        self.shuttle().sound_notifier.listen(listener);
     }
 
     /// Source of the current ambient sound environment from the game world.
