@@ -157,11 +157,8 @@ fn audio_command_thread(
         match message {
             AudioEvent::Play { fluff, source } => {
                 if let Some((sound_handle, amplitude)) = fluff.sound() {
-                    let mut sound = match sound_cache.get(sound_handle.clone(), |sound_def| {
-                        Some(convert_sound_to_kira(sample_rate, sound_def))
-                    }) {
-                        Some(sound) => sound.clone(),
-                        _ => continue,
+                    let Some(mut sound) = sound_cache.get(sound_handle).cloned() else {
+                        continue;
                     };
                     sound.settings.volume = amplitude_to_value(amplitude);
                     // Randomize start time to reduce constructive interference effects.
@@ -210,6 +207,11 @@ fn audio_command_thread(
                         );
                     }
                 }
+            }
+            AudioEvent::Load { handle, value } => {
+                sound_cache.insert(handle, &value, |sound_def| {
+                    Some(convert_sound_to_kira(sample_rate, sound_def))
+                });
             }
         }
     }

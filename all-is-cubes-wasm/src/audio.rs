@@ -86,23 +86,25 @@ async fn audio_command_task(
         }
     };
 
+    let loader = |sound_def: &SoundDef| -> Option<AudioBuffer> {
+        match convert_sound_to_buffer(sample_rate, sound_def) {
+            Ok(buffer) => Some(buffer),
+            Err(e) => {
+                // If this actually happens, it is either a bug or we're out of
+                // memory to store audio.
+                log::warn!("Error while filling sound cache: {e:?}");
+                None
+            }
+        }
+    };
+
     // This loop will exit when the channel is closed, which will happen when the `FluffListener`
     // or the `Gate` is dropped.
     while let Ok(message) = receiver.recv_async().await {
         match message {
             AudioEvent::Play { fluff, source } => {
                 if let Some((sound_handle, gain)) = fluff.sound() {
-                    let Some(buffer) = sound_cache.get(sound_handle.clone(), |sound_def| {
-                        match convert_sound_to_buffer(sample_rate, sound_def) {
-                            Ok(buffer) => Some(buffer),
-                            Err(e) => {
-                                // If this actually happens, it is either a bug or we're out of
-                                // memory to store audio.
-                                log::warn!("Error while filling sound cache: {e:?}");
-                                None
-                            }
-                        }
-                    }) else {
+                    let Some(buffer) = sound_cache.get(sound_handle) else {
                         continue;
                     };
 
@@ -184,6 +186,10 @@ async fn audio_command_task(
                     l.gain().set_value(left_amplitude.into_inner());
                     r.gain().set_value(right_amplitude.into_inner());
                 }
+            }
+
+            AudioEvent::Load { handle, value } => {
+                sound_cache.insert(handle, &value, loader);
             }
         }
     }

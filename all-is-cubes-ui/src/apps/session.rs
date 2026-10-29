@@ -7,6 +7,8 @@ use core::pin::Pin;
 use core::task::{Context, Poll, Waker};
 use std::sync::RwLock;
 
+use descriptive_unwrap::ResultExt as _;
+use exhaust::Exhaust as _;
 use flume::TryRecvError;
 use futures_core::future::BoxFuture;
 use sync_wrapper::SyncWrapper;
@@ -343,8 +345,38 @@ impl Session {
         &self,
         listener: impl listen::Listener<AudioEvent> + Send + Sync + 'static,
     ) {
+        let shuttle = self.shuttle();
+
+        // TODO: Build a buffering mechanism so that we can deliver these events in fewer batches.
+        // `listen::Buffer` is not suitable because it only delivers to `listen::Notifier`s and
+        // that’s not what we’re doing here.
+        //
+        // (This is not a high priority because none of the listeners actually used care very much,
+        // but it’s how `listen::Listener` is supposed to be used.)
+
         listener.receive(&[AudioEvent::UpdateAmbient]);
-        self.shuttle().sound_notifier.listen(listener);
+
+        // TODO: `Builtin` should have pre-filtered iteration over specific types
+        for builtin in universe::Builtin::exhaust() {
+            if let Ok(handle) = Handle::<sound::SoundDef>::try_from(builtin) {
+                listener.receive(&[AudioEvent::Load {
+                    handle,
+                    value: builtin.read::<sound::SoundDef>().clone(),
+                }]);
+            }
+        }
+
+        if let Some(ui) = &shuttle.ui {
+            for event in generate_non_builtin_sound_load_events(ui.universe()) {
+                listener.receive(&[event]);
+            }
+        }
+
+        for event in generate_non_builtin_sound_load_events(&shuttle.game_universe) {
+            listener.receive(&[event]);
+        }
+
+        shuttle.sound_notifier.listen(listener);
     }
 
     /// Source of the current ambient sound environment from the game world.
@@ -781,11 +813,29 @@ impl Shuttle {
     /// * Check if the universe or the universe's `WhenceUniverse` have changed.
     /// * Sync sound state.
     fn sync_universe_and_character_derived(&mut self) {
+        let old_universe_id = self.game_universe_info.get().id;
+        let new_universe_id = self.game_universe.universe_id();
+
         // Sync game_universe_info. The WhenceUniverse might in principle be overwritten any time.
         self.game_universe_info.set_if_unequal(SessionUniverseInfo {
-            id: self.game_universe.universe_id(),
+            id: new_universe_id,
             whence: Arc::clone(&self.game_universe.whence),
         });
+
+        // Sync sound playback cache with any attached listeners.
+        if new_universe_id != old_universe_id {
+            // TODO: This is only necessary if the notifier has any listeners.
+            // Add an operation to Notifier which cheaply gets that information.
+
+            // TODO: Load events should also be generated for sounds that have been
+            // added/removed/changed in the existing universe (but we don’t have the
+            // hooks needed to achieve that yet).
+
+            let mut buffered = self.sound_notifier.buffer::<10>();
+            for event in generate_non_builtin_sound_load_events(&self.game_universe) {
+                buffered.push(event);
+            }
+        }
 
         // Sync space_watch_state.world and ambient_sound_state.
         {
@@ -1139,6 +1189,17 @@ pub enum AudioEvent {
     /// The ambient sound environment has changed and should be re-fetched from
     /// [`Session::ambient_sound()`].
     UpdateAmbient,
+
+    /// Make the given sound ready to be played, or update it if the definition has changed.
+    Load {
+        /// The handle identifying the sound.
+        ///
+        /// This handle should be used as an identifier only, and not be read.
+        handle: Handle<sound::SoundDef>,
+
+        /// The current sound data.
+        value: sound::SoundDef,
+    },
 }
 
 impl AudioEvent {
@@ -1147,6 +1208,7 @@ impl AudioEvent {
         match self {
             AudioEvent::Play { .. } => false,
             AudioEvent::UpdateAmbient => false,
+            AudioEvent::Load { .. } => true,
         }
     }
 }
@@ -1178,6 +1240,16 @@ fn filter_ui_fluff_to_session(fluff: Fluff) -> Option<AudioEvent> {
         fluff,
         source: AudioEventSource::NonSpatial,
     })
+}
+
+fn generate_non_builtin_sound_load_events(universe: &Universe) -> impl Iterator<Item = AudioEvent> {
+    let read_ticket = universe.read_ticket();
+    universe
+        .iter_by_type::<sound::SoundDef>()
+        .map(move |(_name, handle)| AudioEvent::Load {
+            value: handle.read(read_ticket).err_is_unreachable().clone(),
+            handle,
+        })
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -1568,7 +1640,7 @@ mod tests {
     use super::*;
     use crate::apps::Key;
     use all_is_cubes::character::CharacterTransaction;
-    use all_is_cubes::math::Cube;
+    use all_is_cubes::math::{Cube, ps32, zo32};
     use all_is_cubes::universe::Name;
     use all_is_cubes::util::assert_send_sync;
     use core::sync::atomic::{AtomicUsize, Ordering};
@@ -1604,7 +1676,7 @@ mod tests {
         let log = listen::Log::<Fluff>::new();
         session.listen_to_audio_events(log.listener().filter(|sf: &AudioEvent| match sf {
             AudioEvent::Play { fluff, .. } => Some(fluff.clone()),
-            AudioEvent::UpdateAmbient => None,
+            _ => None,
         }));
 
         // Try some fluff with the initial state (we haven't even stepped the session)
@@ -1626,6 +1698,41 @@ mod tests {
         assert_eq!(log.drain(), []);
         session.universe_mut().execute_1(&space2, st).unwrap();
         assert_eq!(log.drain(), [Fluff::Happened]);
+    }
+
+    #[macro_rules_attribute::apply(smol_macros::test)]
+    async fn sound_preload_completeness() {
+        const WORLD_SOUND_NAME: Name = Name::Specific(arcstr::literal!("a_sound"));
+
+        let mut universe = Universe::new();
+        universe
+            .insert(
+                WORLD_SOUND_NAME,
+                const { sound::SoundDef::new_tone(zo32(1.0), ps32(1.0), zo32(1.0)) },
+            )
+            .err_is_unreachable();
+        let mut session = Session::builder().build().await;
+        session.set_universe(universe);
+        let log = listen::Log::<Name>::new();
+
+        session.listen_to_audio_events(log.listener().filter(|event: &AudioEvent| match event {
+            AudioEvent::Load { handle, .. } => Some(handle.name()),
+            _ => None,
+        }));
+
+        // There are currently no UI sounds that are created in the UI universe rather than
+        // being builtins. If that ever changes, they should also show up here.
+        assert_eq!(
+            log.drain(),
+            const {
+                [
+                    Name::Builtin(universe::Builtin::Beep),
+                    Name::Builtin(universe::Builtin::Happened),
+                    Name::Builtin(universe::Builtin::Thump),
+                    WORLD_SOUND_NAME,
+                ]
+            }
+        );
     }
 
     #[macro_rules_attribute::apply(smol_macros::test)]

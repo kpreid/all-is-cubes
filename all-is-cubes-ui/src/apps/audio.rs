@@ -2,11 +2,10 @@ use core::convert::identity;
 use core::fmt;
 
 use hashbrown::HashMap;
-use hashbrown::hash_map::Entry;
 
 use all_is_cubes::listen;
 use all_is_cubes::sound::SoundDef;
-use all_is_cubes::universe::{self, Handle};
+use all_is_cubes::universe::Handle;
 
 use crate::apps::session::AudioEvent;
 
@@ -36,24 +35,25 @@ impl<T> SoundCache<T> {
         }
     }
 
-    /// Retrieve a sound, preparing it if necessary.
+    /// Retrieve a sound from the cache.
+    pub fn get(&mut self, handle: &Handle<SoundDef>) -> Option<&T> {
+        self.data.get(handle)
+    }
+
+    /// Handles `AudioEvent::Load`.
     ///
     /// `loader` should call [`SoundDef::synthesize()`] and convert the result to `T`.
     /// It may return `None` in the case of resource exhaustion or another problem.
-    pub fn get(
+    pub fn insert(
         &mut self,
         handle: Handle<SoundDef>,
+        sound_def: &SoundDef,
         loader: impl FnOnce(&SoundDef) -> Option<T>,
-    ) -> Option<&T> {
-        match self.data.entry(handle) {
-            Entry::Occupied(oe) => Some(oe.into_mut()),
-            Entry::Vacant(ve) => {
-                // TODO: We will need a non-stub read ticket for the game universe,
-                // but that will only be possible by loading sounds eagerly rather than lazily.
-                let value = loader(ve.key().read(universe::ReadTicket::stub()).ok()?)?;
-                Some(ve.insert(value))
-            }
-        }
+    ) {
+        let Some(value) = loader(sound_def) else {
+            return;
+        };
+        self.data.insert(handle, value);
     }
 }
 

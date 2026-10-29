@@ -220,6 +220,10 @@ impl Vui {
         self.current_view.as_source()
     }
 
+    pub(crate) fn universe(&self) -> &Universe {
+        &self.universe
+    }
+
     /// Returns a [`ReadTicket`] for use with the space handle in [`Self::view()`].
     pub fn read_ticket(&self) -> ReadTicket<'_> {
         self.universe.read_ticket()
