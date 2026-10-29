@@ -14,6 +14,7 @@
     * `block::Resolution::least_common_multiple_and_scales()`
     * `block::SetAttribute` is a modifier which overrides a single attribute of a block, instead of all of them.
       It replaces `Modifier::Attributes`.
+    * `fluff::Fluff::Sound`, allows playing custom sounds.
     * `inv::InvInBlock` and `inv::IconRow` now have a complete set of getters for reading their data.
     * `inv::Tool::Custom` can now have a rotation rule.
     * `linking::InGenError::Handle` variant and its corresponding `From<HandleError>` implementation.

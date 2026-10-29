@@ -1029,11 +1029,13 @@ impl ParticleSet {
                 fluff: fluff.clone(),
                 age: 0,
             }),
-            Fluff::Beep
+            Fluff::Sound { .. }
+            | Fluff::Beep
             | Fluff::Happened
             | Fluff::PlaceBlockGeneric
             | Fluff::BlockImpact { .. } => None,
-            _ => todo!(),
+            // TODO: warn-once on this instead of panicking
+            _ => unreachable!("match of non-exhaustive enum Fluff"),
         }
     }
 

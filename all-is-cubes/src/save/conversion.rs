@@ -456,8 +456,13 @@ mod fluff {
         where
             S: Serializer,
         {
-            match self {
-                // Currently, all of the available values in `Fluff` are placeholders.
+            match *self {
+                Fluff::Sound { ref sound, gain } => schema::FluffSer::SoundV1 {
+                    sound: sound.clone(),
+                    gain,
+                },
+
+                // `Gone` and all the variants documented as non-serializable serialize to `Gone`.
                 Fluff::Gone
                 | Fluff::Beep
                 | Fluff::Happened
@@ -476,6 +481,7 @@ mod fluff {
         {
             Ok(match schema::FluffSer::deserialize(deserializer)? {
                 schema::FluffSer::GoneV1 => Fluff::Gone,
+                schema::FluffSer::SoundV1 { sound, gain } => Fluff::Sound { sound, gain },
             })
         }
     }

@@ -27,6 +27,7 @@ mod common {
     };
     pub(super) use crate::character::{Character, Spawn};
     pub(super) use crate::content::make_some_blocks;
+    pub(super) use crate::fluff;
     pub(super) use crate::inv::{self, Inventory, Tool};
     pub(super) use crate::math::{
         Cube, Face, GridAab, GridRotation, Rgb, Rgba, notnan, ps32, zo32,
@@ -587,6 +588,28 @@ mod math {
     #[test]
     fn cube() {
         assert_round_trip_value(&Cube::new(1, 2, 3), json!([1, 2, 3]));
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+
+mod fluff {
+    use super::common::*;
+
+    #[test]
+    fn sound() {
+        let sound = fluff::Fluff::Sound {
+            sound: Builtin::beep().clone(),
+            gain: ps32(1.5),
+        };
+        assert_round_trip_value(
+            &sound,
+            json!({
+                "type": "SoundV1",
+                "sound": {"type": "HandleV1", "Builtin": "sound/beep"},
+                "gain": 1.5
+            }),
+        );
     }
 }
 

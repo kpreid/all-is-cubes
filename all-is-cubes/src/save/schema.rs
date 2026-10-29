@@ -305,6 +305,10 @@ pub(crate) enum SpawnSer {
 #[serde(tag = "type")]
 pub(crate) enum FluffSer {
     GoneV1,
+    SoundV1 {
+        sound: Handle<sound::SoundDef>,
+        gain: PositiveSign<f32>,
+    },
 }
 
 //------------------------------------------------------------------------------------------------//

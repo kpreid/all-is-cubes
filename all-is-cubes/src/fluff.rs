@@ -27,14 +27,22 @@ use crate::{
 /// Currently, all `Fluff` is an item from a fixed list. In the future, it will be able
 /// to refer to audio and visual assets defined in a `Universe`.
 //---
-// TODO: Should we possibly be distinguishing “fluff that can be in the game world” (serializable)
-// from that which is for UI purposes?
+// TODO: Statically distinguish “fluff that can be in the game world” (serializable)
+// from that which is not serializable and not trying to be stable.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Fluff {
     /// Placeholder value which occurs to replace a [`Fluff`] value that cannot be serialized.
     Gone,
+
+    /// Play an arbitrary custom sound.
+    Sound {
+        /// The sound to play.
+        sound: universe::Handle<SoundDef>,
+        /// Amplitude scale.
+        gain: PositiveSign<f32>,
+    },
 
     /// A standard beep/“bell” sound, as might be used for a notification or error.
     ///
@@ -97,6 +105,7 @@ impl Fluff {
     pub fn sound(&self) -> Option<(&universe::Handle<SoundDef>, f32)> {
         match self {
             Fluff::Gone => None,
+            Fluff::Sound { sound, gain } => Some((sound, gain.into_inner())),
             Fluff::Beep => Some((Builtin::beep(), 1.0)),
             Fluff::Happened | Fluff::PlaceBlockGeneric => Some((Builtin::happened(), 1.0)),
             Fluff::BlockFault(_) => None,
@@ -113,9 +122,12 @@ impl Fluff {
 }
 
 impl universe::VisitHandles for Fluff {
-    fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
         match self {
             Fluff::Gone => {}
+            Fluff::Sound { sound, gain: _ } => {
+                visitor.visit(sound);
+            }
             Fluff::Beep => {}
             Fluff::Happened => {}
             Fluff::BlockFault(_) => {}
