@@ -28,6 +28,8 @@ pub use ambient::{Ambient, Band, SpatialAmbient, Spectrum};
 ///
 /// [`SoundDef`]s are used as members of [`Universe`s][crate::universe::Universe]
 /// and may be referenced by ... TODO document
+///
+/// [`SoundDef`] is cheap to [clone][SoundDef::clone].
 #[derive(Clone, Debug, Eq, Hash, PartialEq, bevy_ecs::component::Component)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[expect(clippy::module_name_repetitions)]
@@ -39,10 +41,12 @@ pub struct SoundDef {
     /// The frequency of the oscillator, in hertz.
     pub frequency: PositiveSign<f32>,
 
-    /// TODO: Define amplitude scaling.
-    /// We probably need some physical reference because the obvious alternative, 0 dBFS,
-    /// is a bad idea. But some sounds are spatial and some are not...perhaps "1 meter/cube away
-    /// is the reference distance" will solve that.
+    /// Amplitude of the output of the oscillator.
+    //---
+    // TODO: Define amplitude units/scaling.
+    // We probably need some physical reference because the obvious alternative, 0 dBFS,
+    // is a bad idea. But some sounds are spatial and some are not...perhaps "1 meter/cube away
+    // is the reference distance" will solve that.
     pub amplitude: ZeroOne<f32>,
     // TODO: More properties:
     // * envelope attack
@@ -53,6 +57,19 @@ pub struct SoundDef {
 }
 
 impl SoundDef {
+    /// Construct a [`SoundDef`] that plays a single decaying sine tone.
+    pub const fn new_tone(
+        duration: ZeroOne<f32>,
+        frequency: PositiveSign<f32>,
+        amplitude: ZeroOne<f32>,
+    ) -> Self {
+        Self {
+            duration,
+            frequency,
+            amplitude,
+        }
+    }
+
     /// Synthesize this sound into a sequence of stereo audio samples, at the requested
     /// sample rate in Hz.
     pub fn synthesize(&self, sample_rate: f32) -> impl Iterator<Item = [f32; 2]> {

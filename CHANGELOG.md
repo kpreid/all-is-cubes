@@ -30,6 +30,7 @@
     * `math::{Srgb8, Srgba8}`, type aliases for indicating when sRGB color is being used.
     * `math::Vol::origin_empty()`, infallible construction of empty volume.
     * `physics::Contact::aab()`
+    * `sound::SoundDef::new_tone()`, a basic public constructor.
     * `text::FontDef`
     * `text::Measurement`
     * `time::Clock::phase()`, returns the clock’s phase, which was previously only obtainable through `Tick`.
