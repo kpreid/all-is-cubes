@@ -27,13 +27,13 @@ use all_is_cubes::fluff::Fluff;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
     Cube, Face, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord,
-    GridVector, Rgb, Rgb01, Rgba, ps32, rgb_const, rgba_const,
+    GridVector, PositiveSign, Rgb, Rgb01, Rgba, ps32, rgb_const, rgba_const, zo32,
 };
 use all_is_cubes::op::Operation;
-use all_is_cubes::sound;
+use all_is_cubes::sound::{self, SoundDef};
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::time;
-use all_is_cubes::universe::UniverseTransaction;
+use all_is_cubes::universe::{Handle, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 use crate::alg::{gradient_lookup, scale_color, square_radius};
@@ -91,6 +91,12 @@ impl fmt::Display for DemoBlocks {
     }
 }
 
+struct ExplosionSounds {
+    timer: Handle<SoundDef>,
+    detonation: Handle<SoundDef>,
+    whoosh: Handle<SoundDef>,
+}
+
 /// Add to `universe` demo-content blocks: all of [`DemoBlocks`] and [`LandscapeBlocks`].
 ///
 /// [`LandscapeBlocks`]: crate::landscape::LandscapeBlocks
@@ -104,8 +110,25 @@ pub async fn install_demo_blocks(
     install_landscape_blocks(txn, resolution, landscape_p).await?;
     p.progress(0.0).await;
 
-    BlockProvider::<DemoBlocks>::new_installed_cyclic(p, txn, demo_blocks_generator(resolution))
-        .await?;
+    // Explosion sounds are reused by multiple stages of the explosion, so construct them once.
+    //
+    // TODO: The provider/module system should be extended to multiple types so that these are
+    // module members themselves rather than ad-hoc and anonymous.
+    //
+    // TODO: add features to SoundDef so these sounds can be sharper and also noisier,
+    // to be properly explodey.
+    let explosion_sounds = ExplosionSounds {
+        timer: txn.insert_anonymous(SoundDef::new_tone(zo32(0.005), ps32(630.0), zo32(1.0))),
+        detonation: txn.insert_anonymous(SoundDef::new_tone(zo32(0.01), ps32(315.0), zo32(0.3))),
+        whoosh: txn.insert_anonymous(SoundDef::new_tone(zo32(0.01), ps32(43.2), zo32(0.08))),
+    };
+
+    BlockProvider::<DemoBlocks>::new_installed_cyclic(
+        p,
+        txn,
+        demo_blocks_generator(resolution, &explosion_sounds),
+    )
+    .await?;
 
     Ok(())
 }
@@ -116,6 +139,7 @@ pub async fn install_demo_blocks(
 /// complex code out of the `async` context.)
 fn demo_blocks_generator(
     resolution: block::Resolution,
+    explosion_sounds: &ExplosionSounds,
 ) -> impl Fn(&BlockProvider<DemoBlocks>, &mut UniverseTransaction, DemoBlocks) -> Result<Block, InGenError>
 {
     let resolution_g = GridCoordinate::from(resolution);
@@ -615,28 +639,44 @@ fn demo_blocks_generator(
                 Block::from(txn.insert_anonymous(block_def))
             }
 
-            BecomeBlinker(state) => Block::builder()
-                .color(if state { Rgba::WHITE } else { Rgba::BLACK })
-                .ambient_sound(sound::Ambient::noise_at_frequency(
-                    ps32(0.3),
-                    if state { ps32(320.0) } else { ps32(160.0) },
-                ))
-                .display_name(format!("Blinker {state:?}"))
-                .animation_hint(AnimationHint::replacement(
-                    block::AnimationChange::ColorSameCategory,
-                ))
-                .tick_action(Some(TickAction {
-                    operation: Operation::AndFluff {
-                        // TODO: This should be a custom sound and particle effect, but `Fluff`
-                        // doesn’t support those yet.
-                        fluff: Fluff::Happened,
-                        and: Arc::new(Operation::Become(provider[BecomeBlinker(!state)].clone())),
-                    },
-                    schedule: time::Schedule::from_period(NonZeroU16::new(60).unwrap()),
-                }))
-                .build(),
+            BecomeBlinker(state) => {
+                let low_pitch = ps32(160.0);
+                let high_pitch = low_pitch * ps32(1.5);
+                let [this_pitch, other_pitch] = if state {
+                    [high_pitch, low_pitch]
+                } else {
+                    [low_pitch, high_pitch]
+                };
+                let become_sound =
+                    txn.insert_anonymous(SoundDef::new_tone(zo32(0.05), other_pitch, zo32(0.2)));
+
+                Block::builder()
+                    .color(if state { Rgba::WHITE } else { Rgba::BLACK })
+                    .ambient_sound(sound::Ambient::noise_at_frequency(ps32(0.3), this_pitch))
+                    .display_name(format!("Blinker {state:?}"))
+                    .animation_hint(AnimationHint::replacement(
+                        block::AnimationChange::ColorSameCategory,
+                    ))
+                    .tick_action(Some(TickAction {
+                        operation: Operation::AndFluff {
+                            // TODO: This should have a custom particle effect, but `Fluff`
+                            // doesn’t support those yet (we haven't settled on the scope of
+                            // possible particles, which complicate rendering).
+                            fluff: Fluff::Sound {
+                                sound: become_sound,
+                                gain: ps32(1.0),
+                            },
+                            and: Arc::new(Operation::Become(
+                                provider[BecomeBlinker(!state)].clone(),
+                            )),
+                        },
+                        schedule: time::Schedule::from_period(NonZeroU16::new(60).unwrap()),
+                    }))
+                    .build()
+            }
 
             Explosion(timer) => {
+                let blink_interval = 2;
                 let decay = if timer < 0 {
                     1.0
                 } else {
@@ -647,10 +687,11 @@ fn demo_blocks_generator(
                     // Expire because we're invisible by now
                     [(Cube::ORIGIN, Operation::Become(AIR))].into()
                 } else {
-                    let next = Operation::DestroyTo(provider[Explosion(timer + 1)].clone());
-                    if timer > 0 && timer < 10 {
+                    let place_next_block_op =
+                        Arc::new(Operation::DestroyTo(provider[Explosion(timer + 1)].clone()));
+                    let (fluff, neighbors) = if timer > 0 && timer < 10 {
                         // Expand at first out to ~5 blocks
-                        if timer.rem_euclid(2) == 0 {
+                        let neighbors = if timer.rem_euclid(2) == 0 {
                             if timer.rem_euclid(4) == 0 {
                                 const {
                                     [
@@ -686,14 +727,50 @@ fn demo_blocks_generator(
                             }
                         } else {
                             [Cube::ORIGIN].as_slice()
-                        }
+                        };
+                        (
+                            Some(Fluff::Sound {
+                                sound: explosion_sounds.whoosh.clone(),
+                                gain: PositiveSign::<f32>::new_clamped(decay as f32),
+                            }),
+                            neighbors,
+                        )
                     } else {
                         // Just tick or fade
-                        [Cube::ORIGIN].as_slice()
-                    }
-                    .iter()
-                    .map(|&cube| (cube, next.clone()))
-                    .collect()
+                        let sound = if timer == 0 {
+                            Some(Fluff::Sound {
+                                sound: explosion_sounds.detonation.clone(),
+                                gain: ps32(1.0),
+                            })
+                        } else if timer < 0
+                            && timer.rem_euclid(blink_interval) == blink_interval - 1
+                        {
+                            Some(Fluff::Sound {
+                                sound: explosion_sounds.timer.clone(),
+                                gain: ps32(1.0),
+                            })
+                        } else {
+                            None
+                        };
+                        (sound, [Cube::ORIGIN].as_slice())
+                    };
+
+                    neighbors
+                        .iter()
+                        .map(|&cube| {
+                            (
+                                cube,
+                                if let Some(fluff) = &fluff {
+                                    Operation::AndFluff {
+                                        and: Arc::clone(&place_next_block_op),
+                                        fluff: fluff.clone(),
+                                    }
+                                } else {
+                                    Operation::clone(&place_next_block_op)
+                                },
+                            )
+                        })
+                        .collect()
                 };
 
                 let atom = Block::builder()
@@ -701,7 +778,7 @@ fn demo_blocks_generator(
                     .color(rgba_const!(0.014, 0.01, 0.01, 1.0))
                     .collision(block::Collision::None)
                     .light_emission(if timer < 0 {
-                        if timer.rem_euclid(4) < 2 {
+                        if timer.rem_euclid(blink_interval * 2) < blink_interval {
                             Rgb::ZERO
                         } else {
                             rgb_const!(0.8, 0.0, 0.0)
