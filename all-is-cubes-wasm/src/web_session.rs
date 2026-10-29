@@ -1,6 +1,7 @@
 use std::cell::{BorrowMutError, RefCell};
+use std::fmt;
 use std::rc::{Rc, Weak};
-use std::sync::Arc;
+use std::sync::{Arc, atomic};
 use std::time::Duration;
 
 use js_sys::{ArrayBuffer, Error, Uint8Array};
@@ -471,9 +472,11 @@ impl WebSession {
                 WebRenderer::Wgpu(renderer) => renderer.cameras(),
             };
             if cameras.cameras().world.options().debug_info_text {
-                self.static_dom
-                    .scene_info_text_node
-                    .set_data(&format!("{}", inner.session.info_text(render_info)));
+                self.static_dom.scene_info_text_node.set_data(&format!(
+                    "Wasm memory: {mem}\n{info}",
+                    mem = wasm_memory_size_info(),
+                    info = inner.session.info_text(render_info)
+                ));
             } else {
                 self.static_dom.scene_info_text_node.set_data("");
             }
@@ -622,5 +625,27 @@ fn map_keyboard_event(event: &KeyboardEvent) -> Option<Key> {
         _ => {
             return None;
         }
+    })
+}
+
+fn wasm_memory_size_info() -> impl fmt::Display {
+    const PAGE_SIZE: usize = 65536;
+    const MIB_PER_PAGE: usize = 1024 * 1024 / PAGE_SIZE;
+    static LAST_PAGE_COUNT: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
+
+    let current_page_count = core::arch::wasm32::memory_size::<0>();
+    let last_page_count = LAST_PAGE_COUNT.swap(current_page_count, atomic::Ordering::Relaxed);
+    let delta_page_count = current_page_count.cast_signed() - last_page_count.cast_signed();
+
+    fmt::from_fn(move |f| {
+        write!(
+            f,
+            "{current} MiB",
+            current = current_page_count / MIB_PER_PAGE
+        )?;
+        if delta_page_count != 0 {
+            write!(f, " ({delta_page_count:+2} pages)")?;
+        }
+        Ok(())
     })
 }
