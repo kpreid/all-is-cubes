@@ -1,3 +1,4 @@
+use core::convert::identity;
 use core::fmt;
 
 use hashbrown::HashMap;
@@ -68,9 +69,19 @@ impl<T> Default for SoundCache<T> {
 #[doc(hidden)] // implementation helper of unclear general applicability
 pub fn audio_event_channel(
     capacity: usize,
-) -> (AudioEventChannelSender, flume::Receiver<AudioEvent>) {
-    let (sender, receiver) = flume::bounded(capacity);
-    (AudioEventChannelSender(sender), receiver)
+) -> (AudioEventChannelSender, AudioEventChannelReceiver) {
+    let (lossy_sender, lossy_receiver) = flume::bounded(capacity);
+    let (guaranteed_sender, guaranteed_receiver) = flume::unbounded();
+    (
+        AudioEventChannelSender {
+            lossy_sender,
+            guaranteed_sender,
+        },
+        AudioEventChannelReceiver {
+            lossy_receiver,
+            guaranteed_receiver,
+        },
+    )
 }
 
 /// Sender side of [`audio_event_channel()`].
@@ -78,12 +89,22 @@ pub fn audio_event_channel(
 /// Use this by passing it to [`listen_to_audio_events()`][crate::apps::Session::listen_to_audio_events].
 #[doc(hidden)]
 #[derive(Clone)]
-pub struct AudioEventChannelSender(flume::Sender<AudioEvent>);
+pub struct AudioEventChannelSender {
+    lossy_sender: flume::Sender<AudioEvent>,
+    guaranteed_sender: flume::Sender<AudioEvent>,
+}
+
+impl AudioEventChannelSender {
+    fn is_disconnected(&self) -> bool {
+        // We only need to check one, not both, since both are dropped at almost the same time.
+        self.lossy_sender.is_disconnected()
+    }
+}
 
 impl fmt::Debug for AudioEventChannelSender {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AudioEventChannelSender")
-            .field("alive", &!self.0.is_disconnected())
+            .field("alive", &!self.is_disconnected())
             .finish_non_exhaustive()
     }
 }
@@ -91,16 +112,69 @@ impl fmt::Debug for AudioEventChannelSender {
 impl listen::Listener<AudioEvent> for AudioEventChannelSender {
     fn receive(&self, events: &[AudioEvent]) -> bool {
         if events.is_empty() {
-            !self.0.is_disconnected()
+            !self.is_disconnected()
         } else {
             for event in events {
-                match self.0.try_send(event.clone()) {
+                let channel = if event.must_be_delivered() {
+                    &self.guaranteed_sender
+                } else {
+                    &self.lossy_sender
+                };
+                match channel.try_send(event.clone()) {
                     Ok(()) => {}
                     Err(flume::TrySendError::Full(_)) => {} // drop message if full
                     Err(flume::TrySendError::Disconnected(_)) => return false,
                 }
             }
             true
+        }
+    }
+}
+
+/// Receiver side of [`audio_event_channel()`].
+#[doc(hidden)]
+#[derive(Clone, Debug)]
+pub struct AudioEventChannelReceiver {
+    lossy_receiver: flume::Receiver<AudioEvent>,
+    guaranteed_receiver: flume::Receiver<AudioEvent>,
+}
+
+impl AudioEventChannelReceiver {
+    /// Block until one event is available, then return it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sender has been dropped (the channel is closed).
+    pub fn recv_blocking(&self) -> Result<AudioEvent, flume::RecvError> {
+        // Prioritize lossy_receiver's playback events.
+        match self.lossy_receiver.try_recv() {
+            Ok(event) => Ok(event),
+            Err(flume::TryRecvError::Disconnected) => Err(flume::RecvError::Disconnected),
+            Err(flume::TryRecvError::Empty) => flume::select::Selector::new()
+                .recv(&self.guaranteed_receiver, identity)
+                .recv(&self.lossy_receiver, identity)
+                .wait(),
+        }
+    }
+
+    /// Suspend until one event is available, then return it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sender has been dropped (the channel is closed).
+    pub async fn recv_async(&self) -> Result<AudioEvent, flume::RecvError> {
+        match self.lossy_receiver.try_recv() {
+            Ok(event) => Ok(event),
+            Err(flume::TryRecvError::Disconnected) => Err(flume::RecvError::Disconnected),
+            Err(flume::TryRecvError::Empty) => {
+                let either = futures_util::future::select(
+                    self.lossy_receiver.recv_async(),
+                    self.guaranteed_receiver.recv_async(),
+                )
+                .await;
+                // select() gives us the other future, which we don't need
+                either.factor_first().0
+            }
         }
     }
 }

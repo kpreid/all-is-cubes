@@ -20,7 +20,8 @@ use all_is_cubes::sound::{Band, SoundDef, SpatialAmbient};
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_render::camera::{self, Camera, Layers, StandardCameras};
 use all_is_cubes_ui::apps::{
-    AudioEvent, AudioEventChannelSender, AudioEventSource, SoundCache, audio_event_channel,
+    AudioEvent, AudioEventChannelReceiver, AudioEventChannelSender, AudioEventSource, SoundCache,
+    audio_event_channel,
 };
 
 use crate::Session;
@@ -113,7 +114,7 @@ impl AudioTask {
 /// This is not a real-time audio thread.
 #[expect(clippy::needless_pass_by_value)]
 fn audio_command_thread(
-    receiver: flume::Receiver<AudioEvent>,
+    receiver: AudioEventChannelReceiver,
     mut manager: AudioManager,
     ambient_source: listen::DynSource<SpatialAmbient>,
     spatial_listener_id: kira::listener::ListenerId,
@@ -152,7 +153,7 @@ fn audio_command_thread(
         (Some(volume), Some(ambient_track))
     });
 
-    while let Ok(message) = receiver.recv() {
+    while let Ok(message) = receiver.recv_blocking() {
         match message {
             AudioEvent::Play { fluff, source } => {
                 if let Some((sound_handle, amplitude)) = fluff.sound() {

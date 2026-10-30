@@ -12,7 +12,9 @@ use all_is_cubes::euclid::vec3;
 use all_is_cubes::listen::{self, Listener as _};
 use all_is_cubes::sound::{self, SoundDef};
 use all_is_cubes_render::camera::Camera;
-use all_is_cubes_ui::apps::{AudioEvent, AudioEventSource, SoundCache, audio_event_channel};
+use all_is_cubes_ui::apps::{
+    AudioEvent, AudioEventChannelReceiver, AudioEventSource, SoundCache, audio_event_channel,
+};
 
 use crate::web_glue::{ErrorFromJs, excontext};
 use crate::web_session::Session;
@@ -69,7 +71,7 @@ impl AudioTask {
 
 /// Async task which does most but not all of the [`AudioContext`] control.
 async fn audio_command_task(
-    receiver: flume::Receiver<AudioEvent>,
+    receiver: AudioEventChannelReceiver,
     context: AudioContext,
     ambient_source: listen::DynSource<sound::SpatialAmbient>,
 ) {

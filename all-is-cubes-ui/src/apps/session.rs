@@ -1141,6 +1141,16 @@ pub enum AudioEvent {
     UpdateAmbient,
 }
 
+impl AudioEvent {
+    /// Whether this event must not be discarded under high load.
+    pub(crate) fn must_be_delivered(&self) -> bool {
+        match self {
+            AudioEvent::Play { .. } => false,
+            AudioEvent::UpdateAmbient => false,
+        }
+    }
+}
+
 /// Identifies the source of an [`AudioEvent`].
 ///
 /// May be used to modify its rendering/playback according to spatial location or user settings.
