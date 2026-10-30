@@ -1,8 +1,13 @@
+use core::fmt;
+
 use hashbrown::HashMap;
 use hashbrown::hash_map::Entry;
 
+use all_is_cubes::listen;
 use all_is_cubes::sound::SoundDef;
 use all_is_cubes::universe::{self, Handle};
+
+use crate::apps::session::AudioEvent;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -54,5 +59,48 @@ impl<T> SoundCache<T> {
 impl<T> Default for SoundCache<T> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Create a channel that transports [`AudioEvent`], with prioritizing and dropping excess events.
+#[doc(hidden)] // implementation helper of unclear general applicability
+pub fn audio_event_channel(
+    capacity: usize,
+) -> (AudioEventChannelSender, flume::Receiver<AudioEvent>) {
+    let (sender, receiver) = flume::bounded(capacity);
+    (AudioEventChannelSender(sender), receiver)
+}
+
+/// Sender side of [`audio_event_channel()`].
+///
+/// Use this by passing it to [`listen_to_audio_events()`][crate::apps::Session::listen_to_audio_events].
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct AudioEventChannelSender(flume::Sender<AudioEvent>);
+
+impl fmt::Debug for AudioEventChannelSender {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AudioEventChannelSender")
+            .field("alive", &!self.0.is_disconnected())
+            .finish_non_exhaustive()
+    }
+}
+
+impl listen::Listener<AudioEvent> for AudioEventChannelSender {
+    fn receive(&self, events: &[AudioEvent]) -> bool {
+        if events.is_empty() {
+            !self.0.is_disconnected()
+        } else {
+            for event in events {
+                match self.0.try_send(event.clone()) {
+                    Ok(()) => {}
+                    Err(flume::TrySendError::Full(_)) => {} // drop message if full
+                    Err(flume::TrySendError::Disconnected(_)) => return false,
+                }
+            }
+            true
+        }
     }
 }

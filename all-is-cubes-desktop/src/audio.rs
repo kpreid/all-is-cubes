@@ -19,7 +19,9 @@ use all_is_cubes::listen;
 use all_is_cubes::sound::{Band, SoundDef, SpatialAmbient};
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_render::camera::{self, Camera, Layers, StandardCameras};
-use all_is_cubes_ui::apps::{AudioEvent, AudioEventSource, SoundCache};
+use all_is_cubes_ui::apps::{
+    AudioEvent, AudioEventChannelSender, AudioEventSource, SoundCache, audio_event_channel,
+};
 
 use crate::Session;
 
@@ -31,7 +33,7 @@ pub(crate) struct AudioTask {
         dead_code,
         reason = "eventually we're going to need this for volume control etc."
     )]
-    sender: flume::Sender<AudioEvent>,
+    sender: AudioEventChannelSender,
     world_spatial_listener: ListenerHandle,
 
     // TODO: having our own separate `StandardCameras` is overkill for audio, but because it
@@ -62,8 +64,8 @@ impl AudioTask {
 
         // Transfers audio events to the audio processing thread.
         // We never block on this channel, but drop things if full.
-        let (sender, receiver) = flume::bounded(256);
-        session.listen_to_audio_events(EventAdapter(sender.clone()));
+        let (sender, receiver) = audio_event_channel(256);
+        session.listen_to_audio_events(sender.clone());
 
         // The audio processing is done on a thread because `AudioManager` wants `&mut self`
         // to perform operations, so I either need a dedicated thread (actor) or a mutex.
@@ -229,40 +231,6 @@ fn log_playback_result(
             "Playback error: {error}",
             error = all_is_cubes::util::ErrorChain(&error)
         ),
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-// TODO: Can we de-boilerplate these listener-to-channel adapters somehow?
-// We have basically identical wasm and non-wasm code, but no clear place for it to live.
-// (`all_is_cubes::util` is a place for adapters, but it doesn't depend on `flume`.)
-
-/// Adapter from [`Listener`] to the audio command channel.
-struct EventAdapter(flume::Sender<AudioEvent>);
-
-impl fmt::Debug for EventAdapter {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("EventAdapter")
-            .field("alive", &!self.0.is_disconnected())
-            .finish_non_exhaustive()
-    }
-}
-
-impl listen::Listener<AudioEvent> for EventAdapter {
-    fn receive(&self, events: &[AudioEvent]) -> bool {
-        if events.is_empty() {
-            !self.0.is_disconnected()
-        } else {
-            for event in events {
-                match self.0.try_send(event.clone()) {
-                    Ok(()) => {}
-                    Err(flume::TrySendError::Full(_)) => {} // drop message if full
-                    Err(flume::TrySendError::Disconnected(_)) => return false,
-                }
-            }
-            true
-        }
     }
 }
 

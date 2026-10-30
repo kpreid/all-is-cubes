@@ -3,8 +3,6 @@
 //! Note: This contains extremely similar code to the desktop version at
 //! `all-is-cubes-desktop/src/audio.rs`. Most changes should apply to both.
 
-use core::fmt;
-
 use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 use rand::{RngExt as _, SeedableRng as _};
 use wasm_bindgen::JsValue;
@@ -14,7 +12,7 @@ use all_is_cubes::euclid::vec3;
 use all_is_cubes::listen::{self, Listener as _};
 use all_is_cubes::sound::{self, SoundDef};
 use all_is_cubes_render::camera::Camera;
-use all_is_cubes_ui::apps::{AudioEvent, AudioEventSource, SoundCache};
+use all_is_cubes_ui::apps::{AudioEvent, AudioEventSource, SoundCache, audio_event_channel};
 
 use crate::web_glue::{ErrorFromJs, excontext};
 use crate::web_session::Session;
@@ -34,8 +32,8 @@ impl AudioTask {
         let context = AudioContext::new()?;
 
         // Transfers audio events to the audio processing task.
-        let (sender, receiver) = flume::bounded(256);
-        let (gate, listener) = EventAdapter(sender).gate();
+        let (sender, receiver) = audio_event_channel(256);
+        let (gate, listener) = sender.gate();
         session.listen_to_audio_events(listener);
 
         let audio_task_handle = AudioTask {
@@ -240,35 +238,6 @@ fn make_ambient_sound_synthesizer(
         })?;
 
     Ok(ambient_noise_gains)
-}
-
-// -------------------------------------------------------------------------------------------------
-
-/// Adapter from [`Listener`] to the audio command channel.
-struct EventAdapter(flume::Sender<AudioEvent>);
-
-impl fmt::Debug for EventAdapter {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("EventAdapter")
-            .field("alive", &!self.0.is_disconnected())
-            .finish_non_exhaustive()
-    }
-}
-impl listen::Listener<AudioEvent> for EventAdapter {
-    fn receive(&self, events: &[AudioEvent]) -> bool {
-        if events.is_empty() {
-            !self.0.is_disconnected()
-        } else {
-            for event in events {
-                match self.0.try_send(event.clone()) {
-                    Ok(()) => {}
-                    Err(flume::TrySendError::Full(_)) => {} // drop message if full
-                    Err(flume::TrySendError::Disconnected(_)) => return false,
-                }
-            }
-            true
-        }
-    }
 }
 
 // -------------------------------------------------------------------------------------------------
