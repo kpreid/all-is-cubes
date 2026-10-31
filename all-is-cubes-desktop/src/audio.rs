@@ -51,9 +51,17 @@ impl fmt::Debug for AudioTask {
 
 impl AudioTask {
     pub(crate) fn new(session: &Session) -> Result<AudioTask, anyhow::Error> {
-        let mut manager = AudioManager::<kira::backend::cpal::CpalBackend>::new(
-            kira::AudioManagerSettings::default(),
-        )?;
+        let mut manager =
+            AudioManager::<kira::backend::cpal::CpalBackend>::new(kira::AudioManagerSettings {
+                capacities: kira::Capacities {
+                    // Greatly increased capacity over the default of 128, because our sound
+                    // production approach is nearly granular synthesis: many small sounds
+                    // may be playing.
+                    sub_track_capacity: 1024,
+                    ..kira::Capacities::default()
+                },
+                ..Default::default()
+            })?;
         let cameras_for_audio =
             session.create_cameras(listen::constant(camera::Viewport::with_scale(1.0, [0, 0])));
 
