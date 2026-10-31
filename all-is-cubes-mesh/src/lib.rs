@@ -39,8 +39,8 @@
 //!
 //! * `"auto-threads"`:
 //!   Enables implicit use of threads for parallel and background processing, including via
-#![cfg_attr(feature = "auto-threads", doc = "   [`rayon`]’s")]
-#![cfg_attr(not(feature = "auto-threads"), doc = "   `rayon`’s")]
+#![cfg_attr(feature = "auto-threads", doc = "  [`rayon`]’s")]
+#![cfg_attr(not(feature = "auto-threads"), doc = "  `rayon`’s")]
 //!   global thread pool.
 //! * `"dynamic"`:
 //!   Enable the `dynamic` module.

@@ -25,7 +25,7 @@ use crate::raycast::{Ray, Raycaster};
 /// with `aab_raycast()` to fix that.
 ///
 /// [`RaycastStep`]: crate::raycast::RaycastStep
-#[deprecated]
+#[deprecated(since = "0.11.0", note = "replace with aab_raycast()")]
 #[allow(dead_code, reason = "TODO: remove")]
 pub(crate) fn aab_raycast_legacy(aab: Aab, origin_ray: Ray, reversed: bool) -> Raycaster {
     let leading_corner = aab.corner_point(Octant::from_vector(if reversed {
