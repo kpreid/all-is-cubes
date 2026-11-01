@@ -66,7 +66,7 @@ pub enum DemoBlocks {
     Signboard,
     LabelTextVoxel,
     Clock,
-    BecomeBlinker(bool),
+    BecomeBlinker(BecomeBlinkerState),
     Explosion(i8),
     Projectile,
     // TOOD: Greebly is not actually used anywhere in the demo content but only in visualize-block-mesh for now.
@@ -640,19 +640,16 @@ fn demo_blocks_generator(
             }
 
             BecomeBlinker(state) => {
-                let low_pitch = ps32(160.0);
-                let high_pitch = low_pitch * ps32(1.5);
-                let [this_pitch, other_pitch] = if state {
-                    [high_pitch, low_pitch]
-                } else {
-                    [low_pitch, high_pitch]
-                };
-                let become_sound =
-                    txn.insert_anonymous(SoundDef::new_tone(zo32(0.05), other_pitch, zo32(0.2)));
+                let become_sound = txn.insert_anonymous(SoundDef::new_tone(
+                    zo32(0.05),
+                    state.next().pitch(),
+                    zo32(0.2),
+                ));
 
                 Block::builder()
-                    .color(if state { Rgba::WHITE } else { Rgba::BLACK })
-                    .ambient_sound(sound::Ambient::noise_at_frequency(ps32(0.3), this_pitch))
+                    .color(state.color())
+                    .light_emission(state.emission())
+                    .ambient_sound(sound::Ambient::noise_at_frequency(ps32(0.3), state.pitch()))
                     .display_name(format!("Blinker {state:?}"))
                     .animation_hint(AnimationHint::replacement(
                         block::AnimationChange::ColorSameCategory,
@@ -667,7 +664,7 @@ fn demo_blocks_generator(
                                 gain: ps32(1.0),
                             },
                             and: Arc::new(Operation::Become(
-                                provider[BecomeBlinker(!state)].clone(),
+                                provider[BecomeBlinker(state.next())].clone(),
                             )),
                         },
                         schedule: time::Schedule::from_period(NonZeroU16::new(60).unwrap()),
@@ -947,6 +944,52 @@ pub(crate) fn compose_block_from_faces(
             }),
         ),
     )
+}
+
+/// Just a bounded integer emulation for [`DemoBlocks::BecomeBlinker`].
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[expect(missing_docs, clippy::exhaustive_enums)]
+pub enum BecomeBlinkerState {
+    Zero,
+    One,
+    Two,
+    Three,
+}
+
+impl fmt::Display for BecomeBlinkerState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        (*self as u8).fmt(f)
+    }
+}
+
+impl BecomeBlinkerState {
+    fn pitch(self) -> PositiveSign<f32> {
+        PositiveSign::<f32>::new_clamped(160.0 * 1.5f32.powi(self as i32))
+    }
+    fn color(self) -> Rgba {
+        match self {
+            BecomeBlinkerState::Zero => Rgba::BLACK,
+            BecomeBlinkerState::One => rgba_const!(0.5, 0.5, 0.5, 1.0),
+            BecomeBlinkerState::Two => Rgba::WHITE,
+            BecomeBlinkerState::Three => Rgba::WHITE,
+        }
+    }
+    fn emission(self) -> Rgb {
+        match self {
+            BecomeBlinkerState::Zero => Rgb::ZERO,
+            BecomeBlinkerState::One => Rgb::ZERO,
+            BecomeBlinkerState::Two => Rgb::ZERO,
+            BecomeBlinkerState::Three => Rgb::from_luminance(2.0),
+        }
+    }
+    fn next(self) -> Self {
+        match self {
+            BecomeBlinkerState::Zero => BecomeBlinkerState::One,
+            BecomeBlinkerState::One => BecomeBlinkerState::Two,
+            BecomeBlinkerState::Two => BecomeBlinkerState::Three,
+            BecomeBlinkerState::Three => BecomeBlinkerState::Zero,
+        }
+    }
 }
 
 #[cfg(test)]

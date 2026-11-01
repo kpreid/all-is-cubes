@@ -1,4 +1,4 @@
-use crate::AnimatedVoxels;
+use crate::{AnimatedVoxels, BecomeBlinkerState};
 
 use super::prelude::*;
 
@@ -102,10 +102,15 @@ fn BECOME(ctx: Context<'_>) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
-    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 3]))
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 7]))
         .read_ticket(ctx.universe.read_ticket())
         .build_and_mutate(|m| {
-            for (state, z) in [(false, 0), (true, 2)] {
+            for (state, z) in [
+                (BecomeBlinkerState::Zero, 0),
+                (BecomeBlinkerState::One, 2),
+                (BecomeBlinkerState::Two, 4),
+                (BecomeBlinkerState::Three, 6),
+            ] {
                 stack(
                     m,
                     [0, 0, z],
