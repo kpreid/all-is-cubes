@@ -148,7 +148,7 @@ async fn export_too_large_space() {
     );
 }
 
-/// Test that `export_to_dot_vox_data` accepts BlockDefs.
+/// Test that `export_to_dot_vox_data` accepts `BlockDef`s.
 ///
 /// [`exported_space_equals_exported_block`] below is a more thorough test of the actual content.
 /// TODO: be more tidy about what we're testing, and also have better behavior for

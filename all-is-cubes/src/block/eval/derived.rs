@@ -208,6 +208,8 @@ pub(in crate::block::eval) fn compute_derived(voxels: &Evoxels) -> Derived {
                     |p| voxels_r.get_evoxel(p).color.fully_opaque(),
                 )
             } else {
+                // Short-circuit: if the surface does not fill full_block_bounds, then it can’t
+                // possibly be opaque and we don’t need to check any individual voxels.
                 false
             }
         }),
