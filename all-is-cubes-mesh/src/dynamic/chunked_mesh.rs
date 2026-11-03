@@ -525,6 +525,11 @@ where
             }
             let update_end = time::Instant::now();
 
+            // If we now know that no dynamic depth sorting is required, drop the mesh.
+            if !state.chunk_mesh.meta().needs_depth_sorting_somewhere() {
+                state.chunk_mesh.drop_mesh_but_keep_metadata();
+            }
+
             let compute_time =
                 compute_end_depth_sort_start.saturating_duration_since(compute_start);
             let updater_time = update_end.saturating_duration_since(depth_sort_end_update_start);

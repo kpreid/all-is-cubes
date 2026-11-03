@@ -855,6 +855,14 @@ impl<M: MeshTypes> MeshMeta<M> {
         tm.needs_static_sort() || !tm.depth_sort_validity.contains(view_position)
     }
 
+    /// Returns whether there is any circumstance at all under which depth sorting might be
+    /// required for this mesh, without consideration for the camera position.
+    #[inline] // trivial wrapper
+    pub fn needs_depth_sorting_somewhere(&self) -> bool {
+        // delegate immediately to non-generic form in order to avoid redundant generic codegen
+        TransparentMeta::needs_depth_sorting_somewhere(&self.transparent)
+    }
+
     /// Returns an iterator over all of the block indices in the [`Space`] that occurred
     /// in the region this mesh was constructed from.
     ///
@@ -1057,6 +1065,14 @@ impl TransparentMeta {
 
     pub(crate) fn needs_static_sort(&self) -> bool {
         self.depth_sort_validity == Aabb::EMPTY && self.dynamic_sub_ranges.is_empty()
+    }
+
+    /// Returns whether there is any circumstance at all under which depth sorting might be
+    /// required for this mesh, without consideration for the camera position.
+    ///
+    /// This will always be true when [`Self::needs_static_sort()`] is.
+    fn needs_depth_sorting_somewhere(transparent_metas: &[TransparentMeta; 27]) -> bool {
+        transparent_metas.iter().any(|tm| tm.depth_sort_validity != Aabb::EVERYWHERE)
     }
 
     #[allow(dead_code, reason = "used conditionally")]

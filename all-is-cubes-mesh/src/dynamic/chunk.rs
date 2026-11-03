@@ -345,6 +345,10 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         }
     }
 
+    pub(crate) fn drop_mesh_but_keep_metadata(&mut self) {
+        self.mesh.drop_mesh_but_keep_metadata();
+    }
+
     pub(crate) fn stale_blocks(&self, block_meshes: &dynamic::VersionedBlockMeshes<M>) -> bool {
         self.block_dependencies
             .iter()
@@ -470,6 +474,12 @@ impl<M: DynamicMeshTypes> ChunkMeshData<M> {
                     ChunkMeshData::Meta(_) => unreachable!(),
                 }
             }
+        }
+    }
+
+    fn drop_mesh_but_keep_metadata(&mut self) {
+        if let ChunkMeshData::Full(mesh) = self {
+            *self = ChunkMeshData::Meta(mem::take(mesh).into_meta());
         }
     }
 }
