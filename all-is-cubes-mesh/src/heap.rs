@@ -38,10 +38,16 @@ impl<T: HeapUsage> HeapUsage for Option<T> {
 
 /// This impl applies only to `Copy` types which essentially can’t own anything.
 /// An alternative would be `impl<T: HeapUsage>`, but that’s less useful for our purposes and
-/// would require recursion.
+/// would be potentially unbounded recursive traversal.
 impl<T: Copy> HeapUsage for alloc::vec::Vec<T> {
     fn heap_bytes_owned(&self) -> usize {
         capacity_bytes(self)
+    }
+}
+
+impl<T: HeapUsage, const N: usize> HeapUsage for [T; N] {
+    fn heap_bytes_owned(&self) -> usize {
+        self.iter().map(HeapUsage::heap_bytes_owned).sum()
     }
 }
 
@@ -54,11 +60,36 @@ impl HeapUsage for all_is_cubes::block::VoxelOpacityMask {
     }
 }
 
+macro_rules! trivial_heap_usage {
+    ($t:ty) => {
+        impl HeapUsage for $t {
+            fn heap_bytes_owned(&self) -> usize {
+                0
+            }
+        }
+    };
+}
+trivial_heap_usage!(bool);
+trivial_heap_usage!(crate::Aabb);
+trivial_heap_usage!(crate::Aabbs);
+trivial_heap_usage!(all_is_cubes_render::Flaws);
+trivial_heap_usage!(core::ops::Range<u32>);
+trivial_heap_usage!(core::range::Range<u32>);
+
 // -------------------------------------------------------------------------------------------------
 
 /// Returns the bytes allocated by a `Vec`, ignoring what might be owned by its elements.
 pub(crate) fn capacity_bytes<T>(v: &alloc::vec::Vec<T>) -> usize {
     v.capacity() * size_of::<T>()
+}
+
+/// Returns the bytes allocated by a `SmallVec`, ignoring what might be owned by its elements.
+pub(crate) fn smallvec_capacity_bytes<T: smallvec::Array>(v: &smallvec::SmallVec<T>) -> usize {
+    if v.spilled() {
+        v.capacity() * size_of::<T::Item>()
+    } else {
+        0
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

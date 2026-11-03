@@ -14,7 +14,7 @@ use all_is_cubes::math::{Cube, Face, FaceMap, GridAab, Vol};
 use all_is_cubes::space::{self, BlockIndex, Space};
 use all_is_cubes_render::Flaws;
 
-use crate::heap::HeapUsage;
+use crate::heap::{self, HeapUsage};
 use crate::texture::Channels;
 use crate::{
     Aabb, Aabbs, BlockMesh, DepthOrdering, IndexBound, IndexSlice, IndexVec, IndexVecDeque,
@@ -153,31 +153,10 @@ impl<M: MeshTypes> SpaceMesh<M> {
         self.transparent.iter().for_each(TransparentMeta::consistency_check);
     }
 
-    /// Returns the total memory (not counting allocator overhead) occupied by this
-    /// [`SpaceMesh`] value and all its owned objects,
-    /// not counting the texture it references or allocator overhead.
+    /// Returns the total memory occupied by this [`SpaceMesh`] value and all its owned objects,
+    /// not counting the textures it references or memory allocator overhead.
     pub fn total_byte_size(&self) -> usize {
-        let SpaceMesh {
-            vertices: (v0, v1),
-            indices,
-            meta:
-                MeshMeta {
-                    opaque_range: _,
-                    transparent: _,
-                    block_indices_used,
-                    textures_used,
-                    has_non_rect_transparency: _,
-                    bounding_box: _,
-                    flaws: _,
-                },
-        } = self;
-
-        size_of::<Self>()
-            + v0.heap_bytes_owned()
-            + v1.heap_bytes_owned()
-            + indices.heap_bytes_owned()
-            + block_indices_used.heap_bytes_owned()
-            + crate::heap::capacity_bytes(textures_used)
+        size_of::<Self>() + self.heap_bytes_owned()
     }
 
     /// Computes triangles for the contents of `space` within `bounds` and stores them
@@ -499,6 +478,20 @@ impl<M: MeshTypes> Clone for SpaceMesh<M> {
             indices: self.indices.clone(),
             meta: self.meta.clone(),
         }
+    }
+}
+
+impl<M: MeshTypes> HeapUsage for SpaceMesh<M> {
+    fn heap_bytes_owned(&self) -> usize {
+        let Self {
+            vertices,
+            indices,
+            meta,
+        } = self;
+        vertices.0.heap_bytes_owned()
+            + vertices.1.heap_bytes_owned()
+            + indices.heap_bytes_owned()
+            + meta.heap_bytes_owned()
     }
 }
 
@@ -997,6 +990,27 @@ impl<M: MeshTypes> Clone for MeshMeta<M> {
     }
 }
 
+impl<M: MeshTypes> HeapUsage for MeshMeta<M> {
+    fn heap_bytes_owned(&self) -> usize {
+        let Self {
+            opaque_range,
+            transparent,
+            block_indices_used,
+            textures_used,
+            has_non_rect_transparency,
+            bounding_box,
+            flaws,
+        } = self;
+        opaque_range.heap_bytes_owned()
+            + transparent.heap_bytes_owned()
+            + block_indices_used.heap_bytes_owned()
+            + heap::capacity_bytes(textures_used) // texture handles’ own heap memory is not counted
+            + has_non_rect_transparency.heap_bytes_owned()
+            + bounding_box.heap_bytes_owned()
+            + flaws.heap_bytes_owned()
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Component of [`MeshMeta`] describing the mesh’s contents under a specific [`DepthOrdering`].
@@ -1087,6 +1101,20 @@ impl fmt::Debug for TransparentMeta {
             write!(f, " sorted for {depth_sort_validity:?}")?;
         }
         Ok(())
+    }
+}
+
+impl HeapUsage for TransparentMeta {
+    fn heap_bytes_owned(&self) -> usize {
+        let Self {
+            index_range,
+            depth_sort_validity,
+            dynamic_sub_ranges,
+        } = self;
+
+        index_range.heap_bytes_owned()
+            + depth_sort_validity.heap_bytes_owned()
+            + heap::smallvec_capacity_bytes(dynamic_sub_ranges)
     }
 }
 

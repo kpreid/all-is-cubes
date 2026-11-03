@@ -241,20 +241,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     /// Returns the total memory occupied by this [`BlockMesh`] value and all its owned objects,
     /// not counting the texture it references or allocator overhead.
     pub fn total_byte_size(&self) -> usize {
-        let BlockMesh {
-            face_vertices,
-            interior_vertices,
-            total_indices: _,
-            texture_used: _,
-            voxel_opacity_mask, // TODO: we should be counting this
-            flaws: _,
-        } = self;
-
-        size_of::<Self>()
-            + (face_vertices.values().chain(interior_vertices.values()))
-                .map(HeapUsage::heap_bytes_owned)
-                .sum::<usize>()
-            + voxel_opacity_mask.heap_bytes_owned()
+        size_of::<Self>() + self.heap_bytes_owned()
     }
 
     /// Update this mesh's textures in-place to the given new block data, if this is
@@ -466,6 +453,24 @@ impl<M: MeshTypes> Clone for BlockMesh<M> {
             voxel_opacity_mask: self.voxel_opacity_mask.clone(),
             flaws: self.flaws,
         }
+    }
+}
+
+impl<M: MeshTypes> HeapUsage for BlockMesh<M> {
+    fn heap_bytes_owned(&self) -> usize {
+        let BlockMesh {
+            face_vertices,
+            interior_vertices,
+            total_indices: _,
+            texture_used: _, // texture handles’ own heap memory is not counted
+            voxel_opacity_mask,
+            flaws: _,
+        } = self;
+
+        (face_vertices.values().chain(interior_vertices.values()))
+            .map(HeapUsage::heap_bytes_owned)
+            .sum::<usize>()
+            + voxel_opacity_mask.heap_bytes_owned()
     }
 }
 

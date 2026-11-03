@@ -16,6 +16,7 @@ use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText};
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
 use crate::dynamic::{self, DynamicMeshTypes, job};
+use crate::heap::HeapUsage;
 use crate::{BlockMesh, MeshOptions, SpaceMesh};
 use crate::{MeshMeta, Vertex, texture};
 
@@ -425,6 +426,17 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
         }
 
         None
+    }
+}
+
+impl<M: DynamicMeshTypes> HeapUsage for InstanceMesh<M> {
+    fn heap_bytes_owned(&self) -> usize {
+        let InstanceMesh {
+            meta,
+            render_data: _, // we'd have to ask the user-provided type
+        } = self;
+
+        meta.heap_bytes_owned()
     }
 }
 
