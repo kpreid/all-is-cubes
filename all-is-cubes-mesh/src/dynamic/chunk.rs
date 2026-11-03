@@ -17,6 +17,7 @@ use all_is_cubes::util::{ConciseDebug, Refmt as _};
 use all_is_cubes_render::camera::Camera;
 
 use crate::dynamic::{self, DynamicMeshTypes};
+use crate::heap::HeapUsage;
 use crate::{
     BlockMesh, DepthOrdering, GetBlockMesh, MeshMeta, MeshOptions, MeshRel, Position, SpaceMesh,
 };
@@ -36,7 +37,7 @@ type MeshCubeSet = hashbrown::HashSet<Point3D<u8, MeshRel>>;
 pub struct ChunkMesh<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> {
     pub(super) position: ChunkPos<CHUNK_SIZE>,
 
-    mesh: SpaceMesh<M>,
+    mesh: ChunkMeshData<M>,
 
     block_dependencies: Vec<(BlockIndex, dynamic::BlockMeshVersion)>,
 
@@ -56,6 +57,14 @@ pub struct ChunkMesh<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> {
     /// Toggled whenever the mesh is updated. Value is arbitrary (this is a looping
     /// 2-state counter).
     update_debug: bool,
+}
+
+/// Actual mesh data storage for a [`ChunkMesh`].
+enum ChunkMeshData<M: DynamicMeshTypes> {
+    Full(SpaceMesh<M>),
+    Meta(MeshMeta<M>),
+    // TODO: Add variant for keeping only the positions, indices and metadata for depth sorting,
+    // but not the secondary vertex data.
 }
 
 impl<M, const CHUNK_SIZE: GridCoordinate> PartialEq for ChunkMesh<M, CHUNK_SIZE>
@@ -81,10 +90,24 @@ where
     }
 }
 
+impl<M> PartialEq for ChunkMeshData<M>
+where
+    M: DynamicMeshTypes<Vertex: PartialEq, Tile: PartialEq, RenderData: PartialEq>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ChunkMeshData::Full(m1), ChunkMeshData::Full(m2)) => m1 == m2,
+            (ChunkMeshData::Meta(m1), ChunkMeshData::Meta(m2)) => m1 == m2,
+            _ => false,
+        }
+    }
+}
+
 impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> fmt::Debug
     for ChunkMesh<M, CHUNK_SIZE>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #![expect(clippy::shadow_unrelated)]
         let Self {
             position,
             mesh,
@@ -96,7 +119,13 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> fmt::Debug
         } = self;
         f.debug_struct("ChunkMesh")
             .field("position", &position)
-            .field("mesh", &mesh)
+            .field(
+                "mesh",
+                &fmt::from_fn(|f| match mesh {
+                    ChunkMeshData::Full(space_mesh) => space_mesh.fmt(f),
+                    ChunkMeshData::Meta(mesh_meta) => mesh_meta.fmt(f),
+                }),
+            )
             .field("mesh_cubes", &mesh_cubes)
             .field("block_dependencies", &block_dependencies)
             .field("block_instances", &block_instances)
@@ -110,7 +139,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     pub(crate) fn new(position: ChunkPos<CHUNK_SIZE>) -> Self {
         Self {
             position,
-            mesh: SpaceMesh::default(),
+            mesh: ChunkMeshData::Meta(MeshMeta::default()),
             mesh_cubes: Default::default(),
             render_data: Default::default(),
             block_dependencies: Vec::new(),
@@ -122,7 +151,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     /// Returns the [`MeshMeta`] for this chunk.
     #[inline]
     pub fn meta(&self) -> &MeshMeta<M> {
-        self.mesh.meta()
+        &self.mesh
     }
 
     /// Returns the position of this chunk within the [`Space`].
@@ -143,13 +172,16 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     pub(crate) fn borrow_for_update(
         &mut self,
         indices_only: Option<Range<usize>>,
-    ) -> dynamic::RenderDataUpdate<'_, M> {
-        dynamic::RenderDataUpdate {
-            mesh: &self.mesh,
+    ) -> Option<dynamic::RenderDataUpdate<'_, M>> {
+        Some(dynamic::RenderDataUpdate {
+            mesh: match self.mesh {
+                ChunkMeshData::Full(ref space_mesh) => space_mesh,
+                ChunkMeshData::Meta(_) => return None,
+            },
             render_data: &mut self.render_data,
             indices_only,
             mesh_id: dynamic::MeshId(dynamic::MeshIdImpl::Chunk(self.position.0.into())),
-        }
+        })
     }
 
     pub(crate) fn recompute(
@@ -204,7 +236,12 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
 
                 if missing_instance_mesh {
                     tracking_block_meshes.instances.clear();
-                    self.mesh.compute(space, bounds, options, tracking_block_meshes);
+                    self.mesh.get_or_create_empty_mesh().compute(
+                        space,
+                        bounds,
+                        options,
+                        tracking_block_meshes,
+                    );
                 } else {
                     // We successfully updated instances, so the mesh is unchanged, so put back
                     // the info about the mesh.
@@ -213,7 +250,12 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
                 missing_instance_mesh
             }
             ChunkTodoState::DirtyMeshAndInstances => {
-                self.mesh.compute(space, bounds, options, tracking_block_meshes);
+                self.mesh.get_or_create_empty_mesh().compute(
+                    space,
+                    bounds,
+                    options,
+                    tracking_block_meshes,
+                );
                 true
             }
         };
@@ -222,7 +264,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
             let duration_ms = Instant::now().duration_since(start).as_secs_f32() * 1000.0;
 
             let chunk_origin = bounds.lower_bounds();
-            let vertices = self.mesh.vertices().0.len();
+            let vertices = self.mesh.get_or_create_empty_mesh().vertices().0.len();
             if vertices == 0 {
                 log::trace!(
                     "meshed {:?}+ in {:.3} ms, 0",
@@ -290,12 +332,17 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         ordering: DepthOrdering,
         absolute_view_position: FreePoint,
     ) -> crate::DepthSortResult {
-        // The mesh coordinates are in chunk-relative coordinates,
-        // but the incoming view position is in world coordinates,
-        // so we bring the view position into chunk-relative coordinates.
-        let relative_view_position: Position =
-            self.mesh_origin().inverse().transform_point3d(&absolute_view_position).to_f32();
-        self.mesh.depth_sort_for_view(ordering, relative_view_position)
+        let mesh_origin = self.mesh_origin();
+        if let ChunkMeshData::Full(ref mut mesh) = self.mesh {
+            // The mesh coordinates are in chunk-relative coordinates,
+            // but the incoming view position is in world coordinates,
+            // so we bring the view position into chunk-relative coordinates.
+            let relative_view_position: Position =
+                mesh_origin.inverse().transform_point3d(&absolute_view_position).to_f32();
+            mesh.depth_sort_for_view(ordering, relative_view_position)
+        } else {
+            crate::DepthSortResult::NOTHING_CHANGED
+        }
     }
 
     pub(crate) fn stale_blocks(&self, block_meshes: &dynamic::VersionedBlockMeshes<M>) -> bool {
@@ -383,7 +430,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     // Consider changing the signature or eliminating this entirely in favor of making the caller
     // do the transform they need.
     pub(crate) fn mesh_local_bounding_box(&self) -> crate::Aabbs {
-        self.mesh.meta().bounding_box()
+        self.mesh.bounding_box()
     }
 
     /// Returns the bounding box of all instances in this chunk, in global [`Space`] coordinates.
@@ -397,7 +444,42 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     }
 
     pub(crate) fn mesh_byte_size(&self) -> usize {
-        self.mesh.total_byte_size()
+        self.mesh.heap_bytes_owned()
+    }
+}
+
+impl<M: DynamicMeshTypes> ops::Deref for ChunkMeshData<M> {
+    type Target = MeshMeta<M>;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            ChunkMeshData::Full(mesh) => mesh.meta(),
+            ChunkMeshData::Meta(metadata) => metadata,
+        }
+    }
+}
+
+impl<M: DynamicMeshTypes> ChunkMeshData<M> {
+    fn get_or_create_empty_mesh(&mut self) -> &mut SpaceMesh<M> {
+        match self {
+            ChunkMeshData::Full(space_mesh) => space_mesh,
+            ChunkMeshData::Meta(_) => {
+                *self = ChunkMeshData::Full(SpaceMesh::default());
+                match self {
+                    ChunkMeshData::Full(space_mesh) => space_mesh,
+                    ChunkMeshData::Meta(_) => unreachable!(),
+                }
+            }
+        }
+    }
+}
+
+impl<M: DynamicMeshTypes> HeapUsage for ChunkMeshData<M> {
+    fn heap_bytes_owned(&self) -> usize {
+        match self {
+            ChunkMeshData::Full(space_mesh) => space_mesh.heap_bytes_owned(),
+            ChunkMeshData::Meta(mesh_meta) => mesh_meta.heap_bytes_owned(),
+        }
     }
 }
 

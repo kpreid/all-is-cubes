@@ -513,11 +513,14 @@ where
             let run_updater = actually_changed_mesh || actually_sorted_indices.is_some();
             if run_updater {
                 render_data_updater(
-                    state.chunk_mesh.borrow_for_update(if actually_changed_mesh {
-                        None
-                    } else {
-                        actually_sorted_indices
-                    }),
+                    state
+                        .chunk_mesh
+                        .borrow_for_update(if actually_changed_mesh {
+                            None
+                        } else {
+                            actually_sorted_indices
+                        })
+                        .none_is_unreachable(),
                 );
             }
             let update_end = time::Instant::now();

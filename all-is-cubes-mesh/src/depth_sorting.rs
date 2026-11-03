@@ -284,7 +284,7 @@ pub struct DepthSortInfo {
 }
 
 impl DepthSortResult {
-    const NOTHING_CHANGED: Self = Self {
+    pub(crate) const NOTHING_CHANGED: Self = Self {
         changed: None,
         info: DepthSortInfo::DEFAULT,
     };
