@@ -80,6 +80,14 @@ impl<T: VisitHandles, const N: usize> VisitHandles for [T; N] {
     }
 }
 
+impl<T1: VisitHandles, T2: VisitHandles> VisitHandles for (T1, T2) {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        let (v1, v2) = self;
+        v1.visit_handles(visitor);
+        v2.visit_handles(visitor);
+    }
+}
+
 impl<K: VisitHandles, V: VisitHandles> VisitHandles for alloc::collections::BTreeMap<K, V> {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         for (key, value) in self {

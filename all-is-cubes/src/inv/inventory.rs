@@ -545,6 +545,14 @@ impl Merge for InventoryTransaction {
     }
 }
 
+impl VisitHandles for InventoryTransaction {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        let Self { replace, insert } = self;
+        replace.visit_handles(visitor);
+        insert.visit_handles(visitor);
+    }
+}
+
 /// Implementation type for [`InventoryTransaction::CommitCheck`].
 #[derive(Debug)]
 pub struct InventoryCheck {
