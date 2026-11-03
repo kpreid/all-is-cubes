@@ -87,6 +87,9 @@
 * `all-is-cubes-content` library:
     * Renamed `UniverseTemplate::LightingBench` to `LightBench`.
 
+* `all-is-cubes-mesh` library:
+    * `SpaceMesh::blocks_used_iter()` has been moved to `MeshMeta::iter_blocks_used()`.
+
 * `all-is-cubes-port` library:
     * `export_to_path()` takes an additional parameter of type `ExportOptions`.
 

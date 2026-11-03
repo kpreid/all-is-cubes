@@ -44,9 +44,6 @@ pub struct SpaceMesh<M: MeshTypes> {
     indices: IndexVec,
 
     meta: MeshMeta<M>,
-
-    /// Set of all [`BlockIndex`]es whose meshes were incorporated into this mesh.
-    block_indices_used: BlockIndexSet,
 }
 
 impl<M: MeshTypes> SpaceMesh<M> {
@@ -111,16 +108,6 @@ impl<M: MeshTypes> SpaceMesh<M> {
         self.indices().is_empty()
     }
 
-    /// Returns an iterator over all of the block indices in the [`Space`] that occurred
-    /// in the region this mesh was constructed from.
-    ///
-    /// This may be used to determine when to invalidate this mesh because a block it
-    /// contains has changed its definition.
-    #[inline]
-    pub fn blocks_used_iter(&self) -> impl Iterator<Item = BlockIndex> + '_ {
-        self.block_indices_used.iter()
-    }
-
     #[allow(dead_code, reason = "used conditionally")]
     fn consistency_check(&self) {
         assert_eq!(self.vertices.0.len(), self.vertices.1.len());
@@ -177,12 +164,12 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 MeshMeta {
                     opaque_range: _,
                     transparent: _,
+                    block_indices_used,
                     textures_used,
                     has_non_rect_transparency: _,
                     bounding_box: _,
                     flaws: _,
                 },
-            block_indices_used,
         } = self;
 
         size_of::<Self>()
@@ -281,13 +268,11 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 vertices: (v0, v1),
                 indices,
                 meta,
-                block_indices_used,
             } = self;
             v0.clear();
             v1.clear();
             indices.clear();
             meta.clear();
-            block_indices_used.clear();
         }
 
         // Use the existing index allocation as an (empty) deque for bidirectional insertions.
@@ -312,7 +297,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 return Ok(());
             };
 
-            let already_seen_index = !self.block_indices_used.insert(index)?;
+            let already_seen_index = !self.meta.block_indices_used.insert(index)?;
 
             if !already_seen_index {
                 // Capture texture handles to ensure that our texture coordinates stay valid.
@@ -334,7 +319,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 &mut self.meta,
                 &mut index_count,
                 options.limit_indices_per_mesh,
-                |face| {
+                |face, meta| {
                     let adjacent_cube = cube + face.normal_vector();
                     if let Some(adj_block_index) = space_data_source(adjacent_cube)
                         && block_meshes
@@ -342,7 +327,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                             .is_some_and(|bm| bm.face_vertices[face.opposite()].fully_opaque)
                     {
                         // Don't draw obscured faces, but do record that we depended on them.
-                        self.block_indices_used.insert(adj_block_index)?;
+                        meta.block_indices_used.insert(adj_block_index)?;
                         return Ok(true);
                     }
                     Ok(false)
@@ -482,12 +467,8 @@ impl<M: MeshTypes> PartialEq for SpaceMesh<M> {
             vertices,
             indices,
             meta,
-            block_indices_used,
         } = self;
-        *vertices == other.vertices
-            && *indices == other.indices
-            && *meta == other.meta
-            && *block_indices_used == other.block_indices_used
+        *vertices == other.vertices && *indices == other.indices && *meta == other.meta
     }
 }
 
@@ -497,7 +478,6 @@ impl<M: MeshTypes> fmt::Debug for SpaceMesh<M> {
             vertices,
             indices,
             meta,
-            block_indices_used,
         } = self;
         let mut s = f.debug_struct("SpaceMesh");
         if size_of::<<M::Vertex as Vertex>::SecondaryData>() == 0 {
@@ -508,7 +488,6 @@ impl<M: MeshTypes> fmt::Debug for SpaceMesh<M> {
         }
         s.field("indices", indices);
         s.field("meta", meta);
-        s.field("block_indices_used", block_indices_used);
         s.finish()
     }
 }
@@ -519,7 +498,6 @@ impl<M: MeshTypes> Clone for SpaceMesh<M> {
             vertices: self.vertices.clone(),
             indices: self.indices.clone(),
             meta: self.meta.clone(),
-            block_indices_used: self.block_indices_used.clone(),
         }
     }
 }
@@ -554,7 +532,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     meta: &mut MeshMeta<M>,
     output_index_count: &mut u32,
     limit_indices_per_mesh: u32,
-    mut neighbor_is_fully_opaque: impl FnMut(Face) -> Result<bool, OutOfMemory>,
+    mut neighbor_is_fully_opaque: impl FnMut(Face, &mut MeshMeta<M>) -> Result<bool, OutOfMemory>,
 ) -> Result<(), TooComplex> {
     if block_mesh.is_empty() {
         return Ok(());
@@ -577,7 +555,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
             // Nothing to do; skip the neighbor check.
             continue;
         }
-        if on_block_face && neighbor_is_fully_opaque(face)? {
+        if on_block_face && neighbor_is_fully_opaque(face, meta)? {
             // Skip face fully obscured by a neighbor.
             continue;
         }
@@ -641,7 +619,6 @@ impl<M: MeshTypes> Default for SpaceMesh<M> {
             vertices: Default::default(),
             indices: IndexVec::new(),
             meta: MeshMeta::default(),
-            block_indices_used: BlockIndexSet::new(),
         }
     }
 }
@@ -666,6 +643,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 meta: MeshMeta {
                     opaque_range: Range::from(0..0),
                     transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
+                    block_indices_used: BlockIndexSet::from_iter([0]),
                     textures_used: block_mesh.textures().to_vec(),
                     has_non_rect_transparency: block_mesh
                         .all_sub_meshes()
@@ -673,7 +651,6 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                     bounding_box: block_mesh.bounding_box(),
                     flaws: block_mesh.flaws(),
                 },
-                block_indices_used: BlockIndexSet::from_iter([0]),
             };
 
             let mut opaque_indices_deque = IndexVecDeque::from(IndexVec::with_capacity(
@@ -690,7 +667,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 &mut space_mesh.meta, // partly redundant, but hard to skip
                 &mut 0,
                 IndexBound::MAX,
-                |_| Ok(false),
+                |_, _| Ok(false),
             )?;
             space_mesh.store_indices_and_finish_compute(
                 opaque_indices_deque,
@@ -761,7 +738,7 @@ pub trait GetBlockMesh<'a, M: MeshTypes> {
     /// block to perform additional or substitute rendering separate from the computed mesh.
     /// In the case of substitute rendering, it should return `None`, which is equivalent to
     /// returning [`BlockMesh::EMPTY_REF`] except that the mesh will not be included in
-    /// [`SpaceMesh::blocks_used_iter()`] — essentially, the cube will be treated as if it is
+    /// [`MeshMeta::iter_blocks_used()`] — essentially, the cube will be treated as if it is
     /// excluded from the region covered by the mesh.
     ///
     /// # Errors and panics
@@ -816,6 +793,9 @@ pub struct MeshMeta<M: MeshTypes> {
     ///
     /// The indices of this array are those produced by [`DepthOrdering::to_index()`].
     transparent: [TransparentMeta; DepthOrdering::COUNT],
+
+    /// Set of all [`BlockIndex`]es whose [`BlockMesh`]es were incorporated into this mesh.
+    block_indices_used: BlockIndexSet,
 
     /// Texture tiles used by the vertices; holding these objects is intended to ensure
     /// the texture coordinates remain allocated to the intended texels.
@@ -882,6 +862,19 @@ impl<M: MeshTypes> MeshMeta<M> {
         tm.needs_static_sort() || !tm.depth_sort_validity.contains(view_position)
     }
 
+    /// Returns an iterator over all of the block indices in the [`Space`] that occurred
+    /// in the region this mesh was constructed from.
+    ///
+    /// This may be used to determine when to invalidate this mesh because a block it
+    /// contains has changed its definition.
+    ///
+    /// If [`GetBlockMesh::get_block_mesh()`] returned [`None`] for a block index when this mesh
+    /// was being computed, that block index is not included here.
+    #[inline]
+    pub fn iter_blocks_used(&self) -> impl Iterator<Item = BlockIndex> + '_ {
+        self.block_indices_used.iter()
+    }
+
     /// Returns every texture allocation used by this mesh.
     pub fn textures_used(&self) -> &[M::Tile] {
         &self.textures_used
@@ -901,6 +894,7 @@ impl<M: MeshTypes> MeshMeta<M> {
         let Self {
             opaque_range,
             transparent,
+            block_indices_used,
             textures_used,
             has_non_rect_transparency,
             bounding_box,
@@ -908,6 +902,7 @@ impl<M: MeshTypes> MeshMeta<M> {
         } = self;
         *opaque_range = Range::from(0..0);
         *transparent = [TransparentMeta::EMPTY; DepthOrdering::COUNT];
+        block_indices_used.clear();
         textures_used.clear();
         *has_non_rect_transparency = false;
         *bounding_box = Aabbs::EMPTY;
@@ -923,6 +918,7 @@ impl<M: MeshTypes> Default for MeshMeta<M> {
         Self {
             opaque_range: Range::from(0..0),
             transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
+            block_indices_used: BlockIndexSet::new(),
             textures_used: Vec::new(),
             has_non_rect_transparency: false,
             bounding_box: Aabbs::EMPTY,
@@ -936,6 +932,7 @@ impl<M: MeshTypes> PartialEq for MeshMeta<M> {
         let Self {
             opaque_range,
             transparent,
+            block_indices_used,
             textures_used,
             has_non_rect_transparency,
             bounding_box,
@@ -944,6 +941,7 @@ impl<M: MeshTypes> PartialEq for MeshMeta<M> {
         *bounding_box == other.bounding_box
             && *opaque_range == other.opaque_range
             && *transparent == other.transparent
+            && *block_indices_used == other.block_indices_used
             && *textures_used == other.textures_used
             && *has_non_rect_transparency == other.has_non_rect_transparency
             && *flaws == other.flaws
@@ -967,6 +965,7 @@ impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
         let Self {
             opaque_range,
             transparent,
+            block_indices_used,
             textures_used,
             has_non_rect_transparency,
             bounding_box,
@@ -975,6 +974,7 @@ impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
         f.debug_struct("MeshMeta")
             .field("opaque_range", opaque_range)
             .field("transparent", &OrderingAsKey(transparent))
+            .field("block_indices_used", block_indices_used)
             .field("textures_used", textures_used)
             .field("has_non_rect_transparency", has_non_rect_transparency)
             .field("bounding_box", bounding_box)
@@ -988,6 +988,7 @@ impl<M: MeshTypes> Clone for MeshMeta<M> {
         Self {
             opaque_range: self.opaque_range,
             transparent: self.transparent.clone(),
+            block_indices_used: self.block_indices_used.clone(),
             textures_used: self.textures_used.clone(),
             has_non_rect_transparency: self.has_non_rect_transparency,
             bounding_box: self.bounding_box,
@@ -1173,6 +1174,7 @@ mod tests {
                             ++W: 0..0 [] sorted for EVERYWHERE,
                             +++: 0..0 [] sorted for EVERYWHERE,
                         },
+                        block_indices_used: {},
                         textures_used: [],
                         has_non_rect_transparency: false,
                         bounding_box: Aabbs {
@@ -1181,7 +1183,6 @@ mod tests {
                         },
                         flaws: ,
                     },
-                    block_indices_used: {},
                 }"
             }
         );
@@ -1260,6 +1261,9 @@ mod tests {
                             ++W: 36..36 [] sorted for EVERYWHERE,
                             +++: 36..36 [] sorted for EVERYWHERE,
                         },
+                        block_indices_used: {
+                            0,
+                        },
                         textures_used: [],
                         has_non_rect_transparency: false,
                         bounding_box: Aabbs {
@@ -1271,9 +1275,6 @@ mod tests {
                             transparent: EMPTY,
                         },
                         flaws: ,
-                    },
-                    block_indices_used: {
-                        0,
                     },
                 }"
             }
@@ -1401,6 +1402,9 @@ mod tests {
                             ++W: 606..630 unsorted,
                             +++: 630..648 unsorted,
                         },
+                        block_indices_used: {
+                            0,
+                        },
                         textures_used: [],
                         has_non_rect_transparency: false,
                         bounding_box: Aabbs {
@@ -1412,9 +1416,6 @@ mod tests {
                             ),
                         },
                         flaws: ,
-                    },
-                    block_indices_used: {
-                        0,
                     },
                 }"
             }

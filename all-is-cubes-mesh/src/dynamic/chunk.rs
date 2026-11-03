@@ -247,7 +247,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         self.block_dependencies.clear();
         self.block_dependencies.extend(
             self.mesh
-                .blocks_used_iter()
+                .iter_blocks_used()
                 .map(|index| (index, block_meshes.meshes[usize::from(index)].version)),
         );
 
