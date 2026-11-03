@@ -434,7 +434,7 @@ where
                     && let depth_ordering =
                         DepthOrdering::from_view_of_aabb(relative_view_point, lbb)
                     && chunk_mesh
-                        .mesh()
+                        .meta()
                         .needs_depth_sorting(depth_ordering, relative_view_point.to_f32())
                 {
                     chunk_todo.needs_depth_sort = Some(depth_ordering);
@@ -660,7 +660,7 @@ where
                 chunk_total_cpu_byte_size: self
                     .chunks
                     .values()
-                    .map(|chunk| chunk.mesh().total_byte_size())
+                    .map(ChunkMesh::mesh_byte_size)
                     .sum(),
             },
             deadline < end_all_time,
@@ -944,7 +944,7 @@ impl<const CHUNK_SIZE: GridCoordinate> listen::Store<SpaceChange> for CsmTodo<CH
 pub struct InViewChunkRef<'a, M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> {
     /// The chunk mesh.
     pub chunk: &'a ChunkMesh<M, CHUNK_SIZE>,
-    /// Whether the chunk’s [`ChunkMesh::mesh()`] is in view of the camera.
+    /// Whether the chunk’s main mesh (non-instanced blocks) is in view of the camera.
     pub mesh_in_view: bool,
     /// Whether any of the chunk’s [`ChunkMesh::block_instances()`] are in view of the camera.
     pub instances_in_view: bool,

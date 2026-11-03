@@ -276,7 +276,6 @@ fn space_mesh_benches(c: &mut Criterion) {
 
 #[cfg(feature = "dynamic")]
 fn dynamic_benches(c: &mut Criterion) {
-    use all_is_cubes::chunking::ChunkPos;
     use all_is_cubes::euclid::{self, vec3};
     use all_is_cubes::math::Cube;
     use all_is_cubes::time;
@@ -384,12 +383,15 @@ fn dynamic_benches(c: &mut Criterion) {
                     time::Deadline::Whenever,
                     dynamic::noop_render_data_updater,
                 );
-                // Note: this number will change if the number of `DepthOrdering`s changes.
-                assert_eq!(
-                    1327104,
-                    csm.chunk(ChunkPos::new(0, 0, 0)).unwrap().mesh().indices().len(),
-                    "mesh is not of the expected complexity"
-                );
+                // TODO: The following assertion was useful to sanity check this benchmark
+                // setup, but can no longer be performed.
+                //
+                // // Note: this number will change if the number of `DepthOrdering`s changes.
+                // assert_eq!(
+                //     1327104,
+                //     csm.chunk(ChunkPos::new(0, 0, 0)).unwrap().mesh().indices().len(),
+                //     "mesh is not of the expected complexity"
+                // );
 
                 State {
                     csm,

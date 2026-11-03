@@ -17,7 +17,9 @@ use all_is_cubes::util::{ConciseDebug, Refmt as _};
 use all_is_cubes_render::camera::Camera;
 
 use crate::dynamic::{self, DynamicMeshTypes};
-use crate::{BlockMesh, DepthOrdering, GetBlockMesh, MeshOptions, MeshRel, Position, SpaceMesh};
+use crate::{
+    BlockMesh, DepthOrdering, GetBlockMesh, MeshMeta, MeshOptions, MeshRel, Position, SpaceMesh,
+};
 
 #[cfg(doc)]
 use {crate::dynamic::ChunkedSpaceMesh, all_is_cubes::space::Space};
@@ -117,10 +119,10 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         }
     }
 
-    /// Returns the current mesh for this chunk.
+    /// Returns the [`MeshMeta`] for this chunk.
     #[inline]
-    pub fn mesh(&self) -> &SpaceMesh<M> {
-        &self.mesh
+    pub fn meta(&self) -> &MeshMeta<M> {
+        self.mesh.meta()
     }
 
     /// Returns the position of this chunk within the [`Space`].
@@ -134,7 +136,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     pub fn depth_ordering_for_view(&self, view_position: FreePoint) -> DepthOrdering {
         DepthOrdering::from_view_of_aabb(
             self.mesh_origin().inverse().transform_point3d(&view_position),
-            self.mesh().bounding_box().transparent,
+            self.meta().bounding_box().transparent,
         )
     }
 
@@ -392,6 +394,10 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         } else {
             Some(b.to_free())
         }
+    }
+
+    pub(crate) fn mesh_byte_size(&self) -> usize {
+        self.mesh.total_byte_size()
     }
 }
 

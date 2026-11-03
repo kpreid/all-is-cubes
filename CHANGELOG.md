@@ -45,6 +45,7 @@
     * `MeshMeta::textures_used()`.
     * `MeshMeta::texture_channels_used()`.
     * `IndexSlice::iter_usize()`
+    * `dynamic::ChunkedSpaceMesh::meta()`
 
 * `all-is-cubes-port` library:
     * glTF exports now include textures.
@@ -107,6 +108,9 @@
     * `math::GridMatrix` has been removed.
       Use `Gridgid` (for rigid transformations) or `euclid::Transform3D` (for matrices) instead.
     * `space::PackedLight` no longer implements `From<Rgb>`. There is currently no replacement.
+
+* `all-is-cubes-mesh` library:
+    * `dynamic::ChunkMesh::mesh()` has been replaced by `meta()`, which returns `MeshMeta` instead of `SpaceMesh`. Access to the `SpaceMesh` is no longer possible except through `dynamic::RenderDataUpdate`.
 
 * `all-is-cubes-port` library:
     * `ExportSet::from_block_defs()` and `ExportSet::from_spaces()` have been removed.

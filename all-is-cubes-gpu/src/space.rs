@@ -593,7 +593,7 @@ impl SpaceRenderer {
             {
                 if mesh_in_view && let Some(buffers) = &chunk.render_data {
                     draw_chunk_instance(
-                        chunk.mesh().opaque_range(),
+                        chunk.meta().opaque_range(),
                         render_pass,
                         buffers,
                         &mut instance_buffer_writer,
@@ -603,7 +603,7 @@ impl SpaceRenderer {
                         "",
                     );
                     draw_chunk_instance(
-                        chunk.mesh().transparent_range(
+                        chunk.meta().transparent_range(
                             chunk.depth_ordering_for_view(camera.view_position()),
                         ),
                         render_pass,
@@ -648,7 +648,7 @@ impl SpaceRenderer {
                 chunk_meshes_drawn += 1;
                 if let Some(buffers) = &chunk.render_data {
                     draw_chunk_instance(
-                        chunk.mesh().opaque_range(),
+                        chunk.meta().opaque_range(),
                         render_pass,
                         buffers,
                         &mut instance_buffer_writer,
@@ -660,7 +660,7 @@ impl SpaceRenderer {
                 } else {
                     // TODO: If the chunk is missing, draw a blocking shape, possibly?
                 }
-                flaws |= chunk.mesh().flaws();
+                flaws |= chunk.meta().flaws();
             }
             if instances_in_view {
                 chunks_with_instances_drawn += 1;
@@ -760,7 +760,7 @@ impl SpaceRenderer {
                 if mesh_in_view {
                     if let Some(buffers) = &chunk.render_data {
                         draw_chunk_instance(
-                            chunk.mesh().transparent_range(
+                            chunk.meta().transparent_range(
                                 chunk.depth_ordering_for_view(camera.view_position()),
                             ),
                             render_pass,
@@ -772,7 +772,7 @@ impl SpaceRenderer {
                             "T",
                         );
                     }
-                    flaws |= chunk.mesh().flaws();
+                    flaws |= chunk.meta().flaws();
                 }
                 // TODO: transparent instances support
                 _ = instances_in_view;
