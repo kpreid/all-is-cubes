@@ -8,7 +8,7 @@ use core::time::Duration;
 use futures_channel::oneshot::Canceled;
 
 use all_is_cubes::block::{self, EvaluatedBlock, Resolution};
-use all_is_cubes::math::{Cube, u32size};
+use all_is_cubes::math::u32size;
 use all_is_cubes::space::{self, BlockIndex};
 use all_is_cubes::time::{self, TimeStats};
 use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText};
@@ -16,7 +16,7 @@ use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText};
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
 use crate::dynamic::{self, DynamicMeshTypes, job};
-use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh};
+use crate::{BlockMesh, MeshOptions, SpaceMesh};
 use crate::{MeshMeta, Vertex, texture};
 
 #[derive(Debug)]
@@ -282,21 +282,6 @@ where
 
     pub(crate) fn job_queue(&self) -> &dynamic::MeshJobQueue<M> {
         self.jobs.job_queue()
-    }
-}
-
-// TODO(instancing): This impl is no longer used internally by ChunkedSpaceMesh. Should we remove it?
-impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for &'a VersionedBlockMeshes<M> {
-    fn get_block_mesh(
-        &mut self,
-        index: BlockIndex,
-        _cube: Cube,
-        _primary: bool,
-    ) -> Option<&'a BlockMesh<M>> {
-        Some(match self.get_vbm(index) {
-            Some(vbm) => &vbm.mesh,
-            None => BlockMesh::<M>::EMPTY_REF,
-        })
     }
 }
 
