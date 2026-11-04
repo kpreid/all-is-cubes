@@ -22,6 +22,7 @@ use all_is_cubes_render::{Flaws, camera::Camera};
 use crate::dynamic::blocks::InstanceMesh;
 use crate::dynamic::chunk::ChunkTodoState;
 use crate::dynamic::{self, ChunkMesh, ChunkTodo, DynamicMeshTypes};
+use crate::heap::HeapUsage as _;
 use crate::{DepthOrdering, DepthSortInfo, DepthSortResult, MeshOptions};
 
 // -------------------------------------------------------------------------------------------------
@@ -187,7 +188,7 @@ where
         self.block_meshes
             .meshes
             .get(usize::from(block_index))
-            .and_then(|vbm| vbm.instance_data.as_ref())
+            .and_then(|vbm| vbm.data.instanced_mesh())
     }
 
     /// Calculates how many [`ChunkMesh::block_instances()`] are present in chunks visible from the
@@ -654,7 +655,7 @@ where
                     .block_meshes
                     .meshes
                     .iter()
-                    .map(|vbm| vbm.mesh.total_byte_size())
+                    .map(|vbm| vbm.data.heap_bytes_owned())
                     .sum(),
                 chunk_count: self.chunks.len(),
                 chunk_total_cpu_byte_size: self

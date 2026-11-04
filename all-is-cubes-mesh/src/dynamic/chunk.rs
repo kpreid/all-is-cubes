@@ -420,18 +420,21 @@ impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for InstanceTrackingBlockMeshS
             return Some(BlockMesh::<M>::EMPTY_REF);
         };
 
-        if vbm.instance_data.is_some() {
-            if primary {
-                self.instances.insert(index, cube);
+        match vbm.data {
+            dynamic::blocks::VbmMeshData::Instance(_) => {
+                if primary {
+                    self.instances.insert(index, cube);
+                }
+                None
             }
-            None
-        } else {
-            if primary && !vbm.mesh.is_empty() {
-                self.mesh_cubes.insert(
-                    self.absolute_to_relative.transform_point3d(&cube.lower_bounds()).cast(),
-                );
+            dynamic::blocks::VbmMeshData::Incorporate(ref block_mesh) => {
+                if primary && !block_mesh.is_empty() {
+                    self.mesh_cubes.insert(
+                        self.absolute_to_relative.transform_point3d(&cube.lower_bounds()).cast(),
+                    );
+                }
+                Some(block_mesh)
             }
-            Some(&vbm.mesh)
         }
     }
 }

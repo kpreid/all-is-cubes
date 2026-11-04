@@ -177,7 +177,9 @@ where
             let new_evaluated_block: &EvaluatedBlock = block_data[uindex].evaluated();
             let current_mesh_entry: &mut VersionedBlockMesh<_> = &mut self.meshes[uindex];
 
-            if current_mesh_entry.mesh.try_update_texture_only(new_evaluated_block) {
+            if let VbmMeshData::Incorporate(ref mut mesh) = current_mesh_entry.data
+                && mesh.try_update_texture_only(new_evaluated_block)
+            {
                 // Updated the texture in-place. No need for mesh updates.
             } else {
                 current_mesh_entry.spawn_update_job(
@@ -213,7 +215,10 @@ where
                         // above. (If they were, we'd need to consider what we want to do about
                         // stale chunks with updated texture tiles, which might have geometry gaps
                         // or otherwise be obviously inconsistent.)
-                        if new_block_mesh != current_mesh_entry.mesh
+                        if current_mesh_entry
+                            .data
+                            .incorporated_mesh()
+                            .is_none_or(|m| *m != new_block_mesh)
                             || current_mesh_entry.version == BlockMeshVersion::NotReady
                         {
                             // TODO: reuse old render data
@@ -262,7 +267,7 @@ where
             .meshes
             .iter()
             .enumerate()
-            .filter(|(_, vbm)| vbm.instance_data.is_some() || vbm.mesh.is_empty())
+            .filter(|(_, vbm)| vbm.always_instanced_or_empty())
             .map(|(i, _)| i as BlockIndex)
             .collect();
 
@@ -293,20 +298,11 @@ where
 /// Entry in [`VersionedBlockMeshes`].
 #[derive(Debug)]
 pub(crate) struct VersionedBlockMesh<M: DynamicMeshTypes> {
-    pub(crate) mesh: BlockMesh<M>,
+    pub(crate) data: VbmMeshData<M>,
 
     /// Version ID used to track whether chunks have stale block meshes (ones that don't
     /// match the current definition of that block-index in the space).
     pub(crate) version: BlockMeshVersion,
-
-    /// Arbitrary data used for rendering the block in standalone/instanced form
-    /// (not part of a larger mesh).
-    ///
-    /// If [`None`], then the block is not a candidate for instanced rendering.
-    ///
-    /// TODO(instancing): Eventually all blocks should be candidates, but not always used, depending
-    /// on what happens to the chunk.
-    pub(crate) instance_data: Option<InstanceMesh<M>>,
 
     /// Receives an asynchronously-computed improved version of this mesh.
     /// This will be result of the very latest update job spawned for this mesh.
@@ -333,7 +329,7 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
         // circumstances (e.g. a placed block in an existing chunk mesh). For now, though, we make
         // instance mesh generation conditional on whether it will ever be used, to make life nicer
         // for exporters.
-        let instance_data = if should_use_instances(ev, &mesh) {
+        let data = if should_use_instances(ev, &mesh) {
             // TODO: wasteful data copy to make the SpaceMesh. Consider arranging so that it is
             // merely a sort of borrowing to present a `BlockMesh` as a `RenderDataUpdate`'s mesh.`
             let space_mesh = SpaceMesh::from(&mesh); // TODO: oom handling
@@ -346,18 +342,17 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
                 mesh_id: super::MeshId(super::MeshIdImpl::Block(block_index)),
             });
 
-            Some(InstanceMesh {
+            VbmMeshData::Instance(InstanceMesh {
                 meta: space_mesh.into_meta(),
                 render_data,
             })
         } else {
-            None
+            VbmMeshData::Incorporate(mesh)
         };
 
         Self {
-            mesh,
+            data,
             version,
-            instance_data,
             pending_latest: None,
             pending_oldest: None,
         }
@@ -421,6 +416,14 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
 
         None
     }
+
+    /// Returns whether this contributes nothing to chunk meshes.
+    fn always_instanced_or_empty(&self) -> bool {
+        match self.data {
+            VbmMeshData::Incorporate(ref block_mesh) => block_mesh.is_empty(),
+            VbmMeshData::Instance(_) => true,
+        }
+    }
 }
 
 impl<M: DynamicMeshTypes> HeapUsage for InstanceMesh<M> {
@@ -431,6 +434,50 @@ impl<M: DynamicMeshTypes> HeapUsage for InstanceMesh<M> {
         } = self;
 
         meta.heap_bytes_owned()
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Retained block mesh data, dependent on whether the block is to be rendered using instancing
+/// or incorporated into larger [`SpaceMesh`]es.
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum VbmMeshData<M: DynamicMeshTypes> {
+    /// Data used to incorporate this block mesh into a [`SpaceMesh`] of many blocks.
+    Incorporate(BlockMesh<M>),
+
+    /// Caller-provided data used for rendering the block in standalone/instanced form
+    /// (not part of a larger mesh).
+    ///
+    /// TODO(instancing): Eventually all blocks should be candidates, but not always used, depending
+    /// on what happens to the chunk. When that happens, we will have to change this data structure
+    /// to always keep the `InstanceMesh`.
+    Instance(InstanceMesh<M>),
+}
+
+impl<M: DynamicMeshTypes> VbmMeshData<M> {
+    pub(crate) fn incorporated_mesh(&self) -> Option<&BlockMesh<M>> {
+        match self {
+            VbmMeshData::Incorporate(block_mesh) => Some(block_mesh),
+            VbmMeshData::Instance(_) => None,
+        }
+    }
+
+    pub(crate) fn instanced_mesh(&self) -> Option<&InstanceMesh<M>> {
+        match self {
+            VbmMeshData::Incorporate(_) => None,
+            VbmMeshData::Instance(instance_mesh) => Some(instance_mesh),
+        }
+    }
+}
+
+impl<M: DynamicMeshTypes> HeapUsage for VbmMeshData<M> {
+    fn heap_bytes_owned(&self) -> usize {
+        match self {
+            VbmMeshData::Incorporate(block_mesh) => block_mesh.heap_bytes_owned(),
+            VbmMeshData::Instance(instance_mesh) => instance_mesh.heap_bytes_owned(),
+        }
     }
 }
 
