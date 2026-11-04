@@ -13,12 +13,14 @@ use all_is_cubes::space::{self, BlockIndex};
 use all_is_cubes::time::{self, TimeStats};
 use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText};
 
-#[cfg(doc)]
-use crate::dynamic::ChunkedSpaceMesh;
 use crate::dynamic::{self, DynamicMeshTypes, job};
 use crate::heap::HeapUsage;
-use crate::{BlockMesh, MeshOptions, SpaceMesh};
-use crate::{MeshMeta, Vertex, texture};
+use crate::{BlockMesh, MeshMeta, MeshOptions, SpaceMesh, Vertex, texture};
+
+#[cfg(doc)]
+use crate::dynamic::ChunkedSpaceMesh;
+
+// -------------------------------------------------------------------------------------------------
 
 #[derive(Debug)]
 pub(crate) struct VersionedBlockMeshes<M: DynamicMeshTypes> {
@@ -286,6 +288,8 @@ where
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Entry in [`VersionedBlockMeshes`].
 #[derive(Debug)]
 pub(crate) struct VersionedBlockMesh<M: DynamicMeshTypes> {
@@ -312,16 +316,6 @@ pub(crate) struct VersionedBlockMesh<M: DynamicMeshTypes> {
     /// This will be the result of a job that was superseded by `self.pending_latest`; it is kept
     /// around to ensure that continuous block updates can't starve us of having any meshes at all.
     pending_oldest: Option<job::Receiver<job::CompletedMeshJob<M>>>,
-}
-
-/// Data for instanced rendering of a block. Contains a `M::RenderData` for the block mesh.
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct InstanceMesh<M: DynamicMeshTypes> {
-    /// The [`MeshMeta`] for the mesh data that is in `render_data`.
-    pub meta: MeshMeta<M>,
-    /// Render data for the instanced mesh.
-    pub render_data: M::RenderData,
 }
 
 impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
@@ -440,6 +434,22 @@ impl<M: DynamicMeshTypes> HeapUsage for InstanceMesh<M> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
+/// Data for instanced rendering of a block. Contains a `M::RenderData` for the block mesh.
+///
+/// Obtain this from [`ChunkedSpaceMesh::block_instance_mesh()`].
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct InstanceMesh<M: DynamicMeshTypes> {
+    /// The [`MeshMeta`] for the mesh data that is in `render_data`.
+    pub meta: MeshMeta<M>,
+    /// Render data for the instanced mesh.
+    pub render_data: M::RenderData,
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Together with a [`BlockIndex`], uniquely identifies a block mesh.
 /// Used to determine when chunk meshes need updating.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -452,6 +462,8 @@ pub(crate) enum BlockMeshVersion {
     /// in the course of a single batch of updates unless we're perpetually behind.
     Numbered(NonZeroU32),
 }
+
+// -------------------------------------------------------------------------------------------------
 
 fn should_use_instances<M: DynamicMeshTypes>(
     ev: &EvaluatedBlock,
@@ -473,6 +485,8 @@ fn should_use_instances<M: DynamicMeshTypes>(
     ev.attributes().animation_hint != block::AnimationHint::UNCHANGING
         || u32size(block_mesh.count_indices()) > M::MAXIMUM_MERGED_BLOCK_MESH_SIZE
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, derive_more::AddAssign)]
 pub(crate) struct VbmUpdateInfo {
