@@ -114,7 +114,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
         assert_eq!(self.opaque_range().start, 0);
 
         // Check the transparent ranges are internally consistent, but only if the mesh is complete.
-        if !crate::mesh_might_be_incomplete(self.flaws) {
+        if !crate::mesh_might_be_incomplete(self.flaws()) {
             let len_transparent_unculled =
                 ops::Range::from(self.transparent_range(DepthOrdering::WITHIN)).len();
             for ordering in DepthOrdering::exhaust() {
@@ -134,8 +134,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
         }
 
         let computed_bounding_box: Aabbs = self.compute_bounding_box_from_scratch();
-        let stored_bounding_box = self.bounding_box;
-        if crate::mesh_might_be_incomplete(self.flaws) {
+        let stored_bounding_box = self.bounding_box();
+        if crate::mesh_might_be_incomplete(self.flaws()) {
             // If mesh building was interrupted, the stored box might be too big
             // without this indicating an error.
             assert!(
@@ -150,7 +150,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
             );
         }
 
-        self.transparent.iter().for_each(TransparentMeta::consistency_check);
+        self.ngm.transparent.iter().for_each(TransparentMeta::consistency_check);
     }
 
     /// Returns the total memory occupied by this [`SpaceMesh`] value and all its owned objects,
@@ -194,9 +194,9 @@ impl<M: MeshTypes> SpaceMesh<M> {
         ) {
             Ok(()) => (),
             Err(error) => {
-                self.meta.flaws |= error.to_flaws();
+                self.meta.ngm.flaws |= error.to_flaws();
                 // Recompute the bounding box because it might be wrong.
-                self.meta.bounding_box = self.compute_bounding_box_from_scratch();
+                self.meta.ngm.bounding_box = self.compute_bounding_box_from_scratch();
             }
         }
 
@@ -226,7 +226,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
         ) {
             Ok(()) => (),
             Err(error) => {
-                self.meta.flaws |= error.to_flaws();
+                self.meta.ngm.flaws |= error.to_flaws();
             }
         }
     }
@@ -276,14 +276,14 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 return Ok(());
             };
 
-            let already_seen_index = !self.meta.block_indices_used.insert(index)?;
+            let already_seen_index = !self.meta.ngm.block_indices_used.insert(index)?;
 
             if !already_seen_index {
                 // Capture texture handles to ensure that our texture coordinates stay valid.
                 self.meta.textures_used.try_reserve(block_mesh.textures().len())?;
                 self.meta.textures_used.extend(block_mesh.textures().iter().cloned());
                 // Record flaws
-                self.meta.flaws |= block_mesh.flaws();
+                self.meta.ngm.flaws |= block_mesh.flaws();
             }
 
             // translate vertices so lower_bounds of the space is the origin of the mesh.
@@ -306,7 +306,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                             .is_some_and(|bm| bm.face_vertices[face.opposite()].fully_opaque)
                     {
                         // Don't draw obscured faces, but do record that we depended on them.
-                        meta.block_indices_used.insert(adj_block_index)?;
+                        meta.ngm.block_indices_used.insert(adj_block_index)?;
                         return Ok(true);
                     }
                     Ok(false)
@@ -359,12 +359,12 @@ impl<M: MeshTypes> SpaceMesh<M> {
 
         // Set the opaque range to all indices which have already been stored
         // (which will be the opaque ones only).
-        self.meta.opaque_range =
+        self.meta.ngm.opaque_range =
             Range::from(0..IndexBound::try_from(self.indices.len()).err_is_unreachable());
 
         depth_sorting::store_transparent_indices::<M>(
             &mut self.indices,
-            &mut self.meta.transparent,
+            &mut self.meta.ngm.transparent,
             transparent_indices,
             limit_indices,
         )?;
@@ -426,8 +426,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
             self.indices.as_mut_slice(range),
             ordering,
             view_position,
-            &mut self.meta.transparent[ordering.to_index()],
-            self.meta.has_non_rect_transparency,
+            &mut self.meta.ngm.transparent[ordering.to_index()],
+            self.meta.ngm.has_non_rect_transparency,
         )
     }
 }
@@ -533,7 +533,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
 
     let new_index_count: u32 = output_index_count.saturating_add(block_mesh.count_indices()); // TODO: shouldn't need to cast
     if new_index_count > limit_indices_per_mesh {
-        meta.flaws.insert(Flaws::TOO_COMPLEX);
+        meta.ngm.flaws.insert(Flaws::TOO_COMPLEX);
         return Err(TooComplex::TooManyIndices);
     }
     *output_index_count = new_index_count;
@@ -581,9 +581,9 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         transparent_indices[face]
             .ixtend_with_offset(sub_mesh.indices_transparent.as_slice(..), index_offset)?;
 
-        meta.has_non_rect_transparency |= sub_mesh.has_non_rect_transparency;
+        meta.ngm.has_non_rect_transparency |= sub_mesh.has_non_rect_transparency;
 
-        meta.bounding_box.union_mut(sub_mesh.bounding_box.translate(bb_translation));
+        meta.ngm.bounding_box.union_mut(sub_mesh.bounding_box.translate(bb_translation));
     }
 
     // “Instantiate” the vertices: translate them to their position in the space.
@@ -634,15 +634,17 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 ),
                 indices: IndexVec::new(), // placeholder
                 meta: MeshMeta {
-                    opaque_range: Range::from(0..0),
-                    transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
-                    block_indices_used: BlockIndexSet::from_iter([0]),
+                    ngm: MeshMetaNonGeneric {
+                        opaque_range: Range::from(0..0),
+                        transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
+                        block_indices_used: BlockIndexSet::from_iter([0]),
+                        has_non_rect_transparency: block_mesh
+                            .all_sub_meshes()
+                            .any(|sm| sm.has_non_rect_transparency),
+                        bounding_box: block_mesh.bounding_box(),
+                        flaws: block_mesh.flaws(),
+                    },
                     textures_used: block_mesh.textures().to_vec(),
-                    has_non_rect_transparency: block_mesh
-                        .all_sub_meshes()
-                        .any(|sm| sm.has_non_rect_transparency),
-                    bounding_box: block_mesh.bounding_box(),
-                    flaws: block_mesh.flaws(),
                 },
             };
 
@@ -673,7 +675,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
 
         inner(block_mesh).unwrap_or_else(|error| {
             let mut space_mesh = SpaceMesh::default();
-            space_mesh.meta.flaws.insert(error.to_flaws());
+            space_mesh.meta.ngm.flaws.insert(error.to_flaws());
             space_mesh
         })
     }
@@ -777,6 +779,17 @@ impl<'a, M: MeshTypes> GetBlockMesh<'a, M> for &'a [BlockMesh<M>] {
 /// In addition to index data, it contains the [`texture::Tile`]s of type `T` for the mesh,
 /// so as to keep them allocated. (Therefore, this type is not [`Copy`].)
 pub struct MeshMeta<M: MeshTypes> {
+    ngm: MeshMetaNonGeneric,
+
+    /// Texture tiles used by the vertices; holding these objects is intended to ensure
+    /// the texture coordinates remain allocated to the intended texels.
+    textures_used: Vec<M::Tile>,
+}
+
+/// Data kept by [`MeshMeta`] that doesn’t depend on [`MeshTypes`], split out to encourage
+/// non-generic code.
+#[derive(Clone)]
+struct MeshMetaNonGeneric {
     /// Where in the index vector the triangles with no partial transparency are arranged.
     opaque_range: Range<IndexBound>,
 
@@ -789,10 +802,6 @@ pub struct MeshMeta<M: MeshTypes> {
 
     /// Set of all [`BlockIndex`]es whose [`BlockMesh`]es were incorporated into this mesh.
     block_indices_used: BlockIndexSet,
-
-    /// Texture tiles used by the vertices; holding these objects is intended to ensure
-    /// the texture coordinates remain allocated to the intended texels.
-    textures_used: Vec<M::Tile>,
 
     /// Whether the transparent triangles of this mesh include any that are not guaranteed to be
     /// in the form of pairs of consecutive triangles that form rectangles.
@@ -818,20 +827,20 @@ impl<M: MeshTypes> MeshMeta<M> {
     /// voxels in the scene; it does not include interior volumes which are omitted from the mesh
     /// by hidden face culling.
     pub fn bounding_box(&self) -> Aabbs {
-        self.bounding_box
+        self.ngm.bounding_box
     }
 
     /// Reports any flaws in this mesh: reasons why using it to create a rendering would
     /// fail to accurately represent the scene.
     pub fn flaws(&self) -> Flaws {
-        self.flaws
+        self.ngm.flaws
     }
 
     /// The range of index data which contains the triangles with only alpha values
     /// of 0 or 1 and therefore may be drawn using a depth buffer rather than sorting.
     #[inline]
     pub fn opaque_range(&self) -> Range<usize> {
-        index_range_to_usize(self.opaque_range)
+        self.ngm.opaque_range()
     }
 
     /// Returns a range of index data which contains the triangles with alpha values other
@@ -844,23 +853,21 @@ impl<M: MeshTypes> MeshMeta<M> {
     /// [`needs_depth_sorting()`][Self::needs_depth_sorting] reports whether this is necessary.
     #[inline]
     pub fn transparent_range(&self, ordering: DepthOrdering) -> Range<usize> {
-        index_range_to_usize(self.transparent[ordering.to_index()].index_range)
+        self.ngm.transparent_range(ordering)
     }
 
     /// Returns whether [`SpaceMesh::depth_sort_for_view()`] would have anything to do if called
     /// with the same parameters.
     #[inline]
     pub fn needs_depth_sorting(&self, ordering: DepthOrdering, view_position: Position) -> bool {
-        let tm = &self.transparent[ordering.to_index()];
-        tm.needs_static_sort() || !tm.depth_sort_validity.contains(view_position)
+        self.ngm.needs_depth_sorting(ordering, view_position)
     }
 
     /// Returns whether there is any circumstance at all under which depth sorting might be
     /// required for this mesh, without consideration for the camera position.
     #[inline] // trivial wrapper
     pub fn needs_depth_sorting_somewhere(&self) -> bool {
-        // delegate immediately to non-generic form in order to avoid redundant generic codegen
-        TransparentMeta::needs_depth_sorting_somewhere(&self.transparent)
+        self.ngm.needs_depth_sorting_somewhere()
     }
 
     /// Returns an iterator over all of the block indices in the [`Space`] that occurred
@@ -873,10 +880,11 @@ impl<M: MeshTypes> MeshMeta<M> {
     /// was being computed, that block index is not included here.
     #[inline]
     pub fn iter_blocks_used(&self) -> impl Iterator<Item = BlockIndex> + '_ {
-        self.block_indices_used.iter()
+        self.ngm.block_indices_used.iter()
     }
 
     /// Returns every texture allocation used by this mesh.
+    #[inline]
     pub fn textures_used(&self) -> &[M::Tile] {
         &self.textures_used
     }
@@ -893,10 +901,51 @@ impl<M: MeshTypes> MeshMeta<M> {
     /// Overwrite `self` with [`MeshMeta::default()`].
     fn clear(&mut self) {
         let Self {
+            ngm: ng,
+            textures_used,
+        } = self;
+        ng.clear();
+        textures_used.clear();
+    }
+}
+
+impl MeshMetaNonGeneric {
+    // Note that this must be consistent with `MeshMeta::clear()`.
+    const DEFAULT: Self = MeshMetaNonGeneric {
+        opaque_range: Range { start: 0, end: 0 },
+        transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
+        block_indices_used: BlockIndexSet::new(),
+        has_non_rect_transparency: false,
+        bounding_box: Aabbs::EMPTY,
+        flaws: Flaws::empty(),
+    };
+
+    #[inline]
+    fn opaque_range(&self) -> Range<usize> {
+        index_range_to_usize(self.opaque_range)
+    }
+
+    #[inline]
+    fn transparent_range(&self, ordering: DepthOrdering) -> Range<usize> {
+        index_range_to_usize(self.transparent[ordering.to_index()].index_range)
+    }
+
+    #[inline]
+    fn needs_depth_sorting(&self, ordering: DepthOrdering, view_position: Position) -> bool {
+        let tm = &self.transparent[ordering.to_index()];
+        tm.needs_static_sort() || !tm.depth_sort_validity.contains(view_position)
+    }
+
+    #[inline]
+    fn needs_depth_sorting_somewhere(&self) -> bool {
+        TransparentMeta::needs_depth_sorting_somewhere(&self.transparent)
+    }
+
+    fn clear(&mut self) {
+        let Self {
             opaque_range,
             transparent,
             block_indices_used,
-            textures_used,
             has_non_rect_transparency,
             bounding_box,
             flaws,
@@ -904,7 +953,6 @@ impl<M: MeshTypes> MeshMeta<M> {
         *opaque_range = Range::from(0..0);
         *transparent = [TransparentMeta::EMPTY; DepthOrdering::COUNT];
         block_indices_used.clear();
-        textures_used.clear();
         *has_non_rect_transparency = false;
         *bounding_box = Aabbs::EMPTY;
         *flaws = Flaws::empty();
@@ -913,17 +961,13 @@ impl<M: MeshTypes> MeshMeta<M> {
 
 impl<M: MeshTypes> Default for MeshMeta<M> {
     /// Construct an empty [`MeshMeta`] which designates nothing (using the index range `0..0`).
-    #[inline]
     fn default() -> Self {
-        // Note that this must be consistent with `Self::clear()`.
-        Self {
-            opaque_range: Range::from(0..0),
-            transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
-            block_indices_used: BlockIndexSet::new(),
-            textures_used: Vec::new(),
-            has_non_rect_transparency: false,
-            bounding_box: Aabbs::EMPTY,
-            flaws: Flaws::empty(),
+        // Note that this must be consistent with `MeshMeta::clear()`.
+        const {
+            Self {
+                ngm: MeshMetaNonGeneric::DEFAULT,
+                textures_used: Vec::new(),
+            }
         }
     }
 }
@@ -931,19 +975,28 @@ impl<M: MeshTypes> Default for MeshMeta<M> {
 impl<M: MeshTypes> PartialEq for MeshMeta<M> {
     fn eq(&self, other: &Self) -> bool {
         let Self {
+            ngm: ng,
+            textures_used,
+        } = self;
+        *ng == other.ngm && *textures_used == other.textures_used
+    }
+}
+
+impl PartialEq for MeshMetaNonGeneric {
+    fn eq(&self, other: &Self) -> bool {
+        let Self {
             opaque_range,
             transparent,
             block_indices_used,
-            textures_used,
             has_non_rect_transparency,
             bounding_box,
             flaws,
         } = self;
+        // sorted for likeihood of difference and cheapness
         *bounding_box == other.bounding_box
             && *opaque_range == other.opaque_range
             && *transparent == other.transparent
             && *block_indices_used == other.block_indices_used
-            && *textures_used == other.textures_used
             && *has_non_rect_transparency == other.has_non_rect_transparency
             && *flaws == other.flaws
     }
@@ -963,48 +1016,63 @@ impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
             }
         }
 
+        #[inline(never)]
+        fn fmt_non_generic(
+            f: &mut fmt::Formatter<'_>,
+            ng: &MeshMetaNonGeneric,
+            textures_used: &dyn fmt::Debug,
+        ) -> fmt::Result {
+            let MeshMetaNonGeneric {
+                opaque_range,
+                transparent,
+                block_indices_used,
+                has_non_rect_transparency,
+                bounding_box,
+                flaws,
+            } = ng;
+            f.debug_struct("MeshMeta")
+                .field("opaque_range", opaque_range)
+                .field("transparent", &OrderingAsKey(transparent))
+                .field("block_indices_used", block_indices_used)
+                .field("textures_used", textures_used)
+                .field("has_non_rect_transparency", has_non_rect_transparency)
+                .field("bounding_box", bounding_box)
+                .field("flaws", &DebugAsDisplay(flaws))
+                .finish()
+        }
+
         let Self {
-            opaque_range,
-            transparent,
-            block_indices_used,
+            ngm: ng,
             textures_used,
-            has_non_rect_transparency,
-            bounding_box,
-            flaws,
         } = self;
-        f.debug_struct("MeshMeta")
-            .field("opaque_range", opaque_range)
-            .field("transparent", &OrderingAsKey(transparent))
-            .field("block_indices_used", block_indices_used)
-            .field("textures_used", textures_used)
-            .field("has_non_rect_transparency", has_non_rect_transparency)
-            .field("bounding_box", bounding_box)
-            .field("flaws", &DebugAsDisplay(flaws))
-            .finish()
+        fmt_non_generic(f, ng, &textures_used)
     }
 }
 
 impl<M: MeshTypes> Clone for MeshMeta<M> {
     fn clone(&self) -> Self {
         Self {
-            opaque_range: self.opaque_range,
-            transparent: self.transparent.clone(),
-            block_indices_used: self.block_indices_used.clone(),
+            ngm: self.ngm.clone(),
             textures_used: self.textures_used.clone(),
-            has_non_rect_transparency: self.has_non_rect_transparency,
-            bounding_box: self.bounding_box,
-            flaws: self.flaws,
         }
     }
 }
 
 impl<M: MeshTypes> HeapUsage for MeshMeta<M> {
     fn heap_bytes_owned(&self) -> usize {
+        let Self { ngm, textures_used } = self;
+        // texture handles’ own heap memory is not counted
+        ngm.heap_bytes_owned() + heap::capacity_bytes(textures_used)
+    }
+}
+
+impl HeapUsage for MeshMetaNonGeneric {
+    #[inline(never)]
+    fn heap_bytes_owned(&self) -> usize {
         let Self {
             opaque_range,
             transparent,
             block_indices_used,
-            textures_used,
             has_non_rect_transparency,
             bounding_box,
             flaws,
@@ -1012,13 +1080,11 @@ impl<M: MeshTypes> HeapUsage for MeshMeta<M> {
         opaque_range.heap_bytes_owned()
             + transparent.heap_bytes_owned()
             + block_indices_used.heap_bytes_owned()
-            + heap::capacity_bytes(textures_used) // texture handles’ own heap memory is not counted
             + has_non_rect_transparency.heap_bytes_owned()
             + bounding_box.heap_bytes_owned()
             + flaws.heap_bytes_owned()
     }
 }
-
 // -------------------------------------------------------------------------------------------------
 
 /// Component of [`MeshMeta`] describing the mesh’s contents under a specific [`DepthOrdering`].
@@ -1071,6 +1137,7 @@ impl TransparentMeta {
     /// required for this mesh, without consideration for the camera position.
     ///
     /// This will always be true when [`Self::needs_static_sort()`] is.
+    #[inline(never)]
     fn needs_depth_sorting_somewhere(transparent_metas: &[TransparentMeta; 27]) -> bool {
         transparent_metas.iter().any(|tm| tm.depth_sort_validity != Aabb::EVERYWHERE)
     }
@@ -1339,7 +1406,7 @@ mod tests {
             _ = mesh.depth_sort_for_view(
                 DepthOrdering::from_view_of_aabb(
                     view_point.to_f64().cast_unit(),
-                    mesh.bounding_box.transparent,
+                    mesh.bounding_box().transparent,
                 ),
                 view_point,
             );
