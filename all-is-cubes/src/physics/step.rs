@@ -604,7 +604,10 @@ where
 
     if let Some(contact) = collision.contact {
         // TODO: this expect() is not true — in the event of rounding errors we might get them anyway for the final position
-        let axis = contact.normal().axis().expect("Face7::Within collisions should not reach here");
+        let contact_face = Face::try_from(contact.normal())
+            .expect("Face7::Within collisions should not reach here");
+        let axis = contact_face.axis();
+
         // Advance however much straight-line distance is available.
         // But a little bit back from that, to avoid floating point error pushing us
         // into being already colliding next frame.
@@ -624,10 +627,7 @@ where
         // Convert it to sliding movement for the axes we didn't collide in.
         delta_position[axis] = 0.0;
 
-        // Zero the velocity in that direction.
-        // (This is the velocity part of collision response. That is, if we supported bouncy
-        // objects, we'd do something different here.)
-        body.velocity[axis] = notnan!(0.0);
+        adjust_velocity_for_contact(&mut body.velocity, contact_face);
 
         (
             delta_position,
@@ -649,6 +649,25 @@ where
             },
         )
     }
+}
+
+/// Remove the component of the velocity that is directed towards rather than away from a contact.
+///
+/// `contact_face` should be the surface collided with, as in [`Contact::normal()`],
+/// not the body’s colliding face.
+fn adjust_velocity_for_contact(
+    velocity: &mut Vector3D<NotNan<FreeCoordinate>, Velocity>,
+    contact_face: Face,
+) {
+    let axis = contact_face.axis();
+    let old = velocity[axis];
+    // If we supported bouncing collision responses, we’d be inverting the velocity here instead of
+    // zeroing it.
+    velocity[axis] = if contact_face.is_negative() {
+        old.min(notnan!(0.0))
+    } else {
+        old.max(notnan!(0.0))
+    };
 }
 
 /// Check if we're intersecting any blocks and fix that if so.
@@ -855,7 +874,7 @@ pub(super) fn crush_if_colliding(
 
         // Find the direction which has the least penetration depth,
         // thus the smallest crush to resolve the collision.
-        let least_penetration_depth: Option<(Aab, FreeCoordinate)> = Face::ALL
+        let least_penetration_depth: Option<(Face, Aab, FreeCoordinate)> = Face::ALL
             .into_iter()
             .filter_map(|face| {
                 let depth = body.occupying.face_coordinate_outward(face)
@@ -866,16 +885,19 @@ pub(super) fn crush_if_colliding(
                     if !shrunk.contains(body.position()) {
                         None
                     } else {
-                        Some((shrunk, depth))
+                        Some((face, shrunk, depth))
                     }
                 } else {
                     None
                 }
             })
-            .min_by_key(|&(_, depth)| ordered_float::OrderedFloat(depth));
+            .min_by_key(|&(_, _, depth)| ordered_float::OrderedFloat(depth));
 
-        if let Some((shrunk, _)) = least_penetration_depth {
+        if let Some((face, shrunk, _)) = least_penetration_depth {
             body.occupying = shrunk;
+
+            adjust_velocity_for_contact(&mut body.velocity, face.opposite());
+            // TODO: also add contact to contact set.
         } else {
             // We cannot make further progress.
             break 'crush_step;
