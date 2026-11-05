@@ -33,6 +33,7 @@ use all_is_cubes::op::Operation;
 use all_is_cubes::sound::{self, SoundDef};
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::time;
+use all_is_cubes::universe;
 use all_is_cubes::universe::{Handle, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
@@ -110,10 +111,10 @@ pub async fn install_demo_blocks(
     install_landscape_blocks(txn, resolution, landscape_p).await?;
     p.progress(0.0).await;
 
+    // TODO: The provider/module system should be extended to multiple types so that these
+    // SoundDefs and Spaces are module members themselves rather than ad-hoc and anonymous.
+
     // Explosion sounds are reused by multiple stages of the explosion, so construct them once.
-    //
-    // TODO: The provider/module system should be extended to multiple types so that these are
-    // module members themselves rather than ad-hoc and anonymous.
     //
     // TODO: add features to SoundDef so these sounds can be sharper and also noisier,
     // to be properly explodey.
@@ -123,10 +124,23 @@ pub async fn install_demo_blocks(
         whoosh: txn.insert_anonymous(SoundDef::new_tone(zo32(0.01), ps32(43.2), zo32(0.08))),
     };
 
+    let lamppost_space = const {
+        asset::Space::Image {
+            image: include_image!("blocks/lamppost.png"),
+            rotation: GridRotation::RXZY,
+            expansion: asset::Expansion::Stack { slice_height: 16 },
+            visible: asset::Vox::DEFAULT,
+            invisible: asset::Vox::DENOTES_AIR,
+        }
+    }
+    .load(txn)
+    .map_err(|e| GenError::failure(e, universe::Name::Pending))?;
+    let lamppost_space = txn.insert_anonymous(lamppost_space);
+
     BlockProvider::<DemoBlocks>::new_installed_cyclic(
         p,
         txn,
-        demo_blocks_generator(resolution, &explosion_sounds),
+        demo_blocks_generator(resolution, &explosion_sounds, &lamppost_space),
     )
     .await?;
 
@@ -140,6 +154,7 @@ pub async fn install_demo_blocks(
 fn demo_blocks_generator(
     resolution: block::Resolution,
     explosion_sounds: &ExplosionSounds,
+    lamppost_space: &Handle<Space>,
 ) -> impl Fn(&BlockProvider<DemoBlocks>, &mut UniverseTransaction, DemoBlocks) -> Result<Block, InGenError>
 {
     let resolution_g = GridCoordinate::from(resolution);
@@ -179,7 +194,6 @@ fn demo_blocks_generator(
             .build()
     });
     let lamppost_metal = Block::builder().color(palette::ALMOST_BLACK.with_alpha_one()).build();
-    let lamppost_edge = Block::from(palette::ALMOST_BLACK.saturating_scale(ps32(1.12)));
     let lamp_sound = sound::Ambient::noise_at_frequency(ps32(0.02), ps32(10000.0));
 
     let pedestal_voxel = block::from_color!(palette::STONE);
@@ -361,54 +375,23 @@ fn demo_blocks_generator(
             LamppostSegment => Block::builder()
                 .display_name("Lamppost")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
-                .voxels_fn(resolution, |cube| {
-                    if (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
-                        .component_mul(GridVector::new(1, 0, 1))
-                        .square_length()
-                        <= 4i32.pow(2)
-                    {
-                        &lamppost_metal
-                    } else {
-                        &AIR
-                    }
-                })?
-                .build_txn(txn),
+                .voxels_handle(R16, lamppost_space.clone())
+                .offset(point3(0, 16, 0))
+                .build(),
 
             LamppostBase => Block::builder()
                 .display_name("Lamppost Base")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
-                .voxels_fn(resolution, |cube| {
-                    let shape: [GridCoordinate; 16] =
-                        [8, 8, 7, 7, 6, 6, 6, 5, 5, 5, 6, 6, 5, 4, 4, 3];
-                    let [radius, secondary] = square_radius(resolution, cube);
-                    if radius < shape.get(cube.y as usize).copied().unwrap_or(0) {
-                        if secondary == radius {
-                            &lamppost_edge
-                        } else {
-                            &lamppost_metal
-                        }
-                    } else {
-                        &AIR
-                    }
-                })?
-                .build_txn(txn),
+                .voxels_handle(R16, lamppost_space.clone())
+                .offset(point3(0, 0, 0))
+                .build(),
 
             LamppostTop => Block::builder()
                 .display_name("Lamppost Top")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
-                .voxels_fn(resolution, |cube| {
-                    let shape: [GridCoordinate; 16] =
-                        [4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 7, 8];
-                    let r2 = (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
-                        .component_mul(GridVector::new(1, 0, 1))
-                        .square_length();
-                    if r2 < shape.get(cube.y as usize).copied().unwrap_or(0).pow(2) {
-                        &lamppost_metal
-                    } else {
-                        &AIR
-                    }
-                })?
-                .build_txn(txn),
+                .voxels_handle(R16, lamppost_space.clone())
+                .offset(point3(0, 32, 0))
+                .build(),
 
             Sconce(on) => {
                 let emitter_r2 = (resolution_g / 4).pow(2);
