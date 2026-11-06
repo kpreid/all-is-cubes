@@ -854,7 +854,7 @@ fn place_roads_and_tunnels(
 
 fn place_lamppost(
     base_position: Cube,
-    globe_position: Cube,
+    mut globe_position: Cube,
     m: &mut space::Mutation<'_, '_>,
     demo_blocks: &BlockProvider<DemoBlocks>,
 ) -> Result<(), InGenError> {
@@ -868,6 +868,13 @@ fn place_lamppost(
             .unwrap()
     }
 
+    if (globe_position - base_position).xz().square_length() == 1 {
+        // We don’t have a block for hanging a globe to the side by exactly one cube,
+        // so fudge the globe position instead.
+        globe_position.x = base_position.x;
+        globe_position.z = base_position.z;
+    }
+
     m.set(base_position, &demo_blocks[LamppostBase])?;
 
     for (step1, step2) in walk(base_position, globe_position).tuple_windows() {
@@ -879,18 +886,13 @@ fn place_lamppost(
 
         let block = if next_cube == globe_position {
             demo_blocks[LamppostTop].clone().rotate(rot_py_to(next_dir))
+        } else if prev_dir != next_dir {
+            // This will only work for the kind of elbows that our walk produces.
+            demo_blocks[LamppostElbow]
+                .clone()
+                .rotate(GridRotation::from_to(Face::NX, next_dir, Face::PY).unwrap())
         } else {
             demo_blocks[LamppostSegment].clone().rotate(rot_py_to(next_dir))
-        };
-
-        let block = if prev_dir == next_dir {
-            block
-        } else {
-            block::Composite::new(
-                demo_blocks[LamppostSegment].clone().rotate(rot_py_to(prev_dir)),
-                block::CompositeOperator::Over,
-            )
-            .compose_or_replace(block)
         };
 
         m.set(this_cube, block)?;

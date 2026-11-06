@@ -58,6 +58,7 @@ pub enum DemoBlocks {
     LamppostSegment,
     LamppostBase,
     LamppostTop,
+    LamppostElbow,
     Sconce(bool),
     Arrow,
     Road,
@@ -392,6 +393,29 @@ fn demo_blocks_generator(
                 .voxels_handle(R16, lamppost_space.clone())
                 .offset(point3(0, 32, 0))
                 .build(),
+
+            LamppostElbow => const {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Image {
+                        image: include_image!("blocks/lamppost-elbow.png"),
+                        // TODO: should be RXyZ but the loader doesn't handle this properly when combined with Expansion::Stack, so instead we fix it "in post" for now
+                        rotation: GridRotation::RXYZ,
+                        expansion: asset::Expansion::Stack { slice_height: 16 },
+                        visible: asset::Vox::DEFAULT,
+                        invisible: asset::Vox::DENOTES_AIR,
+                    },
+                    modifiers: &[
+                        block::Modifier::Rotate(GridRotation::RXyZ),
+                        block::Modifier::SetAttribute(block::SetAttribute::DisplayName(literal!(
+                            "Lamppost Elbow"
+                        ))),
+                        block::Modifier::SetAttribute(block::SetAttribute::RotationRule(
+                            RotationPlacementRule::Attach { by: Face::NY },
+                        )),
+                    ],
+                }
+            }
+            .load(txn)?,
 
             Sconce(on) => {
                 let emitter_r2 = (resolution_g / 4).pow(2);
