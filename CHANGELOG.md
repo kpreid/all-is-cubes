@@ -89,6 +89,7 @@
 
 * `all-is-cubes-mesh` library:
     * `SpaceMesh::blocks_used_iter()` has been moved to `MeshMeta::iter_blocks_used()`.
+    * The associated types of `texture::NoTextures` are now `!` (never) instead of distinct library types.
 
 * `all-is-cubes-port` library:
     * `export_to_path()` takes an additional parameter of type `ExportOptions`.
@@ -114,6 +115,7 @@
 
 * `all-is-cubes-mesh` library:
     * `dynamic::ChunkMesh::mesh()` has been replaced by `meta()`, which returns `MeshMeta` instead of `SpaceMesh`. Access to the `SpaceMesh` is no longer possible except through `dynamic::RenderDataUpdate`.
+    * `texture::NoTexture` has been removed. Its uses are now the `!` (never) type instead.
 
 * `all-is-cubes-port` library:
     * `ExportSet::from_block_defs()` and `ExportSet::from_spaces()` have been removed.

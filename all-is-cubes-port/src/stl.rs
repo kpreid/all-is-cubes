@@ -11,10 +11,7 @@ use all_is_cubes::math::{u32size, zo32};
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_mesh::{
-    self as mesh, BlockVertex,
-    texture::{NoTexture, NoTextures},
-};
+use all_is_cubes_mesh::{self as mesh, BlockVertex, texture::NoTextures};
 use all_is_cubes_render::camera::GraphicsOptions;
 
 use crate::MultiFileData;
@@ -124,9 +121,9 @@ enum StlMt {}
 
 impl mesh::MeshTypes for StlMt {
     // TODO: It'd be more efficient to use a custom vertex type but we're not bothering for now.
-    type Vertex = BlockVertex<NoTexture>;
+    type Vertex = BlockVertex<!>;
     type Alloc = NoTextures;
-    type Tile = NoTexture;
+    type Tile = !;
 }
 
 // -------------------------------------------------------------------------------------------------
