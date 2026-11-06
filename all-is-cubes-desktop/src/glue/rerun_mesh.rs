@@ -12,13 +12,12 @@ use all_is_cubes_mesh as mesh;
 use all_is_cubes_render::camera::Camera;
 
 use mesh::dynamic::ChunkedSpaceMesh;
-use mesh::texture::NoTexture;
 
 struct Mt;
 impl mesh::MeshTypes for Mt {
     type Vertex = Vertex;
     type Alloc = mesh::texture::NoTextures;
-    type Tile = NoTexture;
+    type Tile = !;
 }
 impl mesh::dynamic::DynamicMeshTypes for Mt {
     type RenderData = Option<DroppingMesh>;
@@ -43,7 +42,7 @@ struct Vertex {
 impl mesh::Vertex for Vertex {
     const WANTS_DEPTH_SORTING: bool = false;
     type SecondaryData = ();
-    type TexPoint = NoTexture;
+    type TexPoint = !;
     type BlockInst = Vector3D<f32, Cube>;
 
     fn from_block_vertex(
