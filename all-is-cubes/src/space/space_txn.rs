@@ -186,29 +186,8 @@ impl SpaceTransaction {
             },
         ) in &self.cubes
         {
-            // TODO: This is a lot of possibly redundant hash lookups.
-            // `SpaceTransaction`s should use their own palettes to aovid this.
-            if let Equal(Some(new_block)) = new
-                && let hashbrown::hash_map::Entry::Vacant(ve) =
-                    new_block_evaluations.entry(new_block.clone())
-            {
-                ve.insert(PendingEvaluation::new(
-                    read_ticket,
-                    palette,
-                    new_block.clone(),
-                ));
-            }
-
             let cube = Cube::from(cube);
-            if let Some(cube_index) = contents.index(cube) {
-                if let Equal(Some(old)) = old {
-                    // Raw lookup because we already computed the index for a bounds check
-                    // (TODO: Put this in a function, like get_block_index)
-                    if palette.entry(contents.as_linear()[cube_index]).block() != old {
-                        return Err(SpaceTransactionMismatch::Cube(cube));
-                    }
-                }
-            } else {
+            let Some(cube_index) = contents.index(cube) else {
                 // Out of bounds.
                 if *conserved || old.0.is_some() {
                     // It is an error for conserved cube txns to be out of bounds,
@@ -220,7 +199,33 @@ impl SpaceTransaction {
                         transaction: cube.grid_aab(),
                         space: contents.bounds(),
                     });
+                } else {
+                    // Otherwise, apply the rest of the transaction without this change.
+                    continue;
                 }
+            };
+
+            if let Equal(Some(old)) = old {
+                // Raw lookup because we already computed the index for a bounds check
+                // (TODO: Put this in a function, like get_block_index)
+                if palette.entry(contents.as_linear()[cube_index]).block() != old {
+                    return Err(SpaceTransactionMismatch::Cube(cube));
+                }
+            }
+
+            // Evaluate the block that we’re going to insert.
+            // TODO: This is a lot of possibly redundant hash lookups.
+            // `SpaceTransaction`s should have palettes just like `Space`s so that they can do this
+            // once per block rather than once per cube.
+            if let Equal(Some(new_block)) = new
+                && let hashbrown::hash_map::Entry::Vacant(ve) =
+                    new_block_evaluations.entry(new_block.clone())
+            {
+                ve.insert(PendingEvaluation::new(
+                    read_ticket,
+                    palette,
+                    new_block.clone(),
+                ));
             }
         }
         Ok(CommitCheck {
