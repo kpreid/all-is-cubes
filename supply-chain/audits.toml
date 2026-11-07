@@ -41,6 +41,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.7.6 -> 0.7.8"
 
+[[audits.async-executor]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "1.14.0 -> 1.14.1"
+
 [[audits.async_fn_traits]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
