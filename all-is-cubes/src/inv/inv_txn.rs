@@ -51,6 +51,29 @@ impl InventoryTransaction {
         }
     }
 
+    /// Transaction to remove exactly the items currently in the inventory.
+    ///
+    /// The returned transaction will leave the inventory empty if it is not simultaneously
+    /// modified in other ways.
+    /// It will fail if any of the non-empty slots present are removed or changed.
+    ///
+    /// This may be useful when constructing a transaction that inserts the removed items
+    /// elsewhere.
+    //---
+    // TODO: make public if this proves generally useful
+    pub(crate) fn clearing_exactly(source_inventory: &Inventory) -> InventoryTransaction {
+        let mut replace = BTreeMap::new();
+        for (slot, index) in source_inventory.slots.iter().zip(0u16..) {
+            if *slot != Slot::Empty {
+                replace.insert(Ix::from(index), (slot.clone(), Slot::Empty));
+            }
+        }
+        InventoryTransaction {
+            replace,
+            insert: vec![],
+        }
+    }
+
     /// Returns whether this transaction does nothing and checks nothing.
     ///
     /// # Example
@@ -318,6 +341,35 @@ mod tests {
             ]
             .into_boxed_slice()
         );
+    }
+
+    fn check_clear(mut inventory: Inventory) {
+        let size = inventory.size();
+        let txn = InventoryTransaction::clearing_exactly(&inventory);
+        txn.execute(&mut inventory, (), &mut drop)
+            .expect("clear transaction should apply");
+        assert_eq!(inventory, Inventory::new(size));
+    }
+
+    #[test]
+    fn clearing() {
+        check_clear(Inventory::from_slots([]));
+        check_clear(Inventory::from_slots([Slot::Empty]));
+        check_clear(Inventory::from_slots([Slot::stack(1, Tool::Activate)]));
+        check_clear(Inventory::from_slots([
+            Slot::stack(1, Tool::Activate),
+            Slot::stack(2, Tool::Activate),
+        ]));
+        check_clear(Inventory::from_slots([
+            Slot::stack(1, Tool::Activate),
+            Slot::stack(1, Tool::CopyFromSpace),
+        ]));
+        check_clear(Inventory::from_slots([
+            Slot::stack(1, Tool::Activate),
+            Slot::Empty,
+            Slot::stack(1, Tool::CopyFromSpace),
+            Slot::Empty,
+        ]));
     }
 
     #[test]
