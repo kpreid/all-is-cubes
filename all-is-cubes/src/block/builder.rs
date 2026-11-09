@@ -590,7 +590,7 @@ mod tests {
                 .animation_hint(block::AnimationHint::replacement(
                     block::AnimationChange::Shape
                 ))
-                .modifier(Modifier::Rotate(Face::PY.clockwise()))
+                .modifier(Face::PY.clockwise())
                 .build(),
             Block::from(block::Atom {
                 color,
@@ -735,12 +735,8 @@ mod tests {
     #[test]
     fn modifier_before_color_is_equivalent() {
         assert_eq!(
-            Block::builder()
-                .modifier(Modifier::Rotate(GridRotation::RXYz))
-                .color(Rgba::WHITE),
-            Block::builder()
-                .color(Rgba::WHITE)
-                .modifier(Modifier::Rotate(GridRotation::RXYz))
+            Block::builder().modifier(GridRotation::RXYz).color(Rgba::WHITE),
+            Block::builder().color(Rgba::WHITE).modifier(GridRotation::RXYz)
         );
     }
 
@@ -748,12 +744,8 @@ mod tests {
     fn modifier_before_voxels_is_equivalent() {
         let h = Handle::new_gone(Name::Pending);
         assert_eq!(
-            Block::builder()
-                .modifier(Modifier::Rotate(GridRotation::RXYz))
-                .voxels_handle(R8, h.clone()),
-            Block::builder()
-                .voxels_handle(R8, h)
-                .modifier(Modifier::Rotate(GridRotation::RXYz))
+            Block::builder().modifier(GridRotation::RXYz).voxels_handle(R8, h.clone()),
+            Block::builder().voxels_handle(R8, h).modifier(GridRotation::RXYz)
         );
     }
 }

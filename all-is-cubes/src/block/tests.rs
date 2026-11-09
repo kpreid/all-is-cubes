@@ -79,7 +79,7 @@ fn block_debug_with_modifiers() {
                 .color(Rgba::new(1.0, 0.5, 0.0, 1.0))
                 // TODO: When we have more modifiers, pick a different one, that isn't
                 // essentially irrelevant to Primitive::Atom
-                .modifier(Modifier::Rotate(GridRotation::Rxyz))
+                .modifier(GridRotation::Rxyz)
                 .build()
         ),
         "Block { \

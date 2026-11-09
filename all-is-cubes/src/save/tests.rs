@@ -425,7 +425,7 @@ mod block {
             &Block::builder()
                 .color(Rgba::WHITE)
                 .modifier(block::Quote::default())
-                .modifier(Modifier::Rotate(GridRotation::RXyZ))
+                .modifier(GridRotation::RXyZ)
                 .modifier(Inventory::from_slots(vec![Tool::Activate.into()]))
                 .build(),
             json!({

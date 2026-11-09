@@ -272,6 +272,12 @@ impl VisitHandles for Modifier {
     }
 }
 
+impl From<GridRotation> for Modifier {
+    fn from(value: GridRotation) -> Self {
+        Modifier::Rotate(value)
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Result of [`Modifier::unspecialize()`] returned to [`Block::unspecialize()`].
