@@ -383,27 +383,21 @@ impl Operation {
                 let to_insert =
                     InventoryTransaction::insert(source_inventory.slots().iter().cloned());
 
-                let new_block = if destroy_if_empty {
-                    AIR
-                } else {
-                    let mut new_block = old_block.clone();
-                    new_block.modifiers_mut()[source_inventory_index] =
-                        block::Modifier::Inventory(Inventory::new(source_inventory.size()));
-                    new_block
-                };
-
                 if to_insert.check(destination_inventory, ()).is_err() {
                     return Err(OperationError::CharacterInventoryFull);
                 }
 
-                Ok((
-                    SpaceTransaction::set_cube(
-                        target_cube,
-                        Some(old_block.clone()),
-                        Some(new_block),
-                    ),
-                    to_insert,
-                ))
+                let txn = if destroy_if_empty {
+                    CubeTransaction::replacing(Some(old_block.clone()), Some(AIR))
+                } else {
+                    let mut old_block_without_inventory = old_block.clone();
+                    old_block_without_inventory.modifiers_mut().remove(source_inventory_index);
+
+                    CubeTransaction::replacing(Some(old_block_without_inventory), None)
+                        .with_inventory(InventoryTransaction::clearing_exactly(source_inventory))
+                };
+
+                Ok((txn.at(target_cube), to_insert))
             }
             Operation::Neighbors(neighbors) => {
                 let mut txns = OpTxn::default();
@@ -795,12 +789,8 @@ mod tests {
         assert_eq!(
             op.apply(&space.read(), Some(&character_inventory), Gridgid::IDENTITY).unwrap(),
             (
-                {
-                    let mut txn = SpaceTransaction::default();
-                    *txn.at(Cube::new(0, 0, 0)) =
-                        CubeTransaction::replacing(Some(block_with_inventory), Some(AIR));
-                    txn
-                },
+                CubeTransaction::replacing(Some(block_with_inventory), Some(AIR))
+                    .at(Cube::new(0, 0, 0)),
                 InventoryTransaction::insert([stack])
             )
         );
@@ -822,16 +812,13 @@ mod tests {
         assert_eq!(
             op.apply(&space.read(), Some(&character_inventory), Gridgid::IDENTITY).unwrap(),
             (
-                {
-                    let mut txn = SpaceTransaction::default();
-                    *txn.at(Cube::new(0, 0, 0)) = CubeTransaction::replacing(
-                        Some(block_with_inventory),
-                        Some(
-                            block_bare.with_modifier(Inventory::from_slots(vec![inv::Slot::Empty])),
-                        ),
-                    );
-                    txn
-                },
+                CubeTransaction::replacing(Some(block_bare), None)
+                    .with_inventory(InventoryTransaction::replace(
+                        0,
+                        stack.clone(),
+                        inv::Slot::Empty,
+                    ))
+                    .at(Cube::new(0, 0, 0)),
                 InventoryTransaction::insert([stack])
             )
         );
