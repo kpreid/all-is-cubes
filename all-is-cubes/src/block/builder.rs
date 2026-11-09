@@ -112,9 +112,9 @@ impl<'u, P, Txn> Builder<'u, P, Txn> {
 
     /// Adds a modifier to the end of the list of modifiers for the block.
     /// It will be applied after all previously specified modifiers.
-    pub fn modifier(mut self, modifier: Modifier) -> Self {
+    pub fn modifier(mut self, modifier: impl Into<Modifier>) -> Self {
         // TODO: implement a modifier canonicalization procedure here
-        self.modifiers.push(modifier);
+        self.modifiers.push(modifier.into());
         self
     }
 

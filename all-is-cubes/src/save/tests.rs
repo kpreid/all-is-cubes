@@ -424,11 +424,9 @@ mod block {
         assert_round_trip_value(
             &Block::builder()
                 .color(Rgba::WHITE)
-                .modifier(Modifier::Quote(block::Quote::default()))
+                .modifier(block::Quote::default())
                 .modifier(Modifier::Rotate(GridRotation::RXyZ))
-                .modifier(Modifier::Inventory(Inventory::from_slots(vec![
-                    Tool::Activate.into(),
-                ])))
+                .modifier(Inventory::from_slots(vec![Tool::Activate.into()]))
                 .build(),
             json!({
                 "type": "BlockV1",

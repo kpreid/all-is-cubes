@@ -46,9 +46,9 @@ fn inventory_preserves_attributes() {
         })
         .color(Rgba::TRANSPARENT)
         .inventory_config(iib.clone())
-        .modifier(block::Modifier::Inventory(inv::Inventory::from_slots([
-            inv::Tool::Block(item_block).into(),
-        ])))
+        .modifier(inv::Inventory::from_slots([
+            inv::Tool::Block(item_block).into()
+        ]))
         .animation_hint(block::AnimationHint::replacement(
             block::AnimationChange::Shape,
         ))

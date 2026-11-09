@@ -10,7 +10,7 @@ use pretty_assertions::assert_eq;
 
 use crate::block::{
     self, AIR, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockDef, Cost, EvKey,
-    EvaluatedBlock, EvaluatedBlockEq, Evoxel, Evoxels, EvoxelsEq, Modifier, Primitive,
+    EvaluatedBlock, EvaluatedBlockEq, Evoxel, Evoxels, EvoxelsEq, Primitive,
     Resolution::{self, *},
     VoxelOpacityMask, modifier,
 };
@@ -686,7 +686,7 @@ fn color_evaluation_regression_1() {
     let block = Block::builder()
         .color(Rgba::new(1e28, 1e28, 1e28, 1.0))
         // Modifier matters because it causes the block to become voxels
-        .modifier(Modifier::Move(modifier::Move::new(Face::NX, R16, 0, 0)))
+        .modifier(modifier::Move::new(Face::NX, R16, 0, 0))
         .build();
 
     // This should not panic.
