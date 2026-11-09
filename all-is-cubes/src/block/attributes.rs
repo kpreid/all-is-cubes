@@ -39,6 +39,8 @@ macro_rules! derive_attribute_helpers {
                 modifier_style = $modifier_style:tt,
                 // Controls what kind of method [`attribute_builder_method`] generates.
                 builder_param_style = $builder_param_style:tt,
+                // Controls whether to implement `From<$field_type>` for `SetAttribute` and `Modifier`.
+                impl_from = $impl_from:tt,
             )]
             pub $field_name:ident: $field_type:ty,
         )*
@@ -268,6 +270,12 @@ macro_rules! derive_attribute_helpers {
                 attribute_builder_method!($(#[doc = $field_doc] )* $builder_param_style $field_name: $field_type);
             )*
         }
+
+        paste::paste! {
+            $(
+                set_attribute_from_attribute_value!($impl_from, $modifier_style, $field_type, [< $field_name :camel >]);
+            )*
+        }
     };
 }
 
@@ -350,6 +358,69 @@ macro_rules! attribute_modifier_value_wrap {
     };
 }
 
+/// Optionally mplements all of
+/// * `From<$t> for SetAttribute`
+/// * `From<$t> for Modifier`
+/// * `From<attribute_modifier_value_type!($t)> for SetAttribute`
+/// * `From<attribute_modifier_value_type!($t)> for Modifier`
+macro_rules! set_attribute_from_attribute_value {
+    (false, $modifier_style:tt, $field_type:ty, $variant:ident) => {};
+
+    (true, clone, $field_type:ty, $variant:ident) => {
+        // Special case: the wrapped type is equal, so the two input types are equal.
+
+        impl From<$field_type> for SetAttribute {
+            /// Wraps the value in
+            #[doc = concat!("[`SetAttribute::", stringify!($variant), "`].")]
+            fn from(value: $field_type) -> SetAttribute {
+                SetAttribute::$variant(value)
+            }
+        }
+        impl From<$field_type> for Modifier {
+            /// Wraps the value in
+            #[doc = concat!("[`SetAttribute::", stringify!($variant), "`]")]
+            /// and then [`Modifier::SetAttribute`].
+            fn from(value: $field_type) -> Modifier {
+                Modifier::SetAttribute(SetAttribute::$variant(value))
+            }
+        }
+    };
+
+    (true, $modifier_style:tt, $field_type:ty, $variant:ident) => {
+        // Reuse the previous case as if this weren’t a wrapped type
+        set_attribute_from_attribute_value!(
+            true,
+            clone,
+            attribute_modifier_value_type!($modifier_style, $field_type),
+            $variant
+        );
+
+        impl From<$field_type> for SetAttribute {
+            /// Wraps the value in
+            #[doc = concat!("[`SetAttribute::", stringify!($variant), "`].")]
+            fn from(value: $field_type) -> SetAttribute {
+                SetAttribute::$variant(attribute_modifier_value_wrap!(
+                    $modifier_style,
+                    $field_type,
+                    value
+                ))
+            }
+        }
+        impl From<$field_type> for Modifier {
+            /// Wraps the value in
+            #[doc = concat!("[`SetAttribute::", stringify!($variant), "`]")]
+            /// and then [`Modifier::SetAttribute`].
+            fn from(value: $field_type) -> Modifier {
+                Modifier::SetAttribute(SetAttribute::$variant(attribute_modifier_value_wrap!(
+                    $modifier_style,
+                    $field_type,
+                    value
+                )))
+            }
+        }
+    };
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Properties of blocks that are not the block’s voxels.
@@ -379,6 +450,7 @@ pub struct BlockAttributes {
         arbitrary_type = alloc::string::String,
         modifier_style = clone,
         builder_param_style = into,
+        impl_from = false,
     )]
     pub display_name: ArcStr,
 
@@ -389,6 +461,7 @@ pub struct BlockAttributes {
         arbitrary_type = bool,
         modifier_style = clone,
         builder_param_style = exact,
+        impl_from = false,
     )]
     pub selectable: bool,
 
@@ -398,6 +471,7 @@ pub struct BlockAttributes {
         arbitrary_type = InvInBlock,
         modifier_style = arc,
         builder_param_style = exact,
+        impl_from = true,
     )]
     pub inventory: InvInBlock,
 
@@ -406,6 +480,7 @@ pub struct BlockAttributes {
         arbitrary_type = sound::Ambient,
         modifier_style = arc,
         builder_param_style = exact,
+        impl_from = true,
     )]
     pub ambient_sound: sound::Ambient,
 
@@ -419,6 +494,7 @@ pub struct BlockAttributes {
         arbitrary_type = RotationPlacementRule,
         modifier_style = clone,
         builder_param_style = exact,
+        impl_from = true,
     )]
     pub rotation_rule: RotationPlacementRule,
 
@@ -430,6 +506,7 @@ pub struct BlockAttributes {
         arbitrary_type = Option<PlacementAction>,
         modifier_style = (Option<Arc<PlacementAction>>),
         builder_param_style = into,
+        impl_from = true,
     )]
     pub placement_action: Option<PlacementAction>,
 
@@ -438,6 +515,7 @@ pub struct BlockAttributes {
         arbitrary_type =  Option<TickAction>,
         modifier_style = (Option<Arc<TickAction>>),
         builder_param_style = into,
+        impl_from = true,
     )]
     pub tick_action: Option<TickAction>,
 
@@ -446,6 +524,7 @@ pub struct BlockAttributes {
         arbitrary_type = Option<Operation>,
         modifier_style = (Option<Arc<Operation>>),
         builder_param_style = into,
+        impl_from = false,
     )]
     pub activation_action: Option<Operation>,
 
@@ -458,6 +537,7 @@ pub struct BlockAttributes {
         arbitrary_type = AnimationHint,
         modifier_style = clone,
         builder_param_style = exact,
+        impl_from = true,
     )]
     pub animation_hint: AnimationHint,
 }
@@ -504,6 +584,8 @@ impl From<SetAttribute> for Modifier {
         Modifier::SetAttribute(value)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Rule about how this block should be rotated, or not, when placed in a [`Space`] by
 /// some agent not otherwise specifying rotation.

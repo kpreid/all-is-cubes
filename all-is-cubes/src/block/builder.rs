@@ -631,9 +631,7 @@ mod tests {
                 resolution: R2, // not same as space size
                 space: space_handle
             })
-            .with_modifier(Modifier::SetAttribute(SetAttribute::DisplayName(
-                "hello world".into(),
-            ))),
+            .with_modifier(SetAttribute::DisplayName("hello world".into())),
         );
     }
 
