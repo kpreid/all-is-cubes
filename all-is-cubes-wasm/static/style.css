@@ -1,5 +1,20 @@
+@font-face {
+  font-family: "System16";
+  src: url("client/system16.ttf");
+}
+
 html, body {
   background: gray; /* ordinarily invisible, but makes initial loading better */
+}
+
+pre {
+  font-family: "System16", monospace;
+
+  /* Ideally we would request no antialiasing, but this works poorly on devicePixelRatio != 1 in Chrome */
+  /*
+    -webkit-font-smoothing: none;
+    font-smooth: never;
+  */
 }
 
 .overlay-bounds {
@@ -35,8 +50,9 @@ html, body {
 
 #scene-info-overlay {
   position: absolute;
-  left: 1px;
-  top: 1px;
+  /* This offset is the same as the “in-engine” text renderers use for the info text. */
+  left: 5px;
+  top: 5px;
 }
 
 /* --- main UI layout --- */

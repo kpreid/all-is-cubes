@@ -612,12 +612,20 @@ fn build_web(context: &Context<'_>, profile: Profile) -> Result<(), ActionError>
         )?;
     }
 
+    // Copy the font used for HTML text (borrowed from test expectations so we don't have to
+    // also run the exporter for it).
+    copy_file_with_context(
+        &PROJECT_DIR.join("all-is-cubes-port/tests/port-files/ttf/expected/system16.ttf"),
+        &web_client_dir.join("system16.ttf"),
+    )?;
+
     // Warn of unexpected files.
     // (In the future with more confidence, perhaps we should delete them.)
     let extra_dest_files = directory_tree_contents(static_web_app_out_dir, static_web_app_out_dir)?
         .difference(
             &wasm_pack_output_files
                 .into_iter()
+                .chain([PathBuf::from("system16.ttf")])
                 .map(|p| Path::new("client/").join(p))
                 .collect(),
         )
