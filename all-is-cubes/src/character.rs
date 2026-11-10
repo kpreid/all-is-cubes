@@ -634,7 +634,7 @@ impl Transaction for CharacterTransaction {
         <BodyTransaction as Transaction>::CommitCheck,
         <InventoryTransaction as Transaction>::CommitCheck,
     );
-    type Output = transaction::NoOutput;
+    type Output = !;
     type Mismatch = CharacterTransactionMismatch;
 
     fn check(

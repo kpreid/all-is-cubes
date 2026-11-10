@@ -62,6 +62,8 @@ pub trait Transaction: Merge {
     /// The [`Transaction`] trait imposes no requirements on this value, but it may be
     /// a change-notification message which could be redistributed via the target's
     /// owner's [`Notifier`](crate::listen::Notifier).
+    ///
+    /// If a transaction never produces any outputs, it should use `type Output = !`.
     type Output;
 
     /// Error type describing a precondition not met, returned by [`Self::check()`].
@@ -440,8 +442,7 @@ pub trait Transactional {
             &mut Self::Transaction,
             &Self,
         ) -> Result<O, <Self::Transaction as Merge>::Conflict>,
-        Self::Transaction:
-            Transaction<Target = Self, Context<'c> = (), Output = NoOutput> + Default,
+        Self::Transaction: Transaction<Target = Self, Context<'c> = (), Output = !> + Default,
     {
         let mut transaction = Self::Transaction::default();
         let output = f(&mut transaction, self).map_err(ExecuteError::Merge)?;
@@ -450,9 +451,6 @@ pub trait Transactional {
     }
 }
 
-/// Type of `Output` for a [`Transaction`] that never produces any outputs.
-pub type NoOutput = !;
-
 /// Output callback function for committing a [`Transaction`] whose `Output` type is
-/// [`NoOutput`] and therefore cannot produce any outputs.
-pub fn no_outputs(_: NoOutput) {}
+/// [`!`] and therefore cannot produce any outputs.
+pub fn no_outputs(_: !) {}

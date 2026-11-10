@@ -573,7 +573,7 @@ impl Transaction for BlockDefTransaction {
     type Target = BlockDef;
     type Context<'a> = ReadTicket<'a>;
     type CommitCheck = Check;
-    type Output = transaction::NoOutput;
+    type Output = !;
     type Mismatch = BlockDefMismatch;
 
     fn check(

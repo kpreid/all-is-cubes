@@ -589,7 +589,7 @@ impl<H: Host> Transaction for BehaviorSetTransaction<H> {
     type Target = BehaviorSet<H>;
     type Context<'a> = ();
     type CommitCheck = CommitCheck;
-    type Output = transaction::NoOutput;
+    type Output = !;
     type Mismatch = BehaviorTransactionMismatch;
 
     fn check(

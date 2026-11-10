@@ -17,7 +17,7 @@ use crate::space::{
     self, ActivatableRegion, GridAab, Mutation, PendingEvaluation, SetCubeError, Space,
 };
 use crate::transaction::{
-    CommitError, Equal, ExecuteError, Merge, NoOutput, Transaction, Transactional, no_outputs,
+    CommitError, Equal, ExecuteError, Merge, Transaction, Transactional, no_outputs,
 };
 use crate::universe::{self, ReadTicket};
 use crate::util::{ConciseDebug, Refmt as _};
@@ -332,7 +332,7 @@ impl Transaction for SpaceTransaction {
     type Target = Space;
     type Context<'a> = ReadTicket<'a>;
     type CommitCheck = CommitCheck;
-    type Output = NoOutput;
+    type Output = !;
     type Mismatch = SpaceTransactionMismatch;
 
     fn check(

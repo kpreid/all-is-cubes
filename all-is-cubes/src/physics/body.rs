@@ -460,7 +460,7 @@ impl Transaction for BodyTransaction {
     type Target = Body;
     type Context<'a> = ();
     type CommitCheck = ();
-    type Output = transaction::NoOutput;
+    type Output = !;
     type Mismatch = BodyMismatch;
 
     fn check(

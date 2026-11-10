@@ -208,7 +208,7 @@ where
     type Target = ecs::World;
     type Context<'a> = ReadTicket<'a>;
     type CommitCheck = <O::Transaction as Transaction>::CommitCheck;
-    type Output = transaction::NoOutput;
+    type Output = !;
     type Mismatch = MismatchOrHandleError<O::Transaction>;
 
     fn check(
@@ -842,7 +842,7 @@ impl Transaction for UniverseTransaction {
     type Target = Universe;
     type Context<'a> = ();
     type CommitCheck = UniverseCommitCheck;
-    type Output = transaction::NoOutput;
+    type Output = !;
     type Mismatch = UniverseMismatch;
 
     fn check(

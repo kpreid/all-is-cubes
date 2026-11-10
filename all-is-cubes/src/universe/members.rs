@@ -379,7 +379,7 @@ macro_rules! member_enums_and_impls {
             type Target = ecs::World;
             type Context<'a> = ReadTicket<'a>;
             type CommitCheck = ut::AnyTransactionCheck;
-            type Output = transaction::NoOutput;
+            type Output = !;
             type Mismatch = AnyTransactionMismatch;
 
             fn check(

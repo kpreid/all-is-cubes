@@ -5,7 +5,7 @@ use core::mem;
 
 use bevy_ecs::prelude as ecs;
 
-use crate::transaction::{self, Equal, Merge, NoOutput, Transaction};
+use crate::transaction::{self, Equal, Merge, Transaction};
 use crate::universe;
 
 // -------------------------------------------------------------------------------------------------
@@ -191,14 +191,14 @@ macro_rules! impl_transaction_for_tuple {
             impl<$( [<Tr $name>] ),*>
                 Transaction for ($( [<Tr $name>], )*)
             where
-                $( [<Tr $name>]: Transaction<Output = NoOutput>  ),*
+                $( [<Tr $name>]: Transaction<Output = !>  ),*
             {
                 type Target = ($( [<Tr $name>]::Target, )*);
                 type Context<'a> = ($( [<Tr $name>]::Context<'a>, )*);
                 type CommitCheck = (
                     $( <[<Tr $name>] as Transaction>::CommitCheck, )*
                 );
-                type Output = NoOutput;
+                type Output = !;
                 type Mismatch = [< TupleError $count >]<
                     $( <[<Tr $name >] as Transaction>::Mismatch, )*
                 >;

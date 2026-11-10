@@ -111,6 +111,7 @@
     * `math::GridMatrix` has been removed.
       Use `Gridgid` (for rigid transformations) or `euclid::Transform3D` (for matrices) instead.
     * `space::PackedLight` no longer implements `From<Rgb>`. There is currently no replacement.
+    * `transaction::NoOutput` has been removed. Use the `!` type instead.
 
 * `all-is-cubes-mesh` library:
     * `dynamic::ChunkMesh::mesh()` has been replaced by `meta()`, which returns `MeshMeta` instead of `SpaceMesh`. Access to the `SpaceMesh` is no longer possible except through `dynamic::RenderDataUpdate`.
