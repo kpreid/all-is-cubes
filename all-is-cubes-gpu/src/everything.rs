@@ -7,7 +7,8 @@ use core::mem;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{Size2D, Vector2D};
-use all_is_cubes::math::Rgba;
+use all_is_cubes::listen;
+use all_is_cubes::math::{PositiveSign, Rgba};
 use all_is_cubes::time;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::Executor;
@@ -53,6 +54,11 @@ pub(super) struct EverythingRenderer {
     staging_belt: wgpu::util::StagingBelt,
 
     pub(crate) cameras: StandardCameras,
+
+    /// Maximum color channel value to be present in the resulting images.
+    ///
+    /// The minimum of this value and [`GraphicsOptions::maximum_intensity`] is used.
+    maximum_intensity_source: listen::DynSource<PositiveSign<f32>>,
 
     /// Surface configuration maintained to match the viewport.
     config: wgpu::SurfaceConfiguration,
@@ -105,6 +111,7 @@ impl fmt::Debug for EverythingRenderer {
             device,
             staging_belt,
             cameras,
+            maximum_intensity_source: _,
             config,
             fb: _,
             shaders: _,
@@ -171,6 +178,7 @@ impl EverythingRenderer {
         queue: &wgpu::Queue,
         cameras: StandardCameras,
         (surface_format, color_space): (wgpu::TextureFormat, wgpu::SurfaceColorSpace),
+        maximum_intensity_source: listen::DynSource<PositiveSign<f32>>,
         adapter: &wgpu::Adapter,
     ) -> Self {
         let viewport = cameras.viewport();
@@ -290,6 +298,7 @@ impl EverythingRenderer {
             device,
             config,
             cameras,
+            maximum_intensity_source,
             shaders,
             pipelines,
         };
@@ -711,7 +720,7 @@ impl EverythingRenderer {
             &postprocess::PostprocessUniforms::from_options(
                 self.cameras.graphics_options(),
                 self.cameras.viewport(),
-                self.fb.config().maximum_intensity,
+                self.maximum_intensity_source.get(),
                 self.fb.config().output_color_space,
                 self.info_text_coordinate_scale,
                 &self.pipelines.info_text_font_metrics,

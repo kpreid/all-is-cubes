@@ -9,6 +9,7 @@ use futures_core::future::BoxFuture;
 
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen;
+use all_is_cubes::math::ps32;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::Executor;
 use all_is_cubes_render::camera::{ImageSize, Layers, StandardCameras, Viewport};
@@ -85,6 +86,7 @@ impl Builder {
                 wgpu::TextureFormat::Rgba8UnormSrgb,
                 wgpu::SurfaceColorSpace::Srgb,
             ),
+            listen::constant(ps32(1.0)),
             &self.adapter,
         );
 

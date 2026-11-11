@@ -481,22 +481,31 @@ fn handle_window_event<Ren: RendererToWinit>(
                 dsession.window.window.scale_factor(),
                 physical_size,
             ));
+            dsession.renderer.refresh_display_hdr_info();
         }
         WindowEvent::ScaleFactorChanged {
             scale_factor,
             inner_size_writer: _,
-        } => dsession.viewport_cell.set(physical_size_to_viewport(
-            scale_factor,
-            dsession.window.window.inner_size(),
-        )),
+        } => {
+            dsession.viewport_cell.set(physical_size_to_viewport(
+                scale_factor,
+                dsession.window.window.inner_size(),
+            ));
+            dsession.renderer.refresh_display_hdr_info();
+        }
         WindowEvent::Focused(has_focus) => {
             input_processor.key_focus(has_focus);
+            dsession.renderer.refresh_display_hdr_info();
         }
         WindowEvent::Occluded(occluded) => {
             dsession.window.occluded = occluded;
+            dsession.renderer.refresh_display_hdr_info();
             if !occluded {
                 dsession.window.window.request_redraw();
             }
+        }
+        WindowEvent::Moved(_) => {
+            dsession.renderer.refresh_display_hdr_info();
         }
 
         // File drop
@@ -510,7 +519,6 @@ fn handle_window_event<Ren: RendererToWinit>(
 
         // Unused
         WindowEvent::ActivationTokenDone { .. } => {}
-        WindowEvent::Moved(_) => {}
         WindowEvent::Destroyed => {}
         WindowEvent::TouchpadPressure { .. } => {}
         WindowEvent::AxisMotion { .. } => {}
@@ -534,6 +542,8 @@ pub trait RendererToWinit: crate::glue::Renderer + 'static {
     fn cameras(&self) -> &StandardCameras;
     #[doc(hidden)]
     fn redraw(&mut self, session: &Session, window: &Window);
+    #[doc(hidden)]
+    fn refresh_display_hdr_info(&mut self);
 }
 
 impl RendererToWinit for SurfaceRenderer {
@@ -562,5 +572,9 @@ impl RendererToWinit for SurfaceRenderer {
                 || window.pre_present_notify(),
             )
             .unwrap();
+    }
+
+    fn refresh_display_hdr_info(&mut self) {
+        self.refresh_display_hdr_info(); // calling inherent method
     }
 }

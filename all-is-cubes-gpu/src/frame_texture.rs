@@ -1,7 +1,6 @@
 use core::fmt;
 use core::sync::atomic::AtomicBool;
 
-use all_is_cubes::math::{PositiveSign, ps32};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{GraphicsOptions, ImageSize};
 
@@ -417,11 +416,6 @@ pub(crate) struct FbtConfig {
     /// Size of all textures and the surface.
     pub(crate) size: wgpu::Extent3d,
 
-    /// If the surface is known or guessed to support HDR,
-    /// this is the maximum color channel value that should be produced.
-    /// This is used as an upper bound on [`GraphicsOptions::maximum_intensity`].
-    pub(crate) maximum_intensity: PositiveSign<f32>,
-
     /// Texture format of the `linear_scene` and `linear_scene_resolved`.
     ///
     /// This is a floating-point format in order to support HDR rendering, *if* the
@@ -455,15 +449,6 @@ impl FbtConfig {
             depth_or_array_layers: 1,
         };
 
-        // TODO: surface format doesn't *actually* mean we have HDR hardware, and doesn't tell us
-        // what the actual range is; we should be fetching actual monitor information, but there
-        // is no API in wgpu (or winit or anything else involved) to do that yet.
-        let maximum_intensity = match surface_config.format {
-            wgpu::TextureFormat::Rgba16Float => ps32(10.0),
-            wgpu::TextureFormat::Rgba32Float => ps32(10.0),
-            _ => ps32(1.0),
-        };
-
         let wants_antialiasing = options.antialiasing.is_msaa();
         let sample_count_if_ok = if wants_antialiasing { 4 } else { 1 };
         // TODO: define a "wants_hdr" once we have sorted out how graphics options work for that
@@ -482,7 +467,6 @@ impl FbtConfig {
                 Self {
                     features,
                     size,
-                    maximum_intensity,
                     linear_scene_texture_format: wgpu::TextureFormat::Rgba16Float,
                     output_color_space: surface_config.color_space,
                     sample_count: sample_count_if_ok,
@@ -494,7 +478,6 @@ impl FbtConfig {
                 Self {
                     features,
                     size,
-                    maximum_intensity,
                     linear_scene_texture_format: wgpu::TextureFormat::Rgba16Float,
                     output_color_space: surface_config.color_space,
                     sample_count: 1,
@@ -512,7 +495,6 @@ impl FbtConfig {
             Self {
                 features,
                 size,
-                maximum_intensity,
                 linear_scene_texture_format: wgpu::TextureFormat::Rgba8UnormSrgb,
                 output_color_space: surface_config.color_space,
                 sample_count: if features.rgba8_can_multisample {

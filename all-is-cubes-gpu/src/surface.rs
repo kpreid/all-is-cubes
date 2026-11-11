@@ -7,6 +7,7 @@ use wgpu::TextureViewDescriptor;
 
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen;
+use all_is_cubes::math::{PositiveSign, ps32};
 use all_is_cubes::time;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::Executor;
@@ -35,11 +36,18 @@ pub struct SurfaceRenderer {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
+    adapter: wgpu::Adapter,
 
     everything: EverythingRenderer,
 
     /// True if we need to reconfigure the surface.
     need_surface_reconfiguration: listen::Flag,
+
+    /// Cache of the maximum HDR color channel value obtained from the surface.
+    ///
+    /// When rendering, the minimum of this value and [`GraphicsOptions::maximum_intensity`]
+    /// is used.
+    maximum_intensity: listen::Cell<PositiveSign<f32>>,
 }
 
 impl SurfaceRenderer {
@@ -63,13 +71,22 @@ impl SurfaceRenderer {
         ));
         let (device, queue) = request_device_future.await?;
 
+        let surface_format_and_color_space =
+            choose_surface_format_and_color_space(&surface.get_capabilities(&adapter));
+        let maximum_intensity = listen::Cell::new(compute_maximum_intensity(
+            surface_format_and_color_space.0,
+            &surface,
+            &adapter,
+        ));
         let viewport_source = cameras.viewport_source();
+
         let everything = EverythingRenderer::new(
             executor,
             device.clone(),
             &queue,
             cameras,
-            choose_surface_format_and_color_space(&surface.get_capabilities(&adapter)),
+            surface_format_and_color_space,
+            maximum_intensity.as_source(),
             &adapter,
         );
 
@@ -79,6 +96,8 @@ impl SurfaceRenderer {
             surface,
             device,
             queue,
+            maximum_intensity,
+            adapter,
         })
     }
 
@@ -218,6 +237,18 @@ impl SurfaceRenderer {
         Ok(info)
     }
 
+    /// Calls [`wgpu::Surface::display_hdr_info()`] and update tone mapping behavior accordingly.
+    ///
+    /// Call this function when you have evidence that the display behavior may have changed, such
+    /// as the window being moved to another monitor.
+    pub fn refresh_display_hdr_info(&mut self) {
+        self.maximum_intensity.set_if_unequal(compute_maximum_intensity(
+            self.everything.config().format,
+            &self.surface,
+            &self.adapter,
+        ));
+    }
+
     /// Activate logging performance information state to a Rerun stream.
     #[cfg(feature = "rerun")]
     pub fn log_to_rerun(&mut self, destination: rg::RootDestination, filter: RerunFilter) {
@@ -310,4 +341,25 @@ fn choose_surface_format_and_color_space(
     );
 
     (best_format, chosen_color_space)
+}
+
+fn compute_maximum_intensity(
+    surface_format: wgpu::TextureFormat,
+    surface: &wgpu::Surface<'_>,
+    adapter: &wgpu::Adapter,
+) -> PositiveSign<f32> {
+    let texture_format_supports_greater_than_1 = matches!(
+        surface_format,
+        wgpu::TextureFormat::Rgba16Float | wgpu::TextureFormat::Rgba32Float
+    );
+
+    if texture_format_supports_greater_than_1 {
+        surface
+            .display_hdr_info(adapter)
+            .tone_map_headroom()
+            .and_then(|hr| PositiveSign::<f32>::try_from(hr).ok())
+            .unwrap_or(ps32(10.0))
+    } else {
+        ps32(1.0)
+    }
 }
