@@ -124,7 +124,6 @@ impl DepthOrdering {
     /// If `geometry_bounds` [is empty][Aabb::EMPTY], then returns [`Aabb::EVERYWHERE`].
     /// This lacks the consistency property, but is overall simpler and agrees with the
     /// behavior of [`TransparentMeta::depth_sort_validity`].
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn region_of_applicability(self, geometry_bounds: Aabb) -> Aabb {
         if geometry_bounds.is_empty() {
             return Aabb::EVERYWHERE;

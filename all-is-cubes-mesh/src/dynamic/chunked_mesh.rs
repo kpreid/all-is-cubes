@@ -5,12 +5,17 @@ use core::mem;
 use descriptive_unwrap::OptionExt as _;
 use hashbrown::hash_map::Entry;
 use indoc::indoc;
+use ordered_float::NotNan;
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{ParallelBridge, ParallelIterator as _};
 
 use all_is_cubes::chunking::{ChunkChart, ChunkPos, cube_to_chunk, point_to_chunk};
+use all_is_cubes::euclid::{Box3D, Point3D, Translation3D, point3};
 use all_is_cubes::listen::{self, Listen as _};
-use all_is_cubes::math::{Cube, Face, FreeCoordinate, GridCoordinate, OctantMask, lines};
+use all_is_cubes::math::lines::Wireframe as _;
+use all_is_cubes::math::{
+    Aab, Cube, Face, FreeCoordinate, GridAab, GridCoordinate, OctantMask, lines, rgba_const,
+};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
@@ -23,7 +28,7 @@ use crate::dynamic::blocks::InstanceMesh;
 use crate::dynamic::chunk::ChunkTodoState;
 use crate::dynamic::{self, ChunkMesh, ChunkTodo, DynamicMeshTypes};
 use crate::heap::HeapUsage as _;
-use crate::{DepthOrdering, DepthSortInfo, DepthSortResult, MeshOptions};
+use crate::{Aabb, DepthOrdering, DepthSortInfo, DepthSortResult, MeshOptions, MeshRel};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -72,6 +77,13 @@ where
     /// The chunk in which the last [`Camera`] provided is located.
     view_chunk: ChunkPos<CHUNK_SIZE>,
 
+    /// Bounding box of view positions in which [`Self::update()`] does not need to repeat any
+    /// view-dependent work (it only needs to account for changes in `self.space`)
+    /// and need not be called again.
+    ///
+    /// This box is computed from the current view chunk and the depth sorting requirements.
+    eye_region: EyeRegion,
+
     /// Whether, on the previous frame, we did not finish updating all visible chunks.
     ///
     /// If so, then we prioritize adding new chunks over updating existing ones,
@@ -116,6 +128,7 @@ where
             chunks: Default::default(),
             chunk_chart: ChunkChart::new(0.0),
             view_chunk: ChunkPos(Cube::new(0, 0, 0)),
+            eye_region: EyeRegion::EMPTY,
             did_not_finish_chunks: true,
             install_listener: true,
             startup_chunks_only: interactive,
@@ -272,6 +285,10 @@ where
             chunk_todo: ChunkTodo,
             chunk_mesh: ChunkMesh<M, CHUNK_SIZE>,
 
+            /// If the update found transparent content, this is set to `Some` to indicate the
+            /// volume in which that transparent content is properly depth-sorted.
+            has_view_dependence: Option<EyeRegion>,
+
             mesh_generation_time: TimeStats,
             mesh_callback_time: TimeStats,
             instance_generation_time: TimeStats,
@@ -286,6 +303,7 @@ where
 
         let Some(view_chunk) = point_to_chunk(view_point) else {
             // TODO: report error
+            // TODO: This is missing the non-timing information that would normally be reported
             return (
                 CsmUpdateInfo {
                     prep_time: time::Instant::now().saturating_duration_since(update_start_time),
@@ -301,6 +319,7 @@ where
 
         let Ok(ref space) = self.space.read(read_ticket) else {
             // TODO: report error
+            // TODO: This is missing the non-timing information that would normally be reported
             return (
                 CsmUpdateInfo {
                     prep_time: time::Instant::now().saturating_duration_since(update_start_time),
@@ -375,6 +394,12 @@ where
             });
         }
 
+        // Compute the new value of `self.eye_region`.
+        // First, we limit it to the `view_chunk`, because outside that region, we will need to
+        // update additional chunks; then as chunks are checked or updated, we constrain it
+        // to the `global_depth_sort_validity()` of those chunks.
+        let mut new_eye_region: EyeRegion = EyeRegion::from(view_chunk.bounds());
+
         // This iterator iterates over chunks to be updated, *removing* them from `self.chunks`
         // (so that they can be processed in parallel).
         let space_bounds_in_chunks = space.bounds().divide(CHUNK_SIZE);
@@ -427,19 +452,26 @@ where
                 //
                 // TODO: We could also do frustum culling here, and prioritize sorting
                 // chunks that are unsorted and visible.
-                if let Entry::Occupied(chunk_mesh_oe) = &chunk_mesh_entry
+                let depends_on_depth_ordering = if let Entry::Occupied(chunk_mesh_oe) =
+                    &chunk_mesh_entry
                     && let chunk_mesh = chunk_mesh_oe.get()
                     && let lbb = chunk_mesh.mesh_local_bounding_box().transparent
                     && let relative_view_point =
                         chunk_mesh.mesh_origin().inverse().transform_point3d(&view_point)
                     && let depth_ordering =
                         DepthOrdering::from_view_of_aabb(relative_view_point, lbb)
-                    && chunk_mesh
+                {
+                    if chunk_mesh
                         .meta()
                         .needs_depth_sorting(depth_ordering, relative_view_point.to_f32())
-                {
-                    chunk_todo.needs_depth_sort = Some(depth_ordering);
-                }
+                    {
+                        chunk_todo.needs_depth_sort = Some(depth_ordering);
+                    }
+
+                    Some(depth_ordering)
+                } else {
+                    None
+                };
 
                 // Decide whether to update the chunk
                 let should_update_chunk = (chunk_todo.is_not_clean()
@@ -456,6 +488,7 @@ where
                         chunk_pos,
                         chunk_todo,
                         chunk_mesh,
+                        has_view_dependence: None,
                         mesh_generation_time: TimeStats::default(),
                         mesh_callback_time: TimeStats::default(),
                         instance_generation_time: TimeStats::default(),
@@ -463,7 +496,20 @@ where
                         depth_sort_time: TimeStats::default(),
                     })
                 } else {
+                    // Put chunk_todo back.
                     todo.chunks.insert(chunk_pos, chunk_todo);
+
+                    // This chunk is not being updated, so we can use its existing depth sort
+                    // validity.
+                    if let Entry::Occupied(chunk_mesh_oe) = &chunk_mesh_entry
+                        && let chunk_mesh = chunk_mesh_oe.get()
+                        && let Some(depth_ordering) = depends_on_depth_ordering
+                        && let Some(additional_constraint) =
+                            chunk_mesh.global_depth_sort_validity(depth_ordering)
+                    {
+                        new_eye_region = new_eye_region.intersection(&additional_constraint);
+                    }
+
                     None
                 }
             });
@@ -488,12 +534,14 @@ where
                 );
             let compute_end_depth_sort_start = time::Instant::now();
 
-            if actually_changed_mesh {
+            let transparent_bounding_box = state.chunk_mesh.mesh_local_bounding_box().transparent;
+
+            if actually_changed_mesh && !transparent_bounding_box.is_empty() {
                 // If we rebuilt the mesh then we need a new depth sort,
                 // whether or not we planned on one.
                 state.chunk_todo.needs_depth_sort = Some(DepthOrdering::from_view_of_aabb(
                     state.chunk_mesh.mesh_origin().inverse().transform_point3d(&view_point),
-                    state.chunk_mesh.mesh_local_bounding_box().transparent,
+                    transparent_bounding_box,
                 ));
             }
 
@@ -506,7 +554,19 @@ where
                     state.chunk_mesh.depth_sort_for_view(ordering, view_point);
                 actually_sorted_indices = changed;
                 state.depth_sort_info += info;
+
+                state.has_view_dependence = state.chunk_mesh.global_depth_sort_validity(ordering);
+            } else {
+                if !transparent_bounding_box.is_empty() {
+                    let ordering = DepthOrdering::from_view_of_aabb(
+                        state.chunk_mesh.mesh_origin().inverse().transform_point3d(&view_point),
+                        transparent_bounding_box,
+                    );
+                    state.has_view_dependence =
+                        state.chunk_mesh.global_depth_sort_validity(ordering);
+                }
             }
+
             let depth_sort_end_update_start = time::Instant::now();
 
             // Update render data, if we made any changes requiring it.
@@ -580,6 +640,7 @@ where
             chunk_pos,
             chunk_todo,
             chunk_mesh,
+            has_view_dependence,
             mesh_generation_time,
             mesh_callback_time,
             instance_generation_time,
@@ -587,14 +648,21 @@ where
             depth_sort_time,
         } in to_put_back
         {
+            if let Some(bb) = has_view_dependence {
+                new_eye_region = new_eye_region.intersection(&bb)
+            }
+
             self.chunks.insert(chunk_pos, chunk_mesh);
             todo.chunks.insert(chunk_pos, chunk_todo);
+
             chunk_mesh_generation_times += mesh_generation_time;
             chunk_mesh_callback_times += mesh_callback_time;
             chunk_instance_generation_times += instance_generation_time;
             chunk_depth_sort_info += depth_sort_info;
             chunk_depth_sort_times += depth_sort_time;
         }
+
+        self.eye_region = new_eye_region;
 
         // Record outcome of processing.
         self.did_not_finish_chunks =
@@ -643,6 +711,7 @@ where
         (
             CsmUpdateInfo {
                 flaws,
+                eye_region: self.eye_region,
                 total_time: end_all_time.saturating_duration_since(update_start_time),
                 prep_time: prep_to_update_meshes_time.saturating_duration_since(update_start_time),
                 chunk_scan_time: end_all_time
@@ -699,6 +768,11 @@ where
         for chunk_mesh in self.iter_in_view(camera) {
             chunk_mesh.chunk.chunk_debug_lines(camera, output);
         }
+
+        self.eye_region.wireframe_points(&mut lines::colorize(
+            output,
+            rgba_const!(1.0, 0.0, 0.0, 1.0),
+        ));
     }
 
     /// Activate logging performance information as time series to a Rerun stream.
@@ -730,6 +804,9 @@ pub struct CsmUpdateInfo {
     /// Note that this does not include mesh flaws; the caller must gather those when
     /// drawing the chunks.
     pub flaws: Flaws,
+    /// Bounding box of view positions in which [`ChunkedSpaceMesh::update()`] does not
+    /// need to repeat any view-dependent work and need not be called again.
+    eye_region: EyeRegion,
     /// Total time spent on the update.
     pub total_time: Duration,
     /// Time spent on gathering information before starting the chunk scan.
@@ -766,6 +843,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         let CsmUpdateInfo {
             flaws,
+            eye_region,
             total_time: _,
             prep_time,
             chunk_scan_time,
@@ -795,9 +873,11 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                       inst gen {chunk_instance_generation_times}
                       Z sort   {depth_sort_times} ({elements_sorted:6} elems grouped in {groups_sorted:3} dyn + {static_groups_sorted:3} static)
                       upload   {chunk_mesh_callback_times}
+                Eye region: {eye_region}
                 Mem: {block_mib} MiB for {block_count} blocks, {chunk_mib} MiB for {chunk_count} chunks\
             "},
             flaws = flaws,
+            eye_region = eye_region.refmt(fopt),
             prep_time = prep_time.refmt(fopt),
             block_updates = block_updates.refmt(fopt),
             chunk_scan_time = chunk_scan_time.refmt(fopt),
@@ -824,6 +904,7 @@ impl CsmUpdateInfo {
     fn add_second_pass(&mut self, other: Self) {
         let Self {
             flaws,
+            eye_region,
             total_time,
             prep_time,
             chunk_scan_time,
@@ -839,6 +920,7 @@ impl CsmUpdateInfo {
             chunk_total_cpu_byte_size,
         } = self;
         *flaws = other.flaws; // replace!
+        *eye_region = other.eye_region; // replace!
         *total_time += other.total_time;
         *prep_time += other.prep_time;
         *chunk_scan_time += other.chunk_scan_time;
@@ -957,4 +1039,107 @@ pub struct InViewChunkRef<'a, M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordin
     pub mesh_in_view: bool,
     /// Whether any of the chunk’s [`ChunkMesh::block_instances()`] are in view of the camera.
     pub instances_in_view: bool,
+}
+
+// -------------------------------------------------------------------------------------------------
+
+// SAFETY: Infinity is not NaN, so it is permitted.
+const NN_INF: NotNan<FreeCoordinate> = unsafe { NotNan::new_unchecked(f64::INFINITY) };
+// SAFETY: Infinity is not NaN, so it is permitted.
+const NN_NEG_INF: NotNan<FreeCoordinate> = unsafe { NotNan::new_unchecked(f64::NEG_INFINITY) };
+
+/// The set of viewpoints for which a [`ChunkedSpaceMesh`] is ready for rendering
+/// and does not need to be [updated][ChunkedSpaceMesh::update] again.
+//---
+// Design note: The coordinates are `FreeCoordinate`/`f64` in order to have enough precision
+// for long-distance accuracy, since this is a world-space position rather than a mesh-relative
+// one. If we ever switch to using fixed-point coordinates for world space, this is one of the
+// places that should change.
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub(in crate::dynamic) struct EyeRegion(pub(in crate::dynamic) Box3D<NotNan<FreeCoordinate>, Cube>);
+
+impl EyeRegion {
+    pub const EMPTY: Self = Self(Box3D::new(
+        point3(NN_INF, NN_INF, NN_INF),
+        point3(NN_NEG_INF, NN_NEG_INF, NN_NEG_INF),
+    ));
+
+    pub(crate) fn from_mesh_local(
+        mesh_origin: Translation3D<FreeCoordinate, MeshRel, Cube>,
+        local_depth_sort_validity: Aabb,
+    ) -> EyeRegion {
+        // In principle, this should make sure that the translation arithmetic always rounds
+        // inward. In practice, it is probably unnecessary.
+        EyeRegion(
+            mesh_origin
+                .transform_box3d(&Box3D::<f64, MeshRel>::from(local_depth_sort_validity))
+                .try_cast()
+                .none_is_unreachable(),
+        )
+    }
+
+    pub fn intersection(&self, other: &Self) -> Self {
+        match self.0.intersection(&other.0) {
+            Some(b) => EyeRegion(b),
+            None => EyeRegion::EMPTY,
+        }
+    }
+
+    fn fmt_common(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self(Box3D {
+            min:
+                Point3D {
+                    x: lx,
+                    y: ly,
+                    z: lz,
+                    ..
+                },
+            max:
+                Point3D {
+                    x: hx,
+                    y: hy,
+                    z: hz,
+                    ..
+                },
+        }) = self;
+        write!(
+            f,
+            "({lx:+6.1}..{hx:+6.1}, {ly:+6.1}..{hy:+6.1}, {lz:+6.1}..{hz:+6.1})"
+        )
+    }
+}
+
+impl Default for EyeRegion {
+    fn default() -> Self {
+        Self::EMPTY
+    }
+}
+
+impl From<GridAab> for EyeRegion {
+    fn from(value: GridAab) -> Self {
+        // lossless conversion from i32 to f64
+        Self(Box3D::from(value).cast::<NotNan<f64>>())
+    }
+}
+
+impl lines::Wireframe for EyeRegion {
+    fn wireframe_points<E: Extend<[lines::Vertex; 2]>>(&self, output: &mut E) {
+        let b = self.0.to_f64();
+        if let Some(aab) = Aab::checked_from_lower_upper(b.min, b.max) {
+            aab.wireframe_points(output)
+        }
+        // else the box is empty
+    }
+}
+
+impl fmt::Debug for EyeRegion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.fmt_common(f)
+    }
+}
+
+impl Fmt<StatusText> for EyeRegion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+        self.fmt_common(f)
+    }
 }

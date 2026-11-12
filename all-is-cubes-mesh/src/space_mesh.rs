@@ -872,6 +872,20 @@ impl<M: MeshTypes> MeshMeta<M> {
         self.ngm.needs_depth_sorting_somewhere()
     }
 
+    /// Returns the region for which this mesh has been depth sorted.
+    ///
+    /// Special cases of note:
+    ///
+    /// * The result is [`Aabb::EMPTY`] if sorting has not yet been performed.
+    /// * The result is [`Aabb::EVERYWHERE`] if the mesh has no content requiring sorting.
+    /// * Otherwise, it will always be bounded by the
+    ///   [volume `ordering` applies to][DepthOrdering::region_of_applicability].
+    #[cfg_attr(not(any(feature = "dynamic", test)), expect(dead_code))]
+    #[inline]
+    pub(crate) fn depth_sort_validity(&self, ordering: DepthOrdering) -> Aabb {
+        self.ngm.depth_sort_validity(ordering)
+    }
+
     /// Returns an iterator over all of the block indices in the [`Space`] that occurred
     /// in the region this mesh was constructed from.
     ///
@@ -936,6 +950,14 @@ impl MeshMetaNonGeneric {
     fn needs_depth_sorting(&self, ordering: DepthOrdering, view_position: Position) -> bool {
         let tm = &self.transparent[ordering.to_index()];
         tm.needs_static_sort() || !tm.depth_sort_validity.contains(view_position)
+    }
+
+    #[cfg_attr(not(any(feature = "dynamic", test)), expect(dead_code))]
+    #[inline]
+    fn depth_sort_validity(&self, ordering: DepthOrdering) -> Aabb {
+        self.transparent[ordering.to_index()]
+            .depth_sort_validity
+            .intersection(ordering.region_of_applicability(self.bounding_box.transparent))
     }
 
     #[inline]

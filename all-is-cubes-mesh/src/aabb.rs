@@ -168,13 +168,7 @@ impl Aabb {
     ///
     /// If the two boxes touch but have no common volume, then the result covers that surface.
     /// If the two boxes do not touch, then the result is [`Aabb::EMPTY`].
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "TODO: use this in global depth sort validity tracking"
-        )
-    )]
+    #[cfg_attr(not(feature = "dynamic"), expect(dead_code))]
     pub fn intersection(&self, other: Aabb) -> Aabb {
         let low = self.low.max(other.low);
         let high = self.high.min(other.high);

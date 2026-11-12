@@ -16,7 +16,8 @@ use all_is_cubes::time::Instant;
 use all_is_cubes::util::{ConciseDebug, Refmt as _};
 use all_is_cubes_render::camera::Camera;
 
-use crate::dynamic::{self, DynamicMeshTypes};
+use crate::aabb::Aabb;
+use crate::dynamic::{self, DynamicMeshTypes, EyeRegion};
 use crate::heap::HeapUsage;
 use crate::{
     BlockMesh, DepthOrdering, GetBlockMesh, MeshMeta, MeshOptions, MeshRel, Position, SpaceMesh,
@@ -167,6 +168,32 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
             self.mesh_origin().inverse().transform_point3d(&view_position),
             self.meta().bounding_box().transparent,
         )
+    }
+
+    /// Returns the bounding box, in world coordinates, of the region for which this chunk mesh is
+    /// known to be already depth-sorted.
+    ///
+    /// This may be used to generalize the results of [`Self::depth_ordering_for_view()`] to the
+    /// neighborhood of a view point.
+    ///
+    /// Returns [`None`] if sorting is not yet done (so there is no valid region regardless of
+    /// position) or if it is not required (so this chunk does not constrain the overall result).
+    pub(in crate::dynamic) fn global_depth_sort_validity(
+        &self,
+        ordering: DepthOrdering,
+    ) -> Option<EyeRegion>
+    where
+        M: DynamicMeshTypes,
+    {
+        let local_validity = self.meta().depth_sort_validity(ordering);
+        if local_validity.is_empty() || local_validity == Aabb::EVERYWHERE {
+            None
+        } else {
+            Some(EyeRegion::from_mesh_local(
+                self.mesh_origin(),
+                local_validity,
+            ))
+        }
     }
 
     pub(crate) fn borrow_for_update(
