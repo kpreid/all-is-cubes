@@ -1,4 +1,7 @@
-#![expect(unused_qualifications, reason = "derive macro false positive")]
+#![allow(
+    unused_qualifications,
+    reason = "derive macro false positive; TODO: remove after Rust 1.102 release"
+)]
 
 use core::f64::consts::TAU;
 
