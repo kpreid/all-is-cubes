@@ -29,7 +29,6 @@ session = [
     "dep:futures-task",
     "dep:futures-util",
     "dep:hashbrown", # for settings storage
-    "dep:scopeguard",
     "dep:serde", # for settings storage -- may be replaced
     "dep:strum", # for settings storage
     "dep:sync_wrapper",
@@ -57,7 +56,6 @@ mutants = { workspace = true }
 non_structural_derive = { workspace = true }
 num-traits = { workspace = true }
 paste = { workspace = true }
-scopeguard = { workspace = true, optional = true }
 serde = { workspace = true, optional = true, features = ["rc"] }
 # std feature is needed for parse errors to impl Display
 strum = { workspace = true, optional = true, features = ["std"] }

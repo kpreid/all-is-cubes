@@ -489,7 +489,7 @@ impl Session {
                 );
             }
             // Reset on drop even if the future panics
-            let _reset_on_drop = scopeguard::guard((), |()| {
+            let _reset_on_drop = mem::DropGuard::new((), |()| {
                 let mut shuttle_guard = match self.task_context_inner.write() {
                     Ok(g) => g,
                     Err(poisoned) => poisoned.into_inner(),

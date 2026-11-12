@@ -225,7 +225,6 @@ dependencies = [
  "non_structural_derive_macro",
  "num-traits",
  "paste",
- "scopeguard",
  "serde",
  "strum",
  "sync_wrapper",

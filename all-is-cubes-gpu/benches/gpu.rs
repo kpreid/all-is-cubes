@@ -2,6 +2,7 @@
 
 #![expect(clippy::unwrap_used, reason = "test")]
 
+use std::mem::DropGuard;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -157,7 +158,7 @@ fn light_benches(c: &mut Criterion, instance: &wgpu::Instance) {
             texture.forget_mapped();
             texture.ensure_mapped(&queue, &space.read(), bounds);
 
-            scopeguard::guard((), |()| {
+            DropGuard::new((), |()| {
                 // flush wgpu's buffering of copy commands (not sure if this is effective).
                 queue.submit([]);
             })
@@ -177,7 +178,7 @@ fn light_benches(c: &mut Criterion, instance: &wgpu::Instance) {
         b.iter_with_large_drop(|| {
             texture.update_scatter(&device, &queue, &space.read(), updates.iter().copied());
 
-            scopeguard::guard((), |()| {
+            DropGuard::new((), |()| {
                 // flush wgpu's buffering of copy commands (not sure if this is effective).
                 queue.submit([]);
             })
