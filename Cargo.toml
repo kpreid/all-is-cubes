@@ -197,6 +197,11 @@ unused_qualifications = "warn"
 # This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
 # unused_crate_dependencies = "warn"
 
+[workspace.lints.cargo]
+non_kebab_case_bins = "warn"
+non_kebab_case_features = "allow"
+non_kebab_case_packages = "warn"
+
 [workspace.lints.clippy]
 # clippy default lints that are set to allow
 bool_assert_comparison = "allow" # not necessarily clearer
