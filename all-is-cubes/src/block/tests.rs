@@ -18,7 +18,7 @@ use crate::math::{Face, GridRotation, Rgba, u32size};
 use crate::space::{Space, SpaceTransaction};
 use crate::time;
 use crate::transaction::{self, Transaction as _};
-use crate::universe::{Universe, UniverseTransaction};
+use crate::universe::{ReadTicket, Universe, UniverseTransaction};
 
 /// Just install a listener and discard the [`EvaluatedBlock`].
 ///
@@ -353,7 +353,6 @@ mod modify {
 mod txn {
     use super::*;
     use crate::transaction::{Merge, TransactionTester};
-    use crate::universe::ReadTicket;
     use pretty_assertions::assert_eq;
 
     #[test]

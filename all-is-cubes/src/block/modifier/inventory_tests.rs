@@ -7,6 +7,7 @@ use pretty_assertions::assert_eq;
 
 use crate::arcstr::literal;
 use crate::block::{self, Block, Resolution::*};
+use crate::content::make_some_blocks;
 use crate::euclid::{point3, vec3};
 use crate::math::{Face, Rgba, rgba_const};
 use crate::universe::ReadTicket;
@@ -69,4 +70,27 @@ fn inventory_preserves_attributes() {
             ..Default::default()
         }
     );
+}
+
+#[test]
+#[should_panic = "Evoxels contains out of bounds voxels"]
+fn icon_bounds_outside_block_bounds() {
+    let [some_block] = make_some_blocks();
+    let problem_block: Block = some_block
+        .clone()
+        .with_modifier(inv::InvInBlock::new(
+            1,
+            R1,
+            R16,
+            [inv::IconRow::new(0..1, point3(-1, -1, -1), vec3(0, 0, 0))],
+        ))
+        .with_modifier(inv::Inventory::from_slots([inv::Slot::stack(
+            1,
+            inv::Tool::Block(some_block),
+        )]));
+
+    problem_block.evaluate(ReadTicket::stub()).unwrap();
+
+    // TODO: assert the results of this evaluation, rather than just checking it doesn't panic,
+    // because we could use more coverage of these cases. (Or should these be render tests?)
 }
