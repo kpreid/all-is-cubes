@@ -73,7 +73,6 @@ fn inventory_preserves_attributes() {
 }
 
 #[test]
-#[should_panic = "Evoxels contains out of bounds voxels"]
 fn icon_bounds_outside_block_bounds() {
     let [some_block] = make_some_blocks();
     let problem_block: Block = some_block

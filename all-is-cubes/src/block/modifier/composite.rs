@@ -766,6 +766,7 @@ pub(in crate::block) fn render_inventory(
     // `InvInBlock::icon_positions()`. Its effect is largely to clone one `Arc<[IconRow]>`.
     let config = input.attributes().inventory.clone();
     let icon_size_in_resolution = GridCoordinate::from(config.icon_size_in_resolution());
+    let block_bounds = GridAab::for_block(config.render_resolution());
 
     for (slot_index, placed_icon_logical_bounds) in config.icon_positions(inventory.size()) {
         // TODO(inventory): icon_only_if_intrinsic is a kludge
@@ -791,13 +792,15 @@ pub(in crate::block) fn render_inventory(
                 + placed_icon_logical_bounds.lower_bounds().to_vector()
         };
 
-        // Intersection of `placed_icon_logical_bounds` with the data in `icon_evaluated`,
+        // Intersection of `placed_icon_logical_bounds` with the data in `icon_evaluated` and
+        // the bounds of the block,
         // in the coordinate system of the inventory-bearing block rather than the icon block.
         let Some(placed_icon_data_bounds) = GridAab::from_lower_upper(
             scale_from_icon_to_block(icon_evaluated.voxels().bounds().lower_bounds()),
             scale_from_icon_to_block(icon_evaluated.voxels().bounds().upper_bounds()),
         )
-        .intersection_cubes(placed_icon_logical_bounds) else {
+        .intersection_cubes(placed_icon_logical_bounds)
+        .and_then(|b| b.intersection_cubes(block_bounds)) else {
             // Icon’s data doesn't intersect the block's bounds.
             continue;
         };
