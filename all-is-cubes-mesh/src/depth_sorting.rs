@@ -88,6 +88,8 @@ impl DepthOrdering {
     ///
     /// The coordinate system used for the provided point and bounding box does not matter as
     /// long as they use the same one.
+    ///
+    /// If `geometry_bounds` is [empty][euclid::Box3D::is_empty], then returns an arbitrary value.
     pub fn from_view_of_aabb<U>(
         camera_position: euclid::Point3D<f64, U>,
         geometry_bounds: impl Into<euclid::Box3D<f64, U>>,
@@ -112,6 +114,38 @@ impl DepthOrdering {
             camera_position.to_untyped(),
             geometry_bounds.into().to_untyped(),
         )
+    }
+
+    /// Inverse of [`DepthOrdering::from_view_of_aabb()`]; returns the box containing all points
+    /// which would produce this ordering if passed as the `camera_position` to
+    /// [`DepthOrdering::from_view_of_aabb()`].
+    ///
+    /// If `geometry_bounds` is [`Aabb::EMPTY`], then returns either [`Aabb::EMPTY`] or
+    /// [`Aabb::EVERYWHERE`] such that it maintains consistency.
+    pub(crate) fn region_of_applicability(self, geometry_bounds: Aabb) -> Aabb {
+        if geometry_bounds.is_empty() {
+            // This condition must match the outcome of the branches in `from_view_of_aabb()`.
+            return if self == const { DepthOrdering(vec3(Rel::Lower, Rel::Lower, Rel::Lower)) } {
+                Aabb::EVERYWHERE
+            } else {
+                Aabb::EMPTY
+            };
+        }
+        let geometry_bounds = euclid::Box3D::from(geometry_bounds);
+        use crate::aabb::{NN_INF, NN_NEG_INF};
+        let mut region = Aabb::EVERYWHERE;
+        for axis in Axis::ALL {
+            match self.0[axis] {
+                Rel::Lower => region.set_axis_range(axis, NN_NEG_INF, geometry_bounds.min[axis]),
+                Rel::Higher => region.set_axis_range(axis, geometry_bounds.max[axis], NN_INF),
+                Rel::Within => region.set_axis_range(
+                    axis,
+                    geometry_bounds.min[axis],
+                    geometry_bounds.max[axis],
+                ),
+            }
+        }
+        region
     }
 
     /// Counts how many axes have the viewpoint within the bounding box when projected on that axis.
@@ -836,7 +870,7 @@ mod tests {
     use crate::SpaceMesh;
     use crate::testing::TextureMt;
     use all_is_cubes::block;
-    use all_is_cubes::euclid::point3;
+    use all_is_cubes::euclid::{Point3D, point3};
     use all_is_cubes::math::{Aab, Cube, GridAab};
     use all_is_cubes::space::Space;
     use alloc::format;
@@ -851,6 +885,42 @@ mod tests {
             ),
             "−W+"
         );
+    }
+
+    #[test]
+    fn ordering_region_consistency() {
+        let geometry_bounds = Aabb::from_iter([point3(1., 2., 3.), point3(4., 5., 6.)]);
+        for test_point in itertools::iproduct!(
+            // far below, zero, lower boundary, within the box, upper boundary, a position far above.
+            [-100.0, 0.0, 1.0, 2.0, 4.0, 100.0],
+            [-100.0, 0.0, 2.0, 3.0, 5.0, 100.0],
+            [-100.0, 0.0, 3.0, 4.0, 6.0, 100.0],
+        ) {
+            let test_point = Point3D::<f32, _>::from(test_point);
+            let ordering = DepthOrdering::from_view_of_aabb(test_point.to_f64(), geometry_bounds);
+            assert!(ordering.region_of_applicability(geometry_bounds).contains(test_point));
+        }
+    }
+
+    #[test]
+    fn ordering_when_geometry_bounds_is_empty() {
+        // We're testing the behavior with this box.
+        let geometry_bounds = Aabb::EMPTY;
+
+        // This is the arbitrary choice of ordering which we attribute to the empty box.
+        let ordering_found = DepthOrdering::from_view_of_aabb(point3(1., 2., 3.), geometry_bounds);
+
+        // Check that every ordering’s `region_of_applicability` agrees with this choice.
+        for other_ordering in DepthOrdering::exhaust() {
+            assert_eq!(
+                other_ordering.region_of_applicability(geometry_bounds),
+                if other_ordering == ordering_found {
+                    Aabb::EVERYWHERE
+                } else {
+                    Aabb::EMPTY
+                }
+            );
+        }
     }
 
     /// Generic tests for all cases can be confusing and themselves incorrect.

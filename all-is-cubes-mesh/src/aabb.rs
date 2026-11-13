@@ -14,7 +14,8 @@ use crate::{MeshRel, PosCoord, Position};
 
 /// Axis-Aligned Bounding Box of the vertices belonging to a mesh.
 ///
-/// This type is structurally identical to <code>[Option]&lt;[Box3D]&gt;</code>,
+/// This type’s set of possible values is equal to
+/// <code>[Option]&lt;[Box3D]&lt;[f32], [MeshRel]&gt;&gt;</code>,
 /// but has methods allowing it to be used more conveniently to manage the bounding box of a
 /// possibly-empty set of points (vertices). In particular, [`Aabb::union()`] combines two
 /// such possibly-absent boxes.
@@ -38,6 +39,8 @@ use crate::{MeshRel, PosCoord, Position};
 #[allow(clippy::exhaustive_enums)]
 pub(crate) struct Aabb {
     // If no points have been added, then this box's coordinates are inverted (+inf to -inf).
+    // No finite inverted boxes or partially-inverted boxes are permitted.
+    //
     // We are not using `euclid::Box3D` because its `union()` function does not do what we want
     // for finite zero-sized boxes (they are counted as empty and ignored).
     low: Point3D<NotNan<PosCoord>, MeshRel>,
@@ -45,9 +48,9 @@ pub(crate) struct Aabb {
 }
 
 // SAFETY: Infinity is not NaN, so it is permitted.
-const NN_INF: NotNan<PosCoord> = unsafe { NotNan::new_unchecked(f32::INFINITY) };
+pub(crate) const NN_INF: NotNan<PosCoord> = unsafe { NotNan::new_unchecked(f32::INFINITY) };
 // SAFETY: Infinity is not NaN, so it is permitted.
-const NN_NEG_INF: NotNan<PosCoord> = unsafe { NotNan::new_unchecked(f32::NEG_INFINITY) };
+pub(crate) const NN_NEG_INF: NotNan<PosCoord> = unsafe { NotNan::new_unchecked(f32::NEG_INFINITY) };
 
 impl Aabb {
     /// The empty box, containing no points.
@@ -153,6 +156,15 @@ impl Aabb {
             }
         }
     }
+
+    pub(crate) fn set_axis_range(&mut self, axis: Axis, low: NotNan<f32>, high: NotNan<f32>) {
+        if low <= high {
+            self.low[axis] = low;
+            self.high[axis] = high;
+        } else {
+            panic!("inverted axis range");
+        }
+    }
 }
 
 impl fmt::Debug for Aabb {
@@ -243,10 +255,25 @@ impl From<Aabb> for Box3D<f32, MeshRel> {
         }
     }
 }
+impl From<Aabb> for Box3D<NotNan<f32>, MeshRel> {
+    #[inline]
+    fn from(value: Aabb) -> Self {
+        Box3D {
+            min: value.low,
+            max: value.high,
+        }
+    }
+}
 impl From<Aabb> for Box3D<f64, MeshRel> {
     #[inline]
     fn from(value: Aabb) -> Self {
         Box3D::<f32, MeshRel>::from(value).cast::<f64>()
+    }
+}
+impl From<Aabb> for Box3D<NotNan<f64>, MeshRel> {
+    #[inline]
+    fn from(value: Aabb) -> Self {
+        Box3D::<f32, MeshRel>::from(value).cast::<NotNan<f64>>()
     }
 }
 
