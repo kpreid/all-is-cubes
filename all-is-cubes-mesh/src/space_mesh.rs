@@ -10,6 +10,7 @@ use exhaust::Exhaust;
 use itertools::izip;
 use smallvec::SmallVec;
 
+use all_is_cubes::euclid::Box3D;
 use all_is_cubes::math::{Cube, Face, FaceMap, GridAab, Vol};
 use all_is_cubes::space::{self, BlockIndex, Space};
 use all_is_cubes_render::Flaws;
@@ -150,7 +151,10 @@ impl<M: MeshTypes> SpaceMesh<M> {
             );
         }
 
-        self.ngm.transparent.iter().for_each(TransparentMeta::consistency_check);
+        for ordering in DepthOrdering::exhaust() {
+            self.ngm.transparent[ordering.to_index()]
+                .consistency_check(ordering, self.bounding_box().transparent);
+        }
     }
 
     /// Returns the total memory occupied by this [`SpaceMesh`] value and all its owned objects,
@@ -1094,18 +1098,19 @@ pub(crate) struct TransparentMeta {
     /// ordering. Each [`DepthOrdering`] has a non-overlapping range.
     pub(crate) index_range: Range<IndexBound>,
 
-    /// Volume within which the current depth sort of the indices stored within `self.range`
+    /// Volume within which the current depth sort of the indices stored within `self.index_range`
     /// is still valid and does not need to be redone.
     ///
     /// This field is updated by, and used as an early exit within, [`crate::depth_sorting`].
-    /// It does not necessarily confine itself within the bounds of validity of the
-    /// [`DepthOrdering`] this [`TransparentMeta`] is for;
-    /// those checks are to be done seperately before even looking at this struct.
     ///
-    /// If this is equal to [`Aabb::EMPTY`] and `dynamic_sub_ranges` is empty,
-    /// then no sorting at all has yet been done;
-    /// in particular, the “static” sort must be performed to set up the coarse ordering and
-    /// initialize `dynamic_sub_ranges`.
+    /// * If this is equal to [`Aabb::EMPTY`] and `dynamic_sub_ranges` is empty,
+    ///   then no sorting at all has yet been done;
+    ///   in particular, the “static” sort must be performed to set up the coarse ordering and
+    ///   initialize `dynamic_sub_ranges`.
+    /// * If this is equal to [`Aabb::EVERYWHERE`], then either there is no transparent content
+    ///   or it is too simple to require depth sorting.
+    /// * Otherwise, this is no larger than the volume which [`DepthOrdering::from_view_of_aabb()`]
+    ///   associates with this [`TransparentMeta`]’s ordering.
     pub(crate) depth_sort_validity: Aabb,
 
     /// Ranges of mesh indices, within (relative to) `self.index_range`,
@@ -1143,10 +1148,10 @@ impl TransparentMeta {
     }
 
     #[allow(dead_code, reason = "used conditionally")]
-    fn consistency_check(&self) {
+    fn consistency_check(&self, ordering: DepthOrdering, transparent_bounds: Aabb) {
         let &Self {
             index_range,
-            depth_sort_validity: _,
+            depth_sort_validity,
             ref dynamic_sub_ranges,
         } = self;
 
@@ -1160,6 +1165,35 @@ impl TransparentMeta {
         }
 
         assert!(dynamic_sub_ranges.is_sorted_by(|a, b| a.end <= b.start));
+
+        // Check that `depth_sort_validity` is not larger than the volume in which its ordering
+        // applies (except for the special cases mentioned in its documentation).
+        if !depth_sort_validity.is_empty()
+            && depth_sort_validity != Aabb::EVERYWHERE
+            && let Box3D::<f32, MeshRel> { min, max, .. } = depth_sort_validity.into()
+        {
+            // next_up() and next_down() give us test points that are inside the box, not on the
+            // boundary, so that we are not fighting over edge cases (which should never actually
+            // matter, since all triangles that would be sorted differently in that neighborhood
+            // are coplanar with the box face, and thus would be invisible.)
+            for sample_point in itertools::iproduct!(
+                [min.x.next_up(), max.x.next_down()],
+                [min.y.next_up(), max.y.next_down()],
+                [min.z.next_up(), max.z.next_down()],
+            ) {
+                let sample_point = Position::from(sample_point);
+                let recomputed_ordering =
+                    DepthOrdering::from_view_of_aabb(sample_point.to_f64(), transparent_bounds);
+                assert_eq!(
+                    recomputed_ordering, ordering,
+                    "ordering {ordering:?} \
+                    depth_sort_validity {depth_sort_validity:?} \
+                    around transparent bounds {transparent_bounds:?} \
+                    is large enough to include {sample_point:?}, \
+                    which belongs to ordering {recomputed_ordering:?}"
+                );
+            }
+        }
     }
 }
 
