@@ -157,6 +157,10 @@ impl Aabb {
         }
     }
 
+    pub(crate) fn contains_aabb(self, other: Self) -> bool {
+        Box3D::<f32, MeshRel>::from(self).contains_box(&other.into())
+    }
+
     pub(crate) fn set_axis_range(&mut self, axis: Axis, low: NotNan<f32>, high: NotNan<f32>) {
         if low <= high {
             self.low[axis] = low;

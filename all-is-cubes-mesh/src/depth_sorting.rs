@@ -512,6 +512,7 @@ fn static_sort<V: Vertex, P: Primitive>(
     vertices: &[V],
     indices: &mut [P::Item],
     meta: &mut TransparentMeta,
+    geometry_bounds: Aabb,
 ) {
     debug_assert!(meta.dynamic_sub_ranges.is_empty());
 
@@ -545,11 +546,11 @@ fn static_sort<V: Vertex, P: Primitive>(
             // There are no items to sort, so don't generate any range (that would be empty).
             // It is an invariant of `TransparentMeta` that `dynamic_sub_ranges` contains no
             // empty ranges.
-            meta.depth_sort_validity = Aabb::EVERYWHERE;
+            meta.depth_sort_validity = ordering.region_of_applicability(geometry_bounds);
         }
         0 => {
             // The static sort we have already done suffices.
-            meta.depth_sort_validity = Aabb::EVERYWHERE;
+            meta.depth_sort_validity = ordering.region_of_applicability(geometry_bounds);
         }
         3 => {
             // Everything must be sorted dynamically.
@@ -602,7 +603,7 @@ fn static_sort<V: Vertex, P: Primitive>(
                 // No sub-ranges requiring dynamic sorting exist.
                 // Therefore, we have determined that our static sort is sufficient, and can mark
                 // it as valid everywhere.
-                meta.depth_sort_validity = Aabb::EVERYWHERE;
+                meta.depth_sort_validity = ordering.region_of_applicability(geometry_bounds);
             } else {
                 // We have determined what ranges require dynamic sorting, but
                 // those ranges are not yet sorted, so there is no volume of validity.
@@ -633,6 +634,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     view_position: Position,
     meta: &mut TransparentMeta,
     has_non_rect_transparency: bool,
+    transparent_bounds: Aabb,
 ) -> DepthSortResult {
     if !M::Vertex::WANTS_DEPTH_SORTING {
         return DepthSortResult::NOTHING_CHANGED;
@@ -651,16 +653,16 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         // let start_time = Instant::now();
         match (&mut indices, has_non_rect_transparency) {
             (IndexSliceMut::U16(indices), false) => {
-                static_sort::<_, [u16; 6]>(ordering, vertices, indices, meta)
+                static_sort::<_, [u16; 6]>(ordering, vertices, indices, meta, transparent_bounds)
             }
             (IndexSliceMut::U32(indices), false) => {
-                static_sort::<_, [u32; 6]>(ordering, vertices, indices, meta)
+                static_sort::<_, [u32; 6]>(ordering, vertices, indices, meta, transparent_bounds)
             }
             (IndexSliceMut::U16(indices), true) => {
-                static_sort::<_, [u16; 3]>(ordering, vertices, indices, meta)
+                static_sort::<_, [u16; 3]>(ordering, vertices, indices, meta, transparent_bounds)
             }
             (IndexSliceMut::U32(indices), true) => {
-                static_sort::<_, [u32; 3]>(ordering, vertices, indices, meta)
+                static_sort::<_, [u32; 3]>(ordering, vertices, indices, meta, transparent_bounds)
             }
         }
         // TODO: integrate this into DepthSortInfo instead

@@ -10,7 +10,6 @@ use exhaust::Exhaust;
 use itertools::izip;
 use smallvec::SmallVec;
 
-use all_is_cubes::euclid::Box3D;
 use all_is_cubes::math::{Cube, Face, FaceMap, GridAab, Vol};
 use all_is_cubes::space::{self, BlockIndex, Space};
 use all_is_cubes_render::Flaws;
@@ -432,6 +431,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
             view_position,
             &mut self.meta.ngm.transparent[ordering.to_index()],
             self.meta.ngm.has_non_rect_transparency,
+            self.meta.ngm.bounding_box.transparent,
         )
     }
 }
@@ -1167,32 +1167,20 @@ impl TransparentMeta {
         assert!(dynamic_sub_ranges.is_sorted_by(|a, b| a.end <= b.start));
 
         // Check that `depth_sort_validity` is not larger than the volume in which its ordering
-        // applies (except for the special cases mentioned in its documentation).
-        if !depth_sort_validity.is_empty()
-            && depth_sort_validity != Aabb::EVERYWHERE
-            && let Box3D::<f32, MeshRel> { min, max, .. } = depth_sort_validity.into()
-        {
-            // next_up() and next_down() give us test points that are inside the box, not on the
-            // boundary, so that we are not fighting over edge cases (which should never actually
-            // matter, since all triangles that would be sorted differently in that neighborhood
-            // are coplanar with the box face, and thus would be invisible.)
-            for sample_point in itertools::iproduct!(
-                [min.x.next_up(), max.x.next_down()],
-                [min.y.next_up(), max.y.next_down()],
-                [min.z.next_up(), max.z.next_down()],
-            ) {
-                let sample_point = Position::from(sample_point);
-                let recomputed_ordering =
-                    DepthOrdering::from_view_of_aabb(sample_point.to_f64(), transparent_bounds);
-                assert_eq!(
-                    recomputed_ordering, ordering,
-                    "ordering {ordering:?} \
-                    depth_sort_validity {depth_sort_validity:?} \
-                    around transparent bounds {transparent_bounds:?} \
-                    is large enough to include {sample_point:?}, \
-                    which belongs to ordering {recomputed_ordering:?}"
-                );
-            }
+        // applies (except as intended to be permitted)
+        if !depth_sort_validity.is_empty() {
+            let ordering_region = ordering.region_of_applicability(transparent_bounds);
+            assert!(
+                // TODO: This condition is weaker than it should be: we should only allow
+                // `EVERYWHERE` if there is no transparent content requiring sorting from
+                // *any* viewpoint.
+                ordering_region.contains_aabb(depth_sort_validity)
+                    || depth_sort_validity == Aabb::EVERYWHERE,
+                "ordering {ordering:?} \
+                depth_sort_validity {depth_sort_validity:?} \
+                around transparent bounds {transparent_bounds:?} \
+                is larger than the region of that ordering {ordering_region:?}"
+            );
         }
     }
 }
