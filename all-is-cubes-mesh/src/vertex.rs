@@ -1,5 +1,6 @@
 //! Mesh vertices.
 
+use alloc::vec::Vec;
 use core::fmt;
 
 use all_is_cubes::block::Resolution;
@@ -237,5 +238,20 @@ impl<T: Copy + 'static> Vertex for BlockVertex<T> {
     #[inline]
     fn instantiate_vertex(&mut self, offset: Self::BlockInst) {
         self.position += offset;
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Decide whether vertices’ `SecondaryData` is worth printing.
+pub(crate) fn debug_fmt_vertices<V>(vertices: &(Vec<V>, Vec<V::SecondaryData>)) -> &dyn fmt::Debug
+where
+    V: fmt::Debug + Vertex<SecondaryData: fmt::Debug>,
+{
+    if size_of::<V::SecondaryData>() == 0 {
+        // Don't print secondary data array if it will just be `[(), (), ...]` or similar
+        &vertices.0
+    } else {
+        vertices
     }
 }

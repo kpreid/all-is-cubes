@@ -634,7 +634,7 @@ impl<M: MeshTypes> fmt::Debug for SubMesh<M> {
             bounding_box,
         } = self;
         f.debug_struct("SubMesh")
-            .field("vertices", vertices)
+            .field("vertices", crate::debug_fmt_vertices(vertices))
             .field("indices_opaque", indices_opaque)
             .field("indices_transparent", indices_transparent)
             .field("fully_opaque", fully_opaque)
