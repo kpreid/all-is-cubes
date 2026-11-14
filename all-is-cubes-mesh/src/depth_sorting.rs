@@ -120,17 +120,14 @@ impl DepthOrdering {
     /// which would produce this ordering if passed as the `camera_position` to
     /// [`DepthOrdering::from_view_of_aabb()`].
     ///
-    /// If `geometry_bounds` is [`Aabb::EMPTY`], then returns either [`Aabb::EMPTY`] or
-    /// [`Aabb::EVERYWHERE`] such that it maintains consistency.
+    /// Exception:
+    /// If `geometry_bounds` [is empty][Aabb::EMPTY], then returns [`Aabb::EVERYWHERE`].
+    /// This lacks the consistency property, but is overall simpler and agrees with the
+    /// behavior of [`TransparentMeta::depth_sort_validity`].
     #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn region_of_applicability(self, geometry_bounds: Aabb) -> Aabb {
         if geometry_bounds.is_empty() {
-            // This condition must match the outcome of the branches in `from_view_of_aabb()`.
-            return if self == const { DepthOrdering(vec3(Rel::Lower, Rel::Lower, Rel::Lower)) } {
-                Aabb::EVERYWHERE
-            } else {
-                Aabb::EMPTY
-            };
+            return Aabb::EVERYWHERE;
         }
         let geometry_bounds = euclid::Box3D::from(geometry_bounds);
         use crate::aabb::{NN_INF, NN_NEG_INF};
@@ -908,18 +905,14 @@ mod tests {
         // We're testing the behavior with this box.
         let geometry_bounds = Aabb::EMPTY;
 
-        // This is the arbitrary choice of ordering which we attribute to the empty box.
-        let ordering_found = DepthOrdering::from_view_of_aabb(point3(1., 2., 3.), geometry_bounds);
+        // This should not panic, but we don’t care what choice it makes.
+        _ = DepthOrdering::from_view_of_aabb(point3(1., 2., 3.), geometry_bounds);
 
-        // Check that every ordering’s `region_of_applicability` agrees with this choice.
+        // region_of_applicability() is documented to always return EVERYWHERE
         for other_ordering in DepthOrdering::exhaust() {
             assert_eq!(
                 other_ordering.region_of_applicability(geometry_bounds),
-                if other_ordering == ordering_found {
-                    Aabb::EVERYWHERE
-                } else {
-                    Aabb::EMPTY
-                }
+                Aabb::EVERYWHERE
             );
         }
     }
