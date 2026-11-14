@@ -11,22 +11,22 @@ use all_is_cubes::block::{
     Resolution::{self, *},
 };
 use all_is_cubes::content::make_some_blocks;
-use all_is_cubes::euclid::{Point3D, Size3D, point3};
+use all_is_cubes::euclid::{Point3D, Size3D, point3, size3};
 use all_is_cubes::math::{
     Aab, Cube,
     Face::{self, *},
-    FaceMap, GridAab, Rgb, Rgba, range_len, u32size, zo32,
+    FaceMap, GridAab, Rgb, Rgba, Vol, range_len, u32size, zo32,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
-use all_is_cubes::universe::ReadTicket;
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_render::Flaws;
-use all_is_cubes_render::camera::TransparencyOption;
+use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
-use crate::testing::{Allocator, TexPoint, TextureMt, mesh_blocks_and_space};
+use crate::testing::{Allocator, NoTextureMt, TexPoint, TextureMt, mesh_blocks_and_space};
+use crate::texture::NoTextures;
 use crate::{
     Aabb, Aabbs, BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering, IndexSlice,
-    MeshOptions, MeshTypes, PosCoord, SpaceMesh, block_meshes_for_space,
+    MeshOptions, MeshRel, MeshTypes, PosCoord, SpaceMesh, block_meshes_for_space,
 };
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
@@ -663,6 +663,42 @@ fn transparency_split() {
             6 * num_visible_faces
         );
     }
+}
+
+/// Test that, when a mesh’s complexity is limited, depth sorting doesn’t then fail.
+///
+/// This test is very specific because the case was found by fuzzing and it is intended to
+/// catch a particular possible regression. It might have limited value otherwise; consider
+/// generalizing it to cover more cases.
+#[test]
+fn depth_sorting_with_limited_indices() {
+    const VIEW_POSITION: Point3D<f32, MeshRel> = point3(-1., -1., 1.);
+    const BOUNDS: GridAab = GridAab::tiny(point3(0, 0, 0), size3(1, 2, 2));
+    const PALETTE: [Block; 2] = [block::from_color!(1.0, 1.0, 1., 0.5), AIR];
+    let pattern = Vol::from_elements(BOUNDS, [0, 0, 1, 1]).unwrap();
+    let space = Space::builder(BOUNDS)
+        .palette_and_contents(PALETTE, pattern, None)
+        .unwrap()
+        .build();
+    let mesh_options = MeshOptions {
+        limit_indices_per_mesh: 200, // must be in range to fail partway through
+        ..MeshOptions::new(&GraphicsOptions::default())
+    };
+    let mut space_mesh: SpaceMesh<NoTextureMt> = SpaceMesh::new(
+        &space.read(),
+        space.bounds(),
+        &mesh_options,
+        &*block_meshes_for_space(&space.read(), &NoTextures, &mesh_options),
+    );
+
+    // What the test is looking for is that this sort does not fail its debug assertions.
+    _ = space_mesh.depth_sort_for_view(
+        DepthOrdering::from_view_of_aabb(
+            VIEW_POSITION.to_f64().cast_unit(),
+            space_mesh.bounding_box().transparent().unwrap_or(Aab::ZERO),
+        ),
+        VIEW_POSITION,
+    );
 }
 
 #[test]
