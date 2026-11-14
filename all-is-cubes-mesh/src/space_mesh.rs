@@ -566,6 +566,11 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
             return Err(TooComplex::TooManyVertices);
         }
 
+        // Update fields that summarize the contents, *before* we fallibly insert those contents.
+        // (Having these be too broad is less bad than having them be too narrow.)
+        meta.ngm.has_non_rect_transparency |= sub_mesh.has_non_rect_transparency;
+        meta.ngm.bounding_box.union_mut(sub_mesh.bounding_box.translate(bb_translation));
+
         // Copy vertices.
         // They will be translated to the block position later.
         reserve_vertices(vertices, sub_mesh.vertices.0.len())?;
@@ -579,15 +584,14 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         )?;
         transparent_indices[face]
             .ixtend_with_offset(sub_mesh.indices_transparent.as_slice(..), index_offset)?;
-
-        meta.ngm.has_non_rect_transparency |= sub_mesh.has_non_rect_transparency;
-
-        meta.ngm.bounding_box.union_mut(sub_mesh.bounding_box.translate(bb_translation));
     }
 
     // “Instantiate” the vertices: translate them to their position in the space.
     // When doing this, they are chunked into fixed-size batches to encourage optimizations
     // (autovectorization and unrolling).
+    //
+    // TODO: If we fail partway through, this doesn’t run and vertices will be left in the
+    // uninstantiated state; fix that.
     {
         let (v_chunks, v_remainder) = vertices.0[first_new_vertex..].as_chunks_mut::<8>();
         for chunk in v_chunks {
