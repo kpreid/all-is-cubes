@@ -14,11 +14,14 @@ use crate::{MeshRel, PosCoord, Position};
 
 /// Axis-Aligned Bounding Box of the vertices belonging to a mesh.
 ///
-/// This type’s set of possible values is equal to
-/// <code>[Option]&lt;[Box3D]&lt;[f32], [MeshRel]&gt;&gt;</code>,
-/// but has methods allowing it to be used more conveniently to manage the bounding box of a
-/// possibly-empty set of points (vertices). In particular, [`Aabb::union()`] combines two
-/// such possibly-absent boxes.
+/// This type is similar to [`Box3D`] and [`Aab`], but distinct because its element type is [`f32`]
+/// and its operations are designed to produce the best results for the specific task of
+/// computing and reporting the possibly-empty bounding box of a possibly-empty set of points.
+/// In particular, [`Aabb::union()`] combines two such possibly-empty boxes such that the union
+/// of an empty box and a non-empty box is equal to the non-empty box.
+///
+/// Every [`Aabb`] is either equal to [`Aabb::EMPTY`] or non-empty (that is, each of its lower
+/// bounds are `<=` the corresponding upper bound). No coordinate can be NaN.
 ///
 /// It is used internally in `all_is_cubes_mesh` to calculate the bounding boxes of meshes.
 /// Publicly, only `Option<Aab>` is exposed in order to keep our API surface smaller.
@@ -158,6 +161,27 @@ impl Aabb {
                 }
                 None => {} // NaN -- TODO: integrate this with the NotNan checks
             }
+        }
+    }
+
+    /// Computes the intersection of two boxes.
+    ///
+    /// If the two boxes touch but have no common volume, then the result covers that surface.
+    /// If the two boxes do not touch, then the result is [`Aabb::EMPTY`].
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "TODO: use this in global depth sort validity tracking"
+        )
+    )]
+    pub fn intersection(&self, other: Aabb) -> Aabb {
+        let low = self.low.max(other.low);
+        let high = self.high.min(other.high);
+        if low.x <= high.x && low.y <= high.y && low.z <= high.z {
+            Aabb { low, high }
+        } else {
+            Aabb::EMPTY
         }
     }
 
@@ -370,6 +394,7 @@ impl Aabbs {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::euclid::point3;
 
     /// Adding a single point makes the `Aabb` non-empty even though it still has zero volume.
     #[test]
@@ -380,6 +405,47 @@ mod tests {
         aabb.add_point(Point3D::new(0.0, 0.0, 0.0));
         assert!(!std::dbg!(aabb).is_empty());
         assert!(aabb.contains(Point3D::new(0.0, 0.0, 0.0)));
+    }
+
+    #[test]
+    fn intersection_simple() {
+        assert_eq!(
+            Aabb::from_iter([point3(0., 0., 0.), point3(2., 2., 2.)])
+                .intersection(Aabb::from_iter([point3(1., 1., 1.), point3(3., 3., 3.)])),
+            Aabb::from_iter([point3(1., 1., 1.), point3(2., 2., 2.)]),
+        );
+    }
+
+    #[test]
+    fn intersection_face_touching() {
+        assert_eq!(
+            Aabb::from_iter([point3(0., 0., 0.), point3(1., 2., 2.)])
+                .intersection(Aabb::from_iter([point3(1., 1., 1.), point3(3., 3., 3.)])),
+            Aabb::from_iter([point3(1., 1., 1.), point3(1., 2., 2.)]),
+        );
+    }
+
+    #[test]
+    fn intersection_not_touching() {
+        assert_eq!(
+            Aabb::from_iter([point3(0., 0., 0.), point3(1., 2., 2.)])
+                .intersection(Aabb::from_iter([point3(2., 1., 1.), point3(3., 3., 3.)])),
+            Aabb::EMPTY,
+        );
+    }
+
+    #[test]
+    fn everywhere_is_identity_of_intersection() {
+        let finite = Aabb::from_iter([point3(1., 2., 3.), point3(4., 5., 6.)]);
+        assert_eq!(finite.intersection(Aabb::EVERYWHERE), finite);
+        assert_eq!(Aabb::EVERYWHERE.intersection(finite), finite);
+    }
+
+    #[test]
+    fn empty_is_identity_of_union() {
+        let nonempty = Aabb::from_iter([point3(1., 2., 3.), point3(4., 5., 6.)]);
+        assert_eq!(nonempty.union(Aabb::EMPTY), nonempty);
+        assert_eq!(Aabb::EMPTY.union(nonempty), nonempty);
     }
 
     #[test]
