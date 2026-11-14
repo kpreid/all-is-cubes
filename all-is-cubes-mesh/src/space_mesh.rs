@@ -463,12 +463,7 @@ impl<M: MeshTypes> fmt::Debug for SpaceMesh<M> {
             meta,
         } = self;
         let mut s = f.debug_struct("SpaceMesh");
-        if size_of::<<M::Vertex as Vertex>::SecondaryData>() == 0 {
-            // Don't print secondary data array if it will just be `[(), (), ...]` or similar
-            s.field("vertices", &vertices.0);
-        } else {
-            s.field("vertices", vertices);
-        }
+        s.field("vertices", crate::debug_fmt_vertices(vertices));
         s.field("indices", indices);
         s.field("meta", meta);
         s.finish()
