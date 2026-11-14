@@ -206,7 +206,7 @@ impl<'a> IndexSlice<'a> {
 
     /// Returns the indices in this slice, each converted unconditionally to [`u32`].
     #[inline]
-    pub fn iter_u32(&self) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator + '_ {
+    pub fn iter_u32(self) -> impl DoubleEndedIterator<Item = u32> + ExactSizeIterator + use<'a> {
         match self {
             IndexSlice::U16(slice) => Either::Left(slice.iter().copied().map(u32::from)),
             IndexSlice::U32(slice) => Either::Right(slice.iter().copied()),
@@ -218,7 +218,9 @@ impl<'a> IndexSlice<'a> {
     // Design note: This allows callers to make use of our project-wide assumption that usize
     // is at least 32 bits, rather than needing to do their own such assumption.
     #[inline]
-    pub fn iter_usize(&self) -> impl DoubleEndedIterator<Item = usize> + '_ {
+    pub fn iter_usize(
+        self,
+    ) -> impl DoubleEndedIterator<Item = usize> + ExactSizeIterator + use<'a> {
         match self {
             IndexSlice::U16(slice) => Either::Left(slice.iter().copied().map(usize::from)),
             IndexSlice::U32(slice) => Either::Right(slice.iter().copied().map(u32size)),
