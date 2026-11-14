@@ -391,12 +391,12 @@ impl<M: MeshTypes> SpaceMesh<M> {
             opaque: Aabb::from_iter(
                 self.indices.as_slice(self.opaque_range()).iter_u32().map(get_position),
             ),
-            transparent: Aabb::from_iter(
-                self.indices
-                    .as_slice(self.transparent_range(DepthOrdering::ALL_UNSORTED))
-                    .iter_u32()
-                    .map(get_position),
-            ),
+            // Note: This will iterate over redundant indices from the many depth orderings,
+            // but that is necessary because, if we’re doing this recomputation, `self.indices`
+            // may be incomplete such that picking any one ordering would miss some vertices.
+            transparent: Aabb::from_iter(DepthOrdering::exhaust().flat_map(|o| {
+                self.indices.as_slice(self.transparent_range(o)).iter_u32().map(get_position)
+            })),
         }
     }
 
