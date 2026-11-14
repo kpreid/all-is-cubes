@@ -1,8 +1,8 @@
 #![no_main]
 
-use all_is_cubes::block::Block;
-use all_is_cubes::math::{Aab, GridAab};
-use all_is_cubes::space::Space;
+use all_is_cubes::block::{self, Block};
+use all_is_cubes::math::{Aab, GridAab, Vol};
+use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::universe::ArbitraryWithUniverse;
 use all_is_cubes_mesh as mesh;
 
@@ -43,15 +43,26 @@ libfuzzer_sys::fuzz_target!(|input: ArbitraryWithUniverse<(
 // TODO: coverage for other mesh operations
 
 fn construct_space(sing: SpaceIngredients) -> Space {
-    Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 3, 3]))
-        .build_and_mutate(|m| {
-            let mut pattern_iter = sing.pattern.into_iter();
-            m.fill_all(|_cube| {
-                // The len + 1 causes some blocks to be left empty AIR.
-                sing.blocks.get(
-                    usize::from(pattern_iter.next().unwrap()).rem_euclid(sing.blocks.len() + 1),
-                )
-            })
-        })
+    let bounds = GridAab::from_lower_size([0, 0, 0], [3, 3, 3]);
+
+    // Include AIR in the palette always, so that we more reliably exercise different mesh shapes.
+    const PALETTE_LEN: u8 = 4;
+    let [b1, b2, b3] = sing.blocks;
+    let palette: [Block; PALETTE_LEN as usize] = [b1, b2, b3, block::AIR];
+
+    Space::builder(bounds)
+        .palette_and_contents(
+            palette,
+            Vol::from_elements(
+                bounds,
+                // TODO: this is wasting a lot of bits; unpack bits from the bytes
+                Box::<[BlockIndex]>::from_iter(
+                    sing.pattern.into_iter().map(|i| BlockIndex::from(i % PALETTE_LEN)),
+                ),
+            )
+            .unwrap(),
+            None,
+        )
         .unwrap()
+        .build()
 }
