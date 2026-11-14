@@ -126,6 +126,10 @@ impl Aabb {
         true
     }
 
+    pub(crate) fn contains_aabb(self, other: Self) -> bool {
+        Box3D::<f32, MeshRel>::from(self).contains_box(&other.into())
+    }
+
     /// Shrink the box so that, presuming it contains `include`, it still contains `include` but
     /// excludes everything further away than `exclude` on all axes.
     ///
