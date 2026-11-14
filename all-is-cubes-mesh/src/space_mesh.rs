@@ -1107,9 +1107,13 @@ pub(crate) struct TransparentMeta {
     ///   in particular, the “static” sort must be performed to set up the coarse ordering and
     ///   initialize `dynamic_sub_ranges`.
     /// * If this is equal to [`Aabb::EVERYWHERE`], then either there is no transparent content
-    ///   or it is too simple to require depth sorting.
-    /// * Otherwise, this is no larger than the volume which [`DepthOrdering::from_view_of_aabb()`]
-    ///   associates with this [`TransparentMeta`]’s ordering.
+    ///   (`self.index_range.is_empty()`) or it is too simple to require depth sorting (under
+    ///   this specific [`DepthOrdering`]).
+    ///   (Note that [`MeshMeta::needs_depth_sorting_somewhere()`] depends on this being
+    ///   `EVERYWHERE` rather than anything smaller.)
+    /// * Otherwise, this box should be used to decide whether sorting must be redone based on
+    ///   whether the viewpoint is outside it. This box *may* be larger than the region which
+    ///   [`DepthOrdering::from_view_of_aabb()`] would assign to this ordering.
     pub(crate) depth_sort_validity: Aabb,
 
     /// Ranges of mesh indices, within (relative to) `self.index_range`,

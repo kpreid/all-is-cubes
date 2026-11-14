@@ -122,13 +122,7 @@ impl DepthOrdering {
     ///
     /// If `geometry_bounds` is [`Aabb::EMPTY`], then returns either [`Aabb::EMPTY`] or
     /// [`Aabb::EVERYWHERE`] such that it maintains consistency.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "TODO: use this to tighten bounds on depth_sort_validity"
-        )
-    )]
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn region_of_applicability(self, geometry_bounds: Aabb) -> Aabb {
         if geometry_bounds.is_empty() {
             // This condition must match the outcome of the branches in `from_view_of_aabb()`.
