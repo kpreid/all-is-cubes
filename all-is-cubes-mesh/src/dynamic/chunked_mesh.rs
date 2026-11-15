@@ -500,7 +500,7 @@ where
             // Run depth sort, if needed.
             let mut actually_sorted_indices = None;
             let mut ran_depth_sort = false;
-            if let Some(ordering) = state.chunk_todo.needs_depth_sort {
+            if let Some(ordering) = state.chunk_todo.needs_depth_sort.take() {
                 ran_depth_sort = true;
                 let DepthSortResult { changed, info } =
                     state.chunk_mesh.depth_sort_for_view(ordering, view_point);

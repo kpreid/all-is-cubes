@@ -628,3 +628,22 @@ fn at_maximum_number_of_blocks() {
         CsmTester::new(Universe::new(), space, LARGE_VIEW_DISTANCE);
     tester.update(dynamic::noop_render_data_updater);
 }
+
+#[test]
+fn depth_sorting_runs_once() {
+    // space must have at least 2 transparent blocks to need depth sorting
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+        .filled_with(block::from_color!(1., 1., 1., 0.25))
+        .build();
+    let mut tester: CsmTester<NO_INSTANCES> =
+        CsmTester::new(Universe::new(), space, LARGE_VIEW_DISTANCE);
+
+    {
+        let info = tester.update(dynamic::noop_render_data_updater);
+        assert_eq!(info.depth_sort_times.count, 1);
+    }
+    {
+        let info = tester.update(dynamic::noop_render_data_updater);
+        assert_eq!(info.depth_sort_times.count, 0);
+    }
+}
