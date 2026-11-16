@@ -84,12 +84,6 @@ where
     /// This box is computed from the current view chunk and the depth sorting requirements.
     eye_region: EyeRegion,
 
-    /// Whether, on the previous frame, we did not finish updating all visible chunks.
-    ///
-    /// If so, then we prioritize adding new chunks over updating existing ones,
-    /// because blank world is a worse outcome than slightly stale world.
-    pub(in crate::dynamic) did_not_finish_chunks: bool,
-
     /// Whether we have not yet installed the listener on `self.space`.
     install_listener: bool,
 
@@ -129,7 +123,6 @@ where
             chunk_chart: ChunkChart::new(0.0),
             view_chunk: ChunkPos(Cube::new(0, 0, 0)),
             eye_region: EyeRegion::EMPTY,
-            did_not_finish_chunks: true,
             install_listener: true,
             startup_chunks_only: interactive,
             last_mesh_options: None,
@@ -475,9 +468,8 @@ where
                 };
 
                 // Decide whether to update the chunk
-                let should_update_chunk = (chunk_todo.is_not_clean()
-                    && !self.did_not_finish_chunks)
-                    || matches!(chunk_mesh_entry, Entry::Vacant(_));
+                let should_update_chunk =
+                    chunk_todo.is_not_clean() || matches!(chunk_mesh_entry, Entry::Vacant(_));
 
                 if should_update_chunk {
                     let chunk_mesh = match chunk_mesh_entry {
@@ -666,18 +658,20 @@ where
         self.eye_region = new_eye_region;
 
         // Record outcome of processing.
-        self.did_not_finish_chunks =
-            todo.some_chunks_or_blocks && did_not_finish_chunk_scan_due_to_timeout;
-        let complete = block_updates.all_done() && !self.did_not_finish_chunks;
-        if complete {
-            // Record that we now know there is nothing to do until some change
-            // notification arrives.
+        if !did_not_finish_chunk_scan_due_to_timeout && block_updates.all_done() {
+            // If the chunk scan is finished, then all chunks must be updated.
+            // If, also, there are no block mesh updates in flight, then we know that
+            // there is no unfinished work left to do.
             todo.some_chunks_or_blocks = false;
         }
         if !did_not_finish_chunk_scan_due_to_timeout {
             // If we completed the startup chunk-only updates, then we can move on to full updates.
             self.startup_chunks_only = false;
         }
+        // This differs from the above condition in that it might be true even if the scan
+        // timed out. TODO: If we short-circuit earlier, we can avoid needing to distinguish
+        // that case.
+        let complete = block_updates.all_done() && !todo.some_chunks_or_blocks;
 
         // Instant at which we finished all processing
         let end_all_time = time::Instant::now();

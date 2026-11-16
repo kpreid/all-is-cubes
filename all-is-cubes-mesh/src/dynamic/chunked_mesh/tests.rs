@@ -363,7 +363,7 @@ fn did_not_finish_detection() {
         assert_eq!(
             (
                 info.flaws,
-                tester.csm.did_not_finish_chunks,
+                tester.csm.startup_chunks_only,
                 tester.csm.complete_time
             ),
             (Flaws::UNFINISHED | Flaws::OUT_OF_TIME, true, None)
@@ -377,7 +377,7 @@ fn did_not_finish_detection() {
         assert_eq!(
             (
                 info.flaws,
-                tester.csm.did_not_finish_chunks,
+                tester.csm.startup_chunks_only,
                 tester.csm.complete_time.is_some(),
             ),
             (Flaws::empty(), false, true)
@@ -426,7 +426,7 @@ fn did_not_finish_detection() {
         assert_eq!(
             (
                 info.flaws,
-                tester.csm.did_not_finish_chunks,
+                tester.csm.startup_chunks_only,
                 tester.csm.complete_time.is_some(),
             ),
             (Flaws::empty(), false, true)
