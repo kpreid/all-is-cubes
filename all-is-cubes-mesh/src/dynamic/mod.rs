@@ -16,7 +16,7 @@ use chunk::ChunkTodo;
 
 mod chunked_mesh;
 use chunked_mesh::EyeRegion;
-pub use chunked_mesh::{ChunkedSpaceMesh, CsmUpdateInfo, InViewChunkRef};
+pub use chunked_mesh::{ChunkedSpaceMesh, CsmUpdateInfo, InViewChunkRef, StateInfo};
 
 mod instance;
 pub use instance::InstanceCollector;

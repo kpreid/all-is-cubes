@@ -4,7 +4,7 @@ use core::time::Duration;
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::util::{Fmt, Refmt, ShowStatus, StatusText};
-use all_is_cubes_mesh::dynamic::CsmUpdateInfo;
+use all_is_cubes_mesh::dynamic;
 use all_is_cubes_render::{Flaws, camera::Layers};
 
 /// Performance info about drawing an entire scene.
@@ -177,8 +177,9 @@ impl Fmt<StatusText> for RenderInfo {
 pub struct SpaceUpdateInfo {
     pub(crate) total_time: Duration,
 
-    /// Status of the block and chunk meshes.
-    pub(crate) chunk_info: CsmUpdateInfo,
+    /// Timing of work on the block and chunk meshes.
+    pub(crate) chunk_update_info: dynamic::CsmUpdateInfo,
+    pub(crate) chunk_state_info: dynamic::StateInfo,
     /// Status of the texture atlas.
     pub(crate) texture_info: BlockTextureInfo,
 
@@ -190,7 +191,7 @@ pub struct SpaceUpdateInfo {
 
 impl SpaceUpdateInfo {
     pub(crate) fn flaws(&self) -> Flaws {
-        self.chunk_info.flaws
+        self.chunk_update_info.flaws
     }
 
     #[cfg(feature = "rerun")]
@@ -206,11 +207,12 @@ impl SpaceUpdateInfo {
         // TODO: include every useful number we can; make names more consistent
         let &Self {
             total_time,
-            chunk_info:
-                CsmUpdateInfo {
+            chunk_update_info:
+                dynamic::CsmUpdateInfo {
                     total_time: chunk_total_time,
                     ..
                 },
+            chunk_state_info: _,
             texture_info: _,
             light_update_time,
             light_update_count: _,
@@ -232,7 +234,8 @@ impl Fmt<StatusText> for SpaceUpdateInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         let &SpaceUpdateInfo {
             total_time: _, // we print this as summary info from the parent only
-            ref chunk_info,
+            ref chunk_update_info,
+            ref chunk_state_info,
             ref texture_info,
             light_update_time,
             light_update_count,
@@ -240,7 +243,8 @@ impl Fmt<StatusText> for SpaceUpdateInfo {
 
         let light_update_time = light_update_time.refmt(fopt);
 
-        writeln!(fmt, "{}", chunk_info.refmt(fopt))?;
+        writeln!(fmt, "{}", chunk_update_info.refmt(fopt))?;
+        writeln!(fmt, "{}", chunk_state_info.refmt(fopt))?;
         writeln!(
             fmt,
             "Light: {light_update_count:3} cubes in {light_update_time}"

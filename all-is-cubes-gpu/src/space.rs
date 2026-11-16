@@ -360,7 +360,7 @@ impl SpaceRenderer {
         let end_light_update = time::Instant::now();
 
         // Update chunks.
-        let csm_info = {
+        let chunk_update_info = {
             let bwp_mutex = Mutex::new(Msw::new(bwp.reborrow()));
             csm.update(
                 read_ticket,
@@ -450,7 +450,8 @@ impl SpaceRenderer {
             total_time: end_time.saturating_duration_since(start_time),
             light_update_time: end_light_update.saturating_duration_since(start_light_update),
             light_update_count,
-            chunk_info: csm_info,
+            chunk_update_info,
+            chunk_state_info: csm.state_info(),
             texture_info,
         };
 

@@ -319,6 +319,8 @@ fn drop_chunks_when_moving() {
     // it to future counts.
     let initial_chunk_count = tester.csm.iter_chunks().count();
     assert_eq!(initial_chunk_count, 3usize.pow(3));
+    // Bonus: also test state_info() a bit.
+    assert_eq!(tester.csm.state_info().chunk_count, initial_chunk_count);
 
     // Move over one chunk at a time repeatedly.
     for i in 1..30 {
@@ -330,7 +332,10 @@ fn drop_chunks_when_moving() {
     }
     // Check that there is not indefinite accumulation of chunks.
     // (But allow some slop for a caching policy.)
-    assert!(tester.csm.iter_chunks().count() < initial_chunk_count * 3);
+
+    let final_chunk_count = tester.csm.iter_chunks().count();
+    assert!(final_chunk_count < initial_chunk_count * 3);
+    assert_eq!(tester.csm.state_info().chunk_count, final_chunk_count);
 }
 
 /// Test the logic which decides whether `ChunkedSpaceMesh` managed to completely

@@ -535,6 +535,12 @@ fn should_use_instances<M: DynamicMeshTypes>(
 
 // -------------------------------------------------------------------------------------------------
 
+// TODO: The counter fields `queued` and `unfinished`, containing state info rather than timing
+// info, should in principle be split out in the same way as `dynamic::CsmUpdateInfo` and
+// `dynamic::StateInfo` are separate. However, this will make nice formatting trickier, and it is
+// also less of a problem because it will only be noticeable if the `ChunkedSpaceMesh` is having
+// a serious error condition.
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, derive_more::AddAssign)]
 pub(crate) struct VbmUpdateInfo {
     /// Total time taken by the `update()` operation.

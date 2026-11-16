@@ -46,6 +46,7 @@
     * `MeshMeta::texture_channels_used()`.
     * `IndexSlice::iter_usize()`
     * `dynamic::ChunkedSpaceMesh::meta()`
+    * `dynamic::ChunkedSpaceMesh::state_info()`
 
 * `all-is-cubes-port` library:
     * glTF exports now include textures.

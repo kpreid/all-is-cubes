@@ -231,6 +231,7 @@ where
     ///   It may be called concurrently from multiple threads.
     ///
     /// Returns performance information and the chunk the camera is located in.
+    /// Consider also calling [`ChunkedSpaceMesh::state_info()`] for additional info.
     pub fn update<F>(
         &mut self,
         read_ticket: ReadTicket<'_>,
@@ -302,10 +303,10 @@ where
         let view_point = camera.view_position();
 
         let Some(view_chunk) = point_to_chunk(view_point) else {
-            // TODO: report error
-            // TODO: This is missing the non-timing information that would normally be reported
+            // Outside of the coordinate range we can represent.
             return (
                 CsmUpdateInfo {
+                    flaws: Flaws::OTHER,
                     prep_time: time::Instant::now().saturating_duration_since(update_start_time),
                     ..CsmUpdateInfo::default()
                 },
@@ -318,10 +319,10 @@ where
         let todo: &mut CsmTodo<_> = &mut self.todo.lock();
 
         let Ok(ref space) = self.space.read(read_ticket) else {
-            // TODO: report error
-            // TODO: This is missing the non-timing information that would normally be reported
+            // Read ticket isn't adequate.
             return (
                 CsmUpdateInfo {
+                    flaws: Flaws::INVOCATION,
                     prep_time: time::Instant::now().saturating_duration_since(update_start_time),
                     ..CsmUpdateInfo::default()
                 },
@@ -711,7 +712,6 @@ where
         (
             CsmUpdateInfo {
                 flaws,
-                eye_region: self.eye_region,
                 total_time: end_all_time.saturating_duration_since(update_start_time),
                 prep_time: prep_to_update_meshes_time.saturating_duration_since(update_start_time),
                 chunk_scan_time: end_all_time
@@ -725,24 +725,31 @@ where
                 depth_sort_info: chunk_depth_sort_info,
                 depth_sort_times: chunk_depth_sort_times,
                 block_updates,
-
-                // TODO: remember this rather than computing it
-                block_count: self.block_meshes.meshes.len(),
-                block_total_cpu_byte_size: self
-                    .block_meshes
-                    .meshes
-                    .iter()
-                    .map(|vbm| vbm.data.heap_bytes_owned())
-                    .sum(),
-                chunk_count: self.chunks.len(),
-                chunk_total_cpu_byte_size: self
-                    .chunks
-                    .values()
-                    .map(ChunkMesh::mesh_byte_size)
-                    .sum(),
             },
             deadline < end_all_time,
         )
+    }
+
+    /// Returns information about the resource consumption and current state of a
+    /// [`ChunkedSpaceMesh`].
+    ///
+    /// This information is intended to be displayed adjacent to the [`CsmUpdateInfo`] obtained
+    /// from calling [`Self::update()`].
+    pub fn state_info(&self) -> StateInfo {
+        StateInfo {
+            eye_region: self.eye_region,
+
+            // TODO: cache this info to avoid needing to traverse all blocks/chunks repeatedly.
+            block_count: self.block_meshes.meshes.len(),
+            block_total_cpu_byte_size: self
+                .block_meshes
+                .meshes
+                .iter()
+                .map(|vbm| vbm.data.heap_bytes_owned())
+                .sum(),
+            chunk_count: self.chunks.len(),
+            chunk_total_cpu_byte_size: self.chunks.values().map(ChunkMesh::mesh_byte_size).sum(),
+        }
     }
 
     /// Returns a handle to the job queue, which may be used by background tasks (which you supply)
@@ -796,6 +803,8 @@ where
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Performance info from a [`ChunkedSpaceMesh`]'s per-frame update.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[non_exhaustive]
@@ -804,9 +813,6 @@ pub struct CsmUpdateInfo {
     /// Note that this does not include mesh flaws; the caller must gather those when
     /// drawing the chunks.
     pub flaws: Flaws,
-    /// Bounding box of view positions in which [`ChunkedSpaceMesh::update()`] does not
-    /// need to repeat any view-dependent work and need not be called again.
-    eye_region: EyeRegion,
     /// Total time spent on the update.
     pub total_time: Duration,
     /// Time spent on gathering information before starting the chunk scan.
@@ -827,6 +833,18 @@ pub struct CsmUpdateInfo {
     pub depth_sort_times: TimeStats,
     /// Time spent on building block meshes this frame.
     block_updates: dynamic::blocks::VbmUpdateInfo,
+}
+
+/// Info about the resource consumption and current state of a [`ChunkedSpaceMesh`].
+///
+/// This information is intended to be displayed adjacent to the [`CsmUpdateInfo`] obtained
+/// from calling [`ChunkedSpaceMesh::update()`].
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct StateInfo {
+    /// Bounding box of view positions in which [`ChunkedSpaceMesh::update()`] does not
+    /// need to repeat any view-dependent work and need not be called again.
+    eye_region: EyeRegion,
 
     /// Number of block meshes that currently exist.
     pub block_count: usize,
@@ -843,7 +861,6 @@ impl Fmt<StatusText> for CsmUpdateInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         let CsmUpdateInfo {
             flaws,
-            eye_region,
             total_time: _,
             prep_time,
             chunk_scan_time,
@@ -858,10 +875,6 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                 },
             depth_sort_times,
             block_updates,
-            block_count,
-            block_total_cpu_byte_size,
-            chunk_count,
-            chunk_total_cpu_byte_size,
         } = self;
         write!(
             fmt,
@@ -872,12 +885,9 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                       mesh gen {chunk_mesh_generation_times}
                       inst gen {chunk_instance_generation_times}
                       Z sort   {depth_sort_times} ({elements_sorted:6} elems grouped in {groups_sorted:3} dyn + {static_groups_sorted:3} static)
-                      upload   {chunk_mesh_callback_times}
-                Eye region: {eye_region}
-                Mem: {block_mib} MiB for {block_count} blocks, {chunk_mib} MiB for {chunk_count} chunks\
+                      upload   {chunk_mesh_callback_times}\
             "},
             flaws = flaws,
-            eye_region = eye_region.refmt(fopt),
             prep_time = prep_time.refmt(fopt),
             block_updates = block_updates.refmt(fopt),
             chunk_scan_time = chunk_scan_time.refmt(fopt),
@@ -888,6 +898,26 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             groups_sorted = groups_sorted,
             static_groups_sorted = static_groups_sorted,
             depth_sort_times = depth_sort_times,
+        )
+    }
+}
+
+impl Fmt<StatusText> for StateInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
+        let StateInfo {
+            eye_region,
+            block_count,
+            block_total_cpu_byte_size,
+            chunk_count,
+            chunk_total_cpu_byte_size,
+        } = self;
+        write!(
+            fmt,
+            indoc! {"
+                Eye region: {eye_region}
+                Mem: {block_mib} MiB for {block_count} blocks, {chunk_mib} MiB for {chunk_count} chunks\
+            "},
+            eye_region = eye_region.refmt(fopt),
             chunk_mib = chunk_total_cpu_byte_size / (1024 * 1024),
             chunk_count = chunk_count,
             block_mib = block_total_cpu_byte_size / (1024 * 1024),
@@ -897,14 +927,13 @@ impl Fmt<StatusText> for CsmUpdateInfo {
 }
 
 impl CsmUpdateInfo {
-    /// Combine two updates for the *same* [`ChunkedSpaceMesh`] (not double-counting counts),
+    /// Combine two updates for the *same* [`ChunkedSpaceMesh`],
     /// where `self` is the first and `other` is the second.
     ///
-    /// Times are summed, but flaws are replaced and counts are kept.
+    /// Times are summed, but flaws are replaced since any flaws in the first update are obsolete.
     fn add_second_pass(&mut self, other: Self) {
         let Self {
             flaws,
-            eye_region,
             total_time,
             prep_time,
             chunk_scan_time,
@@ -914,13 +943,8 @@ impl CsmUpdateInfo {
             depth_sort_info,
             depth_sort_times,
             block_updates,
-            block_count,
-            block_total_cpu_byte_size,
-            chunk_count,
-            chunk_total_cpu_byte_size,
         } = self;
         *flaws = other.flaws; // replace!
-        *eye_region = other.eye_region; // replace!
         *total_time += other.total_time;
         *prep_time += other.prep_time;
         *chunk_scan_time += other.chunk_scan_time;
@@ -930,12 +954,10 @@ impl CsmUpdateInfo {
         *depth_sort_info += other.depth_sort_info;
         *depth_sort_times += other.depth_sort_times;
         *block_updates += other.block_updates;
-        *block_count = other.block_count; // replace!
-        *block_total_cpu_byte_size = other.block_total_cpu_byte_size; // replace!
-        *chunk_count = other.chunk_count; // replace!
-        *chunk_total_cpu_byte_size = other.chunk_total_cpu_byte_size; // replace!
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// [`ChunkedSpaceMesh`]'s set of things that need recomputing.
 #[derive(Debug, Default)]
