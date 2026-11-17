@@ -1,5 +1,12 @@
 //! Command line option parsing.
 
+// TODO: After Rust 1.102, change this to `expect()` (as well as following the rename to
+// `large_unopt_stack_frames`).
+#![allow(
+    clippy::large_stack_frames,
+    reason = "derive(clap::Subcommand) generates functions full of trivial moves of large structs; <https://github.com/clap-rs/clap/pull/6569>"
+)]
+
 use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::str::FromStr;
