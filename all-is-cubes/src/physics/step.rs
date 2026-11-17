@@ -210,9 +210,12 @@ impl manyfmt::Fmt<ConciseDebug> for BodyStepDetails {
         } = self;
         fmt.debug_struct("BodyStepDetails")
             .field("quiescent", quiescent)
-            .field("already_colliding", already_colliding)
-            .field("uncrush", uncrush)
-            .field("push_out", &push_out.as_ref().map(|v| v.refmt(fopt)))
+            .field("already_colliding", &NoAlternateDebug(already_colliding))
+            .field("uncrush", &NoAlternateDebug(uncrush))
+            .field(
+                "push_out",
+                &NoAlternateDebug(push_out.as_ref().map(|v| v.refmt(fopt))),
+            )
             .field(
                 "initial_crush",
                 // single-line formatting for the FaceMap. TODO: truncate digits too
