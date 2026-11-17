@@ -131,7 +131,7 @@ pub(crate) struct CharMap {
 impl CharMap {
     // TODO: replace this with character maps loaded from font data
     fn iso_8859_1_with_hacks() -> Self {
-        let mut map = HashMap::new();
+        let mut map: HashMap<char, usize> = HashMap::new();
 
         // ASCII non-controls (except including DEL) range
         for c in '\u{20}'..='\u{7F}' {
@@ -143,15 +143,22 @@ impl CharMap {
             map.insert(c, (c as GlyphIndex) - 0x40);
         }
 
-        // Miscellaneous glyph reuses:
-        // Curly quotes
-        map.insert('\u{2018}', '\'' as GlyphIndex);
-        map.insert('\u{2019}', '\'' as GlyphIndex);
-        map.insert('\u{201C}', '"' as GlyphIndex);
-        map.insert('\u{201D}', '"' as GlyphIndex);
-        // Dashes
-        map.insert('\u{2013}', '-' as GlyphIndex);
-        map.insert('\u{2212}', '-' as GlyphIndex);
+        // Miscellaneous glyph reuses (temporary hack):
+        for &(alias, original) in const {
+            &[
+                // Curly quotes
+                ('\u{2018}', '\''),
+                ('\u{2019}', '\''),
+                ('\u{201C}', '"'),
+                ('\u{201D}', '"'),
+                // Dashes
+                ('\u{2013}', '-'),
+                ('\u{2014}', '-'),
+                ('\u{2212}', '-'),
+            ]
+        } {
+            map.insert(alias, map[&original]);
+        }
 
         Self { map }
     }
