@@ -181,6 +181,7 @@ jobs:
       with:
         # We cannot reuse the cache from the `build` job, because `RUSTFLAGS=-Dwarnings`
         # would invalidate all cached artifacts anyway.
+        # TODO: We're no longer using RUSTFLAGS; try merging the caches.
         prefix-key: "v1-rust-unstablefeatures-${{ matrix.toolchain }}"
         shared-key: "lint"
         # Don’t save caches specific to PR branches.
