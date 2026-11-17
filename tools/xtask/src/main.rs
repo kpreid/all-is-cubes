@@ -61,7 +61,7 @@ fn main() -> Result<(), ActionError> {
     // have new `renamed_and_removed_lints` that should be ignored, but build.warnings doesn’t
     // implement ignoring them:
     //   <https://github.com/rust-lang/cargo/issues/17193>
-    let use_rustflags_to_deny_warnings = CI && {
+    let use_lint_config_to_deny_warnings = CI && {
         let rustc_version_output = sh.cmd("rustc").arg("--version").output().unwrap().stdout;
         let rustc_version_output = str::from_utf8(&rustc_version_output).unwrap();
         rustc_version_output.contains("nightly") || rustc_version_output.contains("beta")
@@ -83,7 +83,7 @@ fn main() -> Result<(), ActionError> {
             cargo_timings: timings,
             cargo_quiet: quiet,
             time_log_quiet: quiet,
-            use_rustflags_to_deny_warnings,
+            use_lint_config_to_deny_warnings,
             scope,
             main_metadata,
             time_log_tx,
@@ -667,7 +667,7 @@ fn do_for_all_packages(
             Features::Default => {
                 {
                     let _t = context.capture_time(format!("{op:?}"));
-                    op.cargo_cmd(context).run()?;
+                    op.cargo_cmd(context, &[]).run()?;
                 }
 
                 {
@@ -696,7 +696,7 @@ fn do_for_all_packages(
             Features::AllAndNothing => {
                 {
                     let _t = context.capture_time(format!("{op:?} --all-features"));
-                    op.cargo_cmd(context).args(["--all-targets", "--all-features"]).run()?;
+                    op.cargo_cmd(context, &["--all-targets", "--all-features"]).run()?;
                 }
 
                 // To test with limited features, we need to run commands separately for each
@@ -709,14 +709,16 @@ fn do_for_all_packages(
                     }
 
                     let _t = context.capture_time(format!("{op:?} --package {package_name}"));
-                    op.cargo_cmd(context)
-                        .args([
+                    op.cargo_cmd(
+                        context,
+                        &[
                             "--package",
                             package_name,
                             "--all-targets",
                             "--no-default-features",
-                        ])
-                        .run()?;
+                        ],
+                    )
+                    .run()?;
                 }
             }
 
@@ -738,14 +740,16 @@ fn do_for_all_packages(
                         let _t = context.capture_time(format!(
                             "{op:?} --package={package_name} --features={feature_set_commas}"
                         ));
-                        op.cargo_cmd(context)
-                            .args([
+                        op.cargo_cmd(
+                            context,
+                            &[
                                 &format!("--package={package_name}"),
                                 "--all-targets",
                                 "--no-default-features",
                                 &format!("--features={feature_set_commas}"),
-                            ])
-                            .run()?;
+                            ],
+                        )
+                        .run()?;
                     }
                 }
             }
@@ -776,7 +780,7 @@ fn do_for_all_packages(
             TestOrCheck::BuildTests | TestOrCheck::Lint | TestOrCheck::Check => {
                 let _pushd = context.sh.push_dir("all-is-cubes-wasm");
                 // Build the tests that `wasm-pack test` will test.
-                op.cargo_cmd(context).arg(TARGET_WASM).run()?;
+                op.cargo_cmd(context, &[TARGET_WASM]).run()?;
             }
         }
     }

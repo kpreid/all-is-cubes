@@ -23,8 +23,8 @@ pub struct Context<'a> {
     /// Don’t print timing logs.
     pub time_log_quiet: bool,
 
-    /// Whether to use `RUSTFLAGS=-Dwarnings` instead of Cargo `build.warnings="deny"`.
-    pub use_rustflags_to_deny_warnings: bool,
+    /// Whether to use `cargo clippy -- -Dwarnings` instead of Cargo `build.warnings="deny"`.
+    pub use_lint_config_to_deny_warnings: bool,
 
     /// What parts of the project should be acted on.
     pub scope: Scope,
@@ -112,33 +112,33 @@ pub(crate) enum TestOrCheck {
 }
 
 impl TestOrCheck {
-    pub fn cargo_cmd<'a>(self, config: &'a Context<'_>) -> Cmd<'a> {
-        let mut rustflags_deny_warnings = false;
-
-        let mut cmd = config
+    pub fn cargo_cmd<'a>(self, config: &'a Context<'_>, extra_cargo_args: &[&str]) -> Cmd<'a> {
+        config
             .cargo()
             .args(match self {
-                Self::Test => vec!["test"],
-                Self::BuildTests => vec!["test", "--no-run"],
-                Self::Lint if config.use_rustflags_to_deny_warnings => {
-                    rustflags_deny_warnings = true;
-                    vec!["clippy"]
-                }
-                Self::Lint => vec!["clippy", "--config=build.warnings='deny'"],
-                Self::Check => vec!["check"],
+                Self::Test => ["test"],
+                Self::BuildTests => ["test"],
+                Self::Lint => ["clippy"],
+                Self::Check => ["check"],
             })
-            .args(config.cargo_build_args());
-
-        if rustflags_deny_warnings {
-            let new_rustflags = match std::env::var("RUSTFLAGS") {
-                Ok(old_rustflags) => format!("{old_rustflags} -Dwarnings"),
-                Err(_) => String::from("-Dwarnings"),
-            };
-            eprintln!("[xtask] note: setting RUSTFLAGS to {new_rustflags}");
-            cmd = cmd.env("RUSTFLAGS", new_rustflags)
-        }
-
-        cmd
+            .args(config.cargo_build_args())
+            .args(extra_cargo_args)
+            .args::<&[&'static str]>(match self {
+                Self::BuildTests => &["--no-run"],
+                Self::Lint => {
+                    if config.use_lint_config_to_deny_warnings {
+                        // Workaround for <https://github.com/rust-lang/cargo/issues/17193>.
+                        // Not preferred because it loses the distinction in individual
+                        // diagnostics between “error:” and “warning:”, and it entirely
+                        // hides the renamed lint warning, but it does get the final
+                        // exit code we want.
+                        &["--", "-Dwarnings", "-Arenamed_and_removed_lints"]
+                    } else {
+                        &["--config=build.warnings='deny'"]
+                    }
+                }
+                _ => &[],
+            })
     }
 
     /// Return the cargo subcommand to use for the targets that we are *not* planning or able
