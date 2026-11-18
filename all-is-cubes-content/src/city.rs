@@ -877,11 +877,15 @@ fn place_lamppost(
 
     m.set(base_position, &demo_blocks[LamppostBase])?;
 
+    // TODO: if walk() returned both backwards and forwards faces, we would not need to use
+    // tuple_windows().
     for (step1, step2) in walk(base_position, globe_position).tuple_windows() {
-        // let prev_cube = step1.cube;
         let prev_dir: Face = step1.face.try_into().unwrap();
         let this_cube = step2.cube;
-        let next_dir: Face = step2.face.try_into().unwrap();
+        let Some(next_dir): Option<Face> = step2.face.try_into().ok() else {
+            // skip the last cube in the walk, which is the globe (easier to not handle specially)
+            break;
+        };
         let next_cube = step2.adjacent();
 
         let block = if next_cube == globe_position {

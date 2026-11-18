@@ -15,8 +15,8 @@ use num_traits::float::Float as _;
 
 use all_is_cubes::block::{Atom, Block, Primitive, Resolution};
 use all_is_cubes::math::{
-    Cube, CubeFace, Face, FaceMap, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate,
-    GridSizeCoord, GridVector, Gridgid, PositiveSign, Vol,
+    Cube, CubeFace, Face, Face7, FaceMap, FreeCoordinate, FreePoint, FreeVector, GridAab,
+    GridCoordinate, GridSizeCoord, GridVector, Gridgid, PositiveSign, Vol,
 };
 use all_is_cubes::space::{self, CubeTransaction, SetCubeError, Space, SpaceTransaction};
 
@@ -313,18 +313,23 @@ pub(crate) fn square_radius(resolution: Resolution, cube: Cube) -> [GridCoordina
 
 /// Returns a path of single-cube steps from `start` to `end`.
 ///
+/// Each item’s face is the face shared with the next cube.
+/// The last cube has [`Face7::Within`].
+///
 /// TODO: If useful, allow specifying style of traversal — which axis first, or longest
 /// axis first, or evenly distributed (Bresenham).
 pub(crate) fn walk(start: Cube, end: Cube) -> impl Iterator<Item = CubeFace> + Clone {
-    use Face::*;
     use itertools::repeat_n;
     let delta = end - start;
     let dists = delta.abs().cast::<usize>();
 
-    let x_steps = repeat_n(if delta.x > 0 { PX } else { NX }, dists.x);
-    let y_steps = repeat_n(if delta.y > 0 { PY } else { NY }, dists.y);
-    let z_steps = repeat_n(if delta.z > 0 { PZ } else { NZ }, dists.z);
-    let steps = y_steps.chain(x_steps).chain(z_steps);
+    #[rustfmt::skip]
+    let steps = {
+        let x_steps = repeat_n(if delta.x > 0 { Face7::PX } else { Face7::NX }, dists.x);
+        let y_steps = repeat_n(if delta.y > 0 { Face7::PY } else { Face7::NY }, dists.y);
+        let z_steps = repeat_n(if delta.z > 0 { Face7::PZ } else { Face7::NZ }, dists.z);
+        y_steps.chain(x_steps).chain(z_steps).chain(iter::once(Face7::Within))
+    };
 
     #[derive(Clone, Debug)]
     struct CubeIter<I> {
@@ -332,14 +337,14 @@ pub(crate) fn walk(start: Cube, end: Cube) -> impl Iterator<Item = CubeFace> + C
         // end: Cube,
         inner: I,
     }
-    impl<I: Iterator<Item = Face>> Iterator for CubeIter<I> {
+    impl<I: Iterator<Item = Face7>> Iterator for CubeIter<I> {
         type Item = CubeFace;
 
         fn next(&mut self) -> Option<Self::Item> {
-            let face = self.inner.next()?;
+            let face: Face7 = self.inner.next()?;
             let step = CubeFace {
                 cube: self.start,
-                face: face.into(),
+                face,
             };
             self.start += face.normal_vector();
             Some(step)
@@ -419,20 +424,38 @@ mod tests {
         use Face7::*;
         let start = Cube::new(1, 2, 3);
 
-        assert_eq!(walk(start, start).collect_vec(), []);
         assert_eq!(
-            walk(start, Cube::new(1, 3, 3)).collect_vec(),
+            walk(start, start).collect_vec(),
             [CubeFace {
                 cube: start,
-                face: PY
+                face: Within
             }]
         );
         assert_eq!(
+            walk(start, Cube::new(1, 3, 3)).collect_vec(),
+            [
+                CubeFace {
+                    cube: start,
+                    face: PY
+                },
+                CubeFace {
+                    cube: Cube::new(1, 3, 3),
+                    face: Within
+                }
+            ]
+        );
+        assert_eq!(
             walk(start, Cube::new(1, 1, 3)).collect_vec(),
-            [CubeFace {
-                cube: start,
-                face: NY
-            }]
+            [
+                CubeFace {
+                    cube: start,
+                    face: NY
+                },
+                CubeFace {
+                    cube: Cube::new(1, 1, 3),
+                    face: Within
+                }
+            ]
         );
         assert_eq!(
             walk(start, Cube::new(0, 4, 0)).collect_vec(),
@@ -461,6 +484,10 @@ mod tests {
                     cube: Cube::new(0, 4, 1),
                     face: NZ
                 },
+                CubeFace {
+                    cube: Cube::new(0, 4, 0),
+                    face: Within
+                }
             ]
         );
     }
