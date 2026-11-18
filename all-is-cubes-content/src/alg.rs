@@ -6,6 +6,7 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::iter;
+use core::mem;
 
 use descriptive_unwrap::ResultExt as _;
 /// Acts as polyfill for float methods
@@ -318,43 +319,100 @@ pub(crate) fn square_radius(resolution: Resolution, cube: Cube) -> [GridCoordina
 ///
 /// TODO: If useful, allow specifying style of traversal — which axis first, or longest
 /// axis first, or evenly distributed (Bresenham).
-pub(crate) fn walk(start: Cube, end: Cube) -> impl Iterator<Item = CubeFace> + Clone {
-    use itertools::repeat_n;
-    let delta = end - start;
-    let dists = delta.abs().cast::<usize>();
-
-    #[rustfmt::skip]
-    let steps = {
-        let x_steps = repeat_n(if delta.x > 0 { Face7::PX } else { Face7::NX }, dists.x);
-        let y_steps = repeat_n(if delta.y > 0 { Face7::PY } else { Face7::NY }, dists.y);
-        let z_steps = repeat_n(if delta.z > 0 { Face7::PZ } else { Face7::NZ }, dists.z);
-        y_steps.chain(x_steps).chain(z_steps).chain(iter::once(Face7::Within))
-    };
+pub(crate) fn walk(start: Cube, end: Cube) -> impl DoubleEndedIterator<Item = CubeFace> + Clone {
+    use core::cmp::Ordering::{Equal, Greater, Less};
 
     #[derive(Clone, Debug)]
-    struct CubeIter<I> {
+    struct Walk {
+        /// First cube in the remaining items.
         start: Cube,
-        // end: Cube,
-        inner: I,
+        /// Last cube in the remaining items.
+        end: Cube,
+        /// Face to emit when iterating backwards.
+        backward_face: Face7,
+        /// Whether we’ve produced the final `Within` step.
+        final_produced: bool,
     }
-    impl<I: Iterator<Item = Face7>> Iterator for CubeIter<I> {
+    impl Walk {
+        /// Find which axes we need to move on, and which direction that is for forward iteration.
+        /// Permutes the axes according to our prioritization.
+        /// Never returns [`Face7::Within`].
+        #[inline(always)]
+        fn axis_cmps(&self) -> [Option<Face7>; 3] {
+            let x = match self.end.x.cmp(&self.start.x) {
+                Less => Some(Face7::NX),
+                Equal => None,
+                Greater => Some(Face7::PX),
+            };
+            let y = match self.end.y.cmp(&self.start.y) {
+                Less => Some(Face7::NY),
+                Equal => None,
+                Greater => Some(Face7::PY),
+            };
+            let z = match self.end.z.cmp(&self.start.z) {
+                Less => Some(Face7::NZ),
+                Equal => None,
+                Greater => Some(Face7::PZ),
+            };
+            [y, x, z]
+        }
+
+        /// Pick the first non-`None` element and also update `final_produced`.
+        /// Returns `None` if the iterator should be exhausted.
+        /// This is the shared component between `next()` and `next_back()`.
+        #[inline(always)]
+        fn choose_direction(&mut self, axis_cmps: [Option<Face7>; 3]) -> Option<Face7> {
+            match axis_cmps {
+                [Some(face), _, _] => Some(face),
+                [None, Some(face), _] => Some(face),
+                [None, None, Some(face)] => Some(face),
+                [None, None, None] => {
+                    if self.final_produced {
+                        None
+                    } else {
+                        self.final_produced = true;
+                        Some(Face7::Within)
+                    }
+                }
+            }
+        }
+    }
+    impl Iterator for Walk {
         type Item = CubeFace;
 
+        #[inline(never)]
         fn next(&mut self) -> Option<Self::Item> {
-            let face: Face7 = self.inner.next()?;
+            let direction = self.choose_direction(self.axis_cmps())?;
+
             let step = CubeFace {
                 cube: self.start,
-                face,
+                face: direction,
             };
-            self.start += face.normal_vector();
+            self.start += direction.normal_vector();
+            Some(step)
+        }
+    }
+    impl DoubleEndedIterator for Walk {
+        #[inline(never)]
+        fn next_back(&mut self) -> Option<Self::Item> {
+            let mut axis_cmps = self.axis_cmps();
+            axis_cmps.reverse();
+            let direction = self.choose_direction(axis_cmps)?;
+
+            let step = CubeFace {
+                cube: self.end,
+                face: mem::replace(&mut self.backward_face, direction),
+            };
+            self.end += direction.opposite().normal_vector();
             Some(step)
         }
     }
 
-    CubeIter {
+    Walk {
         start,
-        //  end,
-        inner: steps,
+        end,
+        backward_face: Face7::Within,
+        final_produced: false,
     }
 }
 
@@ -382,7 +440,6 @@ mod tests {
     use crate::make_some_blocks;
     use Resolution::*;
     use all_is_cubes::math::Face7;
-    use itertools::Itertools as _;
 
     #[test]
     fn gradient_lookup_cases() {
@@ -422,17 +479,30 @@ mod tests {
     #[test]
     fn walk_cases() {
         use Face7::*;
+        const LIMIT: usize = 100;
+
         let start = Cube::new(1, 2, 3);
 
+        fn walk_and_check_reverse(start: Cube, end: Cube) -> Vec<CubeFace> {
+            let forward_path: Vec<CubeFace> = walk(start, end).take(LIMIT).collect();
+            let mut reverse_path: Vec<CubeFace> = walk(start, end).rev().take(LIMIT).collect();
+            reverse_path.reverse();
+            assert_eq!(
+                forward_path, reverse_path,
+                "forward and reverse iteration were not equal"
+            );
+            forward_path
+        }
+
         assert_eq!(
-            walk(start, start).collect_vec(),
+            walk_and_check_reverse(start, start),
             [CubeFace {
                 cube: start,
                 face: Within
             }]
         );
         assert_eq!(
-            walk(start, Cube::new(1, 3, 3)).collect_vec(),
+            walk_and_check_reverse(start, Cube::new(1, 3, 3)),
             [
                 CubeFace {
                     cube: start,
@@ -445,7 +515,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            walk(start, Cube::new(1, 1, 3)).collect_vec(),
+            walk_and_check_reverse(start, Cube::new(1, 1, 3)),
             [
                 CubeFace {
                     cube: start,
@@ -458,7 +528,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            walk(start, Cube::new(0, 4, 0)).collect_vec(),
+            walk_and_check_reverse(start, Cube::new(0, 4, 0)),
             [
                 CubeFace {
                     cube: start,
