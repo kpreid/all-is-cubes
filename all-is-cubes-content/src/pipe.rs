@@ -47,25 +47,30 @@ impl Kit {
     ///
     /// One straight and one right-angle pipe is sufficient input to make all possible connections.
     pub fn new_with_rotations(pipes: impl IntoIterator<Item = Descriptor>) -> Self {
-        let mut table: HashMap<(Face, Face), Block> = HashMap::new();
-        for pipe in pipes {
-            // TODO: Allow caller — or the individual pipes — to rank preferred and dispreferred
-            // rotations more finely than "prefer IDENTITY".
-            for rotation in GridRotation::ALL_BUT_REFLECTIONS {
-                let faces = (
-                    rotation.transform(pipe.from_face),
-                    rotation.transform(pipe.to_face),
-                );
-                if rotation == GridRotation::IDENTITY {
-                    // Unconditionally insert.
-                    table.insert(faces, pipe.block.clone().rotate(rotation));
-                } else {
-                    // Insert only if we don't have one already.
-                    table.entry(faces).or_insert_with(|| pipe.block.clone().rotate(rotation));
+        #[inline(never)]
+        fn nongeneric(pipes: &mut dyn Iterator<Item = Descriptor>) -> Kit {
+            let mut table: HashMap<(Face, Face), Block> = HashMap::new();
+            for pipe in pipes {
+                // TODO: Allow caller — or the individual pipes — to rank preferred and dispreferred
+                // rotations more finely than "prefer IDENTITY".
+                for rotation in GridRotation::ALL_BUT_REFLECTIONS {
+                    let faces = (
+                        rotation.transform(pipe.from_face),
+                        rotation.transform(pipe.to_face),
+                    );
+                    if rotation == GridRotation::IDENTITY {
+                        // Unconditionally insert.
+                        table.insert(faces, pipe.block.clone().rotate(rotation));
+                    } else {
+                        // Insert only if we don't have one already.
+                        table.entry(faces).or_insert_with(|| pipe.block.clone().rotate(rotation));
+                    }
                 }
             }
+            Kit(table)
         }
-        Kit(table)
+
+        nongeneric(&mut pipes.into_iter())
     }
 
     /// Rotate and position pipe blocks from `self` to follow `path`.
