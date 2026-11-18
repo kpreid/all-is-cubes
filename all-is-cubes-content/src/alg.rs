@@ -17,7 +17,7 @@ use num_traits::float::Float as _;
 use all_is_cubes::block::{Atom, Block, Primitive, Resolution};
 use all_is_cubes::math::{
     Cube, CubeFace, Face, Face7, FaceMap, FreeCoordinate, FreePoint, FreeVector, GridAab,
-    GridCoordinate, GridSizeCoord, GridVector, Gridgid, PositiveSign, Vol,
+    GridCoordinate, GridSizeCoord, GridVector, Gridgid, PositiveSign, Vol, u32size,
 };
 use all_is_cubes::space::{self, CubeTransaction, SetCubeError, Space, SpaceTransaction};
 
@@ -317,9 +317,14 @@ pub(crate) fn square_radius(resolution: Resolution, cube: Cube) -> [GridCoordina
 /// Each item’s face is the face shared with the next cube.
 /// The last cube has [`Face7::Within`].
 ///
+/// The path must be less than [`usize::MAX`] in length.
+///
 /// TODO: If useful, allow specifying style of traversal — which axis first, or longest
 /// axis first, or evenly distributed (Bresenham).
-pub(crate) fn walk(start: Cube, end: Cube) -> impl DoubleEndedIterator<Item = CubeFace> + Clone {
+pub(crate) fn walk(
+    start: Cube,
+    end: Cube,
+) -> impl DoubleEndedIterator<Item = CubeFace> + ExactSizeIterator + iter::FusedIterator + Clone {
     use core::cmp::Ordering::{Equal, Greater, Less};
 
     #[derive(Clone, Debug)]
@@ -391,6 +396,11 @@ pub(crate) fn walk(start: Cube, end: Cube) -> impl DoubleEndedIterator<Item = Cu
             self.start += direction.normal_vector();
             Some(step)
         }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            let len = self.len();
+            (len, Some(len))
+        }
     }
     impl DoubleEndedIterator for Walk {
         #[inline(never)]
@@ -407,13 +417,41 @@ pub(crate) fn walk(start: Cube, end: Cube) -> impl DoubleEndedIterator<Item = Cu
             Some(step)
         }
     }
+    impl ExactSizeIterator for Walk {
+        #[inline(never)]
+        fn len(&self) -> usize {
+            // Distance on each axis.
+            let deltas = self
+                .end
+                .lower_bounds()
+                .zip(self.start.lower_bounds(), GridCoordinate::abs_diff)
+                .map(u32size);
 
-    Walk {
+            // Total distance, plus one for the final step, makes the number of items.
+            let len: Option<usize> = deltas
+                .x
+                .checked_add(deltas.y)
+                .and_then(|xy| xy.checked_add(deltas.z))
+                .and_then(|xyz| xyz.checked_add(usize::from(!self.final_produced)));
+
+            // Note: we reuse this as a constructor invariant check during construction.
+            len.expect("total path length must fit in usize")
+        }
+    }
+    impl iter::FusedIterator for Walk {}
+
+    let iter = Walk {
         start,
         end,
         backward_face: Face7::Within,
         final_produced: false,
-    }
+    };
+
+    // This call will panic if the path is too long, so that we always implement ExactSizeIterator
+    // correctly as far as any caller can tell.
+    _ = iter.len();
+
+    iter
 }
 
 /// Place a series of blocks on top of each other, starting at the specified point.
@@ -484,13 +522,16 @@ mod tests {
         let start = Cube::new(1, 2, 3);
 
         fn walk_and_check_reverse(start: Cube, end: Cube) -> Vec<CubeFace> {
-            let forward_path: Vec<CubeFace> = walk(start, end).take(LIMIT).collect();
-            let mut reverse_path: Vec<CubeFace> = walk(start, end).rev().take(LIMIT).collect();
+            let it = walk(start, end);
+            let len = it.len();
+            let forward_path: Vec<CubeFace> = it.clone().take(LIMIT).collect();
+            let mut reverse_path: Vec<CubeFace> = it.rev().take(LIMIT).collect();
             reverse_path.reverse();
             assert_eq!(
                 forward_path, reverse_path,
                 "forward and reverse iteration were not equal"
             );
+            assert_eq!(len, forward_path.len(), "size_hint()/len() was incorrect");
             forward_path
         }
 
