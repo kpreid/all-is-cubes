@@ -76,7 +76,8 @@ fn INVENTORY(ctx: Context<'_>) {
             ],
         )?;
 
-        for (cube, block) in kit.fit(
+        kit.fit_mutation(
+            m,
             [
                 [2, 0, 0],
                 [2, 1, 0],
@@ -97,9 +98,7 @@ fn INVENTORY(ctx: Context<'_>) {
                 [2, 1, 0],
             ]
             .map(Cube::from),
-        ) {
-            m.set(cube, block)?;
-        }
+        )?;
 
         // Place some items in the loop of pipe
         {

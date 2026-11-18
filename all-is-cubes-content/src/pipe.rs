@@ -13,6 +13,7 @@ use all_is_cubes::euclid::{point3, vec3};
 use all_is_cubes::inv;
 use all_is_cubes::math::{Cube, Face, GridAab, GridCoordinate, GridRotation};
 use all_is_cubes::op::Operation;
+use all_is_cubes::space;
 use all_is_cubes::time;
 use all_is_cubes::universe::UniverseTransaction;
 
@@ -92,6 +93,19 @@ impl Kit {
                 .expect("path must consist of adjacent cubes");
             (cube_here, &self.0[&(face_behind, face_ahead)])
         })
+    }
+
+    /// As [`Kit::fit()`], but writes directly to a [`space::Mutation`].
+    #[track_caller]
+    pub fn fit_mutation(
+        &self,
+        mutation: &mut space::Mutation<'_, '_>,
+        path: impl IntoIterator<Item = Cube>,
+    ) -> Result<(), space::SetCubeError> {
+        for (cube, block) in self.fit(path) {
+            mutation.set(cube, block)?;
+        }
+        Ok(())
     }
 }
 
