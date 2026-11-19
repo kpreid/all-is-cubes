@@ -11,6 +11,8 @@ mod inv_in_block;
 pub use inv_in_block::*;
 mod inv_in_ecs;
 pub(crate) use inv_in_ecs::InventoryComponent;
+mod inv_txn;
+pub use inv_txn::*;
 mod tool;
 pub use tool::*;
 
