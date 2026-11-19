@@ -32,6 +32,7 @@
     * `math::Vol::origin_empty()`, infallible construction of empty volume.
     * `physics::Contact::aab()`
     * `sound::SoundDef::new_tone()`, a basic public constructor.
+    * `space::CubeTransaction::inventory()`, for applying inventory transactions to blocks’ inventories as part of a `SpaceTransaction`.
     * `text::FontDef`
     * `text::Measurement`
     * `time::Clock::phase()`, returns the clock’s phase, which was previously only obtainable through `Tick`.

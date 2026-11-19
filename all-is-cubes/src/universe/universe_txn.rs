@@ -1311,6 +1311,7 @@ mod tests {
                             },
                         ),
                         conserved: true,
+                        inventory: None,
                     },
                 },
                 [anonymous pending]: Insert(
@@ -1364,6 +1365,8 @@ mod tests {
                             CubeConflict {
                                 old: false,
                                 new: true,
+                                inventory: None,
+                                ignore_inventory_conflict: false,
                             },
                     },
                 ))),

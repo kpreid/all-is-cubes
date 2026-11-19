@@ -14,8 +14,7 @@ use crate::universe::{HandleVisitor, VisitHandles};
 ///
 /// The output type is the change notification which should be passed on after commit,
 /// if any change is made.
-#[derive(Clone, Debug, Default, PartialEq)]
-#[expect(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[must_use]
 pub struct InventoryTransaction {
     replace: BTreeMap<Ix, (Slot, Slot)>,

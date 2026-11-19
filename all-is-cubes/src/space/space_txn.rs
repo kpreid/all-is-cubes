@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::collections::BTreeMap;
 use alloc::collections::btree_map::Entry::*;
 use alloc::string::ToString;
@@ -7,11 +8,13 @@ use core::fmt;
 use core::mem;
 
 use bevy_ecs::prelude as ecs;
+use descriptive_unwrap::OptionExt as _;
 use hashbrown::HashMap as HbHashMap;
 
 use crate::behavior::{self, BehaviorSetTransaction};
-use crate::block::Block;
+use crate::block::{self, Block};
 use crate::fluff::Fluff;
+use crate::inv;
 use crate::math::{Cube, GridCoordinate, GridPoint, Vol};
 use crate::space::{
     self, ActivatableRegion, GridAab, Mutation, PendingEvaluation, SetCubeError, Space,
@@ -24,6 +27,8 @@ use crate::util::{ConciseDebug, Refmt as _};
 
 #[cfg(doc)]
 use crate::behavior::BehaviorSet;
+
+// -------------------------------------------------------------------------------------------------
 
 impl Transactional for Space {
     type Transaction = SpaceTransaction;
@@ -173,6 +178,7 @@ impl SpaceTransaction {
         contents: Vol<&[space::BlockIndex]>,
         behaviors: &behavior::BehaviorSet<Space>,
     ) -> Result<CommitCheck, SpaceTransactionMismatch> {
+        let mut overridden_new_blocks: Vec<(Cube, Block)> = Vec::new();
         let mut new_block_evaluations: HbHashMap<Block, PendingEvaluation> = HbHashMap::new();
 
         for (
@@ -181,6 +187,7 @@ impl SpaceTransaction {
                 old,
                 new,
                 conserved,
+                inventory,
                 activate_behavior: _,
                 fluff: _,
             },
@@ -205,10 +212,74 @@ impl SpaceTransaction {
                 }
             };
 
+            // Fetch the block currently in the space, if we will need it.
+            let old_in_space: Option<&space::SpaceBlockData> =
+                if inventory.is_some() || old.0.is_some() {
+                    Some(palette.entry(contents.as_linear()[cube_index]))
+                } else {
+                    None
+                };
+
+            // If there is an inventory transaction, execute it now to compute the new block.
+            let (new_block_with_inventory_applied, inventory_to_ignore): (
+                Option<Cow<'_, Block>>,
+                Option<usize>,
+            ) = if let Some(inventory_txn) = inventory {
+                let old_block_in_space = old_in_space.as_ref().none_is_unreachable().block();
+                if let Some((old_inventory_modifier_index, old_inventory)) =
+                    old_block_in_space.find_inventory()
+                {
+                    let inventory_txn_check = inventory_txn
+                        .check(old_inventory, ())
+                        // TODO: carry error out for more informative mismatches
+                        .map_err(|_inventory_mismatch| SpaceTransactionMismatch::Cube(cube))?;
+
+                    // Commit the transaction, on a copy of the inventory.
+                    // We must do this immediately because we have the responsibility to
+                    // evaluate all new blocks, so we must compute the new block to evaluate.
+                    let mut new_inventory = old_inventory.clone();
+                    inventory_txn
+                        .clone()
+                        .commit(&mut new_inventory, inventory_txn_check, &mut drop)
+                        .expect("TODO: make commit failure non-fatal");
+                    let new_inventory_modifier = block::Modifier::Inventory(new_inventory);
+
+                    // If this transaction replaces the block, add the inventory to that block.
+                    // Otherwise, replace the inventory the old block must already have.
+                    let mut new_block;
+                    match new.0 {
+                        Some(ref new_block_from_txn) => {
+                            new_block =
+                                new_block_from_txn.clone().with_modifier(new_inventory_modifier)
+                        }
+                        None => {
+                            new_block = old_block_in_space.clone();
+                            new_block.modifiers_mut()[old_inventory_modifier_index] =
+                                new_inventory_modifier;
+                        }
+                    }
+
+                    overridden_new_blocks.push((cube, Block::clone(&new_block)));
+
+                    (
+                        Some(Cow::Owned(new_block)),
+                        Some(old_inventory_modifier_index),
+                    )
+                } else {
+                    // If there is no inventory, then the transaction cannot apply.
+                    return Err(SpaceTransactionMismatch::Cube(cube));
+                }
+            } else {
+                (new.0.as_ref().map(Cow::Borrowed), None)
+            };
+
             if let Equal(Some(old)) = old {
-                // Raw lookup because we already computed the index for a bounds check
-                // (TODO: Put this in a function, like get_block_index)
-                if palette.entry(contents.as_linear()[cube_index]).block() != old {
+                let old_block_in_space = old_in_space.as_ref().none_is_unreachable().block();
+                if !compare_blocks_ignoring_one_modifier(
+                    old,
+                    old_block_in_space,
+                    inventory_to_ignore,
+                ) {
                     return Err(SpaceTransactionMismatch::Cube(cube));
                 }
             }
@@ -217,15 +288,16 @@ impl SpaceTransaction {
             // TODO: This is a lot of possibly redundant hash lookups.
             // `SpaceTransaction`s should have palettes just like `Space`s so that they can do this
             // once per block rather than once per cube.
-            if let Equal(Some(new_block)) = new
-                && let hashbrown::hash_map::Entry::Vacant(ve) =
-                    new_block_evaluations.entry(new_block.clone())
-            {
-                ve.insert(PendingEvaluation::new(
-                    read_ticket,
-                    palette,
-                    new_block.clone(),
-                ));
+            if let Some(new_block) = new_block_with_inventory_applied {
+                if let hashbrown::hash_map::Entry::Vacant(ve) =
+                    new_block_evaluations.entry(Block::clone(&new_block))
+                {
+                    ve.insert(PendingEvaluation::new(
+                        read_ticket,
+                        palette,
+                        Cow::into_owned(new_block),
+                    ));
+                }
             }
         }
         Ok(CommitCheck {
@@ -233,6 +305,7 @@ impl SpaceTransaction {
                 .behaviors
                 .check(behaviors, ())
                 .map_err(SpaceTransactionMismatch::Behaviors)?,
+            overridden_new_blocks,
             new_block_evaluations,
         })
     }
@@ -240,16 +313,24 @@ impl SpaceTransaction {
     fn commit_common(
         self,
         m: &mut Mutation<'_, '_>,
-        mut check: CommitCheck,
+        check: CommitCheck,
     ) -> Result<(), CommitError> {
         let mut to_activate = Vec::new();
+        let CommitCheck {
+            behaviors: behaviors_check,
+            mut new_block_evaluations,
+            overridden_new_blocks,
+        } = check;
+
+        let mut overridden_new_blocks = overridden_new_blocks.into_iter().peekable();
 
         for (
             cube,
             CubeTransaction {
-                old: _,
+                old: _, // check_common() has checked this
                 new,
                 conserved,
+                inventory: _, // check_common() has computed the inventory effect
                 activate_behavior: activate,
                 fluff,
             },
@@ -257,8 +338,20 @@ impl SpaceTransaction {
         {
             let cube = Cube::from(cube);
 
-            if let Equal(Some(new)) = new {
-                match Space::set_impl(m, cube, &new, check.new_block_evaluations.remove(&new)) {
+            let new_block: Option<Block> =
+                if overridden_new_blocks.peek().is_some_and(|(ov_cube, _)| *ov_cube == cube) {
+                    Some(overridden_new_blocks.next().none_is_unreachable().1)
+                } else {
+                    new.0
+                };
+
+            if let Some(new_block) = new_block {
+                match Space::set_impl(
+                    m,
+                    cube,
+                    &new_block,
+                    new_block_evaluations.remove(&new_block),
+                ) {
                     Ok(_) => Ok(()),
                     Err(SetCubeError::OutOfBounds { .. }) if !conserved => {
                         // ignore
@@ -286,7 +379,7 @@ impl SpaceTransaction {
         }
 
         self.behaviors
-            .commit(m.behaviors, check.behaviors, &mut no_outputs)
+            .commit(m.behaviors, behaviors_check, &mut no_outputs)
             .map_err(|e| e.context("behaviors".into()))?;
 
         if !to_activate.is_empty() {
@@ -326,6 +419,12 @@ impl SpaceTransaction {
 pub struct CommitCheck {
     behaviors: <BehaviorSetTransaction<Space> as Transaction>::CommitCheck,
     new_block_evaluations: hashbrown::HashMap<Block, PendingEvaluation>,
+
+    /// New blocks computed during check phase.
+    /// Currently, this is filled only with cubes where the [`CubeTransaction`] has an inventory
+    /// transaction. Otherwise, we use the `new` block already stored in the transaction.
+    /// Always in the same iteration order as the transaction.
+    overridden_new_blocks: Vec<(Cube, Block)>,
 }
 
 impl Transaction for SpaceTransaction {
@@ -478,6 +577,8 @@ impl universe::VisitHandles for SpaceTransaction {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Transaction precondition error type for a [`SpaceTransaction`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -559,12 +660,14 @@ impl fmt::Display for SpaceTransactionConflict {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// A modification to the contents of single cube of a [`Space`].
 ///
 /// To make use of this, insert it into a [`SpaceTransaction`] to specify _which_ cube is
 /// modified. This type does not function directly as a [`Transaction`] (though it does
 /// implement [`Merge`]).
-#[derive(Clone, Default, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct CubeTransaction {
     /// Previous block which must occupy this cube.
     /// If `None`, no precondition.
@@ -576,6 +679,15 @@ pub struct CubeTransaction {
 
     /// If true, two transactions with the same `new` block may not be merged.
     conserved: bool,
+
+    /// Transaction applied to the inventory of this block.
+    ///
+    /// If this is [`Some`] then, regardless of what the inventory transaction itself does,
+    /// the `old` and `new` fields operate on the block as if its `Modifier::Inventory` were absent.
+    ///
+    /// For example, `inventory: Some(InventoryTransaction::default())` allows replacing the block
+    /// while carrying over the contents of its inventory.
+    inventory: Option<inv::InventoryTransaction>,
 
     /// The cube was “activated” (clicked on, more or less) and behaviors attached to
     /// that region of space should respond to that.
@@ -591,12 +703,26 @@ pub struct CubeTransaction {
     fluff: Vec<Fluff>,
 }
 
+impl Default for CubeTransaction {
+    fn default() -> Self {
+        Self {
+            old: Equal(None),
+            new: Equal(None),
+            conserved: false,
+            inventory: None,
+            activate_behavior: false,
+            fluff: Vec::new(),
+        }
+    }
+}
+
 impl fmt::Debug for CubeTransaction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             old: Equal(old),
             new: Equal(new),
             conserved,
+            inventory,
             activate_behavior,
             fluff,
         } = self;
@@ -609,6 +735,8 @@ impl fmt::Debug for CubeTransaction {
         if *activate_behavior {
             ds.field("activate_behavior", &activate_behavior);
         }
+        // None is significant, so print it always
+        ds.field("inventory", &inventory);
         if !fluff.is_empty() {
             ds.field("fluff", &fluff);
         }
@@ -631,6 +759,7 @@ impl CubeTransaction {
         old: Equal(None),
         new: Equal(None),
         conserved: false,
+        inventory: None,
         activate_behavior: true,
         fluff: Vec::new(),
     };
@@ -647,6 +776,35 @@ impl CubeTransaction {
             conserved: true,
             ..Default::default()
         }
+    }
+
+    /// Construct a [`CubeTransaction`] that modifies the inventory of the block in the cube.
+    pub fn inventory(inventory_transaction: inv::InventoryTransaction) -> Self {
+        CubeTransaction {
+            inventory: Some(inventory_transaction),
+            ..Default::default()
+        }
+    }
+
+    /// Add a transaction on the inventory of the block in this cube.
+    ///
+    /// In addition to manipulating the inventory as specified by `inventory_transaction`,
+    /// this causes the transaction's other operations to act on the block as if it did not
+    /// have a [`block::Modifier::Inventory`] attached, and to fail if one is not present.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this transaction already includes an inventory transaction.
+    #[track_caller]
+    #[must_use]
+    pub fn with_inventory(mut self, inventory_transaction: inv::InventoryTransaction) -> Self {
+        match self.inventory {
+            None => self.inventory = Some(inventory_transaction),
+            Some(_) => panic!(
+                "with_inventory may only be used without an inventory transaction already present"
+            ),
+        }
+        self
     }
 
     /// Sets the block to be placed at this cube, replacing any existing modification instruction
@@ -684,29 +842,52 @@ impl Merge for CubeTransaction {
     type Conflict = CubeConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
-        let conflict = CubeConflict {
-            // Incompatible preconditions will always fail.
-            old: self.old.check_merge(&other.old).is_err(),
-            new: if self.conserved {
-                // Replacing the same cube twice is not allowed -- even if they're
-                // equal, doing so could violate an intended conservation law.
-                self.new.0.is_some() && other.new.0.is_some()
-            } else {
-                // If nonconservative, then we simply require equal outcomes.
-                self.new.check_merge(&other.new).is_err()
-            },
+        // Transactions which check/replace the block can only be merged if the other transaction
+        // has the same choice of ignoring or including the inventory.
+        // TODO: We should relax this, once we figure out a policy that doesn’t lead to any
+        // undesirable merges. (Maybe the `inventory` field should have 3 states including a
+        // "don't care"?)
+        let ignore_inventory_conflict = (self.old.0.is_some()
+            || other.old.0.is_some()
+            || self.new.0.is_some()
+            || other.new.0.is_some())
+            && self.inventory.is_some() != other.inventory.is_some();
+
+        // Incompatible preconditions will always fail.
+        let old_conflict = self.old.check_merge(&other.old).is_err();
+
+        let new_conflict = if self.conserved {
+            // Replacing the same cube twice is not allowed -- even if they're
+            // equal, doing so could violate an intended conservation law.
+            self.new.0.is_some() && other.new.0.is_some()
+        } else {
+            // If nonconservative, then we simply require equal outcomes.
+            self.new.check_merge(&other.new).is_err()
         };
 
-        if (conflict
-            != CubeConflict {
-                old: false,
-                new: false,
-            })
-        {
-            Err(conflict)
-        } else {
-            Ok(CubeMergeCheck {})
+        let _inventory_check: Option<()> = self
+            .inventory
+            .as_ref()
+            .zip(other.inventory.as_ref())
+            .map(|(a, b)| a.check_merge(b))
+            .transpose()
+            .map_err(|e| CubeConflict {
+                old: old_conflict,
+                new: new_conflict,
+                inventory: Some(e),
+                ignore_inventory_conflict,
+            })?;
+
+        if old_conflict || new_conflict || ignore_inventory_conflict {
+            return Err(CubeConflict {
+                old: old_conflict,
+                new: new_conflict,
+                inventory: None,
+                ignore_inventory_conflict,
+            });
         }
+
+        Ok(CubeMergeCheck {})
     }
 
     fn commit_merge(&mut self, other: Self, CubeMergeCheck {}: Self::MergeCheck) {
@@ -714,6 +895,7 @@ impl Merge for CubeTransaction {
             old,
             new,
             conserved,
+            inventory,
             activate_behavior,
             fluff,
         } = self;
@@ -723,6 +905,12 @@ impl Merge for CubeTransaction {
 
         old.commit_merge(other.old, ());
         new.commit_merge(other.new, ());
+
+        match (inventory.as_mut(), other.inventory) {
+            (None, other) => *inventory = other,
+            (Some(_), None) => {}
+            (Some(our_inv), Some(other_inv)) => our_inv.commit_merge(other_inv, ()),
+        }
 
         *activate_behavior |= other.activate_behavior;
 
@@ -736,37 +924,61 @@ impl universe::VisitHandles for CubeTransaction {
             old,
             new,
             conserved: _,
+            inventory,
             activate_behavior: _,
             fluff,
         } = self;
 
         old.visit_handles(visitor);
         new.visit_handles(visitor);
+        inventory.visit_handles(visitor);
         fluff.visit_handles(visitor);
     }
 }
 
+impl From<inv::InventoryTransaction> for CubeTransaction {
+    fn from(inventory_transaction: inv::InventoryTransaction) -> Self {
+        CubeTransaction::inventory(inventory_transaction)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[doc(hidden)]
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct CubeMergeCheck {
-    // This might end up having some data later.
-    // For now, it's a placeholder to avoid passing () around
-    // and getting clippy::let_unit_value warnings
-}
+pub struct CubeMergeCheck {}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Transaction conflict error type for a single [`CubeTransaction`] within a
 /// [`SpaceTransaction`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct CubeConflict {
     /// The transactions have conflicting preconditions (`old` blocks).
     pub(crate) old: bool,
     /// The transactions are attempting to modify the same cube.
     pub(crate) new: bool,
+    /// The transactions are attempting to make incompatible inventory changes.
+    pub(crate) inventory: Option<inv::InventoryConflict>,
+    /// The transactions disagree on whether to compare blocks ignoring inventory contents.
+    pub(crate) ignore_inventory_conflict: bool,
 }
 
-impl core::error::Error for CubeConflict {}
+impl core::error::Error for CubeConflict {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            Self {
+                old: _,
+                new: _,
+                inventory: Some(inventory),
+                ignore_inventory_conflict: _,
+            } => Some(inventory),
+            _ => None,
+        }
+    }
+}
 
 impl fmt::Display for CubeConflict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -774,22 +986,66 @@ impl fmt::Display for CubeConflict {
             CubeConflict {
                 old: true,
                 new: false,
-            } => write!(f, "different preconditions"),
+                inventory: _,
+                ignore_inventory_conflict: _,
+            } => write!(f, "different block preconditions"),
             CubeConflict {
                 old: false,
                 new: true,
+                inventory: _,
+                ignore_inventory_conflict: _,
             } => write!(f, "cannot write the same cube twice"),
             CubeConflict {
                 old: true,
                 new: true,
-            } => write!(f, "different preconditions (with write)"),
+                inventory: _,
+                ignore_inventory_conflict: _,
+            } => write!(f, "different block preconditions (with write)"),
             CubeConflict {
                 old: false,
                 new: false,
+                inventory: Some(_),
+                ignore_inventory_conflict: _,
+            } => write!(f, "conflicting inventory changes"),
+            CubeConflict {
+                old: false,
+                new: false,
+                inventory: None,
+                ignore_inventory_conflict: true,
+            } => write!(f, "disagreement on whether to ignore inventory"),
+            CubeConflict {
+                old: false,
+                new: false,
+                inventory: None,
+                ignore_inventory_conflict: false,
             } => unreachable!(),
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Compare two [`Block`]s, treating `b` as if the modifier at index `ignore_in_b` was deleted,
+/// or performing a normal comparison if `ignore_in_b` is [`None`].
+///
+/// # Panics
+///
+/// Panics if `ignore_in_b` is out of bounds of `b.modifiers()`.
+fn compare_blocks_ignoring_one_modifier(a: &Block, b: &Block, ignore_in_b: Option<usize>) -> bool {
+    let Some(ignore_in_b) = ignore_in_b else {
+        return a == b;
+    };
+    if a.primitive() != b.primitive() {
+        return false;
+    }
+    let am = a.modifiers();
+    let bm = b.modifiers();
+    am.len() == bm.len() - 1
+        && am[..ignore_in_b] == bm[..ignore_in_b]
+        && am[ignore_in_b..] == bm[ignore_in_b + 1..]
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -799,6 +1055,7 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::transaction::TransactionTester;
     use crate::universe::EphemeralOpaque;
+    use all_is_cubes_base::resolution::Resolution::R1;
     use alloc::vec;
     use core::sync::atomic::{AtomicU32, Ordering};
     use pretty_assertions::assert_eq;
@@ -902,6 +1159,7 @@ mod tests {
                         old: Equal(Some(b1.clone())),
                         new: Equal(Some(b2.clone())),
                         conserved: true,
+                        inventory: None,
                         activate_behavior: false,
                         fluff: vec![],
                     }
@@ -912,6 +1170,7 @@ mod tests {
                         old: Equal(Some(b1.clone())),
                         new: Equal(Some(b3.clone())),
                         conserved: true,
+                        inventory: None,
                         activate_behavior: false,
                         fluff: vec![],
                     }
@@ -996,8 +1255,149 @@ mod tests {
         assert_eq!(signal.load(Ordering::Relaxed), 1);
     }
 
+    /// Helper for tests which apply an inventory transaction to a block.
+    fn test_inventory_transaction(
+        initial_block: Block,
+        txn: CubeTransaction,
+    ) -> (Space, Result<(), ExecuteError<SpaceTransaction>>) {
+        let mut space = Space::builder(GridAab::ORIGIN_CUBE).filled_with(initial_block).build();
+
+        let result = txn.at(Cube::ORIGIN).execute(&mut space, ReadTicket::stub(), &mut no_outputs);
+        (space, result)
+    }
+
+    fn make_inventory_host_blocks<const N: usize>(slot_count: u16) -> [Block; N] {
+        make_some_blocks()
+            .map(|block| block.with_modifier(inv::InvInBlock::new(slot_count, R1, R1, [])))
+    }
+
+    #[test]
+    fn inventory_txn_only() {
+        let [host_block] = make_inventory_host_blocks(1);
+        let txn = CubeTransaction::inventory(inv::InventoryTransaction::insert([inv::Slot::one(
+            inv::Tool::Activate,
+        )]));
+
+        let (space, result) = test_inventory_transaction(
+            host_block.clone().with_modifier(inv::Inventory::new(1)),
+            txn,
+        );
+        result.unwrap();
+
+        assert_eq!(
+            space[Cube::ORIGIN],
+            host_block.with_modifier(inv::Inventory::from_slots([inv::Slot::one(
+                inv::Tool::Activate
+            )]))
+        );
+    }
+
+    /// TODO: Unclear whether this should succeed or fail. For now, it fails.
+    #[test]
+    fn inventory_txn_on_block_without_inventory() {
+        let [host_block] = make_inventory_host_blocks(1);
+        let txn = CubeTransaction::inventory(inv::InventoryTransaction::insert([inv::Slot::one(
+            inv::Tool::Activate,
+        )]));
+
+        let (_space, result) = test_inventory_transaction(host_block.clone(), txn);
+
+        assert_eq!(
+            result.unwrap_err(),
+            ExecuteError::Check(SpaceTransactionMismatch::Cube(Cube::ORIGIN))
+        );
+    }
+
+    #[test]
+    fn inventory_txn_also_changing_block() {
+        let [block1, block2] = make_inventory_host_blocks(1);
+        let txn = CubeTransaction::replacing(Some(block1.clone()), Some(block2.clone()))
+            .with_inventory(inv::InventoryTransaction::insert([inv::Slot::one(
+                inv::Tool::Activate,
+            )]));
+
+        let (space, result) =
+            test_inventory_transaction(block1.with_modifier(inv::Inventory::new(1)), txn);
+        result.unwrap();
+
+        assert_eq!(
+            space[Cube::ORIGIN],
+            block2.with_modifier(inv::Inventory::from_slots([inv::Slot::one(
+                inv::Tool::Activate
+            )]))
+        );
+    }
+
+    #[test]
+    fn inventory_txn_with_block_precondition_failing() {
+        let [block1, block2] = make_inventory_host_blocks(1);
+        let txn = CubeTransaction::replacing(
+            Some(block2.clone()), // not the same block as in the space
+            None,
+        )
+        .with_inventory(inv::InventoryTransaction::insert([inv::Slot::one(
+            inv::Tool::Activate,
+        )]));
+
+        let (_space, result) =
+            test_inventory_transaction(block1.with_modifier(inv::Inventory::new(1)), txn);
+
+        assert_eq!(
+            result.unwrap_err(),
+            ExecuteError::Check(SpaceTransactionMismatch::Cube(Cube::ORIGIN))
+        );
+    }
+
+    #[test]
+    fn inventory_txn_with_block_precondition_passing() {
+        let [host_block] = make_inventory_host_blocks(1);
+        let txn = CubeTransaction::replacing(Some(host_block.clone()), None).with_inventory(
+            inv::InventoryTransaction::insert([inv::Slot::one(inv::Tool::Activate)]),
+        );
+
+        let (space, result) = test_inventory_transaction(
+            host_block.clone().with_modifier(inv::Inventory::new(1)),
+            txn,
+        );
+        result.unwrap();
+
+        assert_eq!(
+            space[Cube::ORIGIN],
+            host_block.with_modifier(inv::Inventory::from_slots([inv::Slot::one(
+                inv::Tool::Activate
+            )]))
+        );
+    }
+
+    #[test]
+    fn inventory_txn_conflict() {
+        let txn1 = CubeTransaction::inventory(inv::InventoryTransaction::replace(
+            0,
+            inv::Slot::Empty,
+            inv::Slot::Empty,
+        ));
+        let txn2 = CubeTransaction::inventory(inv::InventoryTransaction::replace(
+            0,
+            inv::Slot::stack(1, inv::Tool::Activate),
+            inv::Slot::stack(1, inv::Tool::Activate),
+        ));
+
+        let error = txn1.merge(txn2).unwrap_err();
+
+        assert_eq!(
+            error,
+            CubeConflict {
+                old: false,
+                new: false,
+                inventory: Some(inv::InventoryConflict::ReplaceSameSlot { slot: 0 }),
+                ignore_inventory_conflict: false,
+            }
+        );
+    }
+
     #[test]
     fn systematic() {
+        use crate::inv::InventoryTransaction as It;
         use crate::space::SpaceTransaction as St;
         use crate::transaction::{assert, noop_predicate};
 
@@ -1034,6 +1434,38 @@ mod tests {
                 // TODO: Add a test that activation happened once that's possible
                 noop_predicate,
             )
+            .transaction(
+                CubeTransaction::inventory(It::default()).at(Cube::new(0, 0, 0)),
+                noop_predicate,
+            )
+            .transaction(
+                CubeTransaction::inventory(It::insert([inv::Tool::CopyFromSpace]))
+                    .at(Cube::new(0, 0, 0)),
+                noop_predicate,
+            )
+            .transaction(
+                CubeTransaction::inventory(It::insert([inv::Tool::Activate]))
+                    .at(Cube::new(0, 0, 0)),
+                noop_predicate,
+            )
+            .transaction(
+                CubeTransaction::inventory(It::replace(
+                    0,
+                    inv::Slot::Empty,
+                    inv::Tool::Activate.into(),
+                ))
+                .at(Cube::new(0, 0, 0)),
+                noop_predicate,
+            )
+            .transaction(
+                CubeTransaction::inventory(It::replace(
+                    0,
+                    inv::Tool::Activate.into(),
+                    inv::Slot::Empty,
+                ))
+                .at(Cube::new(0, 0, 0)),
+                noop_predicate,
+            )
             .target(|| Space::empty_positive(2, 1, 1))
             .target(|| {
                 Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
@@ -1054,6 +1486,22 @@ mod tests {
             .target(|| {
                 // This space makes the test transactions at [0, 0, 0] out of bounds
                 Space::empty(GridAab::from_lower_size([1, 0, 0], [1, 1, 1]))
+            })
+            .target(|| {
+                Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+                    .filled_with(
+                        b1.clone().with_modifier(inv::Inventory::from_slots([inv::Slot::Empty])),
+                    )
+                    .build()
+            })
+            .target(|| {
+                Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+                    .filled_with(
+                        b1.clone().with_modifier(inv::Inventory::from_slots([
+                            inv::Tool::Activate.into()
+                        ])),
+                    )
+                    .build()
             })
             // TODO: more spaces
             .test(ReadTicket::stub());
