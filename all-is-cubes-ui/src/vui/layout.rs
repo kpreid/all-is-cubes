@@ -321,8 +321,9 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
     /// Given the specified outermost bounds, perform layout and return a tree
     /// whose leaves are all [`Positioned`].
     ///
+    /// # Errors
+    ///
     /// TODO: haven't decided whether layout can fail yet, hence the placeholder non-error
-    #[expect(clippy::missing_errors_doc, reason = "TODO")]
     pub fn perform_layout(&self, grant: LayoutGrant) -> Result<Arc<LayoutTree<Positioned<W>>>, !> {
         Ok(Arc::new(match *self {
             LayoutTree::Leaf(ref w) => LayoutTree::Leaf(Positioned {
