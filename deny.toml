@@ -30,6 +30,7 @@ yanked = "deny"
 unmaintained = "all"
 ignore = [
     "RUSTSEC-2024-0436", # paste is “done”, not relevantly unmaintained
+    "RUSTSEC-2026-0542", # humantime is only used in tests via trycmd
 ]
 
 [bans]
