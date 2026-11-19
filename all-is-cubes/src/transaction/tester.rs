@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::rc::Rc;
-use alloc::vec::Vec;
+use alloc::string::String;
+use alloc::{vec, vec::Vec};
 use core::error::Error;
 use core::fmt::Debug;
 
@@ -52,7 +53,7 @@ where
     ) -> Self {
         self.transactions.push(TransactionAndPredicate {
             transaction,
-            predicate: Rc::new(predicate),
+            predicates: vec![Rc::new(predicate)],
         });
         self
     }
@@ -93,13 +94,23 @@ where
                     }
                     succeeded_at_least_once = true;
 
-                    if let Err(e) = (tap.predicate)(&before, &target) {
+                    let failures: Vec<String> = tap
+                        .predicates
+                        .iter()
+                        .filter_map(|p| {
+                            p(&before, &target)
+                                .as_ref()
+                                .err()
+                                .map(alloc::string::ToString::to_string)
+                        })
+                        .collect();
+                    if !failures.is_empty() {
                         panic!(
-                            "Predicate failed: {}\n\
-                            Transaction: {:#?}\n\
-                            Target before: {:#?}\n\
-                            Target after: {:#?}",
-                            e, tap.transaction, before, target
+                            "Predicates failed: {failures:#?}\n\
+                            Transaction: {transaction:#?}\n\
+                            Target before: {before:#?}\n\
+                            Target after: {target:#?}",
+                            transaction = tap.transaction
                         );
                     }
                 } // else ignore the inapplicable transaction
@@ -123,18 +134,19 @@ where
     }
 }
 
-pub type PredicateRes = Result<(), Box<dyn Error>>;
+type PError = Box<dyn Error>;
+pub type PredicateRes = Result<(), PError>;
 
 struct TransactionAndPredicate<'a, Tr: Transaction> {
     transaction: Tr,
-    predicate: Rc<dyn Fn(&Tr::Target, &Tr::Target) -> PredicateRes + 'a>,
+    predicates: Vec<Rc<dyn Fn(&Tr::Target, &Tr::Target) -> PredicateRes + 'a>>,
 }
 
 impl<Tr: Transaction + Clone> Clone for TransactionAndPredicate<'_, Tr> {
     fn clone(&self) -> Self {
         TransactionAndPredicate {
             transaction: self.transaction.clone(),
-            predicate: self.predicate.clone(),
+            predicates: self.predicates.clone(),
         }
     }
 }
@@ -148,14 +160,10 @@ where
         self.transaction.commit_merge(other.transaction, merge_check);
         Some(TransactionAndPredicate {
             transaction: self.transaction,
-            predicate: {
-                let p1 = Rc::clone(&self.predicate);
-                let p2 = Rc::clone(&other.predicate);
-                Rc::new(move |before, after| {
-                    p1(before, after)?;
-                    p2(before, after)?;
-                    Ok(())
-                })
+            predicates: {
+                let mut combined = self.predicates;
+                combined.append(&mut { other.predicates });
+                combined
             },
         })
     }
