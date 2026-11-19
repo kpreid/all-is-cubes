@@ -655,7 +655,7 @@ mod tests {
         }
 
         TransactionTester::new()
-            .transaction(BodyTransaction::default(), |_, _| Ok(()))
+            .transaction(BodyTransaction::default(), transaction::noop_predicate)
             .transaction(
                 BodyTransaction::default().with_position(point3(0., 0., 0.)),
                 check_position(point3(0., 0., 0.)),

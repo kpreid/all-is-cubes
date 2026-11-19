@@ -407,49 +407,37 @@ mod txn {
 
     #[test]
     fn systematic() {
+        use transaction::assert;
+
         let [b1, b2, b3] = make_some_blocks();
         TransactionTester::new()
-            .transaction(BlockDefTransaction::default(), |_, _| Ok(()))
+            .transaction(BlockDefTransaction::default(), transaction::noop_predicate)
             .transaction(
                 BlockDefTransaction::replace(b1.clone(), b2.clone()),
                 |before, after| {
-                    if *before.block() != b1 {
-                        return Err("did not assert b1".into());
-                    }
-                    if *after.block() != b2 {
-                        return Err("did not set b2".into());
-                    }
+                    assert(*before.block() == b1, "did not assert b1")?;
+                    assert(*after.block() == b2, "did not set b2")?;
                     Ok(())
                 },
             )
             .transaction(
                 BlockDefTransaction::replace(b1.clone(), b3.clone()),
                 |before, after| {
-                    if *before.block() != b1 {
-                        return Err("did not assert b1".into());
-                    }
-                    if *after.block() != b3 {
-                        return Err("did not set b3".into());
-                    }
+                    assert(*before.block() == b1, "did not assert b1")?;
+                    assert(*after.block() == b3, "did not set b3")?;
                     Ok(())
                 },
             )
             .transaction(BlockDefTransaction::overwrite(b2.clone()), |_, after| {
-                if *after.block() != b2 {
-                    return Err("did not set b2".into());
-                }
+                assert(*after.block() == b2, "did not set b2")?;
                 Ok(())
             })
             .transaction(BlockDefTransaction::expect(b2.clone()), |before, _| {
-                if *before.block() != b2 {
-                    return Err("did not assert b2".into());
-                }
+                assert(*before.block() == b2, "did not assert b2")?;
                 Ok(())
             })
             .transaction(BlockDefTransaction::expect(b1.clone()), |before, _| {
-                if *before.block() != b1 {
-                    return Err("did not assert b1".into());
-                }
+                assert(*before.block() == b1, "did not assert b1")?;
                 Ok(())
             })
             .target(|| BlockDef::new(ReadTicket::stub(), AIR))

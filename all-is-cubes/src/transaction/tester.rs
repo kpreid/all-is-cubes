@@ -160,3 +160,19 @@ where
         })
     }
 }
+
+/// Predicate for [`TransactionTester::transaction`] that always succeeds.
+#[expect(clippy::unnecessary_wraps)]
+pub(crate) fn noop_predicate<T>(_: &T, _: &T) -> PredicateRes {
+    Ok(())
+}
+
+/// Perform an assertion inside [`TransactionTester::transaction`] predicate:
+/// returns `Err` if the condition is false.
+pub(crate) fn assert(condition: bool, message: &str) -> PredicateRes {
+    if condition {
+        Ok(())
+    } else {
+        Err(message.into())
+    }
+}

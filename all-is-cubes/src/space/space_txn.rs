@@ -998,53 +998,41 @@ mod tests {
 
     #[test]
     fn systematic() {
+        use crate::space::SpaceTransaction as St;
+        use crate::transaction::{assert, noop_predicate};
+
         let [b1, b2, b3] = make_some_blocks();
         TransactionTester::new()
-            .transaction(SpaceTransaction::default(), |_, _| Ok(()))
+            .transaction(St::default(), noop_predicate)
             .transaction(
-                SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), Some(b2.clone())),
-                |_, after| {
-                    if after[[0, 0, 0]] != b2 {
-                        return Err("did not set b2".into());
-                    }
-                    Ok(())
-                },
+                St::set_cube([0, 0, 0], Some(b1.clone()), Some(b2.clone())),
+                |_, after| assert(after[[0, 0, 0]] == b2, "did not set b2 (with precondition)"),
             )
             .transaction(
-                SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), Some(b3.clone())),
-                |_, after| {
-                    if after[[0, 0, 0]] != b3 {
-                        return Err("did not set b3".into());
-                    }
-                    Ok(())
-                },
+                St::set_cube([0, 0, 0], Some(b1.clone()), Some(b3.clone())),
+                |_, after| assert(after[[0, 0, 0]] == b3, "did not set b3 (with precondition)"),
             )
             .transaction(
-                SpaceTransaction::set_cube([0, 0, 0], None, Some(b2.clone())),
-                |_, after| {
-                    if after[[0, 0, 0]] != b2 {
-                        return Err("did not set b2".into());
-                    }
-                    Ok(())
-                },
+                St::set_cube([0, 0, 0], None, Some(b2.clone())),
+                |_, after| assert(after[[0, 0, 0]] == b2, "did not set b2 (no precondition)"),
             )
             .transaction(
-                SpaceTransaction::set_cube([0, 0, 0], Some(b2.clone()), None),
-                |_, _| Ok(()),
+                St::set_cube([0, 0, 0], Some(b2.clone()), None),
+                |before, _| assert(before[[0, 0, 0]] == b2, "succeeded without finding b2"),
             )
             .transaction(
-                SpaceTransaction::set_cube([0, 0, 0], Some(b1.clone()), None),
-                |_, _| Ok(()),
+                St::set_cube([0, 0, 0], Some(b1.clone()), None),
+                |before, _| assert(before[[0, 0, 0]] == b1, "succeeded without finding b1"),
             )
             .transaction(
                 CubeTransaction::ACTIVATE_BEHAVIOR.at(Cube::new(0, 0, 0)),
                 // TODO: Add a test that activation happened once that's possible
-                |_, _| Ok(()),
+                noop_predicate,
             )
             .transaction(
                 CubeTransaction::ACTIVATE_BEHAVIOR.at(Cube::new(1, 0, 0)),
                 // TODO: Add a test that activation happened once that's possible
-                |_, _| Ok(()),
+                noop_predicate,
             )
             .target(|| Space::empty_positive(2, 1, 1))
             .target(|| {

@@ -219,7 +219,6 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::inv::{InventoryTransaction, Tool};
     use crate::math::Rgba;
-    use crate::transaction::TransactionTester;
     use alloc::sync::Arc;
     use pretty_assertions::assert_eq;
 
@@ -324,6 +323,8 @@ mod tests {
 
     #[test]
     fn systematic() {
+        use crate::transaction::{TransactionTester, assert};
+
         let old_item = Tool::InfiniteBlocks(block::from_color!(1.0, 0.0, 0.0));
         let new_item_1 = Tool::InfiniteBlocks(block::from_color!(0.0, 1.0, 0.0));
         let new_item_2 = Tool::InfiniteBlocks(block::from_color!(0.0, 0.0, 1.0));
@@ -334,10 +335,10 @@ mod tests {
             .transaction(
                 InventoryTransaction::insert([new_item_1.clone()]),
                 |before, after| {
-                    if after.count_of(&new_item_1) <= before.count_of(&new_item_1) {
-                        return Err("missing added new_item_1".into());
-                    }
-                    Ok(())
+                    assert(
+                        after.count_of(&new_item_1) > before.count_of(&new_item_1),
+                        "missing added new_item_1",
+                    )
                 },
             )
             .transaction(
@@ -347,12 +348,14 @@ mod tests {
                     new_item_1.clone().into(),
                 ),
                 |_, after| {
-                    if after.slots[0].count_of(&old_item) != 0 {
-                        return Err("did not replace old_item".into());
-                    }
-                    if after.slots[0].count_of(&new_item_1) == 0 {
-                        return Err("did not insert new_item_1".into());
-                    }
+                    assert(
+                        after.slots[0].count_of(&old_item) == 0,
+                        "did not replace old_item",
+                    )?;
+                    assert(
+                        after.slots[0].count_of(&new_item_1) > 0,
+                        "did not insert new_item_1",
+                    )?;
                     Ok(())
                 },
             )
@@ -364,12 +367,14 @@ mod tests {
                     new_item_2.clone().into(),
                 ),
                 |_, after| {
-                    if after.slots[0].count_of(&old_item) != 0 {
-                        return Err("did not replace old_item".into());
-                    }
-                    if after.slots[0].count_of(&new_item_2) == 0 {
-                        return Err("did not insert new_item_2".into());
-                    }
+                    assert(
+                        after.slots[0].count_of(&old_item) == 0,
+                        "did not replace old_item",
+                    )?;
+                    assert(
+                        after.slots[0].count_of(&new_item_2) > 0,
+                        "did not insert new_item_2",
+                    )?;
                     Ok(())
                 },
             )

@@ -176,6 +176,8 @@ fn inventory_transaction() {
 
 #[test]
 fn transaction_systematic() {
+    use transaction::assert as rassert;
+
     let mut universe = Universe::new();
     let space = Space::empty_positive(1, 1, 1);
     let space_handle = universe.insert_anonymous(space);
@@ -189,10 +191,6 @@ fn transaction_systematic() {
 
     // TODO: Add tests of stack modification, emptying, merging
 
-    fn rassert(condition: bool, msg: &'static str) -> transaction::PredicateRes {
-        // TODO: put this helper function somewhere? call it a better name?
-        if condition { Ok(()) } else { Err(msg.into()) }
-    }
     TransactionTester::new()
         // Set space
         .transaction(
@@ -211,7 +209,7 @@ fn transaction_systematic() {
         // Note: BodyTransaction has its own transaction test, but we want at least one conflict here.
         .transaction(
             CharacterTransaction::body(BodyTransaction::default()),
-            |_, _| Ok(()),
+            transaction::noop_predicate,
         )
         .transaction(
             CharacterTransaction::body(
