@@ -305,9 +305,7 @@ impl Operation {
                         // if that fails, we are full and do nothing.
                         let adjacent_cube = transform.transform_cube(Cube::ORIGIN + direction);
                         let adjacent_block = &space[adjacent_cube];
-                        let Some((adjacent_inventory_index, adjacent_inventory)) =
-                            adjacent_block.find_inventory()
-                        else {
+                        let Some((_, adjacent_inventory)) = adjacent_block.find_inventory() else {
                             // TODO: if no inventory exists, should we just create it? Need a general policy. Probably the answer should be yes, but we refrain for now.
                             return Err(OperationError::BlockInventoryFull {
                                 cube: adjacent_cube,
@@ -315,26 +313,19 @@ impl Operation {
                         };
 
                         if adjacent_inventory.get(0) == Some(&inv::Slot::Empty) {
-                            // There is room in the adjacent block, so create a transaction to transfer
-                            // this slot.
-                            // TODO: We should have the option of transferring into the first available
-                            // slot and merging stacks, instead of *only* the first slot.
+                            // There is room in the adjacent block, so create a transaction to
+                            // transfer this slot.
+                            //
+                            // TODO: Instead of transferring specifically to the first slot of
+                            // the adjacent inventory, we should have a way to tag inventory
+                            // slots with properties like whether they accept input, and then
+                            // this operation should have configuration about what kinds of slots
+                            // it pushes items into.
 
-                            let mut new_adj_inventory_contents: Vec<inv::Slot> =
-                                adjacent_inventory.slots().to_vec();
-                            new_adj_inventory_contents[0] = last_slot.clone();
-
-                            *space_txn.at(adjacent_cube) = CubeTransaction::replacing(
-                                Some(adjacent_block.clone()),
-                                Some({
-                                    let mut new_adj_block = adjacent_block.clone();
-                                    new_adj_block.modifiers_mut()[adjacent_inventory_index] =
-                                        block::Modifier::Inventory(Inventory::from_slots(
-                                            new_adj_inventory_contents,
-                                        ));
-                                    new_adj_block
-                                }),
-                            )
+                            *space_txn.at(adjacent_cube) =
+                                CubeTransaction::inventory(InventoryTransaction::insert([
+                                    last_slot.clone(),
+                                ]))
                         } else {
                             // Adjacent block has no room in its inventory.
                             return Err(OperationError::BlockInventoryFull {
@@ -359,7 +350,7 @@ impl Operation {
 
                 // If the inventory actually changed, put the change in the transaction
                 if &new_inventory_contents[..] != source_inventory.slots() {
-                    // TODO: In order to avoid merge conflicts with neighbors, we need to be able to stuff an actual InventoryTransaction into a CubeTransaction so that multiple insertions and moves can happen at once.
+                    // TODO: Use `CubeTransaction::inventory()` instead of building a new inventory.
                     let mut new_block = old_block.clone();
                     new_block.modifiers_mut()[source_inventory_index] =
                         block::Modifier::Inventory(Inventory::from_slots(new_inventory_contents));
