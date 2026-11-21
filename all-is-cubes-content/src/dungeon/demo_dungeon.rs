@@ -2,8 +2,8 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec;
 use core::mem;
-use descriptive_unwrap::OptionExt;
 
+use descriptive_unwrap::OptionExt as _;
 use rand::seq::{IndexedRandom as _, IteratorRandom as _};
 use rand::{RngExt as _, SeedableRng as _};
 
@@ -11,7 +11,7 @@ use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, AIR, Block, Resolution::*};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{BoxPart, BoxStyle, palette};
-use all_is_cubes::euclid::{Size3D, Vector3D, vec3};
+use all_is_cubes::euclid::{Size3D, Vector3D, point3, size3, vec3};
 use all_is_cubes::inv::{self, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
@@ -731,6 +731,12 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 
 // -------------------------------------------------------------------------------------------------
 
+pub(crate) const DUNGEON_GRID: DungeonGrid = DungeonGrid {
+    room_box: GridAab::tiny(point3(0, 0, 0), size3(7, 5, 7)),
+    room_wall_thickness: FaceMap::splat_copy(1),
+    gap_between_walls: Size3D::new(1, 1, 1),
+};
+
 /// This function is called from `UniverseTemplate`.
 pub(crate) async fn demo_dungeon(
     universe: &mut Universe,
@@ -750,26 +756,20 @@ pub(crate) async fn demo_dungeon(
         install_txn.execute(universe, (), &mut transaction::no_outputs)?;
     }
 
-    let dungeon_grid = DungeonGrid {
-        room_box: GridAab::from_lower_size([0, 0, 0], [7, 5, 7]),
-        room_wall_thickness: FaceMap::splat(1),
-        gap_between_walls: Size3D::new(1, 1, 1),
-    };
     // allow room for some grass to see out the windows
     let perimeter_margin: GridSizeCoord = 30;
     // Allow room for upward and downward expansions of rooms.
     // This corresponds to `expanded_maze_bounds` elsewhere in the generator.
-    let vertical_expansion: GridSizeCoord = dungeon_grid.room_spacing().height * 2;
+    let vertical_expansion: GridSizeCoord = DUNGEON_GRID.room_spacing().height * 2;
 
-    let mut requested_rooms = Size3D::from(
-        (requested_size.unwrap_or(Size3D::new(165, 40, 165))
+    let mut requested_rooms = DUNGEON_GRID.room_count_from_space_size(
+        requested_size.unwrap_or(Size3D::new(165, 40, 165))
+            // TODO: compute this size only once, not both here and when we construct the space
             - Size3D::new(
                 perimeter_margin * 2,
                 vertical_expansion,
                 perimeter_margin * 2,
-            ))
-        .to_vector()
-        .component_div(dungeon_grid.room_spacing().to_vector()),
+            ),
     );
     if requested_rooms.width == 0 || requested_rooms.height == 0 || requested_rooms.depth == 0 {
         return Err(InGenError::Other("Size too small".into()));
@@ -784,7 +784,7 @@ pub(crate) async fn demo_dungeon(
     let theme = {
         let dungeon_blocks = BlockProvider::<DungeonBlocks>::using(universe)?;
         DemoTheme::new(
-            &dungeon_grid,
+            &DUNGEON_GRID,
             &landscape_blocks,
             &demo_blocks,
             dungeon_blocks,
@@ -816,9 +816,9 @@ pub(crate) async fn demo_dungeon(
     // Construct space with initial bulk-filled contents
     let mut space = {
         let space_construction_progress = progress.start_and_cut(0.1, "filling the earth").await;
-        let space_bounds = dungeon_grid
+        let space_bounds = DUNGEON_GRID
             .minimum_space_for_rooms(dungeon_map.bounds())
-            .expand(FaceMap::symmetric([perimeter_margin, 1, perimeter_margin]));
+            .expand(FaceMap::symmetric([perimeter_margin, 0, perimeter_margin]));
         let space = Space::builder(space_bounds)
             .read_ticket(universe.read_ticket())
             .sky(crate::landscape::sky_with_grass(
@@ -867,7 +867,7 @@ pub(crate) async fn demo_dungeon(
     let mut physics = space.physics().clone();
     physics.light = LightPhysics::Rays {
         // account for large rooms
-        maximum_distance: (dungeon_grid.room_box.size().height * 4) as u8,
+        maximum_distance: (DUNGEON_GRID.room_box.size().height * 4) as u8,
     };
     space.set_physics(physics);
     light_progress.progress(0.01).await;

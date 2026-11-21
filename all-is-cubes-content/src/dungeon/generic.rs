@@ -76,14 +76,12 @@ impl DungeonGrid {
             .unwrap()
     }
 
-    /// Compute the minimum size of `Space` that will fit all the rooms with coordinates
+    /// Compute the minimum size of [`Space`] that will fit all the rooms with coordinates
     /// in `rooms`.
     ///
     /// This includes the `room_wall_thickness` of the outermost rooms, but does not
     /// include a `gap_between_walls` outside of that, since that may not be wanted and
     /// is easy to add using [`GridAab::expand()`].
-    ///
-    /// TODO: This is off by at least 1 (in the too-big direction); write tests and fix.
     pub fn minimum_space_for_rooms(&self, rooms: GridAab) -> GridAab {
         let spacing = self.room_spacing().to_i32().to_vector();
         let basic_size = GridAab::from_lower_upper(
@@ -100,6 +98,15 @@ impl DungeonGrid {
         // basic_size has the correct size, but not the correct position relative to room_box
         // and its walls
         basic_size.translate(self.room_box_including_walls().lower_bounds().to_vector())
+    }
+
+    /// Inverse of [`Self::minimum_space_for_rooms()`], rounding down.
+    pub fn room_count_from_space_size(&self, space_size: GridSize) -> GridSize {
+        let spacing = self.room_spacing().to_vector();
+        GridSize::from(
+            (space_size.to_vector() + self.gap_between_walls.map(u32::from).to_vector())
+                .component_div(spacing),
+        )
     }
 }
 
@@ -160,4 +167,25 @@ where
         ),
     )
     .run(progress, read_ticket, space)
+}
+
+// -------------------------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn space_size_arithmetic() {
+        let grid = crate::dungeon::demo_dungeon::DUNGEON_GRID;
+        for n in 1..10 {
+            let rooms = GridAab::from_lower_size([0, 0, 0], [n, n, n]);
+            let space_bounds = grid.minimum_space_for_rooms(rooms);
+            assert_eq!(
+                grid.room_count_from_space_size(space_bounds.size()),
+                rooms.size(),
+                "case {n}",
+            );
+        }
+    }
 }
