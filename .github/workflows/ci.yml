@@ -505,12 +505,12 @@ jobs:
 
     # Run once on each workspace (hence each lock file) of interest.
     # Our only other workspace is fuzz/, which we aren't interested in checking.
-    - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+    - uses: EmbarkStudios/cargo-deny-action@17aeb3c839e42274e2b8adf721c8c65edfdc74dd # v2.1.3
       background: true
       with:
         # empty arguments disables default --all-features
         arguments:
-    - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+    - uses: EmbarkStudios/cargo-deny-action@17aeb3c839e42274e2b8adf721c8c65edfdc74dd # v2.1.3
       background: true
       with:
         manifest-path: all-is-cubes-wasm/Cargo.toml
