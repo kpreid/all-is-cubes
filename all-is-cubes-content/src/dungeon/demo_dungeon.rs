@@ -762,8 +762,12 @@ pub(crate) async fn demo_dungeon(
     let vertical_expansion: GridSizeCoord = dungeon_grid.room_spacing().height * 2;
 
     let mut requested_rooms = Size3D::from(
-        (requested_size.unwrap_or(Size3D::new(135, 40, 135))
-            - Size3D::new(perimeter_margin, vertical_expansion, perimeter_margin))
+        (requested_size.unwrap_or(Size3D::new(165, 40, 165))
+            - Size3D::new(
+                perimeter_margin * 2,
+                vertical_expansion,
+                perimeter_margin * 2,
+            ))
         .to_vector()
         .component_div(dungeon_grid.room_spacing().to_vector()),
     );
