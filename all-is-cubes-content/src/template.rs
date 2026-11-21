@@ -16,7 +16,7 @@ use num_traits::float::Float as _;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::character::{Character, Spawn};
-use all_is_cubes::euclid::Point3D;
+use all_is_cubes::euclid::{Point3D, size3};
 use all_is_cubes::linking::{GenError, InGenError};
 use all_is_cubes::math::{
     Face, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgb, Rgba,
@@ -53,8 +53,25 @@ macro_rules! generate_template_test {
                 #[cfg(test)]
                 #[macro_rules_attribute::apply(smol_macros::test)]
                 #[allow(non_snake_case)]
-                async fn [< template_ $variant_name >] () {
-                    tests::check_universe_template($enum_name::$variant_name).await;
+                async fn [< template_ $variant_name _default_size >] () {
+                    tests::check_universe_template_default_size($enum_name::$variant_name).await;
+                }
+
+                $( #[cfg($variant_cfg)] )*
+                #[cfg(test)]
+                #[macro_rules_attribute::apply(smol_macros::test)]
+                #[allow(non_snake_case)]
+                async fn [< template_ $variant_name _minimum_size >] () {
+                    tests::check_universe_template_minimum_size($enum_name::$variant_name).await;
+                }
+
+                $( #[cfg($variant_cfg)] )*
+                #[cfg(test)]
+                #[macro_rules_attribute::apply(smol_macros::test)]
+                #[allow(non_snake_case)]
+                #[ignore = "not implemented yet"]
+                async fn [< template_ $variant_name _too_big >] () {
+                    tests::check_universe_template_too_big($enum_name::$variant_name).await;
                 }
             }
         )*
@@ -148,13 +165,87 @@ impl UniverseTemplate {
         }
     }
 
+    /// Default value for [`TemplateParameters::size`].
+    /// [`None`] if the template does not have a configurable size.
+    pub const fn sizing(&self) -> Option<&TemplateSizing> {
+        match self {
+            UniverseTemplate::Menu => None,  // fixed size
+            UniverseTemplate::Blank => None, // no space
+            UniverseTemplate::Fail => None,  // no space
+
+            UniverseTemplate::DemoCity => {
+                const {
+                    Some(&TemplateSizing {
+                        minimum_size: size3(160, 60, 160),
+                        default_size: size3(160, 60, 160),
+                    })
+                }
+            }
+            UniverseTemplate::Dungeon => {
+                const {
+                    Some(&TemplateSizing {
+                        minimum_size: size3(179, 23, 179), // TODO: get this from the layout code
+                        default_size: size3(179, 23, 179),
+                    })
+                }
+            }
+            UniverseTemplate::Islands => {
+                const {
+                    Some(&TemplateSizing {
+                        minimum_size: size3(0, 0, 0),
+                        default_size: size3(1000, 400, 1000),
+                    })
+                }
+            }
+            UniverseTemplate::Atrium => None, // doesn't support resizing
+            UniverseTemplate::CornellBox => {
+                const {
+                    Some(&TemplateSizing {
+                        minimum_size: size3(3, 3, 3),
+                        default_size: size3(30, 30, 30),
+                    })
+                }
+            }
+            UniverseTemplate::MengerSponge => {
+                const {
+                    let edge = 3u32.pow(4); // 4-level sponge
+                    Some(&TemplateSizing {
+                        minimum_size: size3(1, 1, 1),
+                        default_size: size3(edge, edge, edge),
+                    })
+                }
+            }
+            UniverseTemplate::LightBench => {
+                const {
+                    Some(&TemplateSizing {
+                        minimum_size: size3(54, 16, 54), // TODO: get this from the layout code
+                        default_size: size3(54, 16, 54),
+                    })
+                }
+            }
+
+            #[cfg(feature = "arbitrary")]
+            UniverseTemplate::Random => None,
+        }
+    }
+
     /// Create a new [`Universe`] based on this template's specifications.
     #[expect(clippy::missing_panics_doc, reason = "infallible unwraps")]
     pub async fn build(
         self,
         p: YieldProgress,
-        params: TemplateParameters,
+        mut params: TemplateParameters,
     ) -> Result<Box<Universe>, GenError> {
+        let sizing = self.sizing();
+        match (params.size, sizing) {
+            (None, Some(sizing)) => {
+                params.size = Some(sizing.default_size);
+            }
+            // TODO: return error instead, because we can
+            (Some(_), None) => panic!("template {self:?} does not allow specifying a size"),
+            _ => {}
+        }
+
         let mut universe = Universe::new();
 
         // TODO: Later we want a "module loading" system that can lazily bring in content.
@@ -192,20 +283,16 @@ impl UniverseTemplate {
                     Some(crate::islands::islands(&mut universe, p.take().unwrap(), params).await)
                 }
                 Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
-                CornellBox => Some(cornell_box(params.size.unwrap_or(GridSize::splat(30)))),
+                CornellBox => Some(cornell_box(params.size.unwrap())),
                 MengerSponge => Some(
-                    menger_sponge_from_size(
-                        &mut universe,
-                        p.take().unwrap(),
-                        params.size.unwrap_or(GridSize::splat(3u32.pow(4))),
-                    )
-                    .await,
+                    menger_sponge_from_size(&mut universe, p.take().unwrap(), params.size.unwrap())
+                        .await,
                 ),
                 LightBench => Some(
                     all_is_cubes::content::testing::light_bench_space(
                         &mut universe,
                         p.take().unwrap(),
-                        params.size.unwrap_or(GridSize::new(54, 16, 54)),
+                        params.size.unwrap(),
                     )
                     .await,
                 ),
@@ -262,6 +349,17 @@ fn insert_generated_space(
 
 // -------------------------------------------------------------------------------------------------
 
+/// Information about what world size the user may specify via [`TemplateParameters`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct TemplateSizing {
+    /// Minimum size that the template can be constructed with.
+    minimum_size: GridSize,
+    /// Size used if no size is specified.
+    default_size: GridSize,
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Configuration for exactly what a [`UniverseTemplate`] should produce.
 ///
 /// Pass this structure to [`UniverseTemplate::build()`].
@@ -279,12 +377,15 @@ pub struct TemplateParameters {
     // agree on this many bits for seeds.
     pub seed: Option<u64>,
 
-    /// Dimensions of the primary space of the universe, if there is such a thing.
+    /// Dimensions of the primary space of the universe, if there is such a thing and
+    /// it is configurable.
     ///
-    /// If the space cannot be constructed in approximately this size, building the
-    /// template should return an error.
+    /// Consult [`UniverseTemplate::sizing()`] to determine possible sizes.
+    /// If that value is [`None`], this must be [`None`].
     pub size: Option<GridSize>,
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct TemplateAndParameters {
@@ -531,10 +632,12 @@ mod tests {
         );
     }
 
-    /// Test one template.
+    /// Test one universe template at its default size.
     /// This function is called by the [`generate_template_test!`] macro.
-    pub(super) async fn check_universe_template(template: UniverseTemplate) {
-        let params = if let UniverseTemplate::Islands = template {
+    pub(super) async fn check_universe_template_default_size(template: UniverseTemplate) {
+        let params = if let UniverseTemplate::Islands = template
+            && false
+        {
             // Kludge: the islands template is known to be very slow.
             // We should work on making what it does faster, but for now, let's
             // run a much smaller instance of it for the does-it-succeed test.
@@ -558,35 +661,60 @@ mod tests {
             let mut u = result.unwrap();
 
             if template != UniverseTemplate::Blank {
-                let _ = u.get_default_character().unwrap().read(u.read_ticket()).unwrap();
+                // Check that the default character exists.
+                let character = u.get_default_character().unwrap().read(u.read_ticket()).unwrap();
+
+                if let Some(sizing) = template.sizing() {
+                    let space = character.space().read(u.read_ticket()).unwrap();
+                    assert_eq!(space.bounds().size(), sizing.default_size);
+                }
             }
             u.step(false, time::Deadline::Asap);
 
             check_block_spaces(&u);
         }
+    }
 
-        // Test that asking for an impossibly huge size does not panic, but returns an error or
-        // ignores the size.
-        //
-        // (This shouldn't ever actually hog memory because it'd be too much to succeed
-        // in allocating, regardless of platform, unless the template clamps all but exactly one
-        // dimension.)
-        // TODO: This test doesn't pass but it should.
-        if false {
-            std::println!(
-                "too-big result: {:?}",
-                template
-                    .clone()
-                    .build(
-                        yield_progress_for_testing(),
-                        TemplateParameters {
-                            seed: Some(0),
-                            size: Some(GridSize::splat(GridSizeCoord::MAX)),
-                        }
-                    )
-                    .await
-            );
+    /// Test one universe template at its reported minimum size.
+    pub(super) async fn check_universe_template_minimum_size(template: UniverseTemplate) {
+        if let Some(sizing) = template.sizing() {
+            _ = template
+                .clone()
+                .build(
+                    yield_progress_for_testing(),
+                    TemplateParameters {
+                        seed: Some(0),
+                        size: Some(sizing.minimum_size),
+                    },
+                )
+                .await
+                .unwrap();
         }
+    }
+
+    /// Test that asking for an impossibly huge size does not panic, but returns an error or
+    /// ignores the size.
+    ///
+    /// (This shouldn't ever actually hog memory because it'd be too much to succeed
+    /// in allocating, regardless of platform, unless the template clamps all but exactly one
+    /// dimension.)
+    ///
+    /// This function is called by the [`generate_template_test!`] macro,
+    /// except that this doesn't actually succeed yet, so the tests are `#[ignore]`d.
+    pub(super) async fn check_universe_template_too_big(template: UniverseTemplate) {
+        std::println!(
+            "too-big result: {:?}",
+            template
+                .clone()
+                .build(
+                    yield_progress_for_testing(),
+                    TemplateParameters {
+                        seed: Some(0),
+                        size: Some(GridSize::splat(GridSizeCoord::MAX)),
+                    }
+                )
+                .await
+        );
     }
 
     /// Assert that every `Space` used in a `Block` has appropriate properties;

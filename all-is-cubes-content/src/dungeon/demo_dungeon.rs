@@ -763,7 +763,7 @@ pub(crate) async fn demo_dungeon(
     let vertical_expansion: GridSizeCoord = DUNGEON_GRID.room_spacing().height * 2;
 
     let mut requested_rooms = DUNGEON_GRID.room_count_from_space_size(
-        requested_size.unwrap_or(Size3D::new(165, 40, 165))
+        requested_size.expect("demo_dungeon must have a size")
             // TODO: compute this size only once, not both here and when we construct the space
             - Size3D::new(
                 perimeter_margin * 2,

@@ -171,7 +171,7 @@ impl<'u> State<'u> {
             let ground_depth = 30;
             let space_size = params
                 .size
-                .unwrap_or(GridSize::new(160, 60, 160))
+                .expect("demo_city must have a size")
                 .map(|size| i32::try_from(size).unwrap_or(i32::MAX));
 
             GridAab::from_lower_upper(

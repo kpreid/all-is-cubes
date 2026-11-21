@@ -11,7 +11,7 @@ use all_is_cubes::arcstr::literal;
 use all_is_cubes::character::Spawn;
 use all_is_cubes::euclid::{Size3D, Vector2D};
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{FreeCoordinate, GridAab, GridCoordinate, GridSize, GridVector, ps32};
+use all_is_cubes::math::{FreeCoordinate, GridAab, GridCoordinate, GridVector, ps32};
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
@@ -29,7 +29,7 @@ pub(crate) async fn islands(
     params: TemplateParameters,
 ) -> Result<Space, InGenError> {
     let TemplateParameters { size, seed } = params;
-    let size = size.unwrap_or(GridSize::new(1000, 400, 1000));
+    let size = size.expect("must have a size");
     // Set up dimensions
     let bounds = GridAab::checked_from_lower_size(
         [
