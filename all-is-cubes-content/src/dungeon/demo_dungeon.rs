@@ -5,7 +5,7 @@ use core::fmt;
 use core::mem;
 use exhaust::Exhaust;
 
-use descriptive_unwrap::OptionExt as _;
+use descriptive_unwrap::{OptionExt as _, ResultExt};
 use rand::seq::{IndexedRandom as _, IteratorRandom as _};
 use rand::{RngExt as _, SeedableRng as _};
 
@@ -77,6 +77,8 @@ enum WallFeature {
     Passage(Door),
     /// Window to the outside world.
     Window,
+    /// Wall is missing, or we could say, the corridor is as big as the room.
+    Joined,
 }
 
 /// A possible obstruction in a passage.
@@ -115,6 +117,12 @@ struct DemoTheme {
     /// the relevant axis.
     corridor_box_styles: Vector3D<BoxStyle, ()>,
 
+    /// [`BoxStyle`]s with which to carve the joint between a pair of rooms, one per axis.
+    ///
+    /// The interior of each box should be [`AIR`] or at least passable, as should be the faces on
+    /// the relevant axis.
+    joined_room_box_styles: Vector3D<BoxStyle, ()>,
+
     blocks: BlockProvider<DungeonBlocks>,
 
     // TODO: ought to be part of the BlockProvider
@@ -146,6 +154,97 @@ impl DemoTheme {
                     block::CompositeOperator::Over,
                 ));
 
+        let corridor_box_styles = {
+            let basic_style = BoxStyle::from_fn(|part| {
+                if part == BoxPart::INTERIOR {
+                    Some(AIR)
+                } else if part.is_on_face(Face::NY) {
+                    Some(dungeon_blocks[FloorTile].clone())
+                } else {
+                    // TODO: add wall-tile and ceiling-tile blocks
+                    Some(landscape_blocks[LandscapeBlocks::Stone].clone())
+                }
+            });
+
+            let corner_block = |facing_room: Face, left: bool| {
+                block::Composite::new(
+                    dungeon_blocks[DoorwaySideMask].clone().rotate(
+                        GridRotation::from_to(Face::PZ, facing_room, Face::PY).unwrap()
+                            * if left {
+                                GridRotation::IDENTITY
+                            } else {
+                                GridRotation::RxYZ
+                            },
+                    ),
+                    block::CompositeOperator::In,
+                )
+                .reversed()
+                .compose_or_replace(landscape_blocks[LandscapeBlocks::Stone].clone())
+            };
+
+            let on_horizontal_axis = |axis: Axis| -> BoxStyle {
+                basic_style
+                    .clone()
+                    // Cut open the open spaces
+                    .with(BoxPart::face(axis.negative_face()), Some(AIR))
+                    .with(BoxPart::face(axis.positive_face()), Some(AIR))
+                    // Add lintels
+                    .map(|part, block| {
+                        if part.is_on_face(Face::PY)
+                            && (part.is_on_face(axis.positive_face())
+                                || part.is_on_face(axis.negative_face()))
+                        {
+                            lintel_with_stone.clone()
+                        } else {
+                            block
+                        }
+                    })
+                    // Add vertical DoorwaySideMask blocks for each of the four "sides of a
+                    // dooorway" in this corridor.
+                    // TODO: way too repetitive and unclear
+                    .with(
+                        BoxPart::face(axis.positive_face())
+                            .push(axis.positive_face().cross(Face::PY).try_into().unwrap()),
+                        Some(corner_block(axis.positive_face(), true)),
+                    )
+                    .with(
+                        BoxPart::face(axis.positive_face())
+                            .push(axis.positive_face().cross(Face::NY).try_into().unwrap()),
+                        Some(corner_block(axis.positive_face(), false)),
+                    )
+                    .with(
+                        BoxPart::face(axis.negative_face())
+                            .push(axis.negative_face().cross(Face::PY).try_into().unwrap()),
+                        Some(corner_block(axis.negative_face(), true)),
+                    )
+                    .with(
+                        BoxPart::face(axis.negative_face())
+                            .push(axis.negative_face().cross(Face::NY).try_into().unwrap()),
+                        Some(corner_block(axis.negative_face(), false)),
+                    )
+            };
+
+            let on_vertical_axis: BoxStyle = basic_style
+                .clone()
+                .map(|part, block| {
+                    if part.is_on_face(Face::NY) {
+                        // ceiling block instead of floor block
+                        landscape_blocks[LandscapeBlocks::Stone].clone()
+                    } else {
+                        block
+                    }
+                })
+                .with(BoxPart::face(Face::NY), Some(AIR))
+                .with(BoxPart::face(Face::PY), Some(AIR));
+
+            // Build the 3 different corridor boxes
+            vec3(
+                on_horizontal_axis(Axis::X),
+                on_vertical_axis,
+                on_horizontal_axis(Axis::Z),
+            )
+        };
+
         DemoTheme {
             dungeon_grid: dungeon_grid.clone(),
             room_style: BoxStyle::from_fn(|part| {
@@ -159,96 +258,8 @@ impl DemoTheme {
                 }
             }),
             corridor_box: GridAab::from_lower_size([2, 0, 2], [3, 3, 3]),
-            corridor_box_styles: {
-                let basic_style = BoxStyle::from_fn(|part| {
-                    if part == BoxPart::INTERIOR {
-                        Some(AIR)
-                    } else if part.is_on_face(Face::NY) {
-                        Some(dungeon_blocks[FloorTile].clone())
-                    } else {
-                        // TODO: add wall-tile and ceiling-tile blocks
-                        Some(landscape_blocks[LandscapeBlocks::Stone].clone())
-                    }
-                });
-
-                let corner_block = |facing_room: Face, left: bool| {
-                    block::Composite::new(
-                        dungeon_blocks[DoorwaySideMask].clone().rotate(
-                            GridRotation::from_to(Face::PZ, facing_room, Face::PY).unwrap()
-                                * if left {
-                                    GridRotation::IDENTITY
-                                } else {
-                                    GridRotation::RxYZ
-                                },
-                        ),
-                        block::CompositeOperator::In,
-                    )
-                    .reversed()
-                    .compose_or_replace(landscape_blocks[LandscapeBlocks::Stone].clone())
-                };
-
-                let on_horizontal_axis = |axis: Axis| -> BoxStyle {
-                    basic_style
-                        .clone()
-                        // Cut open the open spaces
-                        .with(BoxPart::face(axis.negative_face()), Some(AIR))
-                        .with(BoxPart::face(axis.positive_face()), Some(AIR))
-                        // Add lintels
-                        .map(|part, block| {
-                            if part.is_on_face(Face::PY)
-                                && (part.is_on_face(axis.positive_face())
-                                    || part.is_on_face(axis.negative_face()))
-                            {
-                                lintel_with_stone.clone()
-                            } else {
-                                block
-                            }
-                        })
-                        // Add vertical DoorwaySideMask blocks for each of the four "sides of a
-                        // dooorway" in this corridor.
-                        // TODO: way too repetitive and unclear
-                        .with(
-                            BoxPart::face(axis.positive_face())
-                                .push(axis.positive_face().cross(Face::PY).try_into().unwrap()),
-                            Some(corner_block(axis.positive_face(), true)),
-                        )
-                        .with(
-                            BoxPart::face(axis.positive_face())
-                                .push(axis.positive_face().cross(Face::NY).try_into().unwrap()),
-                            Some(corner_block(axis.positive_face(), false)),
-                        )
-                        .with(
-                            BoxPart::face(axis.negative_face())
-                                .push(axis.negative_face().cross(Face::PY).try_into().unwrap()),
-                            Some(corner_block(axis.negative_face(), true)),
-                        )
-                        .with(
-                            BoxPart::face(axis.negative_face())
-                                .push(axis.negative_face().cross(Face::NY).try_into().unwrap()),
-                            Some(corner_block(axis.negative_face(), false)),
-                        )
-                };
-
-                let on_vertical_axis: BoxStyle = basic_style
-                    .clone()
-                    .map(|part, block| {
-                        if part.is_on_face(Face::NY) {
-                            // ceiling block instead of floor block
-                            landscape_blocks[LandscapeBlocks::Stone].clone()
-                        } else {
-                            block
-                        }
-                    })
-                    .with(BoxPart::face(Face::NY), Some(AIR))
-                    .with(BoxPart::face(Face::PY), Some(AIR));
-
-                // Build the 3 different corridor boxes
-                vec3(
-                    on_horizontal_axis(Axis::X),
-                    on_vertical_axis,
-                    on_horizontal_axis(Axis::Z),
-                )
-            },
+            joined_room_box_styles: corridor_box_styles.clone(), // placeholder; will need to deviate
+            corridor_box_styles,
             locked_gate_block: dungeon_blocks[Gate].clone().with_modifier(block::Composite::new(
                 dungeon_blocks[GateLock].clone(),
                 block::CompositeOperator::Over,
@@ -492,8 +503,13 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 // Construct basic walls.
                 let exterior_box = interior.expand(FaceMap::splat(1));
                 for part in BoxPart::exhaust() {
-                    let block: Option<&Block> = if part != BoxPart::face(Face::NY)
-                        && part.is_face()
+                    let face = part.to_face();
+                    let block: Option<&Block> = if let Some(face) = face
+                        && let WallFeature::Joined = room_data.wall_features[face]
+                    {
+                        None
+                    } else if let Some(face) = face
+                        && face != Face::NY
                         && let Some(wall_block) = wall_type
                     {
                         Some(wall_block)
@@ -512,27 +528,6 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 if room_data.extended_map_bounds().lower_bounds().y < 0 {
                     assert!(!room_data.corridor_only, "{room_data:?}");
                     ctx.fill_uniform(interior.abut(Face::NY, -1).unwrap(), &self.blocks[Spikes])?;
-                }
-
-                match room_data.floor {
-                    FloorKind::Solid => {
-                        ctx.fill_uniform(floor_layer, &self.blocks[FloorTile])?;
-                    }
-                    FloorKind::Chasm => { /* TODO: little platforms */ }
-                    FloorKind::Bridge => {
-                        let midpoint = Cube::containing(floor_layer.center()).unwrap();
-                        for direction in [Face::NX, Face::NZ, Face::PX, Face::PZ] {
-                            if room_data.wall_features[direction] != WallFeature::Blank {
-                                let wall_cube = Cube::containing(
-                                    floor_layer.abut(direction, -1).unwrap().center(),
-                                )
-                                .unwrap();
-                                let bridge_box =
-                                    GridAab::single_cube(midpoint).union_cube(wall_cube);
-                                ctx.fill_uniform(bridge_box, &self.blocks[FloorTile])?;
-                            }
-                        }
-                    }
                 }
 
                 // Lit corridors get the magic pyramid light instead of putting a torch in your face
@@ -633,13 +628,59 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 }
                 Ok(None)
             }
-            Pass::PassagesEtc => {
+            Pass::Passages => {
                 for face in [Face::PX, Face::PY, Face::PZ] {
-                    if let WallFeature::Passage(door) = room_data.wall_features[face] {
-                        self.inside_doorway(ctx, map, room_position, face, door)?;
+                    match room_data.wall_features[face] {
+                        WallFeature::Passage(door) => {
+                            self.inside_doorway(ctx, map, room_position, face, door)?;
+                        }
+                        WallFeature::Joined => {
+                            // TODO: deduplicate this code with inside_doorway()
+                            let join_box = self
+                                .actual_room_box(room_position, room_data)
+                                .abut(face, 0)
+                                .err_is_unreachable() // TODO: infallible abut(0)?
+                                .expand(
+                                    FaceMap::splat_copy(1)
+                                        .with(
+                                            face,
+                                            self.dungeon_grid.gap_between_rooms()[face.axis()],
+                                        )
+                                        .with(face.opposite(), 0),
+                                );
+                            self.joined_room_box_styles[face.axis()]
+                                .create_box(join_box)
+                                .execute_m(ctx)?;
+                        }
+                        WallFeature::Blank | WallFeature::Window => {}
                     }
                 }
-
+                Ok(None)
+            }
+            Pass::Floors => {
+                match room_data.floor {
+                    FloorKind::Solid => {
+                        ctx.fill_uniform(floor_layer, &self.blocks[FloorTile])?;
+                    }
+                    FloorKind::Chasm => { /* TODO: little platforms */ }
+                    FloorKind::Bridge => {
+                        let midpoint = Cube::containing(floor_layer.center()).unwrap();
+                        for direction in [Face::NX, Face::NZ, Face::PX, Face::PZ] {
+                            if room_data.wall_features[direction] != WallFeature::Blank {
+                                let wall_cube = Cube::containing(
+                                    floor_layer.abut(direction, -1).unwrap().center(),
+                                )
+                                .unwrap();
+                                let bridge_box =
+                                    GridAab::single_cube(midpoint).union_cube(wall_cube);
+                                ctx.fill_uniform(bridge_box, &self.blocks[FloorTile])?;
+                            }
+                        }
+                    }
+                }
+                Ok(None)
+            }
+            Pass::Final => {
                 // Debug dump data for the room, so we can compare the data to what was
                 // actually generated. This is spoilers for the maze, but it’s hard to read.
                 if !room_data.corridor_only {
@@ -679,6 +720,10 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                             // Can't use the center of the floor because there's a hole there.
                             // Put the item near a corner instead.
                             Cube::from(floor_layer.lower_bounds() + vec3(1, 1, 1))
+                        }
+                        WallFeature::Joined => {
+                            // Perhaps we will eventually want this to be some kind of shelf
+                            unreachable!("should not generate an item on a missing floor")
                         }
                     };
                     ctx.set(pedestal_location, &self.item_pedestal)?;
@@ -723,14 +768,18 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 #[derive(Clone, Copy, exhaust::Exhaust)]
 enum Pass {
     WallsEtc,
-    PassagesEtc,
+    Passages,
+    Floors,
+    Final,
 }
 
 impl fmt::Display for Pass {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.pad(match self {
             Pass::WallsEtc => "Walls",
-            Pass::PassagesEtc => "Passages",
+            Pass::Passages => "Passages",
+            Pass::Floors => "Floors",
+            Pass::Final => "Final",
         })
     }
 }
@@ -1075,9 +1124,11 @@ fn generate_dungeon_map(
                     .unwrap();
                 }
 
-                // cases we should not meet because it's our job to create them
-                WallFeature::Passage(_) => unreachable!(),
-                WallFeature::Window => unreachable!(),
+                // A lack of wall should stay that way.
+                WallFeature::Joined => {}
+
+                // Cases we should not meet because it's our job to create them.
+                WallFeature::Passage(_) | WallFeature::Window => unreachable!(),
             }
         }
     }
