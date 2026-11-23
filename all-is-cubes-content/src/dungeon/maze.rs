@@ -50,6 +50,15 @@ impl MazeRoom {
     pub fn has_passage(&self, direction: Face) -> bool {
         self.passages[direction]
     }
+
+    /// Returns whether this is neither the start nor the goal room.
+    pub fn is_not_end(&self) -> bool {
+        match self.kind {
+            MazeRoomKind::Start | MazeRoomKind::Goal => false,
+            MazeRoomKind::Path | MazeRoomKind::OffPath => true,
+            MazeRoomKind::Unoccupied => true,
+        }
+    }
 }
 
 fn open_passage(maze: &mut Maze, from: Cube, dir: Face) {

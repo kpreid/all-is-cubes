@@ -27,7 +27,8 @@ use all_is_cubes::util::YieldProgress;
 
 use crate::alg::four_walls;
 use crate::dungeon::{
-    DungeonBlocks, DungeonBlocks::*, DungeonGrid, MazeRoomKind, Theme, build_dungeon, generate_maze,
+    DungeonBlocks::{self, *},
+    DungeonGrid, MazeRoom, MazeRoomKind, Theme, build_dungeon, generate_maze,
 };
 use crate::{DemoBlocks, LandscapeBlocks, TemplateParameters, tree};
 
@@ -38,8 +39,7 @@ const TORCH_PATTERN: [GridCoordinate; 2] = [-3, 3];
 
 #[derive(Clone, Debug)]
 struct DemoRoom {
-    maze_kind: MazeRoomKind,
-    position_on_path: Option<usize>,
+    maze_room: MazeRoom,
 
     /// In a *relative* room coordinate system (1 unit = 1 room box),
     /// how big is this room? Occupying multiple rooms' space if this
@@ -503,7 +503,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         let interior = self.actual_room_box(room_position, room_data);
         let unmodified_room_box = self.dungeon_grid.room_box_at(room_position);
 
-        let wall_type = match room_data.maze_kind {
+        let wall_type = match room_data.maze_room.kind {
             MazeRoomKind::Start => Some(&start_wall),
             MazeRoomKind::Goal => Some(&goal_wall),
             MazeRoomKind::Path | MazeRoomKind::OffPath => None,
@@ -653,8 +653,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 if !room_data.corridor_only {
                     let description = arcstr::format!(
                         "{room_position:?}\n{kind:?}\ndop={position_on_path:?}",
-                        kind = room_data.maze_kind,
-                        position_on_path = room_data.position_on_path
+                        kind = room_data.maze_room.kind,
+                        position_on_path = room_data.maze_room.position_on_path
                     );
                     let info_text_block = block::Text::builder()
                         .string(description)
@@ -700,7 +700,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 
                 // Set spawn and starting room special features.
                 // TODO: Don't unconditionally override spawn; instead communicate this out.
-                if matches!(room_data.maze_kind, MazeRoomKind::Start) {
+                if matches!(room_data.maze_room.kind, MazeRoomKind::Start) {
                     let mut spawn = Spawn::default_for_new_space(ctx.bounds());
                     spawn.set_bounds(interior);
                     spawn.set_inventory(self.starting_inventory.clone());
@@ -894,27 +894,71 @@ fn generate_dungeon_map(
     key_item: &Tool,
 ) -> Vol<Arc<[Option<DemoRoom>]>> {
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
-
     let (maze, path_length) = generate_maze(seed, requested_rooms);
-
     let [gain_key] = choose_key_locations(&mut rng, &maze, path_length);
 
-    // Expand bounds to allow for extra-tall rooms.
-    let expanded_maze_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
+    // This function is organized into a series of passes over the maze.
+    // This is currently unnecessary (all the loops could be combined into one),
+    // but has been arranged so that we can add passes which change the structure of the
+    // maze in ways that affect later passes’ neighbor checks.
 
-    Vol::from_fn(expanded_maze_bounds, |room_position| {
-        let maze_room = maze.get(room_position)?;
+    // Generate initial map from `maze` with no features added,
+    // except for the expanded bounds to allow for extra-tall rooms.
+    let expanded_maze_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
+    let mut dungeon_map: Vol<Box<[Option<DemoRoom>]>> =
+        Vol::from_fn(expanded_maze_bounds, |room_position| {
+            let maze_room = maze.get(room_position)?.clone();
+            if let MazeRoomKind::Unoccupied = maze_room.kind {
+                return None;
+            }
+            Some(DemoRoom {
+                extended_bounds: GridAab::ORIGIN_CUBE,
+                wall_features: FaceMap::from_fn(|face| -> WallFeature {
+                    if maze_room.has_passage(face) {
+                        WallFeature::Passage(Door::None)
+                    } else {
+                        WallFeature::Blank
+                    }
+                }),
+                floor: FloorKind::Solid,
+                corridor_only: false,
+                lit: false,
+                grants_item: None,
+                maze_room,
+            })
+        });
+
+    // Place items that are necessary to solve the puzzle (key items).
+    for (room_position, room) in dungeon_map.iter_mut() {
+        let Some(room) = room else { continue };
 
         let must_grant_item: Option<Tool> =
             (room_position == gain_key.found_in_room).then(|| key_item.clone());
-        // Allow rooms that are not start or end to have more interesting properties.
-        let is_not_end = match maze_room.kind {
-            MazeRoomKind::Unoccupied => return None,
-            MazeRoomKind::Start | MazeRoomKind::Goal => false,
-            MazeRoomKind::Path | MazeRoomKind::OffPath => true,
-        };
 
-        let corridor_only = is_not_end && must_grant_item.is_none() && rng.random_bool(0.5);
+        if let Some(item) = must_grant_item {
+            assert!(
+                room.grants_item.is_none(),
+                "item conflict in room at {room_position:?}",
+            );
+            room.grants_item = Some(item);
+        }
+    }
+
+    // Convert some rooms to corridor_only rooms, which cannot have features other than light.
+    for (_, room) in dungeon_map.iter_mut() {
+        let Some(room) = room else { continue };
+
+        room.corridor_only |=
+            room.maze_room.is_not_end() && room.grants_item.is_none() && rng.random_bool(0.5);
+    }
+
+    // Expand some rooms above or below the maze into unoccupied space.
+    for (room_position, room) in dungeon_map.iter_mut() {
+        let Some(room) = room else { continue };
+
+        // If a required item is present, then we must not do anything preventing it from being
+        // placed.
+        let must_grant_item = room.grants_item.is_some();
 
         let can_have_chasm_obstacle = true; // TODO: make jetpack a key item (needs tool icon fix)
 
@@ -923,7 +967,7 @@ fn generate_dungeon_map(
         // * space outside the bounds of maze generation, but within `expanded_maze_bounds`.
         let mut expanded_room_bounds = GridAab::ORIGIN_CUBE;
         // Optional high ceiling
-        if !corridor_only
+        if !room.corridor_only
             && maze
                 .get(room_position + Face::PY.normal_vector())
                 .is_none_or(|above| above.kind == MazeRoomKind::Unoccupied)
@@ -933,9 +977,9 @@ fn generate_dungeon_map(
                 expanded_room_bounds.expand(FaceMap::default().with(Face::PY, 1));
         }
         // Floor pit
-        let floor = if !corridor_only
-            && is_not_end
-            && must_grant_item.is_none()
+        let floor = if !room.corridor_only
+            && room.maze_room.is_not_end()
+            && !must_grant_item
             && maze
                 .get(room_position + Face::NY.normal_vector())
                 .is_none_or(|below| below.kind == MazeRoomKind::Unoccupied)
@@ -954,26 +998,54 @@ fn generate_dungeon_map(
             FloorKind::Solid
         };
 
-        let wall_features = {
-            FaceMap::from_fn(|face| -> WallFeature {
-                let neighbor = room_position + face.normal_vector();
-                let neighbor_in_bounds = maze.bounds().contains_cube(neighbor);
+        room.extended_bounds = expanded_room_bounds;
+        room.floor = floor;
+    }
 
-                if maze_room.has_passage(face) {
+    // Place wall features beyond basic unblocked passages.
+    for (room_position, room) in dungeon_map.iter_mut() {
+        let Some(room) = room else { continue };
+
+        for (face, wall_feature) in room.wall_features.iter_mut() {
+            let neighbor = room_position + face.normal_vector();
+            let neighbor_in_bounds = maze.bounds().contains_cube(neighbor);
+
+            match wall_feature {
+                WallFeature::Blank => {
+                    // Consider placing a window.
+                    // Create windows only if they look into space outside the maze
+                    let have_window =
+                        if neighbor_in_bounds || room.corridor_only || face == Face::NY {
+                            false
+                        } else if face == Face::PY {
+                            // ceilings are more common overall and we want more internally-lit ones
+                            rng.random_bool(0.25)
+                        } else {
+                            rng.random_bool(0.75)
+                        };
+
+                    if have_window {
+                        *wall_feature = WallFeature::Window;
+                    }
+                }
+
+                WallFeature::Passage(door @ Door::None) => {
+                    // Consider placing a gate.
+
                     // If the two rooms are both on the path, then the path passes between them
                     // and it must be passable.
                     // Also, in the off-path section which has an important item, we must let the
                     // player reach it -- we don’t track what the exact path to items are, so
                     // instead we just make all rooms at that path-position passable.
-                    let must_be_passable = !(maze_room.kind == MazeRoomKind::OffPath
+                    let must_be_passable = !(room.maze_room.kind == MazeRoomKind::OffPath
                         || maze[neighbor].kind == MazeRoomKind::OffPath)
-                        || maze_room.position_on_path == Some(gain_key.found_on_path_position);
+                        || room.maze_room.position_on_path == Some(gain_key.found_on_path_position);
 
-                    let door = *if face.axis() == Axis::Y {
+                    *door = *if face.axis() == Axis::Y {
                         // Currently, vertical passages must not have doors.
                         &[Door::None]
                     } else if must_be_passable {
-                        if gain_key.room_may_require_this(maze_room) {
+                        if gain_key.room_may_require_this(&room.maze_room) {
                             // If the rooms are on the path and the player has a key,
                             // generate no door or a door that is can be opened.
                             &[
@@ -995,52 +1067,44 @@ fn generate_dungeon_map(
                     }
                     .choose(&mut rng)
                     .unwrap();
-                    return WallFeature::Passage(door);
                 }
 
-                // Create windows only if they look into space outside the maze
-                let have_window = if neighbor_in_bounds || corridor_only || face == Face::NY {
-                    false
-                } else if face == Face::PY {
-                    // ceilings are more common overall and we want more internally-lit ones
-                    rng.random_bool(0.25)
-                } else {
-                    rng.random_bool(0.75)
-                };
+                // cases we should not meet because it's our job to create them
+                WallFeature::Passage(_) => unreachable!(),
+                WallFeature::Window => unreachable!(),
+            }
+        }
+    }
 
-                if have_window {
-                    WallFeature::Window
-                } else {
-                    WallFeature::Blank
-                }
-            })
-        };
+    // Place non-required random items.
+    // TODO: Make item probability dependent on maze size?
+    for (_, room) in dungeon_map.iter_mut() {
+        let Some(room) = room else { continue };
+        if let FloorKind::Solid = room.floor
+            && !room.corridor_only
+            && room.maze_room.is_not_end()
+            && let None = room.grants_item
+            && rng.random_bool(0.5)
+        {
+            room.grants_item = grantable_items.choose(&mut rng).cloned();
+        }
+    }
 
-        let ok_to_grant_item = matches!(floor, FloorKind::Solid) && !corridor_only && is_not_end;
-        assert!(must_grant_item.is_none() || ok_to_grant_item);
-        let grants_item = must_grant_item.or_else(|| {
-            (ok_to_grant_item && rng.random_bool(0.5))
-                .then(|| grantable_items.choose(&mut rng).unwrap().clone())
-        });
+    // Light some rooms that might be dark, particularly if they have items in them.
+    for (_, room) in dungeon_map.iter_mut() {
+        let Some(room) = room else { continue };
 
-        Some(DemoRoom {
-            maze_kind: maze_room.kind,
-            position_on_path: maze_room.position_on_path,
-            extended_bounds: expanded_room_bounds,
-            wall_features,
-            floor,
-            corridor_only,
-            // Light some rooms that might be dark, particularly if they have items in them.
-            lit: wall_features[Face::PY] == WallFeature::Blank
-                && (grants_item.is_some() || rng.random_bool(0.75)),
-            grants_item,
-        })
-    })
+        // TODO: should be "not a skylight" instead of "not blank"
+        room.lit |= room.wall_features[Face::PY] == WallFeature::Blank
+            && (room.grants_item.is_some() || rng.random_bool(0.75));
+    }
+
+    dungeon_map.map_container(Arc::from)
 }
 
 fn choose_key_locations<const N: usize>(
     rng: &mut rand_xoshiro::Xoshiro256Plus,
-    maze: &Vol<Box<[super::maze::MazeRoom]>>,
+    maze: &Vol<Box<[MazeRoom]>>,
     path_length: usize,
 ) -> [KeyLocation; N] {
     // Pick positions along the path at which the player will gain items for use to access
@@ -1074,7 +1138,7 @@ struct KeyLocation {
     found_on_path_position: usize,
 }
 impl KeyLocation {
-    fn room_may_require_this(&self, maze_room: &super::maze::MazeRoom) -> bool {
+    fn room_may_require_this(&self, maze_room: &MazeRoom) -> bool {
         maze_room.position_on_path.is_some_and(|p| p > self.found_on_path_position)
     }
 }
