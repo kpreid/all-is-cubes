@@ -650,6 +650,36 @@ impl BoxPart {
         self
     }
 
+    /// Returns the bounding box of this part of the given box.
+    ///
+    /// Returns [`None`] if the box does not have room to have this part, even at zero thickness.
+    #[inline(never)]
+    pub fn bounds_in(self, bounds: GridAab) -> Option<GridAab> {
+        let mut l = bounds.lower_bounds();
+        let mut u = bounds.upper_bounds();
+        let size = bounds.size();
+        let l_inset = l.map(|component| component.wrapping_add(1));
+        let u_inset = u.map(|component| component.wrapping_sub(1));
+        for axis in Axis::ALL {
+            match (self.0[axis], size[axis]) {
+                (PartOnAxis::In, 0 | 1) => return None,
+                (PartOnAxis::In, 2..) => {
+                    l[axis] = l_inset[axis];
+                    u[axis] = u_inset[axis];
+                }
+                (PartOnAxis::Lower, 0) => return None,
+                (PartOnAxis::Lower, 1) => return None,
+                (PartOnAxis::Lower, 2..) => u[axis] = l_inset[axis],
+                (PartOnAxis::Upper, 0) => return None,
+                (PartOnAxis::Upper, 1) => return None,
+                (PartOnAxis::Upper, 2..) => l[axis] = u_inset[axis],
+                (PartOnAxis::LowerUpper, 0 | 1) => {} // use existing bounds
+                (PartOnAxis::LowerUpper, 2..) => return None,
+            }
+        }
+        Some(GridAab::from_lower_upper(l, u))
+    }
+
     /// Counts how many box faces this part touches, such that a face and its opposite face
     /// only counts once.
     #[inline(always)]
@@ -738,5 +768,50 @@ mod tests {
                 "{face:?} to_face"
             );
         }
+    }
+
+    #[test]
+    fn bounds_in_width_4() {
+        let test_bounds = GridAab::from_lower_upper([0, 0, 0], [4, 4, 4]);
+        assert_eq!(
+            BoxPart::INTERIOR.bounds_in(test_bounds),
+            Some(GridAab::from_lower_upper([1, 1, 1], [3, 3, 3])),
+        );
+        assert_eq!(
+            BoxPart::face(Face::NX).bounds_in(test_bounds),
+            Some(GridAab::from_lower_upper([0, 1, 1], [1, 3, 3])),
+        );
+        assert_eq!(
+            BoxPart::face(Face::PX).bounds_in(test_bounds),
+            Some(GridAab::from_lower_upper([3, 1, 1], [4, 3, 3])),
+        );
+        assert_eq!(
+            BoxPart::from_on_faces(FaceMap::symmetric([true, false, false])).bounds_in(test_bounds),
+            None,
+        );
+    }
+
+    #[test]
+    fn bounds_in_width_1() {
+        let test_bounds = GridAab::from_lower_upper([0, 0, 0], [1, 4, 4]);
+        assert_eq!(BoxPart::INTERIOR.bounds_in(test_bounds), None);
+        assert_eq!(BoxPart::face(Face::NX).bounds_in(test_bounds), None);
+        assert_eq!(BoxPart::face(Face::PX).bounds_in(test_bounds), None);
+        assert_eq!(
+            BoxPart::from_on_faces(FaceMap::symmetric([true, false, false])).bounds_in(test_bounds),
+            Some(GridAab::from_lower_upper([0, 1, 1], [1, 3, 3])),
+        );
+    }
+
+    #[test]
+    fn bounds_in_width_0() {
+        let test_bounds = GridAab::from_lower_upper([0, 0, 0], [0, 4, 4]);
+        assert_eq!(BoxPart::INTERIOR.bounds_in(test_bounds), None);
+        assert_eq!(BoxPart::face(Face::NX).bounds_in(test_bounds), None);
+        assert_eq!(BoxPart::face(Face::PX).bounds_in(test_bounds), None);
+        assert_eq!(
+            BoxPart::from_on_faces(FaceMap::symmetric([true, false, false])).bounds_in(test_bounds),
+            Some(GridAab::from_lower_upper([0, 1, 1], [0, 3, 3])),
+        );
     }
 }
