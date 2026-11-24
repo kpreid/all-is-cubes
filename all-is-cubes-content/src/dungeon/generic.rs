@@ -1,5 +1,8 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
+use core::fmt;
+
+use exhaust::Exhaust;
 
 use all_is_cubes::arcstr;
 use all_is_cubes::character::Spawn;
@@ -111,13 +114,18 @@ impl DungeonGrid {
 }
 
 pub trait Theme<R> {
-    fn passes(&self) -> usize;
+    /// Placement pass identifier.
+    ///
+    /// `place_room()` will be called as many times as this type has values.
+    ///
+    /// The type’s [`fmt::Display`] will be used for progress labeling.
+    type Pass: Clone + Exhaust + fmt::Display + Send + Sync;
 
     // TODO: Replace `&mut Space` with transactions so we can use this post-startup?
     fn place_room(
         &self,
         ctx: &mut space::Mutation<'_, '_>,
-        pass_index: usize,
+        pass: Self::Pass,
         map: Vol<&[R]>,
         position_in_room_grid: Cube,
         value: &R,
@@ -138,12 +146,12 @@ where
     let region = space.bounds(); // TODO: compute individual room regions
 
     framework::Queue::from_iter(
-        itertools::iproduct!(0..theme.passes(), map.bounds().interior_iter()).map(
+        itertools::iproduct!(ThemeT::Pass::exhaust(), map.bounds().interior_iter()).map(
             move |(pass, room_position)| {
                 let theme = theme.clone();
                 let map = map.clone();
                 framework::Task {
-                    label: arcstr::format!("pass {pass} @ {room_position:?}", pass = pass + 1),
+                    label: arcstr::format!("{pass} @ {room_position:?}"),
                     time_estimate: ps32(1.0),
                     region,
                     operation: framework::Operation::Custom(Box::new(move |m| {

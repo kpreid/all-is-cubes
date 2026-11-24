@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec;
+use core::fmt;
 use core::mem;
 
 use descriptive_unwrap::OptionExt as _;
@@ -456,14 +457,12 @@ impl DemoTheme {
 }
 
 impl Theme<Option<DemoRoom>> for DemoTheme {
-    fn passes(&self) -> usize {
-        2
-    }
+    type Pass = Pass;
 
     fn place_room(
         &self,
         ctx: &mut space::Mutation<'_, '_>,
-        pass_index: usize,
+        pass: Pass,
         map: Vol<&[Option<DemoRoom>]>,
         room_position: Cube,
         room_data: &Option<DemoRoom>,
@@ -487,8 +486,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         };
         let floor_layer = unmodified_room_box.abut(Face::NY, 1).unwrap();
 
-        match pass_index {
-            0 => {
+        match pass {
+            Pass::WallsEtc => {
                 // Construct basic walls.
                 {
                     let mut alt_style: BoxStyle;
@@ -630,7 +629,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 }
                 Ok(None)
             }
-            1 => {
+            Pass::PassagesEtc => {
                 for face in [Face::PX, Face::PY, Face::PZ] {
                     if let WallFeature::Passage(door) = room_data.wall_features[face] {
                         self.inside_doorway(ctx, map, room_position, face, door)?;
@@ -713,8 +712,22 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     Ok(None)
                 }
             }
-            _ => unreachable!(),
         }
+    }
+}
+
+#[derive(Clone, Copy, exhaust::Exhaust)]
+enum Pass {
+    WallsEtc,
+    PassagesEtc,
+}
+
+impl fmt::Display for Pass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.pad(match self {
+            Pass::WallsEtc => "Walls",
+            Pass::PassagesEtc => "Passages",
+        })
     }
 }
 
