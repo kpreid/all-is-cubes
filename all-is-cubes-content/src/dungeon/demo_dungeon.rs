@@ -96,6 +96,7 @@ enum FloorKind {
     Solid,
     Chasm,
     Bridge,
+    Spikes,
 }
 
 /// Data for the size and theming of dungeon rooms.
@@ -507,7 +508,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     let block: Option<&Block> = if let Some(face) = face
                         && let WallFeature::Joined = room_data.wall_features[face]
                     {
-                        None
+                        Some(&AIR)
                     } else if let Some(face) = face
                         && face != Face::NY
                         && let Some(wall_block) = wall_type
@@ -521,13 +522,6 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     {
                         ctx.fill_uniform(part_bounds, block)?;
                     }
-                }
-
-                // Spikes on the bottom of the pit
-                // (TODO: revise this condition when staircase-ish rooms exist)
-                if room_data.extended_map_bounds().lower_bounds().y < 0 {
-                    assert!(!room_data.corridor_only, "{room_data:?}");
-                    ctx.fill_uniform(interior.abut(Face::NY, -1).unwrap(), &self.blocks[Spikes])?;
                 }
 
                 // Lit corridors get the magic pyramid light instead of putting a torch in your face
@@ -676,6 +670,14 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                 ctx.fill_uniform(bridge_box, &self.blocks[FloorTile])?;
                             }
                         }
+                    }
+                    FloorKind::Spikes => {
+                        assert!(!room_data.corridor_only, "{room_data:?}");
+                        ctx.fill_uniform(floor_layer, &self.blocks[FloorTile])?;
+                        ctx.fill_uniform(
+                            interior.abut(Face::NY, -1).err_is_unreachable(),
+                            &self.blocks[Spikes],
+                        )?;
                     }
                 }
                 Ok(None)
@@ -1008,53 +1010,67 @@ fn generate_dungeon_map(
     }
 
     // Expand some rooms above or below the maze into unoccupied space.
-    for (room_position, room) in dungeon_map.iter_mut() {
-        let Some(room) = room else { continue };
+    for room_position in maze.bounds().interior_iter() {
+        let neighbor_above = room_position + Face::PY;
+        let neighbor_below = room_position + Face::NY;
 
-        // If a required item is present, then we must not do anything preventing it from being
-        // placed.
-        let must_grant_item = room.grants_item.is_some();
-
-        let can_have_chasm_obstacle = true; // TODO: make jetpack a key item (needs tool icon fix)
-
-        // Add features that enlarge the room, if there is space to expand into, either
-        // * an unoccupied room, or
-        // * space outside the bounds of maze generation, but within `expanded_maze_bounds`.
-        let mut expanded_room_bounds = GridAab::ORIGIN_CUBE;
-        // Optional high ceiling
-        if !room.corridor_only
+        // Expand above.
+        if let Some(Some(room)) = dungeon_map.get_mut(room_position)
+            && !room.corridor_only
+            && room.maze_room.is_not_end()
+            && let WallFeature::Blank = room.wall_features[Face::PY]
             && maze
-                .get(room_position + Face::PY.normal_vector())
+                .get(neighbor_above)
                 .is_none_or(|above| above.kind == MazeRoomKind::Unoccupied)
             && rng.random_bool(0.25)
         {
-            expanded_room_bounds =
-                expanded_room_bounds.expand(FaceMap::default().with(Face::PY, 1));
+            let maze_room = room.maze_room.clone();
+            room.wall_features[Face::PY] = WallFeature::Joined;
+            dungeon_map[neighbor_above] = Some(DemoRoom {
+                maze_room, // not strictly accurate but close enough
+                extended_bounds: GridAab::ORIGIN_CUBE,
+                wall_features: FaceMap::splat_copy(WallFeature::Blank)
+                    .with(Face::NY, WallFeature::Joined),
+                floor: FloorKind::Chasm,
+                corridor_only: false,
+                lit: false,
+                grants_item: None,
+            });
         }
-        // Floor pit
-        let floor = if !room.corridor_only
+
+        // Expand below.
+        if let Some(Some(room)) = dungeon_map.get_mut(room_position)
+            && !room.corridor_only
             && room.maze_room.is_not_end()
-            && !must_grant_item
+            && let None = room.grants_item
+            && let WallFeature::Blank = room.wall_features[Face::NY]
             && maze
-                .get(room_position + Face::NY.normal_vector())
+                .get(neighbor_below)
                 .is_none_or(|below| below.kind == MazeRoomKind::Unoccupied)
             && rng.random_bool(0.25)
         {
-            expanded_room_bounds =
-                expanded_room_bounds.expand(FaceMap::default().with(Face::NY, 1));
-            if can_have_chasm_obstacle {
+            let maze_room = room.maze_room.clone();
+            let can_have_chasm_obstacle = true; // TODO: make jetpack a key item (needs tool icon fix)
+
+            room.wall_features[Face::NY] = WallFeature::Joined;
+            room.floor = if can_have_chasm_obstacle {
                 *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
                     .choose(&mut rng)
                     .unwrap()
             } else {
                 FloorKind::Bridge
-            }
-        } else {
-            FloorKind::Solid
-        };
-
-        room.extended_bounds = expanded_room_bounds;
-        room.floor = floor;
+            };
+            dungeon_map[neighbor_below] = Some(DemoRoom {
+                maze_room, // not strictly accurate but close enough
+                extended_bounds: GridAab::ORIGIN_CUBE,
+                wall_features: FaceMap::splat_copy(WallFeature::Blank)
+                    .with(Face::PY, WallFeature::Joined),
+                floor: FloorKind::Spikes,
+                corridor_only: false,
+                lit: false,
+                grants_item: None,
+            });
+        }
     }
 
     // Place wall features beyond basic unblocked passages.
@@ -1069,15 +1085,18 @@ fn generate_dungeon_map(
                 WallFeature::Blank => {
                     // Consider placing a window.
                     // Create windows only if they look into space outside the maze
-                    let have_window =
-                        if neighbor_in_bounds || room.corridor_only || face == Face::NY {
-                            false
-                        } else if face == Face::PY {
-                            // ceilings are more common overall and we want more internally-lit ones
-                            rng.random_bool(0.25)
-                        } else {
-                            rng.random_bool(0.75)
-                        };
+                    let have_window = if neighbor_in_bounds
+                        || room.corridor_only
+                        || face == Face::NY
+                        || room_position.y < 0
+                    {
+                        false
+                    } else if face == Face::PY {
+                        // ceilings are more common overall and we want more internally-lit ones
+                        rng.random_bool(0.25)
+                    } else {
+                        rng.random_bool(0.75)
+                    };
 
                     if have_window {
                         *wall_feature = WallFeature::Window;
