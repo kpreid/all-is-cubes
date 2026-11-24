@@ -3,6 +3,7 @@ use alloc::sync::Arc;
 use alloc::vec;
 use core::fmt;
 use core::mem;
+use exhaust::Exhaust;
 
 use descriptive_unwrap::OptionExt as _;
 use rand::seq::{IndexedRandom as _, IteratorRandom as _};
@@ -489,18 +490,21 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         match pass {
             Pass::WallsEtc => {
                 // Construct basic walls.
-                {
-                    let mut alt_style: BoxStyle;
-                    let room_style = if let Some(wall_type) = wall_type {
-                        alt_style = self.room_style.clone();
-                        for not_floor in [Face::NX, Face::PX, Face::NZ, Face::PZ, Face::PY] {
-                            alt_style[BoxPart::face(not_floor)] = Some(wall_type.clone());
-                        }
-                        &alt_style
+                let exterior_box = interior.expand(FaceMap::splat(1));
+                for part in BoxPart::exhaust() {
+                    let block: Option<&Block> = if part != BoxPart::face(Face::NY)
+                        && part.is_face()
+                        && let Some(wall_block) = wall_type
+                    {
+                        Some(wall_block)
                     } else {
-                        &self.room_style
+                        self.room_style[part].as_ref()
                     };
-                    room_style.create_box(interior.expand(FaceMap::splat(1))).execute_m(ctx)?;
+                    if let Some(block) = block
+                        && let Some(part_bounds) = part.bounds_in(exterior_box)
+                    {
+                        ctx.fill_uniform(part_bounds, block)?;
+                    }
                 }
 
                 // Spikes on the bottom of the pit
