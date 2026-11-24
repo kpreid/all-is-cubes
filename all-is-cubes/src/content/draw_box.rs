@@ -2,6 +2,8 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::ops;
 
+use exhaust::Exhaust;
+
 use crate::block::{self, Block, Resolution};
 use crate::math::{Axis, Cube, Face, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation};
 use crate::{space, universe};
@@ -469,17 +471,22 @@ impl universe::VisitHandles for BoxStyle {
 // -------------------------------------------------------------------------------------------------
 
 /// Identifies one of the 64 parts of a [`BoxStyle`].
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Exhaust, Hash, PartialEq)]
+#[exhaust(factory_is_self)]
 pub struct BoxPart(
     /// These positions/bit-flags follow the same indexing scheme as for the [`BoxStyle::parts`]
     /// field. Only values 0, 1, 2, and 3 are valid.
     ///
     /// We could make this representation denser by using a single `u8` bitfield, but that would be
     /// cryptic to no great gain.
+    ///
+    /// The container type is an array rather than `Vector3D` so that `derive(Exhaust)` works
+    /// directly, and it doesn’t make much difference to anything else.
     [PartOnAxis; 3],
 );
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Exhaust, Hash, PartialEq)]
+#[exhaust(factory_is_self)]
 #[repr(u8)]
 enum PartOnAxis {
     In = 0,
