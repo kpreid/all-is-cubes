@@ -54,6 +54,38 @@ struct DemoRoom {
     grants_item: Option<Tool>,
 }
 
+impl DemoRoom {
+    /// Returns whether this room can be turned into a room joined with the one below, without
+    /// creating problems other than the player’s ability to ascend.
+    fn can_be_joined_below(&self) -> bool {
+        if let Self {
+            maze_room,
+            wall_features: FaceMap {
+                ny: floor_feature, ..
+            },
+            // Corridors don't match normal rooms in size, and have their own kind of
+            // automatic joinedness, so never join them.
+            corridor_only: false,
+            lit: _,
+            // Currently, there is no place for granting an item if the floor is missing.
+            grants_item: None,
+        } = self
+        {
+            maze_room.is_not_end() // keep ends simple -- not strictly needed
+                && match floor_feature {
+                    WallFeature::Blank => true,
+                    WallFeature::Passage(_) => true,
+                    WallFeature::Window => true,
+                    WallFeature::Joined => true,
+                    WallFeature::Bridge => true,
+                    WallFeature::Spikes => false,
+                }
+        } else {
+            false
+        }
+    }
+}
+
 /// What kind of holes a wall has.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum WallFeature {
@@ -947,9 +979,8 @@ fn generate_dungeon_map(
     let [gain_key] = choose_key_locations(&mut rng, &maze, path_length);
 
     // This function is organized into a series of passes over the maze.
-    // This is currently unnecessary (all the loops could be combined into one),
-    // but has been arranged so that we can add passes which change the structure of the
-    // maze in ways that affect later passes’ neighbor checks.
+    // This allows for passes that change the structure of the maze in ways that affect
+    // later passes’ choices.
 
     // Generate initial map from `maze` with no features added,
     // except for the expanded bounds to allow for extra-tall rooms.
@@ -991,14 +1022,6 @@ fn generate_dungeon_map(
         }
     }
 
-    // Convert some rooms to corridor_only rooms, which cannot have features other than light.
-    for (_, room) in dungeon_map.iter_mut() {
-        let Some(room) = room else { continue };
-
-        room.corridor_only |=
-            room.maze_room.is_not_end() && room.grants_item.is_none() && rng.random_bool(0.5);
-    }
-
     // Expand some rooms above or below the maze into unoccupied space.
     for room_position in maze.bounds().interior_iter() {
         let neighbor_above = room_position + Face::PY;
@@ -1028,9 +1051,7 @@ fn generate_dungeon_map(
 
         // Expand below.
         if let Some(Some(room)) = dungeon_map.get_mut(room_position)
-            && !room.corridor_only
-            && room.maze_room.is_not_end()
-            && let None = room.grants_item
+            && room.can_be_joined_below()
             && let WallFeature::Blank = room.wall_features[Face::NY]
             && maze
                 .get(neighbor_below)
@@ -1061,6 +1082,75 @@ fn generate_dungeon_map(
                 grants_item: None,
             });
         }
+    }
+
+    // Convert vertical passages into joined rooms.
+    for (x, z) in itertools::iproduct!(
+        expanded_maze_bounds.x_range(),
+        expanded_maze_bounds.z_range()
+    ) {
+        let mut bottommost: Option<GridCoordinate> = None;
+        for candidate_y in expanded_maze_bounds.y_range() {
+            let room_position = Cube::new(x, candidate_y, z);
+            let Some(Some(candidate_room)) = dungeon_map.get_mut(room_position) else {
+                continue;
+            };
+            let can_continue = matches!(
+                candidate_room.wall_features[Face::PY],
+                WallFeature::Passage(_)
+            ) && matches!(
+                dungeon_map.get_mut(room_position + Face::PY),
+                Some(Some(neighbor_room)) if neighbor_room.can_be_joined_below()
+            );
+
+            if let None = bottommost
+                && can_continue
+            {
+                // Found beginning.
+                bottommost = Some(candidate_y);
+            } else if let Some(bottom_y) = bottommost
+                && !can_continue
+            {
+                // Found end.
+                let top_y = candidate_y;
+                bottommost = None;
+
+                // Convert this string of vertical passages into one joined room.
+                for edit_y in bottom_y..=top_y {
+                    let edit_position = Cube::new(x, edit_y, z);
+                    if let Some(Some(edit_room)) = dungeon_map.get_mut(edit_position) {
+                        if edit_y != bottom_y {
+                            edit_room.wall_features[Face::NY] = WallFeature::Joined;
+                        }
+                        if edit_y != top_y {
+                            edit_room.wall_features[Face::PY] = WallFeature::Joined;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Convert some rooms to corridor_only rooms, which cannot have features other than light.
+    //
+    // This is done after passes that join rooms and handle vertical rooms, so that corridorness
+    // doesn't prevent that and so that we don’t generate problems like corridors that are
+    // 3-way junctions with an arm pointing downward.
+    for (_, room) in dungeon_map.iter_mut() {
+        let Some(room) = room else { continue };
+
+        room.corridor_only |= room.maze_room.is_not_end()
+            && room.grants_item.is_none()
+            && matches!(room.wall_features[Face::NY], WallFeature::Blank)
+            && room.wall_features.into_values_iter().all(|f| match f {
+                WallFeature::Blank => true,
+                WallFeature::Passage(_) => true,
+                WallFeature::Window => false,
+                WallFeature::Joined => false,
+                WallFeature::Bridge => false,
+                WallFeature::Spikes => false,
+            })
+            && rng.random_bool(0.5);
     }
 
     // Place wall features beyond basic unblocked passages.
