@@ -278,30 +278,6 @@ impl DemoTheme {
         }
     }
 
-    fn plain_room(
-        &self,
-        wall_block: Option<&Block>,
-        ctx: &mut space::Mutation<'_, '_>,
-        interior: GridAab,
-    ) -> Result<(), InGenError> {
-        let mut alt_style: BoxStyle;
-        let room_style = if let Some(wall_block) = wall_block {
-            alt_style = self.room_style.clone();
-            alt_style[BoxPart::face(Face::NX)] = Some(wall_block.clone());
-            alt_style[BoxPart::face(Face::PX)] = Some(wall_block.clone());
-            alt_style[BoxPart::face(Face::NZ)] = Some(wall_block.clone());
-            alt_style[BoxPart::face(Face::PZ)] = Some(wall_block.clone());
-            alt_style[BoxPart::face(Face::PY)] = Some(wall_block.clone());
-            &alt_style
-        } else {
-            &self.room_style
-        };
-
-        room_style.create_box(interior.expand(FaceMap::splat(1))).execute_m(ctx)?;
-
-        Ok(())
-    }
-
     fn inside_doorway(
         &self,
         ctx: &mut space::Mutation<'_, '_>,
@@ -513,7 +489,22 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 
         match pass_index {
             0 => {
-                self.plain_room(wall_type, ctx, interior)?;
+                // Construct basic walls.
+                {
+                    let mut alt_style: BoxStyle;
+                    let room_style = if let Some(wall_type) = wall_type {
+                        alt_style = self.room_style.clone();
+                        alt_style[BoxPart::face(Face::NX)] = Some(wall_type.clone());
+                        alt_style[BoxPart::face(Face::PX)] = Some(wall_type.clone());
+                        alt_style[BoxPart::face(Face::NZ)] = Some(wall_type.clone());
+                        alt_style[BoxPart::face(Face::PZ)] = Some(wall_type.clone());
+                        alt_style[BoxPart::face(Face::PY)] = Some(wall_type.clone());
+                        &alt_style
+                    } else {
+                        &self.room_style
+                    };
+                    room_style.create_box(interior.expand(FaceMap::splat(1))).execute_m(ctx)?;
+                }
 
                 // Spikes on the bottom of the pit
                 // (TODO: revise this condition when staircase-ish rooms exist)
