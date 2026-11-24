@@ -8,6 +8,8 @@ use crate::block::{self, Block, Resolution};
 use crate::math::{Axis, Cube, Face, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation};
 use crate::{space, universe};
 
+// -------------------------------------------------------------------------------------------------
+
 // Bits in [`BoxPart`] and indexes of [`BoxStyle::parts`].
 const LOWER: u8 = 1;
 const UPPER: u8 = 2;
@@ -68,7 +70,15 @@ impl BoxStyle {
             // TODO: deduplicate identical Blocks to reduce total number of allocations present
             BoxStyle {
                 parts: Arc::new(from_fn(|x| {
-                    from_fn(|y| from_fn(|z| f(BoxPart(vec3(x as u8, y as u8, z as u8)))))
+                    from_fn(|y| {
+                        from_fn(|z| {
+                            f(BoxPart(vec3(
+                                PartOnAxis::from_bits(x as u8),
+                                PartOnAxis::from_bits(y as u8),
+                                PartOnAxis::from_bits(z as u8),
+                            )))
+                        })
+                    })
                 })),
             }
         }
@@ -380,8 +390,7 @@ impl BoxStyle {
     /// Replace a single part of this and return the modified style.
     #[must_use]
     pub fn with(mut self, part: BoxPart, block: Option<Block>) -> Self {
-        let parts = Arc::make_mut(&mut self.parts);
-        parts[usize::from(part.0.x)][usize::from(part.0.y)][usize::from(part.0.z)] = block;
+        self[part] = block;
         self
     }
 
@@ -394,7 +403,11 @@ impl BoxStyle {
             for (y, row) in plane.iter_mut().enumerate() {
                 for (z, block) in row.iter_mut().enumerate() {
                     if let Some(old_block) = block.take() {
-                        let part = BoxPart(vec3(x as u8, y as u8, z as u8));
+                        let part = BoxPart(vec3(
+                            PartOnAxis::from_bits(x as u8),
+                            PartOnAxis::from_bits(y as u8),
+                            PartOnAxis::from_bits(z as u8),
+                        ));
                         *block = Some(block_fn(part, old_block));
                     }
                 }
@@ -430,14 +443,21 @@ impl BoxStyle {
 impl ops::Index<BoxPart> for BoxStyle {
     type Output = Option<Block>;
 
+    #[rustfmt::skip]
     fn index(&self, index: BoxPart) -> &Self::Output {
-        &self.parts[usize::from(index.0.x)][usize::from(index.0.y)][usize::from(index.0.z)]
+        &self.parts
+            [index.0.x.to_index()]
+            [index.0.y.to_index()]
+            [index.0.z.to_index()]
     }
 }
 impl ops::IndexMut<BoxPart> for BoxStyle {
+    #[rustfmt::skip]
     fn index_mut(&mut self, index: BoxPart) -> &mut Self::Output {
-        &mut Arc::make_mut(&mut self.parts)[usize::from(index.0.x)][usize::from(index.0.y)]
-            [usize::from(index.0.z)]
+        &mut Arc::make_mut(&mut self.parts)
+            [index.0.x.to_index()]
+            [index.0.y.to_index()]
+            [index.0.z.to_index()]
     }
 }
 
@@ -448,6 +468,8 @@ impl universe::VisitHandles for BoxStyle {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Identifies one of the 64 parts of a [`BoxStyle`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct BoxPart(
@@ -456,15 +478,28 @@ pub struct BoxPart(
     ///
     /// We could make this representation denser by using a single `u8` bitfield, but that would be
     /// cryptic to no great gain.
-    Vector3D<u8, ()>,
+    Vector3D<PartOnAxis, ()>,
 );
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[repr(u8)]
+enum PartOnAxis {
+    In = 0,
+    Lower = LOWER,
+    Upper = UPPER,
+    LowerUpper = LOWER | UPPER,
+}
 
 impl BoxPart {
     /// The part that is the interior of the box.
-    pub const INTERIOR: Self = Self(vec3(0, 0, 0));
+    pub const INTERIOR: Self = Self(vec3(PartOnAxis::In, PartOnAxis::In, PartOnAxis::In));
 
     /// The part that is the whole box when its size is 1×1×1.
-    pub const UNIT: Self = Self(vec3(LOWER | UPPER, LOWER | UPPER, LOWER | UPPER));
+    pub const UNIT: Self = Self(vec3(
+        PartOnAxis::LowerUpper,
+        PartOnAxis::LowerUpper,
+        PartOnAxis::LowerUpper,
+    ));
 
     /// Returns the part which is the given face of the box.
     ///
@@ -473,13 +508,14 @@ impl BoxPart {
     /// This function is the inverse of [`BoxPart::to_face()`].
     #[must_use]
     pub const fn face(face: Face) -> Self {
+        use PartOnAxis as A;
         match face {
-            Face::NX => Self(vec3(LOWER, 0, 0)),
-            Face::NY => Self(vec3(0, LOWER, 0)),
-            Face::NZ => Self(vec3(0, 0, LOWER)),
-            Face::PX => Self(vec3(UPPER, 0, 0)),
-            Face::PY => Self(vec3(0, UPPER, 0)),
-            Face::PZ => Self(vec3(0, 0, UPPER)),
+            Face::NX => const { Self(vec3(A::Lower, A::In, A::In)) },
+            Face::NY => const { Self(vec3(A::In, A::Lower, A::In)) },
+            Face::NZ => const { Self(vec3(A::In, A::In, A::Lower)) },
+            Face::PX => const { Self(vec3(A::Upper, A::In, A::In)) },
+            Face::PY => const { Self(vec3(A::In, A::Upper, A::In)) },
+            Face::PZ => const { Self(vec3(A::In, A::In, A::Upper)) },
         }
     }
 
@@ -505,16 +541,18 @@ impl BoxPart {
     }
 
     fn from_on_faces(on_faces: FaceMap<bool>) -> Self {
-        Self(
-            on_faces.negatives().map(u8::from)
-                + on_faces.positives().map(|p: bool| u8::from(p) * 2),
-        )
+        Self(vec3(
+            PartOnAxis::from_bools(on_faces.nx, on_faces.px),
+            PartOnAxis::from_bools(on_faces.ny, on_faces.py),
+            PartOnAxis::from_bools(on_faces.nz, on_faces.pz),
+        ))
     }
 
     /// Returns whether this part is a face, in the polyhedron sense
     /// (i.e. touches only one side of the box, or one side and its opposite).
     ///
     /// Equivalent to `self.to_face().is_some()`.
+    #[inline(always)]
     pub fn is_face(self) -> bool {
         // Note: the aarch64 machine code for this is much shorter than `.to_face().is_some()`.
         self.count_touched_axes() == 1
@@ -527,25 +565,28 @@ impl BoxPart {
     /// This function is the inverse of [`BoxPart::face()`].
     #[rustfmt::skip]
     pub fn to_face(self) -> Option<Face> {
+        use PartOnAxis as A;
         match self.0 {
-            Vector3D { x: LOWER, y: 0, z: 0, .. } => Some(Face::NX),
-            Vector3D { x: 0, y: LOWER, z: 0, .. } => Some(Face::NY),
-            Vector3D { x: 0, y: 0, z: LOWER, .. } => Some(Face::NZ),
-            Vector3D { x: UPPER, y: 0, z: 0, .. } => Some(Face::PX),
-            Vector3D { x: 0, y: UPPER, z: 0, .. } => Some(Face::PY),
-            Vector3D { x: 0, y: 0, z: UPPER, .. } => Some(Face::PZ),
+            Vector3D { x: A::Lower, y: A::In, z: A::In, .. } => Some(Face::NX),
+            Vector3D { x: A::In, y: A::Lower, z: A::In, .. } => Some(Face::NY),
+            Vector3D { x: A::In, y: A::In, z: A::Lower, .. } => Some(Face::NZ),
+            Vector3D { x: A::Upper, y: A::In, z: A::In, .. } => Some(Face::PX),
+            Vector3D { x: A::In, y: A::Upper, z: A::In, .. } => Some(Face::PY),
+            Vector3D { x: A::In, y: A::In, z: A::Upper, .. } => Some(Face::PZ),
             _ => None,
         }
     }
 
     /// Returns whether this part is an edge, in the polyhedron sense
     /// (i.e. touches two adjacent sides of the box, or the perimeter of a flat box).
+    #[inline(always)]
     pub fn is_edge(self) -> bool {
         self.count_touched_axes() == 2
     }
 
     /// Returns whether this part is a corner, in the polyhedron sense
     /// (i.e. touches three adjacent sides of the box
+    #[inline(always)]
     pub fn is_corner(self) -> bool {
         self.count_touched_axes() == 3
     }
@@ -557,19 +598,24 @@ impl BoxPart {
     /// and the “both faces” case used when the box is 1 block thick on some axis.
     #[must_use]
     pub fn is_on_face(self, face: Face) -> bool {
-        self.0[face.axis()] & if face.is_negative() { LOWER } else { UPPER } != 0
+        let value = self.0[face.axis()];
+        if face.is_negative() {
+            value.includes_lower()
+        } else {
+            value.includes_upper()
+        }
     }
 
     /// Returns the same as [`BoxPart::is_on_face()`] but for all faces.
     pub const fn on_faces(self) -> FaceMap<bool> {
         let Vector3D { x, y, z, .. } = self.0;
         FaceMap {
-            nx: x & LOWER != 0,
-            ny: y & LOWER != 0,
-            nz: z & LOWER != 0,
-            px: x & UPPER != 0,
-            py: y & UPPER != 0,
-            pz: z & UPPER != 0,
+            nx: x.includes_lower(),
+            ny: y.includes_lower(),
+            nz: z.includes_lower(),
+            px: x.includes_upper(),
+            py: y.includes_upper(),
+            pz: z.includes_upper(),
         }
     }
 
@@ -581,9 +627,9 @@ impl BoxPart {
     #[must_use]
     pub fn push(mut self, direction: Face) -> Self {
         self.0[direction.axis()] = if direction.is_negative() {
-            LOWER
+            PartOnAxis::Lower
         } else {
-            UPPER
+            PartOnAxis::Upper
         };
         self
     }
@@ -595,16 +641,61 @@ impl BoxPart {
     /// or to find ends starting from [`UNIT`](Self::UNIT).
     #[must_use]
     pub fn centered_on(mut self, axis: Axis) -> Self {
-        self.0[axis] = 0;
+        self.0[axis] = PartOnAxis::In;
         self
     }
 
     /// Counts how many box faces this part touches, such that a face and its opposite face
     /// only counts once.
+    #[inline(always)]
     fn count_touched_axes(self) -> u8 {
-        u8::from(self.0.x != 0) + u8::from(self.0.y != 0) + u8::from(self.0.z != 0)
+        u8::from(self.0.x != PartOnAxis::In)
+            + u8::from(self.0.y != PartOnAxis::In)
+            + u8::from(self.0.z != PartOnAxis::In)
     }
 }
+
+impl PartOnAxis {
+    #[inline(always)]
+    const fn from_bools(lower: bool, upper: bool) -> Self {
+        match (lower, upper) {
+            (false, false) => Self::In,
+            (true, false) => Self::Lower,
+            (false, true) => Self::Upper,
+            (true, true) => Self::LowerUpper,
+        }
+    }
+
+    #[inline(always)]
+    const fn from_bits(bits: u8) -> Self {
+        // can't use an expression in a pattern match
+        const BOTH: u8 = LOWER | UPPER;
+        match bits {
+            0 => Self::In,
+            LOWER => Self::Lower,
+            UPPER => Self::Upper,
+            BOTH => Self::LowerUpper,
+            _ => unreachable!(),
+        }
+    }
+
+    #[inline(always)]
+    const fn includes_lower(self) -> bool {
+        matches!(self, Self::Lower | Self::LowerUpper)
+    }
+
+    #[inline(always)]
+    const fn includes_upper(self) -> bool {
+        matches!(self, Self::Upper | Self::LowerUpper)
+    }
+
+    #[inline(always)]
+    const fn to_index(self) -> usize {
+        self as usize
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
