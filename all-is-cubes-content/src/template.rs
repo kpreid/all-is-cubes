@@ -177,7 +177,7 @@ impl UniverseTemplate {
                 const {
                     Some(&TemplateSizing {
                         minimum_size: size3(160, 60, 160),
-                        default_size: size3(160, 60, 160),
+                        default_size: size3(200, 60, 200),
                     })
                 }
             }

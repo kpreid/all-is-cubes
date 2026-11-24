@@ -21,12 +21,14 @@ mod move_modifier;
 mod resolutions;
 mod rotation;
 mod smallest;
+mod sound;
 mod text_blocks;
 mod transparency;
 mod trees;
 mod ui;
 mod zoom;
 
+/// Radius of flat land needed by the *above-ground* exhibits.
 pub(crate) const NEEDED_RADIUS: GridCoordinate = 60;
 
 /// All exhibits which will show up in [`crate::UniverseTemplate::DemoCity`].
@@ -65,4 +67,5 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[prelude::Exhibit] = &[
     text_blocks::TEXT,
     zoom::ZOOM,
     animation::BECOME,
+    sound::AMBIENT_SOUND,
 ];

@@ -548,8 +548,9 @@ fn place_one_exhibit(
 
     let Some(plot_transform) = planner.find_plot(enclosure_footprint, exhibit.placement) else {
         log::error!(
-            "Out of city space! Could not place {name:?}",
-            name = exhibit.name
+            "Out of city space! Could not place {name:?} of size {size:?}",
+            name = exhibit.name,
+            size = enclosure_footprint.size(),
         );
         return Ok(());
     };

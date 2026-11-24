@@ -9,6 +9,7 @@ pub(super) use core::f64::consts::PI;
 pub(super) use core::iter;
 pub(super) use core::num::NonZero;
 
+pub(super) use descriptive_unwrap::ResultExt as _;
 pub(super) use exhaust::Exhaust as _;
 pub(super) use itertools::izip;
 pub(super) use rand::SeedableRng as _;
@@ -35,9 +36,10 @@ pub(super) use all_is_cubes::listen;
 pub(super) use all_is_cubes::math::{
     Axis, Cube, Face, FaceMap, FreeCoordinate, FreeVector, GridAab, GridCoordinate, GridPoint,
     GridRotation, GridSize, GridSizeCoord, GridVector, Gridgid, Rgb, Rgb01, Rgba, Srgba8, ZeroOne,
-    range_len, rgb_const, rgb01, rgba_const, zo32,
+    ps32, range_len, rgb_const, rgb01, rgba_const, zo32,
 };
 pub(super) use all_is_cubes::op::Operation;
+pub(super) use all_is_cubes::sound;
 pub(super) use all_is_cubes::space::{self, Space, SpacePhysics, SpaceTransaction};
 pub(super) use all_is_cubes::text;
 pub(super) use all_is_cubes::time;
