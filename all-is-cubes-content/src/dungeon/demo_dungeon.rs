@@ -494,11 +494,9 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     let mut alt_style: BoxStyle;
                     let room_style = if let Some(wall_type) = wall_type {
                         alt_style = self.room_style.clone();
-                        alt_style[BoxPart::face(Face::NX)] = Some(wall_type.clone());
-                        alt_style[BoxPart::face(Face::PX)] = Some(wall_type.clone());
-                        alt_style[BoxPart::face(Face::NZ)] = Some(wall_type.clone());
-                        alt_style[BoxPart::face(Face::PZ)] = Some(wall_type.clone());
-                        alt_style[BoxPart::face(Face::PY)] = Some(wall_type.clone());
+                        for not_floor in [Face::NX, Face::PX, Face::NZ, Face::PZ, Face::PY] {
+                            alt_style[BoxPart::face(not_floor)] = Some(wall_type.clone());
+                        }
                         &alt_style
                     } else {
                         &self.room_style
