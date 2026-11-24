@@ -2,8 +2,6 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::ops;
 
-use euclid::{Vector3D, vec3};
-
 use crate::block::{self, Block, Resolution};
 use crate::math::{Axis, Cube, Face, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation};
 use crate::{space, universe};
@@ -72,11 +70,11 @@ impl BoxStyle {
                 parts: Arc::new(from_fn(|x| {
                     from_fn(|y| {
                         from_fn(|z| {
-                            f(BoxPart(vec3(
+                            f(BoxPart([
                                 PartOnAxis::from_bits(x as u8),
                                 PartOnAxis::from_bits(y as u8),
                                 PartOnAxis::from_bits(z as u8),
-                            )))
+                            ]))
                         })
                     })
                 })),
@@ -403,11 +401,11 @@ impl BoxStyle {
             for (y, row) in plane.iter_mut().enumerate() {
                 for (z, block) in row.iter_mut().enumerate() {
                     if let Some(old_block) = block.take() {
-                        let part = BoxPart(vec3(
+                        let part = BoxPart([
                             PartOnAxis::from_bits(x as u8),
                             PartOnAxis::from_bits(y as u8),
                             PartOnAxis::from_bits(z as u8),
-                        ));
+                        ]);
                         *block = Some(block_fn(part, old_block));
                     }
                 }
@@ -446,18 +444,18 @@ impl ops::Index<BoxPart> for BoxStyle {
     #[rustfmt::skip]
     fn index(&self, index: BoxPart) -> &Self::Output {
         &self.parts
-            [index.0.x.to_index()]
-            [index.0.y.to_index()]
-            [index.0.z.to_index()]
+            [index.0[0].to_index()]
+            [index.0[1].to_index()]
+            [index.0[2].to_index()]
     }
 }
 impl ops::IndexMut<BoxPart> for BoxStyle {
     #[rustfmt::skip]
     fn index_mut(&mut self, index: BoxPart) -> &mut Self::Output {
         &mut Arc::make_mut(&mut self.parts)
-            [index.0.x.to_index()]
-            [index.0.y.to_index()]
-            [index.0.z.to_index()]
+            [index.0[0].to_index()]
+            [index.0[1].to_index()]
+            [index.0[2].to_index()]
     }
 }
 
@@ -478,7 +476,7 @@ pub struct BoxPart(
     ///
     /// We could make this representation denser by using a single `u8` bitfield, but that would be
     /// cryptic to no great gain.
-    Vector3D<PartOnAxis, ()>,
+    [PartOnAxis; 3],
 );
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -492,14 +490,14 @@ enum PartOnAxis {
 
 impl BoxPart {
     /// The part that is the interior of the box.
-    pub const INTERIOR: Self = Self(vec3(PartOnAxis::In, PartOnAxis::In, PartOnAxis::In));
+    pub const INTERIOR: Self = Self([PartOnAxis::In, PartOnAxis::In, PartOnAxis::In]);
 
     /// The part that is the whole box when its size is 1×1×1.
-    pub const UNIT: Self = Self(vec3(
+    pub const UNIT: Self = Self([
         PartOnAxis::LowerUpper,
         PartOnAxis::LowerUpper,
         PartOnAxis::LowerUpper,
-    ));
+    ]);
 
     /// Returns the part which is the given face of the box.
     ///
@@ -510,12 +508,12 @@ impl BoxPart {
     pub const fn face(face: Face) -> Self {
         use PartOnAxis as A;
         match face {
-            Face::NX => const { Self(vec3(A::Lower, A::In, A::In)) },
-            Face::NY => const { Self(vec3(A::In, A::Lower, A::In)) },
-            Face::NZ => const { Self(vec3(A::In, A::In, A::Lower)) },
-            Face::PX => const { Self(vec3(A::Upper, A::In, A::In)) },
-            Face::PY => const { Self(vec3(A::In, A::Upper, A::In)) },
-            Face::PZ => const { Self(vec3(A::In, A::In, A::Upper)) },
+            Face::NX => const { Self([A::Lower, A::In, A::In]) },
+            Face::NY => const { Self([A::In, A::Lower, A::In]) },
+            Face::NZ => const { Self([A::In, A::In, A::Lower]) },
+            Face::PX => const { Self([A::Upper, A::In, A::In]) },
+            Face::PY => const { Self([A::In, A::Upper, A::In]) },
+            Face::PZ => const { Self([A::In, A::In, A::Upper]) },
         }
     }
 
@@ -541,11 +539,11 @@ impl BoxPart {
     }
 
     fn from_on_faces(on_faces: FaceMap<bool>) -> Self {
-        Self(vec3(
+        Self([
             PartOnAxis::from_bools(on_faces.nx, on_faces.px),
             PartOnAxis::from_bools(on_faces.ny, on_faces.py),
             PartOnAxis::from_bools(on_faces.nz, on_faces.pz),
-        ))
+        ])
     }
 
     /// Returns whether this part is a face, in the polyhedron sense
@@ -567,12 +565,12 @@ impl BoxPart {
     pub fn to_face(self) -> Option<Face> {
         use PartOnAxis as A;
         match self.0 {
-            Vector3D { x: A::Lower, y: A::In, z: A::In, .. } => Some(Face::NX),
-            Vector3D { x: A::In, y: A::Lower, z: A::In, .. } => Some(Face::NY),
-            Vector3D { x: A::In, y: A::In, z: A::Lower, .. } => Some(Face::NZ),
-            Vector3D { x: A::Upper, y: A::In, z: A::In, .. } => Some(Face::PX),
-            Vector3D { x: A::In, y: A::Upper, z: A::In, .. } => Some(Face::PY),
-            Vector3D { x: A::In, y: A::In, z: A::Upper, .. } => Some(Face::PZ),
+            [A::Lower, A::In, A::In] => Some(Face::NX),
+            [A::In, A::Lower, A::In] => Some(Face::NY),
+            [A::In, A::In, A::Lower] => Some(Face::NZ),
+            [A::Upper, A::In, A::In] => Some(Face::PX),
+            [A::In, A::Upper, A::In] => Some(Face::PY),
+            [A::In, A::In, A::Upper] => Some(Face::PZ),
             _ => None,
         }
     }
@@ -608,7 +606,7 @@ impl BoxPart {
 
     /// Returns the same as [`BoxPart::is_on_face()`] but for all faces.
     pub const fn on_faces(self) -> FaceMap<bool> {
-        let Vector3D { x, y, z, .. } = self.0;
+        let [x, y, z] = self.0;
         FaceMap {
             nx: x.includes_lower(),
             ny: y.includes_lower(),
@@ -649,9 +647,9 @@ impl BoxPart {
     /// only counts once.
     #[inline(always)]
     fn count_touched_axes(self) -> u8 {
-        u8::from(self.0.x != PartOnAxis::In)
-            + u8::from(self.0.y != PartOnAxis::In)
-            + u8::from(self.0.z != PartOnAxis::In)
+        u8::from(self.0[0] != PartOnAxis::In)
+            + u8::from(self.0[1] != PartOnAxis::In)
+            + u8::from(self.0[2] != PartOnAxis::In)
     }
 }
 
