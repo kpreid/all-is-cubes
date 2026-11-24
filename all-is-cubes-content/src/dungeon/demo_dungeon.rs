@@ -43,10 +43,8 @@ const TORCH_PATTERN: [GridCoordinate; 2] = [-3, 3];
 struct DemoRoom {
     maze_room: MazeRoom,
 
-    /// Which walls/faces have something on them.
+    /// What features each wall/floor/ceiling has.
     wall_features: FaceMap<WallFeature>,
-
-    floor: FloorKind,
 
     /// If true, the room is no bigger than its attached corridors.
     corridor_only: bool,
@@ -67,6 +65,13 @@ enum WallFeature {
     Window,
     /// Wall is missing, or we could say, the corridor is as big as the room.
     Joined,
+    // A bridge allowing passage between the adjacent wall passages.
+    // Only applies to floors ([`Face::NY`]).
+    // Is otherwise empty like [`WallFeature::Joined`].
+    Bridge,
+    // Spiked. Extends out 1 block from the wall surface.
+    // Currently only applies to floors ([`Face::NY`]).
+    Spikes,
 }
 
 /// A possible obstruction in a passage.
@@ -77,14 +82,6 @@ enum Door {
     Locked,
     /// Can be seen through but cannot be unlocked.
     Permanent,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FloorKind {
-    Solid,
-    Chasm,
-    Bridge,
-    Spikes,
 }
 
 /// Data for the size and theming of dungeon rooms.
@@ -489,7 +486,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 for part in BoxPart::exhaust() {
                     let face = part.to_face();
                     let block: Option<&Block> = if let Some(face) = face
-                        && let WallFeature::Joined = room_data.wall_features[face]
+                        && let WallFeature::Joined | WallFeature::Bridge =
+                            room_data.wall_features[face]
                     {
                         Some(&AIR)
                     } else if let Some(face) = face
@@ -611,7 +609,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                         WallFeature::Passage(door) => {
                             self.inside_doorway(ctx, map, room_position, face, door)?;
                         }
-                        WallFeature::Joined => {
+                        WallFeature::Joined | WallFeature::Bridge => {
                             // TODO: deduplicate this code with inside_doorway()
                             let join_box = self
                                 .actual_room_box(room_position, room_data)
@@ -629,19 +627,28 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                 .create_box(join_box)
                                 .execute_m(ctx)?;
                         }
-                        WallFeature::Blank | WallFeature::Window => {}
+                        WallFeature::Blank | WallFeature::Window | WallFeature::Spikes => {}
                     }
                 }
                 Ok(None)
             }
             Pass::Floors => {
-                match room_data.floor {
-                    FloorKind::Solid => {
+                match room_data.wall_features[Face::NY] {
+                    WallFeature::Blank => {
                         ctx.fill_uniform(floor_layer, &self.blocks[FloorTile])?;
                     }
-                    FloorKind::Chasm => { /* TODO: little platforms */ }
-                    FloorKind::Bridge => {
+                    WallFeature::Joined => { /* TODO: little balconies */ }
+                    WallFeature::Bridge => {
                         let midpoint = Cube::containing(floor_layer.center()).unwrap();
+                        let floor_tile = &self.blocks[FloorTile];
+
+                        // Little platform around the center.
+                        // This makes the floor easier to navigate, and also makes room to walk
+                        // around an item pedestal.
+                        ctx.fill_uniform(
+                            midpoint.grid_aab().expand(FaceMap::symmetric([1, 0, 1])),
+                            floor_tile,
+                        )?;
                         for direction in [Face::NX, Face::NZ, Face::PX, Face::PZ] {
                             if room_data.wall_features[direction] != WallFeature::Blank {
                                 let wall_cube = Cube::containing(
@@ -650,11 +657,11 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                 .unwrap();
                                 let bridge_box =
                                     GridAab::single_cube(midpoint).union_cube(wall_cube);
-                                ctx.fill_uniform(bridge_box, &self.blocks[FloorTile])?;
+                                ctx.fill_uniform(bridge_box, floor_tile)?;
                             }
                         }
                     }
-                    FloorKind::Spikes => {
+                    WallFeature::Spikes => {
                         assert!(!room_data.corridor_only, "{room_data:?}");
                         ctx.fill_uniform(floor_layer, &self.blocks[FloorTile])?;
                         ctx.fill_uniform(
@@ -662,6 +669,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                             &self.blocks[Spikes],
                         )?;
                     }
+                    WallFeature::Window => {}
+                    WallFeature::Passage(_) => {}
                 }
                 Ok(None)
             }
@@ -696,7 +705,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 if let Some(item) = room_data.grants_item.clone() {
                     // note that this is the nominal floor, not the possibly extended downward floor
                     let pedestal_location: Cube = match room_data.wall_features[Face::NY] {
-                        WallFeature::Blank | WallFeature::Window => {
+                        WallFeature::Blank | WallFeature::Window | WallFeature::Bridge => {
                             // Center of floor
                             Cube::containing(floor_layer.abut(Face::PY, 1).unwrap().center())
                                 .unwrap()
@@ -706,7 +715,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                             // Put the item near a corner instead.
                             Cube::from(floor_layer.lower_bounds() + vec3(1, 1, 1))
                         }
-                        WallFeature::Joined => {
+                        WallFeature::Joined | WallFeature::Spikes => {
                             // Perhaps we will eventually want this to be some kind of shelf
                             unreachable!("should not generate an item on a missing floor")
                         }
@@ -959,7 +968,6 @@ fn generate_dungeon_map(
                         WallFeature::Blank
                     }
                 }),
-                floor: FloorKind::Solid,
                 corridor_only: false,
                 lit: false,
                 grants_item: None,
@@ -1012,7 +1020,6 @@ fn generate_dungeon_map(
                 maze_room, // not strictly accurate but close enough
                 wall_features: FaceMap::splat_copy(WallFeature::Blank)
                     .with(Face::NY, WallFeature::Joined),
-                floor: FloorKind::Chasm,
                 corridor_only: false,
                 lit: false,
                 grants_item: None,
@@ -1033,19 +1040,22 @@ fn generate_dungeon_map(
             let maze_room = room.maze_room.clone();
             let can_have_chasm_obstacle = true; // TODO: make jetpack a key item (needs tool icon fix)
 
-            room.wall_features[Face::NY] = WallFeature::Joined;
-            room.floor = if can_have_chasm_obstacle {
-                *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
-                    .choose(&mut rng)
-                    .unwrap()
+            room.wall_features[Face::NY] = if can_have_chasm_obstacle {
+                *[
+                    WallFeature::Joined,
+                    WallFeature::Bridge,
+                    WallFeature::Bridge,
+                ]
+                .choose(&mut rng)
+                .unwrap()
             } else {
-                FloorKind::Bridge
+                WallFeature::Bridge
             };
             dungeon_map[neighbor_below] = Some(DemoRoom {
                 maze_room, // not strictly accurate but close enough
                 wall_features: FaceMap::splat_copy(WallFeature::Blank)
-                    .with(Face::PY, WallFeature::Joined),
-                floor: FloorKind::Spikes,
+                    .with(Face::PY, WallFeature::Joined)
+                    .with(Face::NY, WallFeature::Spikes),
                 corridor_only: false,
                 lit: false,
                 grants_item: None,
@@ -1123,8 +1133,8 @@ fn generate_dungeon_map(
                     .unwrap();
                 }
 
-                // A lack of wall should stay that way.
-                WallFeature::Joined => {}
+                // These should stay as they are.
+                WallFeature::Joined | WallFeature::Bridge | WallFeature::Spikes => {}
 
                 // Cases we should not meet because it's our job to create them.
                 WallFeature::Passage(_) | WallFeature::Window => unreachable!(),
@@ -1136,7 +1146,7 @@ fn generate_dungeon_map(
     // TODO: Make item probability dependent on maze size?
     for (_, room) in dungeon_map.iter_mut() {
         let Some(room) = room else { continue };
-        if let FloorKind::Solid = room.floor
+        if let WallFeature::Blank = room.wall_features[Face::NY]
             && !room.corridor_only
             && room.maze_room.is_not_end()
             && let None = room.grants_item
