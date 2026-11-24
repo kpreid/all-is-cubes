@@ -43,11 +43,6 @@ const TORCH_PATTERN: [GridCoordinate; 2] = [-3, 3];
 struct DemoRoom {
     maze_room: MazeRoom,
 
-    /// In a *relative* room coordinate system (1 unit = 1 room box),
-    /// how big is this room? Occupying multiple rooms' space if this
-    /// is not equal to `GridAab::ORIGIN_CUBE`.
-    extended_bounds: GridAab,
-
     /// Which walls/faces have something on them.
     wall_features: FaceMap<WallFeature>,
 
@@ -59,13 +54,6 @@ struct DemoRoom {
     lit: bool,
 
     grants_item: Option<Tool>,
-}
-
-impl DemoRoom {
-    /// Area of dungeon-room-cubes this room data actually occupies
-    fn extended_map_bounds(&self) -> GridAab {
-        self.extended_bounds
-    }
 }
 
 /// What kind of holes a wall has.
@@ -411,19 +399,14 @@ impl DemoTheme {
         Ok(())
     }
 
-    /// Box of the room, in space coordinates, that might be smaller or bigger than the
+    /// Box of the room, in space coordinates, that might be smaller than the
     /// [`DungeonGrid`]'s box.
     /// TODO: Should we teach `DungeonGrid` to help with this?
     fn actual_room_box(&self, room_position: Cube, room_data: &DemoRoom) -> GridAab {
         if room_data.corridor_only {
             self.corridor_box.translate(self.dungeon_grid.room_translation(room_position))
         } else {
-            let eb = room_data.extended_map_bounds();
-            self.dungeon_grid
-                .room_box_at(room_position + eb.lower_bounds().to_vector())
-                .union_box(self.dungeon_grid.room_box_at(
-                    room_position + eb.upper_bounds().to_vector() - GridVector::new(1, 1, 1),
-                ))
+            self.dungeon_grid.room_box_at(room_position)
         }
     }
 
@@ -969,7 +952,6 @@ fn generate_dungeon_map(
                 return None;
             }
             Some(DemoRoom {
-                extended_bounds: GridAab::ORIGIN_CUBE,
                 wall_features: FaceMap::from_fn(|face| -> WallFeature {
                     if maze_room.has_passage(face) {
                         WallFeature::Passage(Door::None)
@@ -1028,7 +1010,6 @@ fn generate_dungeon_map(
             room.wall_features[Face::PY] = WallFeature::Joined;
             dungeon_map[neighbor_above] = Some(DemoRoom {
                 maze_room, // not strictly accurate but close enough
-                extended_bounds: GridAab::ORIGIN_CUBE,
                 wall_features: FaceMap::splat_copy(WallFeature::Blank)
                     .with(Face::NY, WallFeature::Joined),
                 floor: FloorKind::Chasm,
@@ -1062,7 +1043,6 @@ fn generate_dungeon_map(
             };
             dungeon_map[neighbor_below] = Some(DemoRoom {
                 maze_room, // not strictly accurate but close enough
-                extended_bounds: GridAab::ORIGIN_CUBE,
                 wall_features: FaceMap::splat_copy(WallFeature::Blank)
                     .with(Face::PY, WallFeature::Joined),
                 floor: FloorKind::Spikes,
