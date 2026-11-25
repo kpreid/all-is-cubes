@@ -1469,7 +1469,6 @@ mod tests {
     }
 
     #[test]
-
     fn ps_sum() {
         assert_eq!(
             iter::empty::<PositiveSign<f32>>().sum::<PositiveSign<f32>>(),
