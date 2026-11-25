@@ -4,7 +4,7 @@
 // `large_unopt_stack_frames`).
 #![allow(
     clippy::large_stack_frames,
-    reason = "derive(clap::Subcommand) generates functions full of trivial moves of large structs; <https://github.com/clap-rs/clap/pull/6569>"
+    reason = "TODO: investigate further; <https://github.com/clap-rs/clap/pull/6569> helped prior to Rust 1.102"
 )]
 
 use std::fmt::Write as _;
