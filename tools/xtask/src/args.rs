@@ -1,9 +1,7 @@
 //! Command-line parser.
 
-// TODO: After Rust 1.102, change this to `expect()` (as well as following the rename to
-// `large_unopt_stack_frames`).
-#![allow(
-    clippy::large_stack_frames,
+#![expect(
+    clippy::large_unopt_stack_frames,
     reason = "TODO: investigate further; <https://github.com/clap-rs/clap/pull/6569> helped prior to Rust 1.102"
 )]
 
