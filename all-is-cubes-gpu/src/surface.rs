@@ -161,7 +161,7 @@ impl SurfaceRenderer {
         }
 
         // If the GPU is busy, `get_current_texture()` blocks until a previous texture
-        // is no longer in use (except on wasm, in which case submit() seems to take the time).
+        // is no longer in use (except on WebGL, in which case submit() seems to take the time).
         let before_get = time::Instant::now();
         let skip = Ok(RenderInfo {
             flaws: Flaws::UNFINISHED,
