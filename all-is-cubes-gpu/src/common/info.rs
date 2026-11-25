@@ -102,18 +102,14 @@ impl Fmt<StatusText> for RenderInfo {
             flaws,
         } = self;
 
-        let total_time = waiting_for_gpu
-            .saturating_add(update_time)
-            .saturating_add(draw_time.world)
-            .saturating_add(draw_time.ui);
+        let render_time = update_time.saturating_add(draw_time.world).saturating_add(draw_time.ui);
 
         // Overall summary line
         write!(
             fmt,
-            // TODO: adjust this format to account for more pieces
-            "Frame time: {} (GPU wait {}, update {}, draw world {}, ui {}",
-            total_time.refmt(fopt),
+            "Frame time: GPU wait {}, render {} (update {}, draw world {}, draw ui {}",
             waiting_for_gpu.refmt(fopt),
+            render_time.refmt(fopt),
             update_time.refmt(fopt),
             draw_time.world.refmt(fopt),
             draw_time.ui.refmt(fopt),
