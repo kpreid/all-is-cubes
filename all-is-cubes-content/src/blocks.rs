@@ -536,68 +536,28 @@ fn demo_blocks_generator(
                 })?
                 .build_txn(txn),
 
-            Signboard => {
-                let sign_board = block::from_color!(palette::PLANK);
-                let sign_post = block::from_color!(palette::STEEL);
-
-                // This shape has to coordinate with the name-drawing code in city::demo_city.
-                // Haven't thought of a good way to abstract/combine it yet.
-                let resolution = R16;
-                let resolution_g = GridCoordinate::from(resolution);
-
-                let bottom_edge = 3;
-                let top_edge = 12;
-
-                let space = Space::builder(GridAab::from_lower_upper(
-                    [0, 0, 9],
-                    [resolution_g, resolution_g, resolution_g],
-                ))
-                .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-                .build_and_mutate(|m| {
-                    // Sign board
-                    m.fill_uniform(
-                        GridAab::from_lower_upper(
-                            [0, bottom_edge, resolution_g - 1],
-                            [resolution_g, top_edge, resolution_g],
-                        ),
-                        &sign_board,
-                    )?;
-
-                    // Support posts
-                    // TODO: consider drawing this from an image or ascii-art instead,
-                    // for more art control with less code.
-                    for post_x in [2, resolution_g - 3] {
-                        let post_shape_depth = 6;
-                        m.fill(
-                            GridAab::from_lower_size(
-                                [post_x, 0, resolution_g - post_shape_depth - 1],
-                                [
-                                    1,
-                                    top_edge.cast_unsigned() - 1,
-                                    post_shape_depth.cast_unsigned(),
-                                ],
-                            ),
-                            |cube| {
-                                let vertical_post = cube.z >= resolution_g - 3;
-                                let diagonal_brace = (9..11).contains(&(cube.z - cube.y));
-                                if vertical_post || diagonal_brace {
-                                    Some(&sign_post)
-                                } else {
-                                    None
-                                }
-                            },
-                        )?;
-                    }
-
-                    Ok(())
-                })?;
-
-                Block::builder()
-                    .display_name("Signboard")
-                    .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
-                    .voxels_handle(resolution, txn.insert_anonymous(space))
-                    .build()
+            Signboard => const {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Image {
+                        image: include_image!("blocks/signboard.png"),
+                        // TODO: should be RXyz but the loader doesn't handle this properly when combined with Expansion::Stack, so instead we fix it "in post" for now
+                        rotation: GridRotation::IDENTITY,
+                        expansion: asset::Expansion::Stack { slice_height: 16 },
+                        visible: asset::Vox::DEFAULT,
+                        invisible: asset::Vox::DENOTES_AIR,
+                    },
+                    modifiers: &[
+                        block::Modifier::Rotate(GridRotation::RXyz),
+                        block::Modifier::SetAttribute(block::SetAttribute::DisplayName(literal!(
+                            "Signboard"
+                        ))),
+                        block::Modifier::SetAttribute(block::SetAttribute::RotationRule(
+                            RotationPlacementRule::Attach { by: Face::NY },
+                        )),
+                    ],
+                }
             }
+            .load(txn)?,
 
             // TODO: not all text that should use this does yet
             LabelTextVoxel => const {
