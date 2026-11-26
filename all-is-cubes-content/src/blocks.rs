@@ -197,8 +197,6 @@ fn demo_blocks_generator(
     let lamppost_metal = Block::builder().color(palette::ALMOST_BLACK.with_alpha_one()).build();
     let lamp_sound = sound::Ambient::noise_at_frequency(ps32(0.02), ps32(10000.0));
 
-    let pedestal_voxel = block::from_color!(palette::STONE);
-
     use DemoBlocks::*;
 
     move |provider, txn, key| {
@@ -519,22 +517,27 @@ fn demo_blocks_generator(
                     .build_txn(txn)
             }
 
-            Pedestal => Block::builder()
-                .display_name("Pedestal")
-                .rotation_rule(RotationPlacementRule::Attach { by: Face::NY })
-                .voxels_fn(resolution, |cube| {
-                    // TODO: fancier shape
-                    let shape: [GridCoordinate; 16] =
-                        [6, 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 7, 8, 8];
-                    let [radius, secondary] = square_radius(resolution, cube);
-                    let size = shape.get(cube.y as usize).copied().unwrap_or(0);
-                    if radius <= size && (radius != secondary || radius < size) {
-                        &pedestal_voxel
-                    } else {
-                        &AIR
-                    }
-                })?
-                .build_txn(txn),
+            Pedestal => const {
+                asset::Block {
+                    primitive: asset::PrimitiveOrSuch::Image {
+                        image: include_image!("blocks/pedestal.png"),
+                        rotation: GridRotation::RXZY,
+                        expansion: asset::Expansion::Stack { slice_height: 16 },
+                        visible: asset::Vox::DEFAULT,
+                        invisible: asset::Vox::DENOTES_AIR,
+                    },
+                    modifiers: &[
+                        block::Modifier::Rotate(GridRotation::RXyZ),
+                        block::Modifier::SetAttribute(block::SetAttribute::DisplayName(literal!(
+                            "Pedestal"
+                        ))),
+                        block::Modifier::SetAttribute(block::SetAttribute::RotationRule(
+                            RotationPlacementRule::Attach { by: Face::NY },
+                        )),
+                    ],
+                }
+            }
+            .load(txn)?,
 
             Signboard => const {
                 asset::Block {
