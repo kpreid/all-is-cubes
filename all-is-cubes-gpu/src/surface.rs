@@ -160,14 +160,22 @@ impl SurfaceRenderer {
             }
         }
 
+        // Prepare and submit drawing commands.
+        let draw_info = self.everything.draw_frame_linear(&self.queue);
+
+        // Fetch surface texture.
+        //
         // If the GPU is busy, `get_current_texture()` blocks until a previous texture
         // is no longer in use (except on WebGL, in which case submit() seems to take the time).
+        // Therefore, we call it as late as possible to avoid wasting any opportunity to make good
+        // use of the CPU.
+        // (At this level. TODO: Refactor so we can defer even further.)
         let before_get = time::Instant::now();
         let skip = Ok(RenderInfo {
             flaws: Flaws::UNFINISHED,
             ..RenderInfo::default()
         });
-        let output = match self.surface.get_current_texture() {
+        let surface_texture = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(t) => t,
 
             wgpu::CurrentSurfaceTexture::Suboptimal(t) => {
@@ -209,8 +217,6 @@ impl SurfaceRenderer {
         };
         let after_get = time::Instant::now();
 
-        let draw_info = self.everything.draw_frame_linear(&self.queue);
-
         // Construct aggregated info.
         // TODO: the flaws combination logic is awkward. Should we combine them at printing
         // time only?
@@ -229,21 +235,22 @@ impl SurfaceRenderer {
             draw: draw_info,
         };
 
-        // Render info and postprocessing step.
-        // TODO: We should record the amount of time this takes, then display that next frame.
-        // TODO(efficiency): combine draw_frame_linear and postprocess into one submission.
+        // Draw overlay text, and perform postprocessing (tone mapping and bloom), writing to the
+        // surface texture.
         let (post_cmd, post_flaws) = self.everything.add_info_text_and_postprocess(
             &self.queue,
-            &output.texture.create_view(&TextureViewDescriptor {
+            &surface_texture.texture.create_view(&TextureViewDescriptor {
                 format: Some(super::surface_view_format(self.everything.config().format)),
                 ..Default::default()
             }),
             &info_text_fn(&info),
         );
-        info.flaws |= post_flaws;
         self.queue.submit([post_cmd]);
+
+        info.flaws |= post_flaws;
         about_to_present();
-        self.queue.present(output);
+        self.queue.present(surface_texture);
+
         Ok(info)
     }
 
